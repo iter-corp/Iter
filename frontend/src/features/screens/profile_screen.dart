@@ -1,89 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../providers/auth_providers.dart';
 import '../widgets/profile_widget.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: ProfileBody(),
-    );
-  }
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class ProfileBody extends StatefulWidget {
-  const ProfileBody({super.key});
-
-  @override
-  State<ProfileBody> createState() => _ProfileBodyState();
-}
-
-class _ProfileBodyState extends State<ProfileBody> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   int selectedTab = 0;
 
-  final List<String> posts = const [
-    "assets/img/1.png",
-    "assets/img/2.png",
-    "assets/img/1.png",
-    "assets/img/2.png",
-    "assets/img/1.png",
-    "assets/img/2.png",
-  ];
-
-  final List<String> reposts = const [
-    "assets/img/2.png",
-    "assets/img/1.png",
-    "assets/img/2.png",
-    "assets/img/1.png",
-  ];
-
-  final List<String> saved = const [
-    "assets/img/1.png",
-    "assets/img/2.png",
-  ];
-
-  List<String> get currentList =>
-      selectedTab == 0 ? posts : selectedTab == 1 ? reposts : saved;
-
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          ProfileCoverAvatar(posts: posts),
-          const ProfileNameBio(),
-          const ProfileStats(),
-          const ProfileButtons(),
-          ProfileTabBar(
-            selectedTab: selectedTab,
-            onTap: (i) => setState(() => selectedTab = i),
-          ),
-          const Divider(height: 1),
-          currentList.isEmpty
-              ? const ProfileEmpty()
-              : GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(2),
-                  itemCount: currentList.length,
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
-                  ),
-                  itemBuilder: (context, i) => ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.asset(
-                      currentList[i],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+    final userAsync = ref.watch(currentUserDocProvider);
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: userAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (user) {
+          if (user == null) {
+            return const Center(child: Text('No profile data'));
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 100),
+            child: Column(
+              children: [
+                ProfileCoverAvatar(
+                  coverUrl: user['coverUrl'] as String?,
+                  avatarUrl: user['avatarUrl'] as String?,
                 ),
-        ],
+                ProfileNameBio(
+                  name: (user['username'] as String?) ?? 'No name',
+                  bio: (user['bio'] as String?) ?? '',
+                ),
+                ProfileStats(
+                  followers: (user['followersCount'] as int?) ?? 0,
+                  following: (user['followingCount'] as int?) ?? 0,
+                  posts: (user['postsCount'] as int?) ?? 0,
+                ),
+                ProfileButtons(
+                  onSettings: () => _showSettings(context),
+                ),
+                ProfileTabBar(
+                  selectedTab: selectedTab,
+                  onTap: (i) => setState(() => selectedTab = i),
+                ),
+                const Divider(height: 1),
+                const ProfileEmpty(),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Log out',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                await ref.read(authServiceProvider).signOut();
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

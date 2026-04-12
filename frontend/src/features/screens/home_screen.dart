@@ -1,27 +1,10 @@
 import 'package:flutter/material.dart';
-import '../model/post_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../providers/post_providers.dart';
 import '../widgets/header.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_section.dart';
-
-final List<Post> posts = [
-  Post(
-    image: "assets/img/1.png",
-    username: "Hike_With_Me",
-    handle: "@jack09",
-    caption: "What a beautiful nature #hike #mountain #life",
-    avatar: "https://i.pravatar.cc/150?img=1",
-    isPrivate: false,
-  ),
-  Post(
-    image: "assets/img/2.png",
-    username: "Arianaa",
-    handle: "@ariana26",
-    caption: "Exploring mountains 🏔️",
-    avatar: "https://i.pravatar.cc/150?img=2",
-    isPrivate: true,
-  ),
-];
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -35,22 +18,35 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class HomeBody extends StatelessWidget {
+class HomeBody extends ConsumerWidget {
   const HomeBody({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feedAsync = ref.watch(feedProvider);
+
     return SafeArea(
       child: Column(
         children: [
           const HeaderWidget(),
           const StoriesList(),
           Expanded(
-            child: ListView.builder(
-              itemCount: posts.length,
-              padding: const EdgeInsets.only(top: 8, bottom: 100),
-              itemBuilder: (context, index) {
-                return PostCard(post: posts[index]);
+            child: feedAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (posts) {
+                if (posts.isEmpty) {
+                  return const Center(
+                    child: Text('No posts yet. Create the first one!'),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: posts.length,
+                  padding: const EdgeInsets.only(top: 8, bottom: 100),
+                  itemBuilder: (context, index) =>
+                      PostCard(post: posts[index]),
+                );
               },
             ),
           ),

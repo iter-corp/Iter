@@ -1,5 +1,5 @@
-import 'package:coil/src/features/widgets/story_item.dart';
 import 'package:flutter/material.dart';
+import 'story_item.dart';
 
 class StoriesList extends StatelessWidget {
   const StoriesList({super.key});

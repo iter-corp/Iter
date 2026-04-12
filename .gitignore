@@ -1,0 +1,12 @@
+frontend/build/
+frontend/.dart_tool/
+frontend/.gradle/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/ios/Pods/
+frontend/ios/Flutter/Flutter.framework/
+frontend/ios/Flutter/Flutter.podspec
+*.apk
+*.so
+*.dill

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /d/COIL-project log --oneline -15)",
+      "Bash(git -C /d/COIL-project log --all --name-only)",
+      "Bash(flutter pub:*)"
+    ]
+  }
+}

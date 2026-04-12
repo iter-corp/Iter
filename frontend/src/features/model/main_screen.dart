@@ -29,7 +29,7 @@ class _MainScreenState extends State<MainScreen> {
     const EventBody(),
     const TranslateBody(),
     const MessageBody(),
-    const ProfileBody(),
+    const ProfileScreen(),
   ];
 
   // 📌 SECTION: Resolve background color per tab
@@ -62,7 +62,7 @@ class _MainScreenState extends State<MainScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(40),
                 boxShadow: const [
                   BoxShadow(

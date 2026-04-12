@@ -1,25 +1,26 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../screens/edit_profile.dart';
 
 /// COVER + AVATAR
 class ProfileCoverAvatar extends StatelessWidget {
-  final List<String> posts;
-  const ProfileCoverAvatar({super.key, required this.posts});
+  final String? coverUrl;
+  final String? avatarUrl;
+  const ProfileCoverAvatar({super.key, this.coverUrl, this.avatarUrl});
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        posts.isNotEmpty
-            ? Image.asset(
-                posts[0],
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              )
-            : Container(height: 180, color: const Color(0xFFF0F0F0)),
+        SizedBox(
+          height: 180,
+          width: double.infinity,
+          child: coverUrl != null
+              ? CachedNetworkImage(imageUrl: coverUrl!, fit: BoxFit.cover)
+              : Container(color: const Color(0xFFF0F0F0)),
+        ),
         Positioned(
           bottom: -40,
           left: 0,
@@ -31,9 +32,15 @@ class ProfileCoverAvatar extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: Colors.white,
               ),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 40,
-                backgroundImage: AssetImage("assets/img/2.png"),
+                backgroundColor: Colors.grey.shade200,
+                backgroundImage: avatarUrl != null
+                    ? CachedNetworkImageProvider(avatarUrl!)
+                    : null,
+                child: avatarUrl == null
+                    ? const Icon(Icons.person, size: 40, color: Colors.grey)
+                    : null,
               ),
             ),
           ),
@@ -45,23 +52,22 @@ class ProfileCoverAvatar extends StatelessWidget {
 
 /// NAME + BIO
 class ProfileNameBio extends StatelessWidget {
-  const ProfileNameBio({super.key});
+  final String name;
+  final String bio;
+  const ProfileNameBio({super.key, required this.name, required this.bio});
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(top: 52, bottom: 8),
+    return Padding(
+      padding: const EdgeInsets.only(top: 52, bottom: 8),
       child: Column(
         children: [
-          Text(
-            "Katty Abrahams",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 4),
-          Text(
-            "Tour Guide | Hiking",
-            style: TextStyle(fontSize: 13, color: Colors.grey),
-          ),
+          Text(name,
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(bio,
+              style: const TextStyle(fontSize: 13, color: Colors.grey)),
         ],
       ),
     );
@@ -70,7 +76,15 @@ class ProfileNameBio extends StatelessWidget {
 
 /// STATS
 class ProfileStats extends StatelessWidget {
-  const ProfileStats({super.key});
+  final int followers;
+  final int following;
+  final int posts;
+  const ProfileStats({
+    super.key,
+    required this.followers,
+    required this.following,
+    required this.posts,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -79,14 +93,20 @@ class ProfileStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem("16K", "Followers"),
+          _statItem(_fmt(followers), "Followers"),
           _divider(),
-          _statItem("145", "Following"),
+          _statItem(_fmt(following), "Following"),
           _divider(),
-          _statItem("68", "Posts"),
+          _statItem(_fmt(posts), "Posts"),
         ],
       ),
     );
+  }
+
+  String _fmt(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
   }
 
   Widget _statItem(String value, String label) {
@@ -105,9 +125,12 @@ class ProfileStats extends StatelessWidget {
   Widget _divider() =>
       Container(width: 1, height: 36, color: Colors.grey.shade300);
 }
+
 /// EDIT PROFILE + SETTING BUTTONS
 class ProfileButtons extends StatelessWidget {
-  const ProfileButtons({super.key});
+  final VoidCallback? onSettings;
+  const ProfileButtons({super.key, this.onSettings});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -139,7 +162,7 @@ class ProfileButtons extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: onSettings,
               icon: const Icon(Icons.settings,
                   size: 16, color: Colors.black),
               label: const Text("Setting",
@@ -268,10 +291,9 @@ class ProfileBottomNav extends StatelessWidget {
       right: 20,
       bottom: 16,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.75),
+          color: Colors.black.withValues(alpha: 0.75),
           borderRadius: BorderRadius.circular(40),
           boxShadow: const [
             BoxShadow(
