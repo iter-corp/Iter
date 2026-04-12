@@ -1,0 +1,58 @@
+name: coil
+description: Coil — Social community app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+# ─────────────────────────────────────────────
+#  Dependencies
+# ─────────────────────────────────────────────
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Navigation
+  go_router: ^13.2.0
+
+ 
+
+  # Image caching (better than raw Image.network)
+  cached_network_image: ^3.3.1
+
+  # Safe area / device info
+  flutter_native_splash: ^2.4.0
+  flutter_svg: ^2.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+# ─────────────────────────────────────────────
+#  Flutter config
+# ─────────────────────────────────────────────
+flutter:
+  uses-material-design: true
+
+  # 📌 Assets — add your images / SVG icons here
+  assets:
+    - assets/img/
+    - assets/icons/
+
+
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700
