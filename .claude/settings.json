@@ -3,7 +3,16 @@
     "allow": [
       "Bash(git -C /d/COIL-project log --oneline -15)",
       "Bash(git -C /d/COIL-project log --all --name-only)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(git push:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git cat-file:*)",
+      "Bash(awk '$1==\"blob\" && $2>1000000')",
+      "Bash(sort -k2 -n -r)",
+      "Bash(git reset:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'Add Flutter build artifacts to gitignore and remove from tracking:*)"
     ]
   }
 }
