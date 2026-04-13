@@ -45,11 +45,10 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
 
   @override
   Widget build(BuildContext context) {
-    final inboxAsync = ref.watch(inboxProvider);
-    final allConvs =
-        inboxAsync.value?.where((c) => !c.isRequest).toList() ?? [];
-    final requestConvs =
-        inboxAsync.value?.where((c) => c.isRequest).toList() ?? [];
+    final acceptedInboxAsync = ref.watch(acceptedInboxProvider);
+    final requestsAsync = ref.watch(requestsProvider);
+    final allConvs = acceptedInboxAsync.value ?? [];
+    final requestConvs = requestsAsync.value ?? [];
 
     return SafeArea(
       child: Column(
@@ -85,35 +84,41 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
 
           // ── Conversation list ────────────────────────────────────────
           Expanded(
-            child: inboxAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (_) {
-                if (selectedTab == 0) {
-                  if (allConvs.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No messages yet',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 100),
-                    itemCount: allConvs.length,
-                    itemBuilder: (_, i) => _ConvTile(
-                      conv: allConvs[i],
-                      onTap: () => _openChat(allConvs[i]),
-                    ),
-                  );
-                } else {
-                  return RequestsTab(
-                    requests: requestConvs,
-                    onTap: _openChat,
-                  );
-                }
-              },
-            ),
+            child: selectedTab == 0
+                ? acceptedInboxAsync.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Error: $e')),
+                    data: (_) {
+                      if (allConvs.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No messages yet',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 100),
+                        itemCount: allConvs.length,
+                        itemBuilder: (_, i) => _ConvTile(
+                          conv: allConvs[i],
+                          onTap: () => _openChat(allConvs[i]),
+                        ),
+                      );
+                    },
+                  )
+                : requestsAsync.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Error: $e')),
+                    data: (_) {
+                      return RequestsTab(
+                        requests: requestConvs,
+                        onTap: _openChat,
+                      );
+                    },
+                  ),
           ),
         ],
       ),

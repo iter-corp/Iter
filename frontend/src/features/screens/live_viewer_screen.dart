@@ -1,3 +1,4 @@
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,8 +15,13 @@ class LiveViewerScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
+  RtcEngine? _engine;
+  int? _remoteUid;
+  String? _errorText;
+
   bool _joined = false;
   bool _loading = true;
+  bool _roomCountReleased = false;
 
   @override
   void initState() {
@@ -25,23 +31,146 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
 
   Future<void> _join() async {
     try {
-      await ref.read(liveServiceProvider).joinStream(widget.stream.id);
+      final stream =
+          await ref.read(liveServiceProvider).joinStream(widget.stream.id);
+
+      if (!mounted) return;
+
+      if (stream.appId == null || stream.token == null) {
+        setState(() {
+          _joined = false;
+          _loading = false;
+          _errorText = 'Live credentials are not configured on the backend.';
+        });
+        return;
+      }
+
+      final engine = createAgoraRtcEngine();
+      await engine.initialize(RtcEngineContext(appId: stream.appId));
+      await engine.enableVideo();
+      await engine.setClientRole(
+        role: ClientRoleType.clientRoleAudience,
+      );
+
+      engine.registerEventHandler(
+        RtcEngineEventHandler(
+          onJoinChannelSuccess: (_, __) {
+            if (!mounted) return;
+            setState(() => _joined = true);
+          },
+          onUserJoined: (_, uid, __) {
+            if (!mounted) return;
+            setState(() => _remoteUid = uid);
+          },
+          onUserOffline: (_, uid, __) {
+            if (!mounted) return;
+            if (_remoteUid == uid) {
+              setState(() => _remoteUid = null);
+            }
+          },
+          onError: (error, _) {
+            if (!mounted) return;
+            setState(() {
+              _errorText = 'Agora error: $error';
+            });
+          },
+        ),
+      );
+
+      await engine.joinChannel(
+        token: stream.token!,
+        channelId: stream.id,
+        uid: 0,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+          clientRoleType: ClientRoleType.clientRoleAudience,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        ),
+      );
+
+      if (!mounted) {
+        await engine.release();
+        return;
+      }
+
+      setState(() {
+        _engine = engine;
+        _loading = false;
+      });
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _joined = true;
           _loading = false;
+          _errorText = 'Unable to join stream';
         });
-        // TODO: initialize Agora RTC engine with _token and widget.stream.id
       }
-    } catch (e) {
-      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _leave() async {
+  Future<void> _leaveAgora() async {
+    final engine = _engine;
+    _engine = null;
+    if (engine == null) return;
+    try {
+      await engine.leaveChannel();
+    } catch (_) {}
+    await engine.release();
+  }
+
+  Future<void> _releaseViewerCount() async {
+    if (_roomCountReleased) return;
+    _roomCountReleased = true;
     await ref.read(liveServiceProvider).leaveStream(widget.stream.id);
-    // TODO: leave Agora channel
+  }
+
+  Future<void> _leave() async {
+    await _releaseViewerCount();
+    await _leaveAgora();
     if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  void dispose() {
+    _releaseViewerCount();
+    _leaveAgora();
+    super.dispose();
+  }
+
+  Widget _buildVideoArea() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_errorText != null) {
+      return Center(
+        child: Text(
+          _errorText!,
+          style: const TextStyle(color: Colors.white70),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    if (_engine == null || !_joined) {
+      return const Center(
+        child: Text('Unable to join stream',
+            style: TextStyle(color: Colors.white)),
+      );
+    }
+    if (_remoteUid == null) {
+      return Center(
+        child: Text(
+          'Waiting for host video…',
+          style: const TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+    return AgoraVideoView(
+      controller: VideoViewController.remote(
+        rtcEngine: _engine!,
+        canvas: VideoCanvas(uid: _remoteUid),
+        connection: RtcConnection(channelId: widget.stream.id),
+      ),
+    );
   }
 
   @override
@@ -53,39 +182,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
           children: [
             // Video area placeholder
             Positioned.fill(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _joined
-                      ? Container(
-                          color: const Color(0xFF1A1A2E),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.live_tv,
-                                    color: Colors.white54, size: 64),
-                                const SizedBox(height: 16),
-                                // TODO: render Agora RtcLocalView here once SDK added
-                                Text(
-                                  widget.stream.title,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Live video integration coming soon',
-                                  style: TextStyle(
-                                      color: Colors.white54, fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : const Center(
-                          child: Text('Unable to join stream',
-                              style: TextStyle(color: Colors.white))),
+              child: _buildVideoArea(),
             ),
 
             // Top bar

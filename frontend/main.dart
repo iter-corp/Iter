@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -22,10 +24,15 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Init FCM once whenever a user signs in.
-    ref.listen<AsyncValue<User?>>(authStateProvider, (_, next) {
-      final user = next.value;
-      if (user != null) {
-        FcmService().init(user.uid);
+    ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
+      final previousUser = prev?.value;
+      final nextUser = next.value;
+      final fcmService = FcmService();
+
+      if (nextUser != null) {
+        unawaited(fcmService.init(nextUser.uid));
+      } else if (previousUser != null) {
+        unawaited(fcmService.removeToken(previousUser.uid));
       }
     });
 

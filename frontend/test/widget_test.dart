@@ -20,5 +20,5 @@ void main() {
     await tester.pump();
 
     expect(find.byType(app.MyApp), findsOneWidget);
-  }, skip: 'Requires Firebase test initialization');
+  }, skip: true);
 }

@@ -5,6 +5,7 @@ class LiveStream {
   final String id;
   final String hostUid;
   final String title;
+  final String? appId;
   final String? token;
   final bool isActive;
   final int viewersCount;
@@ -14,6 +15,7 @@ class LiveStream {
     required this.id,
     required this.hostUid,
     required this.title,
+    this.appId,
     this.token,
     required this.isActive,
     required this.viewersCount,
@@ -26,6 +28,7 @@ class LiveStream {
       id: doc.id,
       hostUid: d['hostUid'] as String? ?? '',
       title: d['title'] as String? ?? '',
+      appId: d['appId'] as String?,
       token: d['token'] as String?,
       isActive: d['isActive'] as bool? ?? false,
       viewersCount: (d['viewersCount'] as int?) ?? 0,
@@ -61,8 +64,11 @@ class LiveService {
           .httpsCallable('issueLiveToken')
           .call({'channelName': ref.id, 'role': 'host'});
       final token = result.data['token'] as String?;
+      final appId = result.data['appId'] as String?;
       if (token != null) {
-        await ref.update({'token': token});
+        await ref.update({'token': token, if (appId != null) 'appId': appId});
+      } else if (appId != null) {
+        await ref.update({'appId': appId});
       }
     } catch (_) {
       // Cloud Function not yet deployed — proceed without token
@@ -94,11 +100,13 @@ class LiveService {
 
     // Request a viewer token from Cloud Function
     String? token;
+    String? appId;
     try {
       final result = await _functions
           .httpsCallable('issueLiveToken')
           .call({'channelName': streamId, 'role': 'audience'});
       token = result.data['token'] as String?;
+      appId = result.data['appId'] as String?;
     } catch (_) {
       // Cloud Function not yet deployed
     }
@@ -111,6 +119,7 @@ class LiveService {
             id: stream.id,
             hostUid: stream.hostUid,
             title: stream.title,
+            appId: appId ?? stream.appId,
             token: token,
             isActive: stream.isActive,
             viewersCount: stream.viewersCount,

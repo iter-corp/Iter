@@ -10,3 +10,4 @@ frontend/ios/Flutter/Flutter.podspec
 *.apk
 *.so
 *.dill
+node_modules

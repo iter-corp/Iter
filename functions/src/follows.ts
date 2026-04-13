@@ -3,7 +3,7 @@ import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/fire
 
 const db = admin.firestore();
 
-export const onFollowCreate = onDocumentCreated('follows/{targetUid}/followers/{followerUid}', async (event) => {
+export const onFollowCreate = onDocumentCreated('users/{targetUid}/followers/{followerUid}', async (event) => {
   const targetUid = event.params.targetUid;
   const followerUid = event.params.followerUid;
 
@@ -32,7 +32,7 @@ export const onFollowCreate = onDocumentCreated('follows/{targetUid}/followers/{
   await batch.commit();
 });
 
-export const onFollowDelete = onDocumentDeleted('follows/{targetUid}/followers/{followerUid}', async (event) => {
+export const onFollowDelete = onDocumentDeleted('users/{targetUid}/followers/{followerUid}', async (event) => {
   const targetUid = event.params.targetUid;
   const followerUid = event.params.followerUid;
 

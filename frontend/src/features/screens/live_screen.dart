@@ -7,6 +7,7 @@ import '../../providers/live_providers.dart';
 import 'camera_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_viewer_screen.dart';
+import 'live_host_screen.dart';
 
 // ─────────────────────────────────────────────
 // 📌 SECTION: Live Screen
@@ -38,7 +39,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => LiveViewerScreen(stream: stream),
+              builder: (_) => LiveHostScreen(stream: stream),
             ),
           );
         },

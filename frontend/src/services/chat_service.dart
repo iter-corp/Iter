@@ -159,27 +159,16 @@ class ChatService {
       return;
     }
 
-    final lastMessage = trimmedText.isNotEmpty ? trimmedText : 'Photo';
-
     final batch = _db.batch();
     final msgRef = _messagesCol(chatId).doc();
 
     batch.set(msgRef, {
       'senderUid': senderUid,
+      'receiverUid': receiverUid,
       'text': trimmedText,
       'imageUrl': normalizedImageUrl,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
-    });
-
-    batch.update(_chatDoc(chatId), {
-      'lastMessage': lastMessage,
-      'lastMessageSenderUid': senderUid,
-      'lastTime': FieldValue.serverTimestamp(),
-      'unread.$receiverUid': FieldValue.increment(1),
-      'unread.$senderUid': 0,
-      // Sending a message implicitly accepts the conversation.
-      'acceptedBy': FieldValue.arrayUnion([senderUid]),
     });
 
     await batch.commit();
@@ -221,12 +210,46 @@ class ChatService {
   }
 
   Stream<List<ChatConversation>> streamRequests(String uid) {
-    return streamInbox(uid).map(
-        (conversations) => conversations.where((c) => c.isRequest).toList());
+    return streamInbox(uid).asyncMap((conversations) async {
+      final requestIds =
+          await _requestChatIdsByNonFollowers(uid, conversations);
+      return conversations
+          .where((conversation) => requestIds.contains(conversation.chatId))
+          .toList();
+    });
   }
 
   Stream<List<ChatConversation>> streamAcceptedInbox(String uid) {
-    return streamInbox(uid).map(
-        (conversations) => conversations.where((c) => !c.isRequest).toList());
+    return streamInbox(uid).asyncMap((conversations) async {
+      final requestIds =
+          await _requestChatIdsByNonFollowers(uid, conversations);
+      return conversations
+          .where((conversation) => !requestIds.contains(conversation.chatId))
+          .toList();
+    });
+  }
+
+  Future<Set<String>> _requestChatIdsByNonFollowers(
+    String currentUid,
+    List<ChatConversation> conversations,
+  ) async {
+    final checks = await Future.wait(conversations.map((conversation) async {
+      if (conversation.otherUid.isEmpty) {
+        return MapEntry(conversation.chatId, false);
+      }
+
+      final followerSnap = await _db
+          .collection('users')
+          .doc(currentUid)
+          .collection('followers')
+          .doc(conversation.otherUid)
+          .get();
+      return MapEntry(conversation.chatId, !followerSnap.exists);
+    }));
+
+    return {
+      for (final entry in checks)
+        if (entry.value) entry.key,
+    };
   }
 }

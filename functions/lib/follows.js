@@ -37,7 +37,7 @@ exports.onFollowDelete = exports.onFollowCreate = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const db = admin.firestore();
-exports.onFollowCreate = (0, firestore_1.onDocumentCreated)('follows/{targetUid}/followers/{followerUid}', async (event) => {
+exports.onFollowCreate = (0, firestore_1.onDocumentCreated)('users/{targetUid}/followers/{followerUid}', async (event) => {
     const targetUid = event.params.targetUid;
     const followerUid = event.params.followerUid;
     const batch = db.batch();
@@ -53,7 +53,7 @@ exports.onFollowCreate = (0, firestore_1.onDocumentCreated)('follows/{targetUid}
     });
     await batch.commit();
 });
-exports.onFollowDelete = (0, firestore_1.onDocumentDeleted)('follows/{targetUid}/followers/{followerUid}', async (event) => {
+exports.onFollowDelete = (0, firestore_1.onDocumentDeleted)('users/{targetUid}/followers/{followerUid}', async (event) => {
     const targetUid = event.params.targetUid;
     const followerUid = event.params.followerUid;
     const batch = db.batch();

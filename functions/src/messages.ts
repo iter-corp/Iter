@@ -9,17 +9,32 @@ export const onMessageCreate = onDocumentCreated('chats/{chatId}/messages/{messa
   if (!msg) return;
 
   const senderUid = String(msg.senderUid ?? '');
-  const receiverUid = String(msg.receiverUid ?? '');
-  const text = String(msg.text ?? '');
+  let receiverUid = String(msg.receiverUid ?? '');
+
+  if (receiverUid.length === 0) {
+    const chatSnap = await db.collection('chats').doc(chatId).get();
+    const participants = (chatSnap.data()?.participants as string[] | undefined) ?? [];
+    receiverUid = participants.find((uid) => uid !== senderUid) ?? '';
+  }
+
+  if (receiverUid.length === 0) return;
+
+  const text = String(msg.text ?? '').trim();
+  const imageUrl = String(msg.imageUrl ?? '').trim();
+  const lastMessage = text.length > 0 ? text : (imageUrl.length > 0 ? 'Photo' : 'Message');
 
   const batch = db.batch();
 
+  const chatRef = db.collection('chats').doc(chatId);
   batch.set(
-    db.collection('chats').doc(chatId),
+    chatRef,
     {
-      lastMessage: text,
+      lastMessage,
+      lastMessageSenderUid: senderUid,
       lastTime: admin.firestore.FieldValue.serverTimestamp(),
       [`unread.${receiverUid}`]: admin.firestore.FieldValue.increment(1),
+      [`unread.${senderUid}`]: 0,
+      acceptedBy: admin.firestore.FieldValue.arrayUnion(senderUid),
     },
     { merge: true },
   );

@@ -18,6 +18,18 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSelf(uid);
       allow update, delete: if isSelf(uid);
+
+      match /followers/{followerUid} {
+        allow read: if signedIn();
+        allow create, delete: if isSelf(followerUid);
+        allow update: if false;
+      }
+
+      match /following/{followingUid} {
+        allow read: if signedIn();
+        allow create, delete: if isSelf(uid);
+        allow update: if false;
+      }
     }
 
     match /follows/{targetUid}/followers/{followerUid} {
