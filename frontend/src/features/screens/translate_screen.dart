@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../services/translate_service.dart';
+
 // 📌 SECTION: Supported Languages
 const List<String> _kLanguages = [
   'English(USA)',
@@ -22,9 +24,19 @@ class _TranslateBodyState extends State<TranslateBody> {
   String _sourceLang = 'English(USA)';
   String _targetLang = 'Kurdish(Sorani)';
   final TextEditingController _inputController = TextEditingController();
+  final TranslateService _translateService = TranslateService();
   String _translatedText = '';
   bool _hasTranslation = false;
   bool _isRecording = false;
+  bool _isTranslating = false;
+
+  static const Map<String, String> _langCodes = {
+    'English(USA)': 'en',
+    'Kurdish(Sorani)': 'ckb',
+    'Arabic': 'ar',
+    'Persian': 'fa',
+    'Turkish': 'tr',
+  };
 
   @override
   void dispose() {
@@ -43,14 +55,36 @@ class _TranslateBodyState extends State<TranslateBody> {
     });
   }
 
-  void _onTranslate() {
+  Future<void> _onTranslate() async {
     final input = _inputController.text.trim();
-    if (input.isEmpty) return;
-    setState(() {
-      _hasTranslation = true;
-      _translatedText =
-          _targetLang == 'Kurdish(Sorani)' ? 'سڵاو' : input;
-    });
+    if (input.isEmpty || _isTranslating) return;
+    setState(() => _isTranslating = true);
+
+    final sourceCode = _langCodes[_sourceLang] ?? 'en';
+    final targetCode = _langCodes[_targetLang] ?? 'en';
+
+    try {
+      final translated = await _translateService.translateText(
+        text: input,
+        sourceLang: sourceCode,
+        targetLang: targetCode,
+      );
+      if (!mounted) return;
+      setState(() {
+        _hasTranslation = true;
+        _translatedText = translated;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Translation is currently unavailable'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isTranslating = false);
+    }
   }
 
   void _copyToClipboard() {
@@ -100,8 +134,7 @@ class _TranslateBodyState extends State<TranslateBody> {
               _InputBox(
                 controller: _inputController,
                 isRecording: _isRecording,
-                onMicTap: () =>
-                    setState(() => _isRecording = !_isRecording),
+                onMicTap: () => setState(() => _isRecording = !_isRecording),
               ),
               const SizedBox(height: 16),
 
@@ -120,14 +153,23 @@ class _TranslateBodyState extends State<TranslateBody> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: const Text(
-                      'Translate',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isTranslating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Translate',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -170,7 +212,9 @@ class _LanguageSelectorRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _LanguageDropdown(value: sourceLang, onChanged: onSourceChanged)),
+        Expanded(
+            child: _LanguageDropdown(
+                value: sourceLang, onChanged: onSourceChanged)),
         const SizedBox(width: 10),
         GestureDetector(
           onTap: onSwap,
@@ -187,12 +231,15 @@ class _LanguageSelectorRow extends StatelessWidget {
               width: 18,
               height: 18,
               fit: BoxFit.contain,
-              colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+              colorFilter:
+                  const ColorFilter.mode(Colors.black, BlendMode.srcIn),
             ),
           ),
         ),
         const SizedBox(width: 10),
-        Expanded(child: _LanguageDropdown(value: targetLang, onChanged: onTargetChanged)),
+        Expanded(
+            child: _LanguageDropdown(
+                value: targetLang, onChanged: onTargetChanged)),
       ],
     );
   }
@@ -218,17 +265,22 @@ class _LanguageDropdown extends StatelessWidget {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 20),
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Colors.black, size: 20),
+          style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
           items: _kLanguages
               .map((lang) => DropdownMenuItem(
                     value: lang,
                     child: Text(lang,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.black87)),
                   ))
               .toList(),
-          onChanged: (val) { if (val != null) onChanged(val); },
+          onChanged: (val) {
+            if (val != null) onChanged(val);
+          },
         ),
       ),
     );
@@ -270,7 +322,10 @@ class _InputBox extends StatelessWidget {
               isDense: true,
               contentPadding: EdgeInsets.zero,
             ),
-            style: const TextStyle(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                fontSize: 15,
+                color: Colors.black87,
+                fontWeight: FontWeight.bold),
           ),
 
           // 🔹 Mic icon ↔ animated wave toggle
@@ -288,7 +343,8 @@ class _InputBox extends StatelessWidget {
                         'assets/icons/voice.svg',
                         width: 22,
                         height: 22,
-                        colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                        colorFilter: const ColorFilter.mode(
+                            Colors.black, BlendMode.srcIn),
                       ),
               ),
             ),
@@ -314,7 +370,19 @@ class _WaveAnimationState extends State<_WaveAnimation>
 
   // 🔹 Bell-curve height profile matching the screenshot
   static const List<double> _baseHeights = [
-    4, 7, 11, 15, 19, 15, 23, 15, 19, 15, 11, 7, 4,
+    4,
+    7,
+    11,
+    15,
+    19,
+    15,
+    23,
+    15,
+    19,
+    15,
+    11,
+    7,
+    4,
   ];
 
   late final List<Animation<double>> _animations;
@@ -333,7 +401,8 @@ class _WaveAnimationState extends State<_WaveAnimation>
     _animations = List.generate(_baseHeights.length, (i) {
       // spread start offsets evenly between 0.0 and 0.6
       final double start = (i / _baseHeights.length) * 0.6;
-      final double end = start + 0.4; // each bar animates over 40 % of the cycle
+      final double end =
+          start + 0.4; // each bar animates over 40 % of the cycle
 
       return TweenSequence<double>([
         // rise
@@ -381,7 +450,8 @@ class _WaveAnimationState extends State<_WaveAnimation>
             children: List.generate(_baseHeights.length, (i) {
               return Container(
                 width: 2.4,
-                height: _animations[i].value.clamp(2.0, 30.0), // 🔹 clamp prevents 0-height render glitch
+                height: _animations[i].value.clamp(
+                    2.0, 30.0), // 🔹 clamp prevents 0-height render glitch
                 margin: const EdgeInsets.symmetric(horizontal: 0.8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFCE5DE5),
@@ -439,7 +509,8 @@ class _OutputBox extends StatelessWidget {
                   'assets/icons/bookmark.svg',
                   width: 20,
                   height: 20,
-                  colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                  colorFilter:
+                      const ColorFilter.mode(Colors.black, BlendMode.srcIn),
                 ),
               ),
               const SizedBox(width: 12),
@@ -449,14 +520,13 @@ class _OutputBox extends StatelessWidget {
                   'assets/icons/outline_duplicate.svg',
                   width: 20,
                   height: 20,
-                  colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                  colorFilter:
+                      const ColorFilter.mode(Colors.black, BlendMode.srcIn),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           if (translatedText.isNotEmpty)
             Directionality(
               textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
@@ -474,16 +544,15 @@ class _OutputBox extends StatelessWidget {
                 ),
               ),
             ),
-
           const SizedBox(height: 25),
-
           Align(
             alignment: Alignment.bottomRight,
             child: SvgPicture.asset(
               'assets/icons/speech.svg',
               width: 20,
               height: 20,
-              colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+              colorFilter:
+                  const ColorFilter.mode(Colors.black, BlendMode.srcIn),
             ),
           ),
         ],

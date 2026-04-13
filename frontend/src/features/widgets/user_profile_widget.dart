@@ -18,6 +18,8 @@ class UserCoverAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final coverImage = posts.isNotEmpty ? posts.first : "assets/img/2.png";
+
     if (isPrivate) {
       return SizedBox(
         height: 200,
@@ -89,7 +91,7 @@ class UserCoverAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Image.asset(
-          posts[0],
+          coverImage,
           height: 180,
           width: double.infinity,
           fit: BoxFit.cover,
@@ -107,8 +109,8 @@ class UserCoverAvatar extends StatelessWidget {
                 color: Colors.black.withOpacity(0.4),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_back,
-                  color: Colors.white, size: 20),
+              child:
+                  const Icon(Icons.arrow_back, color: Colors.white, size: 20),
             ),
           ),
         ),
@@ -155,14 +157,12 @@ class UserNameBio extends StatelessWidget {
         children: [
           Text(
             username,
-            style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
             handle,
-            style:
-                const TextStyle(fontSize: 13, color: Colors.grey),
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
           ),
         ],
       ),
@@ -172,38 +172,57 @@ class UserNameBio extends StatelessWidget {
 
 /// STATS
 class UserStats extends StatelessWidget {
-  const UserStats({super.key});
+  final int followers;
+  final int following;
+  final int posts;
+  final VoidCallback? onFollowersTap;
+  final VoidCallback? onFollowingTap;
+
+  const UserStats({
+    super.key,
+    required this.followers,
+    required this.following,
+    required this.posts,
+    this.onFollowersTap,
+    this.onFollowingTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem("16K", "Followers"),
+          _statItem(_fmt(followers), "Followers", onFollowersTap),
           _divider(),
-          _statItem("145", "Following"),
+          _statItem(_fmt(following), "Following", onFollowingTap),
           _divider(),
-          _statItem("68", "Posts"),
+          _statItem(_fmt(posts), "Posts", null),
         ],
       ),
     );
   }
 
-  Widget _statItem(String value, String label) {
-    return Column(
+  String _fmt(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
+  }
+
+  Widget _statItem(String value, String label, VoidCallback? onTap) {
+    final content = Column(
       children: [
         Text(value,
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold)),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 12, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
+
+    if (onTap == null) return content;
+    return InkWell(
+        onTap: onTap, borderRadius: BorderRadius.circular(8), child: content);
   }
 
   Widget _divider() =>
@@ -226,8 +245,7 @@ class UserButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           /// FOLLOW BUTTON
@@ -239,9 +257,7 @@ class UserButtons extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
-                    color: isFollowing
-                        ? Colors.white
-                        : const Color(0xFFB05ECC),
+                    color: isFollowing ? Colors.white : const Color(0xFFB05ECC),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isFollowing
@@ -253,9 +269,7 @@ class UserButtons extends StatelessWidget {
                     child: Text(
                       isFollowing ? "Following" : "Follow",
                       style: TextStyle(
-                        color: isFollowing
-                            ? Colors.black
-                            : Colors.white,
+                        color: isFollowing ? Colors.black : Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -264,7 +278,9 @@ class UserButtons extends StatelessWidget {
                 ),
               ),
             ),
-          ),/// MESSAGE BUTTON — only for public
+          ),
+
+          /// MESSAGE BUTTON — only for public
           if (!isPrivate) ...[
             const SizedBox(width: 10),
             Expanded(
@@ -329,9 +345,7 @@ class UserTabBar extends StatelessWidget {
                 color: Colors.white,
                 border: Border(
                   bottom: BorderSide(
-                    color: isActive
-                        ? Colors.black
-                        : Colors.transparent,
+                    color: isActive ? Colors.black : Colors.transparent,
                     width: 2,
                   ),
                 ),
@@ -356,8 +370,7 @@ class UserPrivateMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-          vertical: 40, horizontal: 32),
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 32),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -366,8 +379,7 @@ class UserPrivateMessage extends StatelessWidget {
         ),
         child: const Row(
           children: [
-            Icon(Icons.lock_outline,
-                size: 24, color: Colors.black),
+            Icon(Icons.lock_outline, size: 24, color: Colors.black),
             SizedBox(width: 12),
             Expanded(
               child: Column(

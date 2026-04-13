@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../model/message_model.dart';
+
+import '../../services/chat_service.dart';
 
 /// TAB BAR
 class MessageTabBar extends StatelessWidget {
@@ -24,7 +25,7 @@ class MessageTabBar extends StatelessWidget {
         children: [
           Expanded(child: _tab("All $allCount", 0)),
           const SizedBox(width: 8),
-          Expanded(child: _tab("Requests", 1)),
+          Expanded(child: _tab("Requests $requestCount", 1)),
         ],
       ),
     );
@@ -38,9 +39,7 @@ class MessageTabBar extends StatelessWidget {
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFFB05ECC)
-              : const Color(0xFFF0F0F0),
+          color: isActive ? const Color(0xFFB05ECC) : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Center(
@@ -60,7 +59,7 @@ class MessageTabBar extends StatelessWidget {
 
 /// MESSAGE TILE
 class MessageTile extends StatelessWidget {
-  final MessageModel message;
+  final ChatConversation message;
   final VoidCallback onTap;
 
   const MessageTile({
@@ -75,21 +74,26 @@ class MessageTile extends StatelessWidget {
       onTap: onTap,
       leading: CircleAvatar(
         radius: 26,
-        backgroundImage: NetworkImage(message.avatar),
+        backgroundColor: Colors.grey.shade200,
+        backgroundImage: message.otherAvatarUrl.isNotEmpty
+            ? NetworkImage(message.otherAvatarUrl)
+            : null,
+        child: message.otherAvatarUrl.isEmpty
+            ? const Icon(Icons.person, color: Colors.white)
+            : null,
       ),
       title: Text(
-        message.name,
-        style:
-            const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        message.otherUsername,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       subtitle: Text(
-        "${message.lastMessage} ${message.time}",
+        message.lastMessage,
         style: const TextStyle(color: Colors.grey, fontSize: 12),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (message.hasUnread)
+          if (message.unreadCount > 0)
             Container(
               width: 10,
               height: 10,
@@ -99,8 +103,7 @@ class MessageTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-          const Icon(Icons.camera_alt_outlined,
-              size: 20, color: Colors.grey),
+          const Icon(Icons.camera_alt_outlined, size: 20, color: Colors.grey),
         ],
       ),
     );

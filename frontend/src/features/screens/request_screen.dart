@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import '../model/message_model.dart';
+
+import '../../services/chat_service.dart';
 import 'chat_screen.dart';
 
 class HiddenRequestsScreen extends StatelessWidget {
-  final List<MessageModel> requests;
+  final List<ChatConversation> requests;
 
   const HiddenRequestsScreen({super.key, required this.requests});
 
@@ -17,8 +18,7 @@ class HiddenRequestsScreen extends StatelessWidget {
           children: [
             /// HEADER
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
               child: Row(
                 children: [
                   IconButton(
@@ -27,8 +27,7 @@ class HiddenRequestsScreen extends StatelessWidget {
                   ),
                   const Text(
                     "Hidden Requests",
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -36,8 +35,7 @@ class HiddenRequestsScreen extends StatelessWidget {
 
             /// SUBTITLE
             const Padding(
-              padding:
-                  EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Text(
                 "Requests containing messages that may be offensive or unwanted are moved to this folder.",
                 style: TextStyle(color: Colors.grey, fontSize: 13),
@@ -57,26 +55,33 @@ class HiddenRequestsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ChatScreen(
-                          name: msg.name,
-                          avatar: msg.avatar,
+                          chatId: msg.chatId,
+                          otherUid: msg.otherUid,
+                          otherName: msg.otherUsername,
+                          otherAvatar: msg.otherAvatarUrl,
                         ),
                       ),
                     ),
                     leading: CircleAvatar(
                       radius: 24,
-                      backgroundImage: NetworkImage(msg.avatar),
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: msg.otherAvatarUrl.isNotEmpty
+                          ? NetworkImage(msg.otherAvatarUrl)
+                          : null,
+                      child: msg.otherAvatarUrl.isEmpty
+                          ? const Icon(Icons.person, color: Colors.white)
+                          : null,
                     ),
                     title: Text(
-                      msg.name,
+                      msg.otherUsername,
                       style: const TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                     subtitle: Text(
-                      "${msg.lastMessage} ${msg.time}",
-                      style: const TextStyle(
-                          color: Colors.grey, fontSize: 12),
+                      msg.lastMessage,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
-                    trailing: msg.hasUnread
+                    trailing: msg.unreadCount > 0
                         ? Container(
                             width: 10,
                             height: 10,
@@ -99,8 +104,8 @@ class HiddenRequestsScreen extends StatelessWidget {
 
 /// REQUESTS TAB CONTENT
 class RequestsTab extends StatelessWidget {
-  final List<MessageModel> requests;
-  final Function(MessageModel) onTap;
+  final List<ChatConversation> requests;
+  final Function(ChatConversation) onTap;
 
   const RequestsTab({
     super.key,
@@ -119,8 +124,7 @@ class RequestsTab extends StatelessWidget {
               color: const Color(0xFFF0F0F0),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.notifications_off_outlined,
-                size: 24),
+            child: const Icon(Icons.notifications_off_outlined, size: 24),
           ),
           title: const Text("Hidden Requests",
               style: TextStyle(fontWeight: FontWeight.w600)),
@@ -128,8 +132,7 @@ class RequestsTab extends StatelessWidget {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  HiddenRequestsScreen(requests: requests),
+              builder: (_) => HiddenRequestsScreen(requests: requests),
             ),
           ),
         ),
@@ -146,19 +149,24 @@ class RequestsTab extends StatelessWidget {
                 onTap: () => onTap(msg),
                 leading: CircleAvatar(
                   radius: 24,
-                  backgroundImage: NetworkImage(msg.avatar),
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: msg.otherAvatarUrl.isNotEmpty
+                      ? NetworkImage(msg.otherAvatarUrl)
+                      : null,
+                  child: msg.otherAvatarUrl.isEmpty
+                      ? const Icon(Icons.person, color: Colors.white)
+                      : null,
                 ),
                 title: Text(
-                  msg.name,
+                  msg.otherUsername,
                   style: const TextStyle(
                       fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 subtitle: Text(
-                  "${msg.lastMessage} ${msg.time}",
-                  style: const TextStyle(
-                      color: Colors.grey, fontSize: 12),
+                  msg.lastMessage,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
-                trailing: msg.hasUnread
+                trailing: msg.unreadCount > 0
                     ? Container(
                         width: 10,
                         height: 10,

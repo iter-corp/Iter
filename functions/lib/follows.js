@@ -1,0 +1,63 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.onFollowDelete = exports.onFollowCreate = void 0;
+const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-functions/v2/firestore");
+const db = admin.firestore();
+exports.onFollowCreate = (0, firestore_1.onDocumentCreated)('follows/{targetUid}/followers/{followerUid}', async (event) => {
+    const targetUid = event.params.targetUid;
+    const followerUid = event.params.followerUid;
+    const batch = db.batch();
+    batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+    batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+    const notifRef = db.collection('notifications').doc(targetUid).collection('items').doc();
+    batch.set(notifRef, {
+        type: 'follow',
+        actorUid: followerUid,
+        targetId: followerUid,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+});
+exports.onFollowDelete = (0, firestore_1.onDocumentDeleted)('follows/{targetUid}/followers/{followerUid}', async (event) => {
+    const targetUid = event.params.targetUid;
+    const followerUid = event.params.followerUid;
+    const batch = db.batch();
+    batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+    batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+    await batch.commit();
+});

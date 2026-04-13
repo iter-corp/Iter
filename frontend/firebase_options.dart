@@ -50,12 +50,12 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCng4vFhY_O0cvh0qs7kMj0P39yMhvU0MM',
-    appId: '1:398881924784:web:e85b87184add4615f13d75',
-    messagingSenderId: '398881924784',
-    projectId: 'coil-9239e',
-    authDomain: 'coil-9239e.firebaseapp.com',
-    storageBucket: 'coil-9239e.firebasestorage.app',
+    apiKey: 'AIzaSyANV9AQMtCxoi-vOPLxddlw_Fd4JPT6LyY',
+    appId: '1:751233585713:web:b7e39c68742bd244a97b10',
+    messagingSenderId: '751233585713',
+    projectId: 'coil-50528',
+    authDomain: 'coil-50528.firebaseapp.com',
+    storageBucket: 'coil-50528.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

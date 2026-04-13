@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'create_post_screen.dart';
+
+import '../../providers/auth_providers.dart';
+import '../../providers/live_providers.dart';
 import 'camera_story_screen.dart';
+import 'create_post_screen.dart';
+import 'live_viewer_screen.dart';
 
 // ─────────────────────────────────────────────
 // 📌 SECTION: Live Screen
 // ─────────────────────────────────────────────
-class LiveScreen extends StatefulWidget {
+class LiveScreen extends ConsumerStatefulWidget {
   const LiveScreen({super.key});
 
   @override
-  State<LiveScreen> createState() => _LiveScreenState();
+  ConsumerState<LiveScreen> createState() => _LiveScreenState();
 }
 
-class _LiveScreenState extends State<LiveScreen> {
+class _LiveScreenState extends ConsumerState<LiveScreen> {
   // Live tab is always active (index 2)
   final int _activeTab = 2;
 
@@ -22,7 +27,22 @@ class _LiveScreenState extends State<LiveScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const _LiveTitleSheet(),
+      builder: (_) => _LiveTitleSheet(
+        onSubmit: (title) async {
+          final uid = ref.read(authStateProvider).value?.uid;
+          if (uid == null) return;
+          final stream = await ref
+              .read(liveServiceProvider)
+              .startStream(hostUid: uid, title: title);
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LiveViewerScreen(stream: stream),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -66,10 +86,19 @@ class _LiveScreenState extends State<LiveScreen> {
             ),
 
             // 📌 SECTION: Left Side Menu
-            const Positioned(
+            Positioned(
               top: 120,
               left: 16,
-              child: _LiveLeftMenu(),
+              child: _LiveLeftMenu(onOpenTitleSheet: _showTitleSheet),
+            ),
+
+            // 📌 SECTION: Active Streams
+            Positioned(
+              top: 60,
+              left: 0,
+              right: 0,
+              bottom: 160,
+              child: _ActiveStreamsList(),
             ),
 
             // 📌 SECTION: Bottom Controls
@@ -137,15 +166,17 @@ class _LiveScreenState extends State<LiveScreen> {
 // 📌 SECTION: Live Left Menu
 // ─────────────────────────────────────────────
 class _LiveLeftMenu extends StatelessWidget {
-  const _LiveLeftMenu();
+  final VoidCallback onOpenTitleSheet;
+
+  const _LiveLeftMenu({required this.onOpenTitleSheet});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: 40),
-        _TextToolIcon(),
+        const SizedBox(height: 40),
+        _TextToolIcon(onOpenTitleSheet: onOpenTitleSheet),
       ],
     );
   }
@@ -155,21 +186,14 @@ class _LiveLeftMenu extends StatelessWidget {
 // 📌 SECTION: Text Tool Icon (T with underline)
 // ─────────────────────────────────────────────
 class _TextToolIcon extends StatelessWidget {
-  const _TextToolIcon();
+  final VoidCallback onOpenTitleSheet;
 
-  void _openTitleSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, // important for keyboard
-      backgroundColor: Colors.transparent, // keeps rounded corners clean
-      builder: (_) => const _LiveTitleSheet(),
-    );
-  }
+  const _TextToolIcon({required this.onOpenTitleSheet});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _openTitleSheet(context), // 👈 THIS is what you need
+      onTap: onOpenTitleSheet,
       child: SvgPicture.asset(
         'assets/icons/title.svg',
         width: 30,
@@ -237,18 +261,130 @@ class _LiveButtonState extends State<_LiveButton> {
   }
 }
 
+class _ActiveStreamsList extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streamsAsync = ref.watch(activeStreamsProvider);
+
+    return streamsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text(
+          'Live list unavailable',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+        ),
+      ),
+      data: (streams) {
+        if (streams.isEmpty) {
+          return Center(
+            child: Text(
+              'No one is live right now',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.75)),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          itemCount: streams.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, i) {
+            final stream = streams[i];
+            return Material(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LiveViewerScreen(stream: stream),
+                  ),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              stream.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Host: ${stream.hostUid}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(Icons.remove_red_eye,
+                          size: 18,
+                          color: Colors.white.withValues(alpha: 0.85)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${stream.viewersCount}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 // ─────────────────────────────────────────────
 // 📌 SECTION: Live Title Bottom Sheet
 // ─────────────────────────────────────────────
-class _LiveTitleSheet extends StatefulWidget {
-  const _LiveTitleSheet();
+class _LiveTitleSheet extends ConsumerStatefulWidget {
+  final Future<void> Function(String title) onSubmit;
+
+  const _LiveTitleSheet({required this.onSubmit});
 
   @override
-  State<_LiveTitleSheet> createState() => _LiveTitleSheetState();
+  ConsumerState<_LiveTitleSheet> createState() => _LiveTitleSheetState();
 }
 
-class _LiveTitleSheetState extends State<_LiveTitleSheet> {
+class _LiveTitleSheetState extends ConsumerState<_LiveTitleSheet> {
   final TextEditingController _controller = TextEditingController();
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -308,8 +444,8 @@ class _LiveTitleSheetState extends State<_LiveTitleSheet> {
                       color: Color(0xFFE0E0E0),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.person,
-                        color: Colors.white, size: 24),
+                    child:
+                        const Icon(Icons.person, color: Colors.white, size: 24),
                   ),
                 ),
               ),
@@ -362,22 +498,41 @@ class _LiveTitleSheetState extends State<_LiveTitleSheet> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () async {
+                  final title = _controller.text.trim();
+                  if (title.isEmpty || _loading) return;
+                  setState(() => _loading = true);
+                  try {
+                    await widget.onSubmit(title);
+                    if (mounted) Navigator.pop(context);
+                  } finally {
+                    if (mounted) setState(() => _loading = false);
+                  }
+                },
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Add Title',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    letterSpacing: 0.2,
-                  ),
-                ),
+                child: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Go Live',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
               ),
             ),
           ),

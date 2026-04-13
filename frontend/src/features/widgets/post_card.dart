@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../providers/post_providers.dart';
 import '../model/post_model.dart';
 import '../screens/user_screen.dart';
+import '../screens/comment_screen.dart';
 
 class PostCard extends ConsumerWidget {
   final Post post;
@@ -38,8 +39,7 @@ class PostCard extends ConsumerWidget {
                     padding: const EdgeInsets.all(24),
                     child: Text(
                       post.caption,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 18),
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -68,14 +68,12 @@ class PostCard extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        UserProfileScreen(uid: post.authorUid),
+                    builder: (_) => UserProfileScreen(uid: post.authorUid),
                   ),
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(30),
@@ -123,9 +121,7 @@ class PostCard extends ConsumerWidget {
                       child: Row(
                         children: [
                           Icon(
-                            isLiked
-                                ? Icons.favorite
-                                : Icons.favorite_border,
+                            isLiked ? Icons.favorite : Icons.favorite_border,
                             color: isLiked ? Colors.red : Colors.white,
                             size: 22,
                           ),
@@ -136,8 +132,20 @@ class PostCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    _miniIcon('assets/icons/Group.svg',
-                        '${post.commentsCount}'),
+                    GestureDetector(
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        builder: (_) => CommentScreen(post: post),
+                      ),
+                      child: _miniIcon(
+                          'assets/icons/Group.svg', '${post.commentsCount}'),
+                    ),
                     const SizedBox(width: 16),
                     _miniIcon('assets/icons/Send.svg', ''),
                     const Spacer(),
@@ -148,8 +156,7 @@ class PostCard extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Text(
                     post.caption,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 13),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
                   ),
                 ],
               ],
@@ -167,10 +174,8 @@ class PostCard extends ConsumerWidget {
           svgPath,
           width: 20,
           height: 20,
-          colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          placeholderBuilder: (_) =>
-              const SizedBox(width: 20, height: 20),
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          placeholderBuilder: (_) => const SizedBox(width: 20, height: 20),
         ),
         if (text.isNotEmpty) ...[
           const SizedBox(width: 4),

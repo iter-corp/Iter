@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../model/message_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../providers/chat_providers.dart';
+import '../../services/chat_service.dart';
 import '../widgets/message_widget.dart';
 import 'chat_screen.dart';
 import 'request_screen.dart';
-
 
 class MessageScreen extends StatelessWidget {
   const MessageScreen({super.key});
@@ -17,102 +19,44 @@ class MessageScreen extends StatelessWidget {
   }
 }
 
-class MessageBody extends StatefulWidget {
+class MessageBody extends ConsumerStatefulWidget {
   const MessageBody({super.key});
 
   @override
-  State<MessageBody> createState() => _MessageBodyState();
+  ConsumerState<MessageBody> createState() => _MessageBodyState();
 }
 
-class _MessageBodyState extends State<MessageBody> {
+class _MessageBodyState extends ConsumerState<MessageBody> {
   int selectedTab = 0;
 
-  final List<MessageModel> allMessages = const [
-    MessageModel(
-      name: "Zhalian Omar",
-      avatar: "https://i.pravatar.cc/150?img=1",
-      lastMessage: "Yes that's right .",
-      time: "29m",
-      hasUnread: true,
-    ),
-    MessageModel(
-      name: "Hike_With_Me",
-      avatar: "https://i.pravatar.cc/150?img=2",
-      lastMessage: "4+ new messages .",
-      time: "2h",
-      hasUnread: true,
-    ),
-    MessageModel(
-      name: "Anna.salh",
-      avatar: "https://i.pravatar.cc/150?img=3",
-      lastMessage: "OK, thank you .",
-      time: "6h",
-      hasUnread: true,
-    ),
-    MessageModel(
-      name: "Sara Kamal",
-      avatar: "https://i.pravatar.cc/150?img=4",
-      lastMessage: "sent 10h ago",
-      time: "10h",
-    ),
-    MessageModel(
-      name: "Michael",
-      avatar: "https://i.pravatar.cc/150?img=5",
-      lastMessage: "active 23h ago",
-      time: "23h",
-    ),
-  ];
+  void _openChat(ChatConversation conv) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          chatId: conv.chatId,
+          otherUid: conv.otherUid,
+          otherName: conv.otherUsername,
+          otherAvatar: conv.otherAvatarUrl,
+        ),
+      ),
+    );
+  }
 
-  final List<MessageModel> requests = const [
-    MessageModel(
-      name: "Aram Sardar",
-      avatar: "https://i.pravatar.cc/150?img=6",
-      lastMessage: "Hi .",
-      time: "1h",
-      hasUnread: true,
-      isRequest: true,
-    ),
-    MessageModel(
-      name: "Ahmed Ali",
-      avatar: "https://i.pravatar.cc/150?img=7",
-      lastMessage: "4+ new messages .",
-      time: "22h",
-      hasUnread: true,
-      isRequest: true,
-    ),
-    MessageModel(
-      name: "Savan_Rahman",
-      avatar: "https://i.pravatar.cc/150?img=8",
-      lastMessage: "sorry, one question .",
-      time: "5d",
-      hasUnread: true,
-      isRequest: true,
-    ),
-    MessageModel(
-      name: "Shadost",
-      avatar: "https://i.pravatar.cc/150?img=9",
-      lastMessage: "thanks for sharing this...",
-      time: "6d",
-      hasUnread: true,
-      isRequest: true,
-    ),
-    MessageModel(
-      name: "Hiwa jamal",
-      avatar: "https://i.pravatar.cc/150?img=10",
-      lastMessage: "Open the previous link .",
-      time: "2w",
-      hasUnread: true,
-      isRequest: true,
-    ),
-  ];
   @override
   Widget build(BuildContext context) {
+    final inboxAsync = ref.watch(inboxProvider);
+    final allConvs =
+        inboxAsync.value?.where((c) => !c.isRequest).toList() ?? [];
+    final requestConvs =
+        inboxAsync.value?.where((c) => c.isRequest).toList() ?? [];
+
     return SafeArea(
       child: Column(
         children: [
+          // ── Search bar ──────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -121,53 +65,110 @@ class _MessageBodyState extends State<MessageBody> {
               ),
               child: const TextField(
                 decoration: InputDecoration(
-                  hintText: "Search...",
-                  hintStyle:
-                      TextStyle(color: Colors.grey, fontSize: 14),
+                  hintText: 'Search...',
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
                   border: InputBorder.none,
                   icon: Icon(Icons.search, color: Colors.grey),
                 ),
               ),
             ),
           ),
+
+          // ── Tab bar ─────────────────────────────────────────────────
           MessageTabBar(
             selectedTab: selectedTab,
-            allCount: allMessages.length,
-            requestCount: requests.length,
+            allCount: allConvs.length,
+            requestCount: requestConvs.length,
             onTap: (i) => setState(() => selectedTab = i),
           ),
           const SizedBox(height: 8),
+
+          // ── Conversation list ────────────────────────────────────────
           Expanded(
-            child: selectedTab == 0
-                ? ListView.builder(
+            child: inboxAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (_) {
+                if (selectedTab == 0) {
+                  if (allConvs.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No messages yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
                     padding: const EdgeInsets.only(bottom: 100),
-                    itemCount: allMessages.length,
-                    itemBuilder: (context, i) => MessageTile(
-                      message: allMessages[i],
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            name: allMessages[i].name,
-                            avatar: allMessages[i].avatar,
-                          ),
-                        ),
-                      ),
+                    itemCount: allConvs.length,
+                    itemBuilder: (_, i) => _ConvTile(
+                      conv: allConvs[i],
+                      onTap: () => _openChat(allConvs[i]),
                     ),
-                  )
-                : RequestsTab(
-                    requests: requests,
-                    onTap: (msg) => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          name: msg.name,
-                          avatar: msg.avatar,
-                        ),
-                      ),
-                    ),
-                  ),
+                  );
+                } else {
+                  return RequestsTab(
+                    requests: requestConvs,
+                    onTap: _openChat,
+                  );
+                }
+              },
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Private conversation tile
+// ─────────────────────────────────────────────
+
+class _ConvTile extends StatelessWidget {
+  final ChatConversation conv;
+  final VoidCallback onTap;
+
+  const _ConvTile({required this.conv, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        radius: 26,
+        backgroundColor: Colors.grey.shade200,
+        backgroundImage: conv.otherAvatarUrl.isNotEmpty
+            ? NetworkImage(conv.otherAvatarUrl)
+            : null,
+        child: conv.otherAvatarUrl.isEmpty
+            ? const Icon(Icons.person, color: Colors.white)
+            : null,
+      ),
+      title: Text(
+        conv.otherUsername,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      ),
+      subtitle: Text(
+        conv.lastMessage,
+        style: const TextStyle(color: Colors.grey, fontSize: 12),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (conv.unreadCount > 0)
+            Container(
+              width: 10,
+              height: 10,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFB05ECC),
+                shape: BoxShape.circle,
+              ),
+            ),
+          const Icon(Icons.camera_alt_outlined, size: 20, color: Colors.grey),
         ],
       ),
     );

@@ -10,6 +10,9 @@ class NotificationTile extends StatelessWidget {
   final bool isLike;
   final NotificationType trailingType;
 
+  /// Called when the Follow / Follow Back button is tapped.
+  final VoidCallback? onFollowTap;
+
   const NotificationTile({
     super.key,
     required this.avatar,
@@ -18,6 +21,7 @@ class NotificationTile extends StatelessWidget {
     this.postImage,
     this.isLike = false,
     required this.trailingType,
+    this.onFollowTap,
   });
 
   @override
@@ -31,9 +35,13 @@ class NotificationTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundImage: NetworkImage(avatar),
+                backgroundColor: Colors.grey.shade200,
+                backgroundImage:
+                    avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                child: avatar.isEmpty
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
               ),
-
               if (isLike)
                 const Positioned(
                   bottom: 0,
@@ -74,34 +82,41 @@ class NotificationTile extends StatelessWidget {
   Widget _buildTrailing() {
     switch (trailingType) {
       case NotificationType.followBack:
-        return _buildButton("Follow back");
+        return _buildButton('Follow back', onFollowTap);
 
       case NotificationType.follow:
-        return _buildButton("Follow");
+        return _buildButton('Follow', onFollowTap);
 
       case NotificationType.image:
+        if (postImage == null || postImage!.isEmpty) {
+          return const SizedBox(width: 45, height: 45);
+        }
         return ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.asset(
-            postImage ?? "",
+            postImage!,
             width: 45,
             height: 45,
             fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox(width: 45, height: 45),
           ),
         );
     }
   }
 
-  Widget _buildButton(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: const Color(0xFFB44FFF),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
+  Widget _buildButton(String text, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFB44FFF),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+        ),
       ),
     );
   }

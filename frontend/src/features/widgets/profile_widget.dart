@@ -66,8 +66,7 @@ class ProfileNameBio extends StatelessWidget {
               style:
                   const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(bio,
-              style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text(bio, style: const TextStyle(fontSize: 13, color: Colors.grey)),
         ],
       ),
     );
@@ -79,11 +78,15 @@ class ProfileStats extends StatelessWidget {
   final int followers;
   final int following;
   final int posts;
+  final VoidCallback? onFollowersTap;
+  final VoidCallback? onFollowingTap;
   const ProfileStats({
     super.key,
     required this.followers,
     required this.following,
     required this.posts,
+    this.onFollowersTap,
+    this.onFollowingTap,
   });
 
   @override
@@ -93,11 +96,11 @@ class ProfileStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(_fmt(followers), "Followers"),
+          _statItem(_fmt(followers), "Followers", onFollowersTap),
           _divider(),
-          _statItem(_fmt(following), "Following"),
+          _statItem(_fmt(following), "Following", onFollowingTap),
           _divider(),
-          _statItem(_fmt(posts), "Posts"),
+          _statItem(_fmt(posts), "Posts", null),
         ],
       ),
     );
@@ -109,17 +112,19 @@ class ProfileStats extends StatelessWidget {
     return '$n';
   }
 
-  Widget _statItem(String value, String label) {
-    return Column(
+  Widget _statItem(String value, String label, VoidCallback? onTap) {
+    final content = Column(
       children: [
         Text(value,
-            style:
-                const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
+
+    if (onTap == null) return content;
+    return InkWell(
+        onTap: onTap, borderRadius: BorderRadius.circular(8), child: content);
   }
 
   Widget _divider() =>
@@ -155,20 +160,17 @@ class ProfileButtons extends StatelessWidget {
               ),
               child: const Text("Edit Profile",
                   style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600)),
+                      color: Colors.black, fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton.icon(
               onPressed: onSettings,
-              icon: const Icon(Icons.settings,
-                  size: 16, color: Colors.black),
+              icon: const Icon(Icons.settings, size: 16, color: Colors.black),
               label: const Text("Setting",
                   style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600)),
+                      color: Colors.black, fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.grey.shade300),
                 shape: RoundedRectangleBorder(
@@ -246,8 +248,7 @@ class ProfileEmpty extends StatelessWidget {
             const Icon(Icons.image_outlined, size: 48, color: Colors.grey),
             const SizedBox(height: 12),
             const Text("Create your first post",
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 4),
             const Text("Share your content",
                 style: TextStyle(color: Colors.grey, fontSize: 13)),
@@ -258,11 +259,11 @@ class ProfileEmpty extends StatelessWidget {
                 backgroundColor: const Color(0xFFB05ECC),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20)),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
               ),
-              child: const Text("Create",
-                  style: TextStyle(color: Colors.white)),
+              child:
+                  const Text("Create", style: TextStyle(color: Colors.white)),
             ),
           ],
         ),

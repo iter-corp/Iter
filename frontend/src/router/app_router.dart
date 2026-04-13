@@ -13,29 +13,32 @@ import '../providers/auth_providers.dart';
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
-    refreshListenable: _AuthListenable(ref),
+      refreshListenable: _AuthListenable(ref),
     redirect: (context, state) {
       final authAsync = ref.read(authStateProvider);
       final loc = state.matchedLocation;
 
-      // While auth is loading, stay on splash.
+      // While auth is loading, show the splash screen.
       if (authAsync.isLoading) {
         return loc == '/splash' ? null : '/splash';
       }
 
       final user = authAsync.value;
       final loggedIn = user != null;
-      final inAuthFlow = loc == '/login' ||
-          loc == '/signup' ||
-          loc == '/forgot-password' ||
-          loc == '/splash';
+      // Auth flow pages (explicit login/signup/forgot). Do NOT include splash
+      // so that once loading finishes unauthenticated users are forwarded to
+      // the login page instead of remaining on splash.
+      final inAuthFlow = loc == '/login' || loc == '/signup' || loc == '/forgot-password';
 
-      if (!loggedIn) return inAuthFlow ? null : '/login';
+      if (!loggedIn) {
+        // If the user isn't logged in, send them to login unless they're
+        // already on an auth page.
+        return inAuthFlow ? null : '/login';
+      }
 
       // Logged in — check if profile setup needed.
       final userDoc = ref.read(currentUserDocProvider).value;
-      final needsOnboarding =
-          userDoc != null && (userDoc['username'] == null);
+      final needsOnboarding = userDoc != null && (userDoc['username'] == null);
 
       if (needsOnboarding && loc != '/onboarding') return '/onboarding';
       if (!needsOnboarding && (inAuthFlow || loc == '/onboarding')) {
