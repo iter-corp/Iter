@@ -1,26 +1,45 @@
 {
   "project_info": {
-    "project_number": "398881924784",
-    "project_id": "coil-9239e",
-    "storage_bucket": "coil-9239e.firebasestorage.app"
+    "project_number": "751233585713",
+    "firebase_url": "https://coil-50528-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "coil-50528",
+    "storage_bucket": "coil-50528.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:398881924784:android:5be7efa816feee2ef13d75",
+        "mobilesdk_app_id": "1:751233585713:android:5dce8e83bba17fa4a97b10",
         "android_client_info": {
-          "package_name": "com.example.coil"
+          "package_name": "com.team.coil"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "751233585713-inc610u5mvtg0or1pssi314kn6fagkls.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.team.coil",
+            "certificate_hash": "c7ef0605d3fccba29be0b02ca2423563386d923d"
+          }
+        },
+        {
+          "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyA2Smk8UwnMv1BfdphO0odGITNBYT4A848"
+          "current_key": "AIzaSyBBqeOrAoIPgBzOVvfXc6NP93_KbHwXMl0"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

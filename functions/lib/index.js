@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.translate = exports.notifications = exports.messages = exports.live = exports.follows = exports.comments = void 0;
+exports.translate = exports.posts = exports.notifications = exports.messages = exports.live = exports.follows = exports.comments = void 0;
 const admin = __importStar(require("firebase-admin"));
 const comments = __importStar(require("./comments"));
 exports.comments = comments;
@@ -45,6 +45,8 @@ const messages = __importStar(require("./messages"));
 exports.messages = messages;
 const notifications = __importStar(require("./notifications"));
 exports.notifications = notifications;
+const posts = __importStar(require("./posts"));
+exports.posts = posts;
 const translate = __importStar(require("./translate"));
 exports.translate = translate;
 admin.initializeApp();

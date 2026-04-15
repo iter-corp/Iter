@@ -5,6 +5,7 @@ import * as follows from './follows';
 import * as live from './live';
 import * as messages from './messages';
 import * as notifications from './notifications';
+import * as posts from './posts';
 import * as translate from './translate';
 
 admin.initializeApp();
@@ -15,5 +16,6 @@ export {
   live,
   messages,
   notifications,
+  posts,
   translate,
 };

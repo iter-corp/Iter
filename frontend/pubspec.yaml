@@ -33,10 +33,10 @@ dependencies:
   firebase_storage: ^12.3.2
   firebase_messaging: ^15.2.0
   firebase_database: ^11.1.4
-  cloud_functions: ^5.1.5
   agora_rtc_engine: ^6.3.2
   intl: ^0.20.2
   permission_handler: ^11.3.1
+  http: ^1.2.2
 
   # Media
   image_picker: ^1.1.2

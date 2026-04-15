@@ -30,6 +30,18 @@ service cloud.firestore {
         allow create, delete: if isSelf(uid);
         allow update: if false;
       }
+
+      match /reposts/{postId} {
+        allow read: if signedIn();
+        allow create, delete: if isSelf(uid);
+        allow update: if false;
+      }
+
+      match /saved/{postId} {
+        allow read: if isSelf(uid);
+        allow create, delete: if isSelf(uid);
+        allow update: if false;
+      }
     }
 
     match /follows/{targetUid}/followers/{followerUid} {
@@ -40,7 +52,11 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if true;
       allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.authorUid == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.authorUid == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount', 'likesCount'])
+      );
+      allow delete: if signedIn() && resource.data.authorUid == request.auth.uid;
 
       match /likes/{uid} {
         allow read: if true;
@@ -50,11 +66,13 @@ service cloud.firestore {
       match /comments/{commentId} {
         allow read: if true;
         allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
-        allow delete: if signedIn() &&
-          (
-            resource.data.authorUid == request.auth.uid ||
-            get(/databases/$(database)/documents/posts/$(postId)).data.authorUid == request.auth.uid
-          );
+        allow delete: if signedIn() && resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+      }
+
+      match /reposts/{uid} {
+        allow read: if true;
+        allow create, delete: if isSelf(uid);
         allow update: if false;
       }
     }
@@ -82,9 +100,13 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow read: if isChatParticipant(chatId);
+      allow get: if signedIn() && (
+        !exists(/databases/$(database)/documents/chats/$(chatId)) ||
+        request.auth.uid in resource.data.participants
+      );
+      allow list: if signedIn() && request.auth.uid in resource.data.participants;
       allow create: if signedIn() && request.auth.uid in request.resource.data.participants;
-      allow update: if isChatParticipant(chatId);
+      allow update: if signedIn() && request.auth.uid in resource.data.participants;
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -97,7 +119,8 @@ service cloud.firestore {
 
     match /notifications/{uid}/items/{itemId} {
       allow read, update, delete: if isSelf(uid);
-      allow create: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.actorUid == request.auth.uid;
     }
 
     match /liveStreams/{streamId} {
