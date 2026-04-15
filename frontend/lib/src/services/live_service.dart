@@ -67,12 +67,16 @@ class LiveService {
   }
 
   /// Stream all currently active live streams.
+  /// Sorted client-side to avoid requiring a Firestore composite index.
   Stream<List<LiveStream>> getActiveStreams() {
     return _col
         .where('isActive', isEqualTo: true)
-        .orderBy('startedAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(LiveStream.fromDoc).toList());
+        .map((snap) {
+      final list = snap.docs.map(LiveStream.fromDoc).toList();
+      list.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      return list;
+    });
   }
 
   /// Join an existing stream as a viewer. Returns the [LiveStream] with token.

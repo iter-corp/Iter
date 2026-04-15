@@ -17,8 +17,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _usernameCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _loading = false;
+  bool _googleLoading = false;
   bool _obscurePassword = true;
   String? _error;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _googleLoading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authServiceProvider).signInWithGoogle();
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = e.message ?? 'Google sign-in failed');
+    } catch (e) {
+      setState(() => _error = 'Google sign-in failed: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -183,15 +200,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildSocialButton(
-                  label: 'Sign In with Google',
-                  icon: _buildSocialBadge('G', const Color(0xFF4285F4)),
-                  onTap: () {},
-                ),
-                const SizedBox(height: 12),
-                _buildSocialButton(
-                  label: 'Sign In with Facebook',
-                  icon: _buildSocialBadge('f', const Color(0xFF1877F2)),
-                  onTap: () {},
+                  label: _googleLoading
+                      ? 'Signing in...'
+                      : 'Sign In with Google',
+                  icon: _googleLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : _buildSocialBadge('G', const Color(0xFF4285F4)),
+                  onTap: _googleLoading ? () {} : _signInWithGoogle,
                 ),
                 const SizedBox(height: 30),
                 Row(

@@ -12,7 +12,18 @@
       "Bash(git reset:*)",
       "Bash(git rm:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m 'Add Flutter build artifacts to gitignore and remove from tracking:*)"
+      "Bash(git commit -m 'Add Flutter build artifacts to gitignore and remove from tracking:*)",
+      "Bash(npm --version)",
+      "Bash(where supabase *)",
+      "Bash(curl -s -X POST https://htiwlasyspclmsyslaco.supabase.co/functions/v1/issue-upload-url -H \"Content-Type: application/json\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0aXdsYXN5c3BjbG1zeXNsYWNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNDc3MjksImV4cCI6MjA5MTcyMzcyOX0.njgw7AZFge403hvIOYoNsJFR7daqmnZHG4xsJ_9mCtI\" -d '{\"bucket\":\"avatars\",\"kind\":\"avatar\",\"ext\":\"jpg\"}')",
+      "Bash(rm -rf \"d:/COIL-project/frontend/android/app/src/main/kotlin/com/example\")",
+      "Bash(flutter clean *)",
+      "Bash(python -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\([p['name'] for p in d.get\\('plugins',{}\\).get\\('android',[]\\)]\\)\\)\")",
+      "Bash(flutter devices *)",
+      "Bash(flutter run *)",
+      "Bash(./gradlew signingReport)",
+      "Bash(adb -s \"adb-RZ8M73FHH3P-gbTpgR._adb-tls-connect._tcp\" uninstall com.team.coil)",
+      "Bash(adb -s \"adb-RZ8M73FHH3P-gbTpgR._adb-tls-connect._tcp\" uninstall com.example.coil)"
     ]
   }
 }

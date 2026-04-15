@@ -1,71 +1,114 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:photo_manager/photo_manager.dart';
+
+import '../../services/story_service.dart';
+import '../../services/storage_service.dart';
 import 'create_post_screen.dart';
 import 'camera_story_screen.dart';
 import 'live_screen.dart';
 
-// ─────────────────────────────────────────────
-// 📌 SECTION: Add To Story / Gallery Picker Screen
-// ─────────────────────────────────────────────
-class AddToStoryScreen extends StatefulWidget {
+class AddToStoryScreen extends ConsumerStatefulWidget {
   const AddToStoryScreen({super.key});
 
   @override
-  State<AddToStoryScreen> createState() => _AddToStoryScreenState();
+  ConsumerState<AddToStoryScreen> createState() => _AddToStoryScreenState();
 }
 
-class _AddToStoryScreenState extends State<AddToStoryScreen> {
+class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
   int _bottomTab = 1;
-
-  final ScrollController _scrollController = ScrollController();
-  double _scrollOffset = 0;
-
-  // Top bar title section collapses over this many pixels of scroll
-  static const double _collapseRange = 56.0;
-
-  // 📌 SECTION: Mock gallery items
-  // TODO: replace with real device gallery via photo_manager package
-  static const List<_GalleryItem> _items = [
-    _GalleryItem(isCamera: true),
-    _GalleryItem(seed: '1'),
-    _GalleryItem(seed: '2'),
-    _GalleryItem(seed: '1'),
-    _GalleryItem(seed: '2'),
-    _GalleryItem(seed: '1', duration: '0:30'),
-    _GalleryItem(seed: '2'),
-    _GalleryItem(seed: '1'),
-    _GalleryItem(seed: '2'),
-    _GalleryItem(seed: '1'),
-    _GalleryItem(seed: '2'),
-    _GalleryItem(seed: '1'),
-  ];
+  bool _loading = true;
+  bool _uploading = false;
+  String? _permissionMessage;
+  List<AssetEntity> _assets = const [];
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      setState(() {
-        _scrollOffset =
-            _scrollController.offset.clamp(0.0, _collapseRange);
-      });
-    });
+    _loadGallery();
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _loadGallery() async {
+    final ps = await PhotoManager.requestPermissionExtend();
+    if (!ps.isAuth && !ps.hasAccess) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _permissionMessage =
+              'Photo permission denied. Enable it in settings to pick photos.';
+        });
+      }
+      return;
+    }
+
+    final albums = await PhotoManager.getAssetPathList(
+      type: RequestType.image,
+      onlyAll: true,
+    );
+    if (albums.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _assets = const [];
+        });
+      }
+      return;
+    }
+    final recent = albums.first;
+    final assets = await recent.getAssetListPaged(page: 0, size: 100);
+    if (mounted) {
+      setState(() {
+        _assets = assets;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+    await _uploadAndPublish(File(picked.path));
+  }
+
+  Future<void> _pickAsset(AssetEntity asset) async {
+    final file = await asset.file;
+    if (file == null) return;
+    await _uploadAndPublish(file);
+  }
+
+  Future<void> _uploadAndPublish(File file) async {
+    if (_uploading) return;
+    setState(() => _uploading = true);
+    try {
+      final url = await StorageService().uploadStoryImage(file);
+      await StoryService().createStory(imageUrl: url);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Story added')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add story: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 0.0 → fully visible, 1.0 → fully collapsed
-    final double collapseProgress = _scrollOffset / _collapseRange;
-    // Title bar height: 54px → 0px
-    final double titleHeight = (54.0 * (1 - collapseProgress)).clamp(0.0, 54.0);
-    // Title opacity: 1 → 0 (fades out in the first half of scroll)
-    final double titleOpacity = (1 - collapseProgress * 2).clamp(0.0, 1.0);
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -73,72 +116,43 @@ class _AddToStoryScreenState extends State<AddToStoryScreen> {
           children: [
             Column(
               children: [
-                // 📌 SECTION: Collapsing dark header
                 Container(
                   color: const Color(0xFF2B2D30),
-                  child: Column(
+                  padding:
+                      const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                  child: Row(
                     children: [
-                      // ── Shrinking title bar ───────
-                      ClipRect(
-                        child: SizedBox(
-                          height: titleHeight,
-                          child: Opacity(
-                            opacity: titleOpacity,
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: GestureDetector(
-                                      onTap: () => Navigator.pop(context),
-                                      child: const Icon(Icons.close,
-                                          color: Colors.white, size: 26),
-                                    ),
-                                  ),
-                                  const Text(
-                                    'Add to story',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Icon(Icons.close,
+                            color: Colors.white, size: 26),
+                      ),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            'Add to story',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ),
-
-                      // ── Album row always visible ──
-                      _buildAlbumRow(),
+                      const SizedBox(width: 26),
                     ],
                   ),
                 ),
-
-                // 📌 SECTION: Photo grid
-                Expanded(
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 80),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 5,
-                      crossAxisSpacing: 5,
-                      childAspectRatio: 0.76,
-                    ),
-                    itemCount: _items.length,
-                    itemBuilder: (_, index) =>
-                        _GalleryCell(item: _items[index]),
-                  ),
-                ),
+                Expanded(child: _buildBody()),
               ],
             ),
-
-            // 📌 SECTION: Floating pill tab bar
+            if (_uploading)
+              Container(
+                color: Colors.black.withValues(alpha: 0.5),
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
             Positioned(
               bottom: 16,
               left: 0,
@@ -167,69 +181,66 @@ class _AddToStoryScreenState extends State<AddToStoryScreen> {
     );
   }
 
-  // ── Album row ────────────────────────────────
-  Widget _buildAlbumRow() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Recent ▼
-          const Row(
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_permissionMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Recent',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
+              const Icon(Icons.photo_library_outlined,
+                  size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(_permissionMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: () => PhotoManager.openSetting(),
+                child: const Text('Open Settings'),
               ),
-              SizedBox(width: 3),
-              Icon(Icons.keyboard_arrow_down,
-                  color: Colors.white, size: 20),
             ],
           ),
-
-          // Select pill
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3A3A3C),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/filled.svg',
-                  colorFilter:
-                      const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                  width: 23,
-                  height: 23,
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'Select',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 80),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 4,
+        crossAxisSpacing: 4,
+        childAspectRatio: 0.76,
       ),
+      itemCount: _assets.length + 1,
+      itemBuilder: (_, index) {
+        if (index == 0) {
+          return GestureDetector(
+            onTap: _pickFromCamera,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                color: const Color(0xFF3A3C3F),
+                child: const Center(
+                  child: Icon(Icons.photo_camera_outlined,
+                      color: Colors.white, size: 32),
+                ),
+              ),
+            ),
+          );
+        }
+        final asset = _assets[index - 1];
+        return _AssetThumbCell(asset: asset, onTap: () => _pickAsset(asset));
+      },
     );
   }
 
-  // ── Pill tab button ──────────────────────────
   Widget _buildTab(String text, int index) {
     final bool isActive = _bottomTab == index;
-
     return GestureDetector(
       onTap: () {
         setState(() => _bottomTab = index);
@@ -270,83 +281,31 @@ class _AddToStoryScreenState extends State<AddToStoryScreen> {
   }
 }
 
-// ─────────────────────────────────────────────
-// 📌 SECTION: Gallery Item Model
-// ─────────────────────────────────────────────
-class _GalleryItem {
-  final bool isCamera;
-  final String? seed;
-  final String? duration;
+class _AssetThumbCell extends StatelessWidget {
+  final AssetEntity asset;
+  final VoidCallback onTap;
 
-  const _GalleryItem({
-    this.isCamera = false,
-    this.seed,
-    this.duration,
-  });
-}
-
-// ─────────────────────────────────────────────
-// 📌 SECTION: Gallery Cell Widget
-// ─────────────────────────────────────────────
-class _GalleryCell extends StatelessWidget {
-  final _GalleryItem item;
-  const _GalleryCell({required this.item});
+  const _AssetThumbCell({required this.asset, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: item.isCamera ? _buildCameraCell() : _buildImageCell(),
-    );
-  }
-
-  Widget _buildCameraCell() {
-    return Container(
-      color: const Color(0xFF3A3C3F),
-      child: const Center(
-        child: Icon(
-          Icons.photo_camera_outlined,
-          color: Colors.white60,
-          size: 32,
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: FutureBuilder(
+          future: asset.thumbnailDataWithSize(
+            const ThumbnailSize(256, 256),
+          ),
+          builder: (context, snap) {
+            final bytes = snap.data;
+            if (bytes == null) {
+              return Container(color: const Color(0xFF3A3C3F));
+            }
+            return Image.memory(bytes, fit: BoxFit.cover);
+          },
         ),
       ),
-    );
-  }
-
-  Widget _buildImageCell() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          'assets/img/${item.seed}.png',
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              Container(color: const Color(0xFF3A3C3F)),
-        ),
-
-        // Duration badge
-        if (item.duration != null)
-          Positioned(
-            bottom: 7,
-            right: 7,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.65),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                item.duration!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

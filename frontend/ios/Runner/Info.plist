@@ -27,9 +27,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Coil needs camera access to broadcast live video.</string>
+	<string>Coil needs camera access to capture photos for posts, stories, and live video.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Coil needs microphone access to broadcast live audio.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Coil needs access to your photos so you can post images, set your avatar, and share stories.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Coil saves images you capture to your photo library.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

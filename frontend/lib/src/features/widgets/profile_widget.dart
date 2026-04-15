@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../screens/create_post_screen.dart';
 import '../screens/edit_profile.dart';
 
 /// COVER + AVATAR
@@ -253,18 +254,27 @@ class ProfileEmpty extends StatelessWidget {
             const Text("Share your content",
                 style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB05ECC),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
-              ),
-              child:
-                  const Text("Create", style: TextStyle(color: Colors.white)),
-            ),
+            Builder(builder: (ctx) {
+              return ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    ctx,
+                    MaterialPageRoute(
+                      builder: (_) => const CreatePostScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFB05ECC),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+                ),
+                child: const Text("Create",
+                    style: TextStyle(color: Colors.white)),
+              );
+            }),
           ],
         ),
       ),

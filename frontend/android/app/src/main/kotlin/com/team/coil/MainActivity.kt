@@ -1,4 +1,4 @@
-package com.example.coil
+package com.team.coil
 
 import io.flutter.embedding.android.FlutterActivity
 

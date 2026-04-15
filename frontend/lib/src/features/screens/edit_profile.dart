@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../providers/auth_providers.dart';
+import '../../services/storage_service.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -18,7 +22,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   bool _initialized = false;
   bool _saving = false;
+  bool _uploadingAvatar = false;
+  bool _uploadingCover = false;
   String? _avatarUrl;
+  String? _coverUrl;
 
   @override
   void dispose() {
@@ -34,7 +41,64 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _bioController.text = (user['bio'] as String?) ?? '';
     _genderController.text = (user['gender'] as String?) ?? '';
     _avatarUrl = user['avatarUrl'] as String?;
+    _coverUrl = user['coverUrl'] as String?;
     _initialized = true;
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    if (_uploadingAvatar) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final url = await StorageService().uploadAvatar(File(picked.path));
+      final uid = ref.read(authServiceProvider).currentUser!.uid;
+      await ref.read(userServiceProvider).updateUser(uid, {'avatarUrl': url});
+      if (mounted) setState(() => _avatarUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  Future<void> _pickAndUploadCover() async {
+    if (_uploadingCover) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploadingCover = true);
+    try {
+      final url = await StorageService().uploadCover(File(picked.path));
+      final uid = ref.read(authServiceProvider).currentUser!.uid;
+      await ref.read(userServiceProvider).updateUser(uid, {'coverUrl': url});
+      if (mounted) setState(() => _coverUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cover upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
   }
 
   Future<void> _save() async {
@@ -95,41 +159,33 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        const SizedBox(height: 20),
-                        Center(
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white,
-                                ),
-                                child: CircleAvatar(
-                                  radius: 44,
-                                  backgroundColor: Colors.grey.shade200,
-                                  backgroundImage: _avatarUrl != null
-                                      ? CachedNetworkImageProvider(_avatarUrl!)
-                                      : null,
-                                  child: _avatarUrl == null
-                                      ? const Icon(Icons.person,
-                                          size: 44, color: Colors.grey)
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                "Edit picture",
-                                style: TextStyle(
-                                  color: Color(0xFFB05ECC),
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+                        // COVER + AVATAR composite
+                        _buildCoverAndAvatar(),
+                        const SizedBox(height: 56),
+                        GestureDetector(
+                          onTap: _pickAndUploadAvatar,
+                          child: const Text(
+                            "Edit picture",
+                            style: TextStyle(
+                              color: Color(0xFFB05ECC),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: _pickAndUploadCover,
+                          child: const Text(
+                            "Edit cover",
+                            style: TextStyle(
+                              color: Color(0xFFB05ECC),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
                         _buildField("Username", _usernameController),
                         _buildField("Bio", _bioController, maxLines: 3),
                         _buildField("Gender", _genderController),
@@ -176,6 +232,95 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildCoverAndAvatar() {
+    return SizedBox(
+      height: 180 + 52,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Cover
+          GestureDetector(
+            onTap: _pickAndUploadCover,
+            child: Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                image: _coverUrl != null
+                    ? DecorationImage(
+                        image: CachedNetworkImageProvider(_coverUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: Stack(
+                children: [
+                  if (_uploadingCover)
+                    const Center(
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2.5),
+                    ),
+                  Positioned(
+                    right: 14,
+                    top: 14,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt_outlined,
+                          color: Colors.white, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Avatar
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: _pickAndUploadAvatar,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 44,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: _avatarUrl != null
+                            ? CachedNetworkImageProvider(_avatarUrl!)
+                            : null,
+                        child: _avatarUrl == null
+                            ? const Icon(Icons.person,
+                                size: 44, color: Colors.grey)
+                            : null,
+                      ),
+                      if (_uploadingAvatar)
+                        const CircularProgressIndicator(
+                          color: Color(0xFFB05ECC),
+                          strokeWidth: 2.5,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

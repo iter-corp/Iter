@@ -1,14 +1,124 @@
+import 'dart:convert';
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+
+class StorageException implements Exception {
+  StorageException(this.message);
+  final String message;
+  @override
+  String toString() => 'StorageException: $message';
+}
 
 class StorageService {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  StorageService();
 
-  Future<String> uploadFile(String path, File file) async {
-    final ref = _storage.ref(path);
-    await ref.putFile(file);
-    return ref.getDownloadURL();
+  String get _supabaseUrl => dotenv.env['SUPABASE_URL']!;
+  String get _anonKey => dotenv.env['SUPABASE_ANON_KEY']!;
+
+  Future<String> uploadAvatar(File file) {
+    return _uploadViaEdge(bucket: 'avatars', file: file, kind: 'avatar');
   }
 
-  Future<void> deleteFile(String path) => _storage.ref(path).delete();
+  Future<String> uploadCover(File file) {
+    return _uploadViaEdge(bucket: 'avatars', file: file, kind: 'cover');
+  }
+
+  Future<String> uploadPostImage(File file) {
+    return _uploadViaEdge(bucket: 'posts', file: file, kind: 'post');
+  }
+
+  Future<String> uploadChatImage(File file, String chatId) {
+    return _uploadViaEdge(bucket: 'posts', file: file, kind: 'chat', subPath: chatId);
+  }
+
+  Future<String> uploadStoryImage(File file) {
+    return _uploadViaEdge(bucket: 'posts', file: file, kind: 'story');
+  }
+
+  Future<String> _uploadViaEdge({
+    required String bucket,
+    required File file,
+    required String kind,
+    String? subPath,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StorageException('Not signed in');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw StorageException('Could not get Firebase ID token');
+
+    final ext = _extensionOf(file.path);
+    final contentType = _contentTypeOf(ext);
+
+    final edgeUri = Uri.parse('$_supabaseUrl/functions/v1/issue-upload-url');
+
+    final req = await http.post(
+      edgeUri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_anonKey',
+        'apikey': _anonKey,
+        'X-Firebase-Token': idToken,
+      },
+      body: jsonEncode({
+        'bucket': bucket,
+        'kind': kind,
+        'ext': ext,
+        if (subPath != null) 'subPath': subPath,
+      }),
+    );
+
+    if (req.statusCode != 200) {
+      throw StorageException('issue-upload-url failed: ${req.statusCode} ${req.body}');
+    }
+
+    final data = jsonDecode(req.body) as Map<String, dynamic>;
+    final uploadUrl = data['uploadUrl'] as String;
+    final publicUrl = data['publicUrl'] as String;
+    final token = data['token'] as String?;
+
+    final bytes = await file.readAsBytes();
+    final upload = await http.put(
+      Uri.parse(uploadUrl),
+      headers: {
+        'Content-Type': contentType,
+        if (token != null) 'Authorization': 'Bearer $token',
+        'x-upsert': 'true',
+      },
+      body: bytes,
+    );
+
+    if (upload.statusCode != 200 && upload.statusCode != 201) {
+      throw StorageException('upload failed: ${upload.statusCode} ${upload.body}');
+    }
+
+    return publicUrl;
+  }
+
+  String _extensionOf(String path) {
+    final i = path.lastIndexOf('.');
+    if (i == -1) return 'bin';
+    return path.substring(i + 1).toLowerCase();
+  }
+
+  String _contentTypeOf(String ext) {
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'heic':
+        return 'image/heic';
+      default:
+        return 'application/octet-stream';
+    }
+  }
 }

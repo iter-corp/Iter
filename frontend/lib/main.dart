@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
@@ -12,9 +13,35 @@ import 'src/services/fcm_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  debugPrint('[boot] WidgetsFlutterBinding ready');
+
+  try {
+    await dotenv.load(fileName: '.env');
+    debugPrint('[boot] dotenv loaded');
+  } catch (e) {
+    debugPrint('[boot] dotenv load failed (ignored): $e');
+  }
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('[boot] Firebase initialized (fresh)');
+  } catch (e) {
+    debugPrint('[boot] Firebase init non-fatal: $e');
+  }
+  debugPrint('[boot] Firebase.apps=${Firebase.apps.length}');
+
+  // Sanity-check that auth stream produces a first event.
+  FirebaseAuth.instance.authStateChanges().first.timeout(
+    const Duration(seconds: 5),
+    onTimeout: () {
+      debugPrint('[boot] authStateChanges timed out (no user / stuck)');
+      return null;
+    },
+  ).then((u) => debugPrint('[boot] first auth event: ${u?.uid ?? 'null'}'));
+
+  debugPrint('[boot] runApp');
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -23,7 +50,6 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Init FCM once whenever a user signs in.
     ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
       final previousUser = prev?.value;
       final nextUser = next.value;
@@ -40,6 +66,13 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router,
+      builder: (context, child) {
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child,
+        );
+      },
     );
   }
 }

@@ -1,12 +1,14 @@
+import 'dart:io';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../services/storage_service.dart';
+import '../../services/story_service.dart';
 import 'add_to_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_screen.dart';
 
-// ─────────────────────────────────────────────
-// 📌 SECTION: Camera / Story Screen
-// ─────────────────────────────────────────────
 class CameraStoryScreen extends StatefulWidget {
   const CameraStoryScreen({super.key});
 
@@ -14,12 +16,134 @@ class CameraStoryScreen extends StatefulWidget {
   State<CameraStoryScreen> createState() => _CameraStoryScreenState();
 }
 
-class _CameraStoryScreenState extends State<CameraStoryScreen> {
-  int _bottomTab = 1; // 0=Post, 1=Story, 2=Live
-  int _flashMode = 2; // 0=Off, 1=On, 2=Auto
-  bool _isExpanded = false;
+class _CameraStoryScreenState extends State<CameraStoryScreen>
+    with WidgetsBindingObserver {
+  int _bottomTab = 1;
+  CameraController? _controller;
+  Future<void>? _initFuture;
+  List<CameraDescription> _cameras = const [];
+  int _activeCamera = 0;
+  FlashMode _flashMode = FlashMode.auto;
+  bool _uploading = false;
+  String? _initError;
 
-  // ── Tab selection & navigation ──────────────
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _setupCamera();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    if (state == AppLifecycleState.inactive) {
+      c.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      _setupCamera();
+    }
+  }
+
+  Future<void> _setupCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras.isEmpty) {
+        setState(() => _initError = 'No cameras found');
+        return;
+      }
+      final desc = _cameras[_activeCamera];
+      final c = CameraController(
+        desc,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+      _controller = c;
+      _initFuture = c.initialize();
+      await _initFuture;
+      if (!mounted) return;
+      await c.setFlashMode(_flashMode);
+      setState(() {});
+    } catch (e) {
+      if (mounted) setState(() => _initError = 'Camera init failed: $e');
+    }
+  }
+
+  Future<void> _flipCamera() async {
+    if (_cameras.length < 2) return;
+    _activeCamera = (_activeCamera + 1) % _cameras.length;
+    await _controller?.dispose();
+    _controller = null;
+    setState(() {});
+    await _setupCamera();
+  }
+
+  Future<void> _cycleFlash() async {
+    FlashMode next;
+    switch (_flashMode) {
+      case FlashMode.off:
+        next = FlashMode.auto;
+        break;
+      case FlashMode.auto:
+        next = FlashMode.always;
+        break;
+      case FlashMode.always:
+      case FlashMode.torch:
+        next = FlashMode.off;
+        break;
+    }
+    _flashMode = next;
+    try {
+      await _controller?.setFlashMode(next);
+    } catch (_) {}
+    setState(() {});
+  }
+
+  IconData get _flashIcon {
+    switch (_flashMode) {
+      case FlashMode.off:
+        return Icons.flash_off;
+      case FlashMode.auto:
+        return Icons.flash_auto;
+      case FlashMode.always:
+      case FlashMode.torch:
+        return Icons.flash_on;
+    }
+  }
+
+  Future<void> _captureAndPublish() async {
+    final c = _controller;
+    if (_uploading || c == null || !c.value.isInitialized) return;
+    setState(() => _uploading = true);
+    try {
+      final pic = await c.takePicture();
+      final url = await StorageService().uploadStoryImage(File(pic.path));
+      await StoryService().createStory(imageUrl: url);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Story added')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Capture failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   void _onTabSelected(int index) {
     switch (index) {
       case 0:
@@ -39,62 +163,34 @@ class _CameraStoryScreenState extends State<CameraStoryScreen> {
     }
   }
 
-  // ── Build ────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF2B2D30),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
-            // 📌 SECTION: Top Bar
+            Positioned.fill(child: _buildPreview()),
+
             Positioned(
               top: 12,
               left: 16,
               right: 16,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  GestureDetector(
+                  _CircleButton(
+                    icon: Icons.close,
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Colors.white, size: 28),
                   ),
-                  GestureDetector(
-                    onTap: () =>
-                        setState(() => _flashMode = (_flashMode + 1) % 3),
-                    child: Icon(
-                      _flashMode == 0
-                          ? Icons.flash_off
-                          : _flashMode == 1
-                              ? Icons.flash_on
-                              : Icons.flash_auto,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                  const Spacer(),
+                  _CircleButton(
+                    icon: _flashIcon,
+                    onTap: _cycleFlash,
                   ),
                 ],
               ),
             ),
 
-            // ── Divider below top bar ───────────
-            const Positioned(
-              top: 60,
-              left: 0,
-              right: 0,
-              child: Divider(
-                color: Colors.white54,
-                thickness: 0.5,
-              ),
-            ),
-
-            // 📌 SECTION: Left Side Menu
-            Positioned(
-              top: 120,
-              left: 16,
-              child: _buildLeftMenu(),
-            ),
-
-            // 📌 SECTION: Bottom Controls
             Positioned(
               bottom: 0,
               left: 0,
@@ -108,7 +204,6 @@ class _CameraStoryScreenState extends State<CameraStoryScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Gallery thumbnail → navigates to AddToStoryScreen
                         GestureDetector(
                           onTap: () => Navigator.push(
                             context,
@@ -116,125 +211,63 @@ class _CameraStoryScreenState extends State<CameraStoryScreen> {
                               builder: (_) => const AddToStoryScreen(),
                             ),
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.asset(
-                              'assets/img/1.png',
-                              width: 44,
-                              height: 44,
-                              fit: BoxFit.cover,
-                              frameBuilder: (_, child, frame, __) =>
-                                  frame != null
-                                      ? child
-                                      : const SizedBox(width: 44, height: 44),
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox(width: 44, height: 44),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
                             ),
+                            child: const Icon(Icons.photo_library_outlined,
+                                color: Colors.white),
                           ),
                         ),
-
-                        // Shutter button
-                        const _ShutterButton(),
-
-                        // Flip camera
-                        SvgPicture.asset(
-                          'assets/icons/reverse.svg',
-                          colorFilter: const ColorFilter.mode(
-                              Colors.white, BlendMode.srcIn),
-                          width: 28,
-                          height: 28,
+                        _ShutterButton(
+                          uploading: _uploading,
+                          onTap: _captureAndPublish,
+                        ),
+                        GestureDetector(
+                          onTap: _flipCamera,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                                Icons.cameraswitch_outlined,
+                                color: Colors.white),
+                          ),
                         ),
                       ],
                     ),
                   ),
-
-                  // ── Tabs ─────────────────────
                   Padding(
                     padding: const EdgeInsets.only(bottom: 20),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildTab("Post", 0),
+                        _buildTab('Post', 0),
                         const SizedBox(width: 24),
-                        _buildTab("Story", 1),
+                        _buildTab('Story', 1),
                         const SizedBox(width: 24),
-                        _buildTab("Live", 2),
+                        _buildTab('Live', 2),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  // ── Left menu ───────────────────────────────
-  Widget _buildLeftMenu() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildIcon(iconPath: 'assets/icons/Aa.svg', label: "Create", index: 0),
-        _buildIcon(
-            iconPath: 'assets/icons/infinity.svg',
-            label: "Boomerang",
-            index: 1),
-        _buildIcon(
-            iconPath: 'assets/icons/layout.svg', label: "Layout", index: 2),
-        _buildCollapseArrow(label: "Close"),
-      ],
-    );
-  }
-
-  Widget _buildIcon({
-    required String iconPath,
-    required String label,
-    required int index,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          SvgPicture.asset(
-            iconPath,
-            colorFilter:
-                const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-            width: index == 0 ? 13 : 22,
-            height: index == 0 ? 13 : 22,
-          ),
-          const SizedBox(width: 8),
-          if (_isExpanded)
-            Text(label,
-                style: const TextStyle(color: Colors.white, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCollapseArrow({required String label}) {
-    return GestureDetector(
-      onTap: () => setState(() => _isExpanded = !_isExpanded),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            SvgPicture.asset(
-              _isExpanded
-                  ? 'assets/icons/arrow-up.svg'
-                  : 'assets/icons/arrow-down.svg',
-              colorFilter:
-                  const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              width: 22,
-              height: 22,
-            ),
-            if (_isExpanded)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(label,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 13)),
+            if (_uploading)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                ),
               ),
           ],
         ),
@@ -242,7 +275,42 @@ class _CameraStoryScreenState extends State<CameraStoryScreen> {
     );
   }
 
-  // ── Tab button ──────────────────────────────
+  Widget _buildPreview() {
+    if (_initError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _initError!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || _initFuture == null) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+    return FutureBuilder<void>(
+      future: _initFuture,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(
+              child: CircularProgressIndicator(color: Colors.white));
+        }
+        return FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: c.value.previewSize?.height ?? 1,
+            height: c.value.previewSize?.width ?? 1,
+            child: CameraPreview(c),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildTab(String text, int index) {
     final bool isActive = _bottomTab == index;
     return GestureDetector(
@@ -259,11 +327,32 @@ class _CameraStoryScreenState extends State<CameraStoryScreen> {
   }
 }
 
-// ─────────────────────────────────────────────
-// 📌 SECTION: Shutter Button
-// ─────────────────────────────────────────────
+class _CircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.4),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
 class _ShutterButton extends StatefulWidget {
-  const _ShutterButton();
+  final bool uploading;
+  final VoidCallback onTap;
+  const _ShutterButton({required this.uploading, required this.onTap});
 
   @override
   State<_ShutterButton> createState() => _ShutterButtonState();
@@ -276,7 +365,10 @@ class _ShutterButtonState extends State<_ShutterButton> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        if (!widget.uploading) widget.onTap();
+      },
       onTapCancel: () => setState(() => _pressed = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),

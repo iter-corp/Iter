@@ -1,15 +1,18 @@
 ﻿import 'dart:async';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/chat_service.dart';
+import '../../services/storage_service.dart';
 import '../model/post_model.dart';
 import '../widgets/post_card.dart';
 
@@ -35,6 +38,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
+  bool _sendingImage = false;
 
   String? get _currentUid => ref.read(authStateProvider).value?.uid;
 
@@ -88,6 +92,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           receiverUid: widget.otherUid,
           text: text,
         );
+  }
+
+  Future<void> _pickAndSendImage() async {
+    if (_sendingImage) return;
+    final uid = _currentUid;
+    if (uid == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+
+    setState(() => _sendingImage = true);
+    try {
+      final url = await StorageService()
+          .uploadChatImage(File(picked.path), widget.chatId);
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: '',
+            imageUrl: url,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
   }
 
   void _scrollToBottom() {
@@ -242,9 +281,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.camera_alt_outlined,
-                        color: Colors.grey),
+                    onPressed: _sendingImage ? null : _pickAndSendImage,
+                    icon: _sendingImage
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Color(0xFFB05ECC)),
+                          )
+                        : const Icon(Icons.camera_alt_outlined,
+                            color: Colors.grey),
                   ),
                   Expanded(
                     child: Container(
@@ -342,11 +388,43 @@ class _MessageBubble extends StatelessWidget {
                       bottomRight: Radius.circular(isMe ? 4 : 16),
                     ),
                   ),
-                  child:
-                      (msg.sharedPostId != null && msg.sharedPostId!.isNotEmpty)
-                          ? _SharedPostPreview(
-                              postId: msg.sharedPostId!,
-                              isMe: isMe,
+                  child: (msg.sharedPostId != null &&
+                          msg.sharedPostId!.isNotEmpty)
+                      ? _SharedPostPreview(
+                          postId: msg.sharedPostId!,
+                          isMe: isMe,
+                        )
+                      : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: CachedNetworkImage(
+                                    imageUrl: msg.imageUrl!,
+                                    width: 240,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => const SizedBox(
+                                      height: 180,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (msg.text.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    msg.text,
+                                    style: TextStyle(
+                                      color:
+                                          isMe ? Colors.white : Colors.black,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             )
                           : Text(
                               msg.text,

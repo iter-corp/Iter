@@ -74,12 +74,15 @@ class _TranslateBodyState extends State<TranslateBody> {
         _hasTranslation = true;
         _translatedText = translated;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[translate] failed: $e');
+      debugPrint('[translate] stack: $st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Translation is currently unavailable'),
+        SnackBar(
+          content: Text('Translate failed: $e'),
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
         ),
       );
     } finally {
@@ -506,7 +509,7 @@ class _OutputBox extends StatelessWidget {
               GestureDetector(
                 onTap: onBookmark,
                 child: SvgPicture.asset(
-                  'assets/icons/bookmark.svg',
+                  'assets/icons/Bookmark.svg',
                   width: 20,
                   height: 20,
                   colorFilter:

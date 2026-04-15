@@ -41,13 +41,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // Logged in — check if profile setup needed.
-      final userDoc = ref.read(currentUserDocProvider).value;
+      final userDocAsync = ref.read(currentUserDocProvider);
+      final userDoc = userDocAsync.value;
+
+      // While user doc is still loading (first emission hasn't happened yet),
+      // keep showing the splash instead of bouncing them to /home with no
+      // knowledge of onboarding state.
+      if (userDocAsync.isLoading) {
+        return loc == '/splash' ? null : '/splash';
+      }
+
       final needsOnboarding = userDoc != null && (userDoc['username'] == null);
 
       if (needsOnboarding && loc != '/onboarding' && loc != '/otp') {
         return '/onboarding';
       }
-      if (!needsOnboarding && (inAuthFlow || loc == '/onboarding')) {
+      // Anywhere we're still on the splash or in auth flow, move to home.
+      if (!needsOnboarding &&
+          (inAuthFlow || loc == '/onboarding' || loc == '/splash')) {
         return '/home';
       }
       return null;

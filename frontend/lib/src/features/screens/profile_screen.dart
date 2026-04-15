@@ -1,9 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/follow_providers.dart';
+import '../../providers/post_providers.dart';
+import '../model/post_model.dart';
+import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -148,13 +152,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: (i) => setState(() => selectedTab = i),
                 ),
                 const Divider(height: 1),
-                const ProfileEmpty(),
+                if (currentUid != null)
+                  _tabContent(currentUid)
+                else
+                  const ProfileEmpty(),
               ],
             ),
           );
         },
       ),
     );
+  }
+
+  Widget _tabContent(String uid) {
+    switch (selectedTab) {
+      case 0:
+        return UserPostsGrid(uid: uid);
+      case 1:
+        return const _EmptyTab(
+          icon: Icons.repeat,
+          title: 'No reposts yet',
+          subtitle: 'Posts you repost will show here.',
+        );
+      case 2:
+        return const _EmptyTab(
+          icon: Icons.bookmark_border,
+          title: 'No saved posts',
+          subtitle: 'Save posts to view them here later.',
+        );
+      default:
+        return UserPostsGrid(uid: uid);
+    }
   }
 
   void _showSettings(BuildContext context) {
@@ -176,6 +204,166 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class UserPostsGrid extends ConsumerWidget {
+  final String uid;
+  const UserPostsGrid({super.key, required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postsAsync = ref.watch(userPostsProvider(uid));
+    return postsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $e')),
+      ),
+      data: (posts) {
+        if (posts.isEmpty) return const ProfileEmpty();
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(2),
+          gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+            childAspectRatio: 1,
+          ),
+          itemCount: posts.length,
+          itemBuilder: (_, i) {
+            final post = posts[i];
+            final url = post.imageUrls.isNotEmpty
+                ? post.imageUrls.first
+                : null;
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PostDetailScreen(
+                    posts: posts,
+                    initialIndex: i,
+                  ),
+                ),
+              ),
+              child: Container(
+                color: const Color(0xFFEDEDF2),
+                child: url != null
+                    ? CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                            color: const Color(0xFFEDEDF2)),
+                        errorWidget: (_, __, ___) => const Icon(
+                            Icons.broken_image, color: Colors.grey),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Center(
+                          child: Text(
+                            post.caption,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.black87),
+                          ),
+                        ),
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _EmptyTab extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _EmptyTab({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+class PostDetailScreen extends StatefulWidget {
+  final List<Post> posts;
+  final int initialIndex;
+  const PostDetailScreen({
+    super.key,
+    required this.posts,
+    this.initialIndex = 0,
+  });
+
+  @override
+  State<PostDetailScreen> createState() => _PostDetailScreenState();
+}
+
+class _PostDetailScreenState extends State<PostDetailScreen> {
+  late final ScrollController _controller;
+  static const _itemExtent = 560.0; // approx PostCard height
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ScrollController(
+      initialScrollOffset: widget.initialIndex * _itemExtent,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Posts'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+      ),
+      body: ListView.builder(
+        controller: _controller,
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        itemCount: widget.posts.length,
+        itemBuilder: (_, i) => PostCard(post: widget.posts[i]),
       ),
     );
   }

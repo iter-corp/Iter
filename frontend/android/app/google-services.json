@@ -23,6 +23,14 @@
           }
         },
         {
+          "client_id": "751233585713-u7s2ksgng7c63bjhqsr05j1vsh2ssnvt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.team.coil",
+            "certificate_hash": "e52d6b26bba5bec9acc1fc6f48947a2c20caa05c"
+          }
+        },
+        {
           "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
           "client_type": 3
         }
