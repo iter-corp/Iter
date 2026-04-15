@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/model/main_screen.dart';
+import '../features/screens/admin/admin_dashboard_screen.dart';
 import '../features/screens/auth/forgot_password_screen.dart';
 import '../features/screens/auth/login_screen.dart';
 import '../features/screens/auth/onboarding_screen.dart';
@@ -82,6 +83,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const OnboardingScreen(),
       ),
       GoRoute(path: '/home', builder: (_, __) => const MainScreen()),
+      GoRoute(
+        path: '/admin',
+        builder: (_, __) => const AdminDashboardScreen(),
+      ),
     ],
   );
 });

@@ -23,7 +23,8 @@
       "Bash(flutter run *)",
       "Bash(./gradlew signingReport)",
       "Bash(adb -s \"adb-RZ8M73FHH3P-gbTpgR._adb-tls-connect._tcp\" uninstall com.team.coil)",
-      "Bash(adb -s \"adb-RZ8M73FHH3P-gbTpgR._adb-tls-connect._tcp\" uninstall com.example.coil)"
+      "Bash(adb -s \"adb-RZ8M73FHH3P-gbTpgR._adb-tls-connect._tcp\" uninstall com.example.coil)",
+      "Bash(adb devices *)"
     ]
   }
 }

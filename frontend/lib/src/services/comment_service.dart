@@ -36,6 +36,9 @@ class CommentService {
   CollectionReference<Map<String, dynamic>> _comments(String postId) =>
       _db.collection('posts').doc(postId).collection('comments');
 
+  DocumentReference<Map<String, dynamic>> _postRef(String postId) =>
+      _db.collection('posts').doc(postId);
+
   Stream<List<Comment>> streamComments(String postId) {
     return _comments(postId)
         .orderBy('createdAt', descending: false)
@@ -51,19 +54,29 @@ class CommentService {
     required String text,
   }) async {
     final commentRef = _comments(postId).doc();
-    await commentRef.set({
+    final batch = _db.batch();
+    batch.set(commentRef, {
       'authorUid': authorUid,
       'authorUsername': authorUsername,
       'authorAvatar': authorAvatar,
       'text': text,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    batch.update(_postRef(postId), {
+      'commentsCount': FieldValue.increment(1),
+    });
+    await batch.commit();
   }
 
   Future<void> deleteComment({
     required String postId,
     required String commentId,
   }) async {
-    await _comments(postId).doc(commentId).delete();
+    final batch = _db.batch();
+    batch.delete(_comments(postId).doc(commentId));
+    batch.update(_postRef(postId), {
+      'commentsCount': FieldValue.increment(-1),
+    });
+    await batch.commit();
   }
 }

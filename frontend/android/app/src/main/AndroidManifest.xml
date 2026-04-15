@@ -10,7 +10,7 @@
         android:maxSdkVersion="32" />
 
     <application
-        android:label="coil"
+        android:label="Iter"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

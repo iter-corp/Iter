@@ -1,17 +1,108 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/translate_service.dart';
 
 // 📌 SECTION: Supported Languages
-const List<String> _kLanguages = [
-  'English(USA)',
-  'Kurdish(Sorani)',
-  'Arabic',
-  'Persian',
-  'Turkish',
+//
+// Gemini handles virtually any language. We keep a broad list here, with the
+// ISO-639 code Gemini should receive, plus an optional BCP-47 locale for
+// on-device speech-to-text. Languages without a `stt` locale fall back to the
+// device default; live transcription may be less accurate for those.
+class _Language {
+  final String label;
+  final String code;
+  final String? stt;
+  final bool rtl;
+  const _Language(this.label, this.code, {this.stt, this.rtl = false});
+}
+
+const List<_Language> _kLanguages = [
+  _Language('English (USA)', 'en', stt: 'en_US'),
+  _Language('English (UK)', 'en', stt: 'en_GB'),
+  _Language('Arabic', 'ar', stt: 'ar_SA', rtl: true),
+  _Language('Kurdish (Sorani)', 'ckb', stt: 'ar_IQ', rtl: true),
+  _Language('Kurdish (Kurmanji)', 'kmr', stt: 'tr_TR'),
+  _Language('Persian', 'fa', stt: 'fa_IR', rtl: true),
+  _Language('Turkish', 'tr', stt: 'tr_TR'),
+  _Language('Spanish', 'es', stt: 'es_ES'),
+  _Language('French', 'fr', stt: 'fr_FR'),
+  _Language('German', 'de', stt: 'de_DE'),
+  _Language('Italian', 'it', stt: 'it_IT'),
+  _Language('Portuguese (Brazil)', 'pt-BR', stt: 'pt_BR'),
+  _Language('Portuguese (Portugal)', 'pt-PT', stt: 'pt_PT'),
+  _Language('Russian', 'ru', stt: 'ru_RU'),
+  _Language('Ukrainian', 'uk', stt: 'uk_UA'),
+  _Language('Polish', 'pl', stt: 'pl_PL'),
+  _Language('Dutch', 'nl', stt: 'nl_NL'),
+  _Language('Swedish', 'sv', stt: 'sv_SE'),
+  _Language('Norwegian', 'no', stt: 'nb_NO'),
+  _Language('Danish', 'da', stt: 'da_DK'),
+  _Language('Finnish', 'fi', stt: 'fi_FI'),
+  _Language('Czech', 'cs', stt: 'cs_CZ'),
+  _Language('Greek', 'el', stt: 'el_GR'),
+  _Language('Hebrew', 'he', stt: 'he_IL', rtl: true),
+  _Language('Urdu', 'ur', stt: 'ur_PK', rtl: true),
+  _Language('Hindi', 'hi', stt: 'hi_IN'),
+  _Language('Bengali', 'bn', stt: 'bn_IN'),
+  _Language('Tamil', 'ta', stt: 'ta_IN'),
+  _Language('Telugu', 'te', stt: 'te_IN'),
+  _Language('Malay', 'ms', stt: 'ms_MY'),
+  _Language('Indonesian', 'id', stt: 'id_ID'),
+  _Language('Thai', 'th', stt: 'th_TH'),
+  _Language('Vietnamese', 'vi', stt: 'vi_VN'),
+  _Language('Japanese', 'ja', stt: 'ja_JP'),
+  _Language('Korean', 'ko', stt: 'ko_KR'),
+  _Language('Chinese (Simplified)', 'zh-CN', stt: 'zh_CN'),
+  _Language('Chinese (Traditional)', 'zh-TW', stt: 'zh_TW'),
+  _Language('Swahili', 'sw', stt: 'sw_KE'),
+  _Language('Amharic', 'am', stt: 'am_ET'),
+  _Language('Somali', 'so'),
+  _Language('Hausa', 'ha'),
+  _Language('Zulu', 'zu', stt: 'zu_ZA'),
+  _Language('Afrikaans', 'af', stt: 'af_ZA'),
+  _Language('Hungarian', 'hu', stt: 'hu_HU'),
+  _Language('Romanian', 'ro', stt: 'ro_RO'),
+  _Language('Bulgarian', 'bg', stt: 'bg_BG'),
+  _Language('Serbian', 'sr', stt: 'sr_RS'),
+  _Language('Croatian', 'hr', stt: 'hr_HR'),
+  _Language('Slovak', 'sk', stt: 'sk_SK'),
+  _Language('Slovenian', 'sl', stt: 'sl_SI'),
+  _Language('Lithuanian', 'lt', stt: 'lt_LT'),
+  _Language('Latvian', 'lv', stt: 'lv_LV'),
+  _Language('Estonian', 'et', stt: 'et_EE'),
+  _Language('Icelandic', 'is', stt: 'is_IS'),
+  _Language('Catalan', 'ca', stt: 'ca_ES'),
+  _Language('Basque', 'eu', stt: 'eu_ES'),
+  _Language('Galician', 'gl', stt: 'gl_ES'),
+  _Language('Welsh', 'cy'),
+  _Language('Irish', 'ga'),
+  _Language('Albanian', 'sq'),
+  _Language('Armenian', 'hy'),
+  _Language('Azerbaijani', 'az'),
+  _Language('Georgian', 'ka'),
+  _Language('Kazakh', 'kk'),
+  _Language('Uzbek', 'uz'),
+  _Language('Mongolian', 'mn'),
+  _Language('Khmer', 'km'),
+  _Language('Lao', 'lo'),
+  _Language('Burmese', 'my'),
+  _Language('Filipino', 'fil', stt: 'fil_PH'),
+  _Language('Nepali', 'ne'),
+  _Language('Sinhala', 'si'),
+  _Language('Pashto', 'ps', rtl: true),
+  _Language('Maltese', 'mt'),
+  _Language('Esperanto', 'eo'),
 ];
+
+_Language _langByLabel(String label) =>
+    _kLanguages.firstWhere((l) => l.label == label,
+        orElse: () => _kLanguages.first);
 
 class TranslateBody extends StatefulWidget {
   const TranslateBody({super.key});
@@ -21,27 +112,156 @@ class TranslateBody extends StatefulWidget {
 }
 
 class _TranslateBodyState extends State<TranslateBody> {
-  String _sourceLang = 'English(USA)';
-  String _targetLang = 'Kurdish(Sorani)';
+  String _sourceLang = 'English (USA)';
+  String _targetLang = 'Kurdish (Sorani)';
   final TextEditingController _inputController = TextEditingController();
   final TranslateService _translateService = TranslateService();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _sttInitialized = false;
   String _translatedText = '';
   bool _hasTranslation = false;
   bool _isRecording = false;
   bool _isTranslating = false;
 
-  static const Map<String, String> _langCodes = {
-    'English(USA)': 'en',
-    'Kurdish(Sorani)': 'ckb',
-    'Arabic': 'ar',
-    'Persian': 'fa',
-    'Turkish': 'tr',
-  };
+  // ── TTS ──
+  final FlutterTts _tts = FlutterTts();
+  bool _isSpeaking = false;
+
+  // ── Bookmark ──
+  bool _isBookmarked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() => _isSpeaking = false);
+    });
+    _tts.setCancelHandler(() {
+      if (mounted) setState(() => _isSpeaking = false);
+    });
+    _tts.setErrorHandler((_) {
+      if (mounted) setState(() => _isSpeaking = false);
+    });
+  }
 
   @override
   void dispose() {
+    _tts.stop();
+    _speech.stop();
     _inputController.dispose();
     super.dispose();
+  }
+
+  String _friendlySttError(String code) {
+    switch (code) {
+      case 'error_no_match':
+        return "Couldn't recognize speech. Make sure the source language matches what you're saying.";
+      case 'error_speech_timeout':
+      case 'error_no_speech':
+        return 'No speech detected. Try again and speak closer to the mic.';
+      case 'error_audio':
+        return 'Mic audio error. Close other apps using the mic and retry.';
+      case 'error_network':
+      case 'error_network_timeout':
+        return 'Network error. Speech recognition needs internet.';
+      case 'error_permission':
+        return 'Mic permission denied. Enable it in device settings.';
+      default:
+        return 'Mic error: $code';
+    }
+  }
+
+  Future<void> _toggleListen() async {
+    if (_isRecording) {
+      await _speech.stop();
+      if (mounted) setState(() => _isRecording = false);
+      return;
+    }
+
+    if (!_sttInitialized) {
+      _sttInitialized = await _speech.initialize(
+        onStatus: (s) {
+          if (s == 'done' || s == 'notListening') {
+            if (mounted) setState(() => _isRecording = false);
+          }
+        },
+        onError: (err) {
+          debugPrint('[stt] error: ${err.errorMsg}');
+          if (!mounted) return;
+          setState(() => _isRecording = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_friendlySttError(err.errorMsg))),
+          );
+        },
+      );
+      if (!_sttInitialized) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone not available. Check permission.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Pick a locale the device actually supports. Not all the languages
+    // in our picker have an installed STT engine — fall back to the device
+    // default so speak-to-translate still works.
+    final requested = _langByLabel(_sourceLang).stt ?? 'en_US';
+    final installed = await _speech.locales();
+    var match = installed.firstWhere(
+      (l) =>
+          l.localeId == requested ||
+          l.localeId.replaceAll('-', '_') == requested ||
+          l.localeId.replaceAll('_', '-') == requested,
+      orElse: () => stt.LocaleName('', ''),
+    );
+
+    if (match.localeId.isEmpty) {
+      // Try to match just the primary language code (e.g., 'ar' or 'en')
+      final prefix = requested.split(RegExp(r'[-_]')).first;
+      match = installed.firstWhere(
+        (l) => l.localeId.startsWith(prefix),
+        orElse: () => stt.LocaleName('', ''),
+      );
+    }
+
+    if (match.localeId.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Speech-to-text not supported for $_sourceLang on this device.'),
+          ),
+        );
+      }
+      return;
+    }
+    setState(() => _isRecording = true);
+    await _speech.listen(
+      localeId: match.localeId,
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      ),
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() {
+          _inputController.text = result.recognizedWords;
+          _inputController.selection = TextSelection.collapsed(
+            offset: _inputController.text.length,
+          );
+        });
+        if (result.finalResult &&
+            result.recognizedWords.trim().isNotEmpty) {
+          _onTranslate();
+        }
+      },
+    );
   }
 
   void _swapLanguages() {
@@ -60,8 +280,8 @@ class _TranslateBodyState extends State<TranslateBody> {
     if (input.isEmpty || _isTranslating) return;
     setState(() => _isTranslating = true);
 
-    final sourceCode = _langCodes[_sourceLang] ?? 'en';
-    final targetCode = _langCodes[_targetLang] ?? 'en';
+    final sourceCode = _langByLabel(_sourceLang).code;
+    final targetCode = _langByLabel(_targetLang).code;
 
     try {
       final translated = await _translateService.translateText(
@@ -73,7 +293,10 @@ class _TranslateBodyState extends State<TranslateBody> {
       setState(() {
         _hasTranslation = true;
         _translatedText = translated;
+        _isBookmarked = false; // new result → not yet saved
       });
+      // Stop any ongoing TTS from the previous result.
+      if (_isSpeaking) _tts.stop();
     } catch (e, st) {
       debugPrint('[translate] failed: $e');
       debugPrint('[translate] stack: $st');
@@ -102,13 +325,87 @@ class _TranslateBodyState extends State<TranslateBody> {
     );
   }
 
+  // ── TTS: Speak the translated text ──
+  Future<void> _toggleSpeak() async {
+    if (_translatedText.isEmpty) return;
+
+    if (_isSpeaking) {
+      await _tts.stop();
+      setState(() => _isSpeaking = false);
+      return;
+    }
+
+    // Map our language code to a BCP-47 locale the TTS engine understands.
+    final lang = _langByLabel(_targetLang);
+    final locale = lang.stt ?? lang.code; // stt field is BCP-47 when available
+    await _tts.setLanguage(locale.replaceAll('_', '-'));
+    await _tts.setSpeechRate(0.45);
+    await _tts.setPitch(1.0);
+
+    setState(() => _isSpeaking = true);
+    await _tts.speak(_translatedText);
+  }
+
+  // ── Bookmark: Save translation to Firestore ──
+  Future<void> _toggleBookmark() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || _translatedText.isEmpty) return;
+
+    final col = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('savedTranslations');
+
+    if (_isBookmarked) {
+      // Remove: find and delete the matching doc.
+      final snap = await col
+          .where('sourceText', isEqualTo: _inputController.text.trim())
+          .where('targetLang', isEqualTo: _langByLabel(_targetLang).code)
+          .limit(1)
+          .get();
+      for (final doc in snap.docs) {
+        await doc.reference.delete();
+      }
+      if (!mounted) return;
+      setState(() => _isBookmarked = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Translation removed from saved'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      // Save the translation.
+      await col.add({
+        'sourceText': _inputController.text.trim(),
+        'translatedText': _translatedText,
+        'sourceLang': _langByLabel(_sourceLang).code,
+        'sourceLangLabel': _sourceLang,
+        'targetLang': _langByLabel(_targetLang).code,
+        'targetLangLabel': _targetLang,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      setState(() => _isBookmarked = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Translation saved!'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFE8EAF0),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -137,7 +434,8 @@ class _TranslateBodyState extends State<TranslateBody> {
               _InputBox(
                 controller: _inputController,
                 isRecording: _isRecording,
-                onMicTap: () => setState(() => _isRecording = !_isRecording),
+                onMicTap: _toggleListen,
+                sourceLang: _sourceLang,
               ),
               const SizedBox(height: 16),
 
@@ -181,18 +479,20 @@ class _TranslateBodyState extends State<TranslateBody> {
               // 📌 Output Box
               _OutputBox(
                 translatedText: _hasTranslation ? _translatedText : '',
-                isRTL: _targetLang == 'Kurdish(Sorani)' ||
-                    _targetLang == 'Arabic' ||
-                    _targetLang == 'Persian',
-                onBookmark: () {/* TODO */},
+                isRTL: _langByLabel(_targetLang).rtl,
+                isBookmarked: _isBookmarked,
+                isSpeaking: _isSpeaking,
+                onBookmark: _toggleBookmark,
                 onCopy: _copyToClipboard,
+                onSpeak: _toggleSpeak,
               ),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // 📌 SECTION: Language Selector Row
@@ -248,42 +548,149 @@ class _LanguageSelectorRow extends StatelessWidget {
   }
 }
 
-// 📌 SECTION: Language Dropdown
+// 📌 SECTION: Language Picker (searchable bottom sheet)
 class _LanguageDropdown extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
   const _LanguageDropdown({required this.value, required this.onChanged});
 
+  Future<void> _openPicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _LanguagePickerSheet(current: value),
+    );
+    if (selected != null) onChanged(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD7D7D7),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+    return GestureDetector(
+      onTap: () => _openPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD7D7D7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: Colors.black, size: 20),
+          ],
+        ),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: Colors.black, size: 20),
-          style: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
-          items: _kLanguages
-              .map((lang) => DropdownMenuItem(
-                    value: lang,
-                    child: Text(lang,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13, color: Colors.black87)),
-                  ))
-              .toList(),
-          onChanged: (val) {
-            if (val != null) onChanged(val);
-          },
+    );
+  }
+}
+
+// 📌 SECTION: Language Picker Sheet (search)
+class _LanguagePickerSheet extends StatefulWidget {
+  final String current;
+  const _LanguagePickerSheet({required this.current});
+
+  @override
+  State<_LanguagePickerSheet> createState() => _LanguagePickerSheetState();
+}
+
+class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? _kLanguages
+        : _kLanguages
+            .where((l) =>
+                l.label.toLowerCase().contains(q) ||
+                l.code.toLowerCase().contains(q))
+            .toList();
+
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Search languages',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F0F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No languages match',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final lang = filtered[i];
+                        final isCurrent = lang.label == widget.current;
+                        return ListTile(
+                          title: Text(lang.label),
+                          subtitle: Text(
+                            lang.code,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          trailing: isCurrent
+                              ? const Icon(Icons.check,
+                                  color: Color(0xFFCE5DE5))
+                              : null,
+                          onTap: () => Navigator.pop(context, lang.label),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -295,11 +702,13 @@ class _InputBox extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onMicTap;
   final bool isRecording;
+  final String sourceLang;
 
   const _InputBox({
     required this.controller,
     required this.onMicTap,
     required this.isRecording,
+    required this.sourceLang,
   });
 
   @override
@@ -473,14 +882,20 @@ class _WaveAnimationState extends State<_WaveAnimation>
 class _OutputBox extends StatelessWidget {
   final String translatedText;
   final bool isRTL;
+  final bool isBookmarked;
+  final bool isSpeaking;
   final VoidCallback onBookmark;
   final VoidCallback onCopy;
+  final VoidCallback onSpeak;
 
   const _OutputBox({
     required this.translatedText,
     required this.isRTL,
+    this.isBookmarked = false,
+    this.isSpeaking = false,
     required this.onBookmark,
     required this.onCopy,
+    required this.onSpeak,
   });
 
   @override
@@ -494,7 +909,7 @@ class _OutputBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -506,17 +921,30 @@ class _OutputBox extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              // 🔖 Bookmark — toggles filled/outline
               GestureDetector(
-                onTap: onBookmark,
-                child: SvgPicture.asset(
-                  'assets/icons/Bookmark.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter:
-                      const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                onTap: translatedText.isNotEmpty ? onBookmark : null,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: isBookmarked
+                      ? const Icon(
+                          Icons.bookmark,
+                          key: ValueKey('filled'),
+                          size: 22,
+                          color: Color(0xFFCE5DE5),
+                        )
+                      : SvgPicture.asset(
+                          key: const ValueKey('outline'),
+                          'assets/icons/Bookmark.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: const ColorFilter.mode(
+                              Colors.black, BlendMode.srcIn),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
+              // 📋 Copy
               GestureDetector(
                 onTap: onCopy,
                 child: SvgPicture.asset(
@@ -548,14 +976,33 @@ class _OutputBox extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 25),
+          // 🔊 TTS — tappable with visual feedback
           Align(
             alignment: Alignment.bottomRight,
-            child: SvgPicture.asset(
-              'assets/icons/speech.svg',
-              width: 20,
-              height: 20,
-              colorFilter:
-                  const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+            child: GestureDetector(
+              onTap: translatedText.isNotEmpty ? onSpeak : null,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: isSpeaking
+                    ? const Icon(
+                        Icons.stop_circle_outlined,
+                        key: ValueKey('stop'),
+                        size: 22,
+                        color: Color(0xFFCE5DE5),
+                      )
+                    : SvgPicture.asset(
+                        key: const ValueKey('speaker'),
+                        'assets/icons/speech.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(
+                          translatedText.isNotEmpty
+                              ? Colors.black
+                              : Colors.grey,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+              ),
             ),
           ),
         ],

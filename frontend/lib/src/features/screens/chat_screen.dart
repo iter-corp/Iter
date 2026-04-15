@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -56,10 +56,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _typingTimer?.cancel();
-    final uid = _currentUid;
-    if (uid != null) {
-      ref.read(typingServiceProvider).setTyping(widget.chatId, uid, false);
-    }
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();

@@ -10,7 +10,7 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Coil',
+            Text('Iter',
                 style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold)),
             SizedBox(height: 24),
             CircularProgressIndicator(),

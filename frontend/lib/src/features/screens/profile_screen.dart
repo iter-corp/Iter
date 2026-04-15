@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
@@ -169,29 +170,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       case 0:
         return UserPostsGrid(uid: uid);
       case 1:
-        return const _EmptyTab(
-          icon: Icons.repeat,
-          title: 'No reposts yet',
-          subtitle: 'Posts you repost will show here.',
-        );
+        return UserRepostsGrid(uid: uid);
       case 2:
-        return const _EmptyTab(
-          icon: Icons.bookmark_border,
-          title: 'No saved posts',
-          subtitle: 'Save posts to view them here later.',
-        );
+        return UserSavedGrid(uid: uid);
       default:
         return UserPostsGrid(uid: uid);
     }
   }
 
   void _showSettings(BuildContext context) {
+    final isAdmin = ref.read(isAdminProvider);
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (isAdmin)
+              ListTile(
+                leading: const Icon(Icons.shield_outlined,
+                    color: Color(0xFF7E3BE8)),
+                title: const Text('Admin panel',
+                    style: TextStyle(
+                      color: Color(0xFF7E3BE8),
+                      fontWeight: FontWeight.w600,
+                    )),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/admin');
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Log out', style: TextStyle(color: Colors.red)),
@@ -262,6 +270,174 @@ class UserPostsGrid extends ConsumerWidget {
                         fit: BoxFit.cover,
                         placeholder: (_, __) => Container(
                             color: const Color(0xFFEDEDF2)),
+                        errorWidget: (_, __, ___) => const Icon(
+                            Icons.broken_image, color: Colors.grey),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Center(
+                          child: Text(
+                            post.caption,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.black87),
+                          ),
+                        ),
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class UserRepostsGrid extends ConsumerWidget {
+  final String uid;
+  const UserRepostsGrid({super.key, required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repostsAsync = ref.watch(userRepostsProvider(uid));
+    return repostsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $e')),
+      ),
+      data: (posts) {
+        if (posts.isEmpty) {
+          return const _EmptyTab(
+            icon: Icons.repeat,
+            title: 'No reposts yet',
+            subtitle: 'Posts you repost will show here.',
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(2),
+          gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+            childAspectRatio: 1,
+          ),
+          itemCount: posts.length,
+          itemBuilder: (_, i) {
+            final post = posts[i];
+            final url = post.imageUrls.isNotEmpty
+                ? post.imageUrls.first
+                : null;
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PostDetailScreen(
+                    posts: posts,
+                    initialIndex: i,
+                  ),
+                ),
+              ),
+              child: Container(
+                color: const Color(0xFFEDEDF2),
+                child: url != null
+                    ? CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            Container(color: const Color(0xFFEDEDF2)),
+                        errorWidget: (_, __, ___) => const Icon(
+                            Icons.broken_image, color: Colors.grey),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Center(
+                          child: Text(
+                            post.caption,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.black87),
+                          ),
+                        ),
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class UserSavedGrid extends ConsumerWidget {
+  final String uid;
+  const UserSavedGrid({super.key, required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final savedAsync = ref.watch(userSavedProvider(uid));
+    return savedAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $e')),
+      ),
+      data: (posts) {
+        if (posts.isEmpty) {
+          return const _EmptyTab(
+            icon: Icons.bookmark_border,
+            title: 'No saved posts',
+            subtitle: 'Save posts to view them here later.',
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(2),
+          gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+            childAspectRatio: 1,
+          ),
+          itemCount: posts.length,
+          itemBuilder: (_, i) {
+            final post = posts[i];
+            final url = post.imageUrls.isNotEmpty
+                ? post.imageUrls.first
+                : null;
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PostDetailScreen(
+                    posts: posts,
+                    initialIndex: i,
+                  ),
+                ),
+              ),
+              child: Container(
+                color: const Color(0xFFEDEDF2),
+                child: url != null
+                    ? CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            Container(color: const Color(0xFFEDEDF2)),
                         errorWidget: (_, __, ___) => const Icon(
                             Icons.broken_image, color: Colors.grey),
                       )

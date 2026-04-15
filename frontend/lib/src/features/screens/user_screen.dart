@@ -1,9 +1,15 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_providers.dart';
+import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
+import '../../providers/post_providers.dart';
+import '../model/post_model.dart';
 import '../widgets/user_profile_widget.dart';
+import 'chat_screen.dart';
+import 'profile_screen.dart' show PostDetailScreen;
 
 final _otherUserProvider =
     StreamProvider.family<Map<String, dynamic>?, String>((ref, uid) {
@@ -21,6 +27,7 @@ class UserProfileScreen extends ConsumerStatefulWidget {
 class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   int selectedTab = 0;
   bool _followBusy = false;
+  bool _messageBusy = false;
 
   Future<void> _toggleFollow(bool currentlyFollowing) async {
     final currentUser = ref.read(authStateProvider).value;
@@ -42,6 +49,37 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       }
     } finally {
       if (mounted) setState(() => _followBusy = false);
+    }
+  }
+
+  Future<void> _openMessage(String otherName, String otherAvatar) async {
+    final currentUser = ref.read(authStateProvider).value;
+    if (currentUser == null || _messageBusy) return;
+    setState(() => _messageBusy = true);
+    try {
+      final chatId = await ref.read(chatServiceProvider).openChat(
+            currentUid: currentUser.uid,
+            otherUid: widget.uid,
+          );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            chatId: chatId,
+            otherUid: widget.uid,
+            otherName: otherName,
+            otherAvatar: otherAvatar,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _messageBusy = false);
     }
   }
 
@@ -141,7 +179,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           }
           final username = (user['username'] as String?) ?? 'User';
           final handle = (user['handle'] as String?) ?? '';
-          final avatar = (user['avatarUrl'] as String?) ?? '';
+          final avatarUrl = user['avatarUrl'] as String?;
+          final coverUrl = user['coverUrl'] as String?;
           const isPrivate = false;
           final isFollowing = isFollowingAsync.value ?? false;
           final followers = (user['followersCount'] as int?) ?? 0;
@@ -153,8 +192,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             child: Column(
               children: [
                 UserCoverAvatar(
-                  avatar: avatar,
-                  posts: const [],
+                  avatarUrl: avatarUrl,
+                  coverUrl: coverUrl,
                   isPrivate: isPrivate,
                   onBack: () => Navigator.pop(context),
                 ),
@@ -178,19 +217,19 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     isPrivate: isPrivate,
                     onFollowTap:
                         _followBusy ? () {} : () => _toggleFollow(isFollowing),
+                    onMessageTap: _messageBusy
+                        ? null
+                        : () => _openMessage(username, avatarUrl ?? ''),
                   ),
                 UserTabBar(
                   selectedTab: selectedTab,
                   onTap: (i) => setState(() => selectedTab = i),
                 ),
                 const Divider(height: 1),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 60),
-                  child: Center(
-                    child: Text("No posts yet",
-                        style: TextStyle(color: Colors.grey)),
-                  ),
-                ),
+                if (selectedTab == 0)
+                  _UserPostsGrid(uid: widget.uid)
+                else
+                  _UserRepostsGrid(uid: widget.uid),
               ],
             ),
           );
@@ -198,4 +237,123 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       ),
     );
   }
+}
+
+class _UserPostsGrid extends ConsumerWidget {
+  final String uid;
+  const _UserPostsGrid({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postsAsync = ref.watch(userPostsProvider(uid));
+    return postsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $e')),
+      ),
+      data: (posts) {
+        if (posts.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 60),
+            child: Center(
+              child: Text('No posts yet',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+          );
+        }
+        return _postsGrid(context, posts);
+      },
+    );
+  }
+}
+
+class _UserRepostsGrid extends ConsumerWidget {
+  final String uid;
+  const _UserRepostsGrid({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repostsAsync = ref.watch(userRepostsProvider(uid));
+    return repostsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $e')),
+      ),
+      data: (posts) {
+        if (posts.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 60),
+            child: Center(
+              child: Text('No reposts yet',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+          );
+        }
+        return _postsGrid(context, posts);
+      },
+    );
+  }
+}
+
+Widget _postsGrid(BuildContext context, List<Post> posts) {
+  return GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    padding: const EdgeInsets.all(2),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 3,
+      mainAxisSpacing: 2,
+      crossAxisSpacing: 2,
+      childAspectRatio: 1,
+    ),
+    itemCount: posts.length,
+    itemBuilder: (_, i) {
+      final post = posts[i];
+      final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
+      return GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PostDetailScreen(
+              posts: posts,
+              initialIndex: i,
+            ),
+          ),
+        ),
+        child: Container(
+          color: const Color(0xFFEDEDF2),
+          child: url != null
+              ? CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) =>
+                      Container(color: const Color(0xFFEDEDF2)),
+                  errorWidget: (_, __, ___) =>
+                      const Icon(Icons.broken_image, color: Colors.grey),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Center(
+                    child: Text(
+                      post.caption,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.black87),
+                    ),
+                  ),
+                ),
+        ),
+      );
+    },
+  );
 }

@@ -31,7 +31,7 @@ class HeaderWidget extends ConsumerWidget {
           const Expanded(
             child: Center(
               child: Text(
-                'Coil',
+                'Iter',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,

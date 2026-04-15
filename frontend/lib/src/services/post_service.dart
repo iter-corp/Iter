@@ -66,6 +66,18 @@ class PostService {
     });
   }
 
+  Future<void> updatePost(
+    String postId, {
+    String? caption,
+    bool? isPrivate,
+  }) async {
+    final data = <String, dynamic>{};
+    if (caption != null) data['caption'] = caption;
+    if (isPrivate != null) data['isPrivate'] = isPrivate;
+    if (data.isEmpty) return;
+    await _posts.doc(postId).update(data);
+  }
+
   Future<void> toggleLike(String postId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
@@ -93,5 +105,114 @@ class PostService {
         .doc(uid)
         .snapshots()
         .map((s) => s.exists);
+  }
+
+  Future<void> toggleRepost(String postId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    final userRepostRef =
+        _db.collection('users').doc(user.uid).collection('reposts').doc(postId);
+    final postRepostRef =
+        _posts.doc(postId).collection('reposts').doc(user.uid);
+
+    await _db.runTransaction((tx) async {
+      final existing = await tx.get(userRepostRef);
+      if (existing.exists) {
+        tx.delete(userRepostRef);
+        tx.delete(postRepostRef);
+      } else {
+        final data = {'createdAt': FieldValue.serverTimestamp()};
+        tx.set(userRepostRef, data);
+        tx.set(postRepostRef, data);
+      }
+    });
+  }
+
+  Stream<bool> streamIsReposted(String postId) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(false);
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('reposts')
+        .doc(postId)
+        .snapshots()
+        .map((s) => s.exists);
+  }
+
+  Future<void> toggleSave(String postId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    final ref = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('saved')
+        .doc(postId);
+    final snap = await ref.get();
+    if (snap.exists) {
+      await ref.delete();
+    } else {
+      await ref.set({'createdAt': FieldValue.serverTimestamp()});
+    }
+  }
+
+  Stream<bool> streamIsSaved(String postId) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(false);
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('saved')
+        .doc(postId)
+        .snapshots()
+        .map((s) => s.exists);
+  }
+
+  Stream<List<Post>> streamUserSaved(String uid) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('saved')
+        .snapshots()
+        .asyncMap((snap) async {
+      final entries = snap.docs.toList();
+      entries.sort((a, b) {
+        final at = (a.data()['createdAt'] as Timestamp?)?.toDate();
+        final bt = (b.data()['createdAt'] as Timestamp?)?.toDate();
+        if (at == null) return 1;
+        if (bt == null) return -1;
+        return bt.compareTo(at);
+      });
+      final posts = await Future.wait(entries.map((d) async {
+        final postSnap = await _posts.doc(d.id).get();
+        return postSnap.exists ? Post.fromDoc(postSnap) : null;
+      }));
+      return posts.whereType<Post>().toList();
+    });
+  }
+
+  /// Streams posts that [uid] has reposted, most recent first.
+  /// Expands the repost pointer docs into full Post objects.
+  Stream<List<Post>> streamUserReposts(String uid) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('reposts')
+        .snapshots()
+        .asyncMap((snap) async {
+      final entries = snap.docs.toList();
+      entries.sort((a, b) {
+        final at = (a.data()['createdAt'] as Timestamp?)?.toDate();
+        final bt = (b.data()['createdAt'] as Timestamp?)?.toDate();
+        if (at == null) return 1;
+        if (bt == null) return -1;
+        return bt.compareTo(at);
+      });
+      final posts = await Future.wait(entries.map((d) async {
+        final postSnap = await _posts.doc(d.id).get();
+        return postSnap.exists ? Post.fromDoc(postSnap) : null;
+      }));
+      return posts.whereType<Post>().toList();
+    });
   }
 }

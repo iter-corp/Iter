@@ -28,6 +28,21 @@ class MessageBody extends ConsumerStatefulWidget {
 
 class _MessageBodyState extends ConsumerState<MessageBody> {
   int selectedTab = 0;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  bool _matches(ChatConversation c) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return c.otherUsername.toLowerCase().contains(q) ||
+        c.lastMessage.toLowerCase().contains(q);
+  }
 
   void _openChat(ChatConversation conv) {
     Navigator.push(
@@ -47,8 +62,10 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
   Widget build(BuildContext context) {
     final acceptedInboxAsync = ref.watch(acceptedInboxProvider);
     final requestsAsync = ref.watch(requestsProvider);
-    final allConvs = acceptedInboxAsync.value ?? [];
-    final requestConvs = requestsAsync.value ?? [];
+    final allConvs =
+        (acceptedInboxAsync.value ?? []).where(_matches).toList();
+    final requestConvs =
+        (requestsAsync.value ?? []).where(_matches).toList();
 
     return SafeArea(
       child: Column(
@@ -62,8 +79,10 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                 color: const Color(0xFFF0F0F0),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const TextField(
-                decoration: InputDecoration(
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: const InputDecoration(
                   hintText: 'Search...',
                   hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
                   border: InputBorder.none,

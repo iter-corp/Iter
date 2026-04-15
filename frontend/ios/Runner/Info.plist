@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Coil</string>
+	<string>Iter</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>coil</string>
+	<string>Iter</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,13 +27,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Coil needs camera access to capture photos for posts, stories, and live video.</string>
+	<string>Iter needs camera access to capture photos for posts, stories, and live video.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Coil needs microphone access to broadcast live audio.</string>
+	<string>Iter needs microphone access to broadcast live audio.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Coil needs access to your photos so you can post images, set your avatar, and share stories.</string>
+	<string>Iter needs access to your photos so you can post images, set your avatar, and share stories.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Coil saves images you capture to your photo library.</string>
+	<string>Iter saves images you capture to your photo library.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

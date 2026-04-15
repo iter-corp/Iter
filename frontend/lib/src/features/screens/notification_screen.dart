@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +8,9 @@ import '../../providers/follow_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../services/notification_service.dart';
 import '../widgets/notification_tile.dart';
+import 'chat_screen.dart';
+import 'post_detail_screen.dart';
+import 'user_screen.dart';
 
 class NotificationScreen extends ConsumerWidget {
   const NotificationScreen({super.key});
@@ -80,6 +85,12 @@ class NotificationScreen extends ConsumerWidget {
                           : () => ref
                               .read(notificationServiceProvider)
                               .markRead(user.uid, notifications[i].id),
+                      onDelete: user == null
+                          ? null
+                          : () => ref
+                              .read(notificationServiceProvider)
+                              .deleteNotification(
+                                  user.uid, notifications[i].id),
                     ),
                   );
                 },
@@ -99,8 +110,13 @@ class NotificationScreen extends ConsumerWidget {
 class _NotificationItem extends ConsumerWidget {
   final AppNotification notif;
   final VoidCallback? onMarkRead;
+  final VoidCallback? onDelete;
 
-  const _NotificationItem({required this.notif, this.onMarkRead});
+  const _NotificationItem({
+    required this.notif,
+    this.onMarkRead,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -144,27 +160,111 @@ class _NotificationItem extends ConsumerWidget {
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
+          case 'message':
+            title = '$username sent you a message';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
           default:
             title = username;
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
         }
 
-        return GestureDetector(
-          onTap: onMarkRead,
-          child: Opacity(
-            opacity: notif.read ? 0.55 : 1.0,
-            child: NotificationTile(
-              avatar: avatar,
-              title: title,
-              subtitle: subtitle,
-              trailingType: trailingType,
-              isLike: isLike,
-              onFollowTap: onFollow,
+        // Build the trailing widget for like/comment (post thumbnail).
+        Widget? trailingWidget;
+        if ((notif.type == 'like' || notif.type == 'comment') &&
+            notif.targetId != null) {
+          trailingWidget = _PostThumbnail(postId: notif.targetId!);
+        }
+
+        return Dismissible(
+          key: ValueKey(notif.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            color: Colors.red.shade400,
+            child: const Icon(Icons.delete_outline, color: Colors.white),
+          ),
+          onDismissed: (_) => onDelete?.call(),
+          child: GestureDetector(
+            onTap: () {
+              onMarkRead?.call();
+              _navigateToTarget(context, notif);
+            },
+            child: Opacity(
+              opacity: notif.read ? 0.55 : 1.0,
+              child: NotificationTile(
+                avatar: avatar,
+                title: title,
+                subtitle: subtitle,
+                trailingType: trailingType,
+                isLike: isLike,
+                onFollowTap: onFollow,
+                trailingWidget: trailingWidget,
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  void _navigateToTarget(BuildContext context, AppNotification notif) {
+    switch (notif.type) {
+      case 'follow':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserProfileScreen(uid: notif.actorUid),
+          ),
+        );
+        break;
+      case 'like':
+      case 'comment':
+        if (notif.targetId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PostDetailScreen(postId: notif.targetId!),
+            ),
+          );
+        }
+        break;
+      case 'message':
+        if (notif.targetId != null) {
+          _openChatFromNotification(context, notif);
+        }
+        break;
+    }
+  }
+
+  /// Resolves the chat metadata + actor info, then navigates to ChatScreen.
+  Future<void> _openChatFromNotification(
+    BuildContext context,
+    AppNotification notif,
+  ) async {
+    final db = FirebaseFirestore.instance;
+    // Fetch actor (the sender) info for ChatScreen header.
+    final actorSnap =
+        await db.collection('users').doc(notif.actorUid).get();
+    final actorData = actorSnap.data() ?? {};
+    final otherName = (actorData['username'] as String?) ?? 'User';
+    final otherAvatar = (actorData['avatarUrl'] as String?) ?? '';
+
+    if (!context.mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          chatId: notif.targetId!,
+          otherUid: notif.actorUid,
+          otherName: otherName,
+          otherAvatar: otherAvatar,
+        ),
+      ),
     );
   }
 
@@ -178,3 +278,42 @@ class _NotificationItem extends ConsumerWidget {
     return '${(d.inDays / 7).floor()}w';
   }
 }
+
+// ─────────────────────────────────────────────
+// Post thumbnail — loads the first image from a post
+// ─────────────────────────────────────────────
+
+class _PostThumbnail extends StatelessWidget {
+  final String postId;
+  const _PostThumbnail({required this.postId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DocumentSnapshot>(
+      future:
+          FirebaseFirestore.instance.collection('posts').doc(postId).get(),
+      builder: (context, snap) {
+        if (!snap.hasData || !snap.data!.exists) {
+          return const SizedBox(width: 45, height: 45);
+        }
+        final data = snap.data!.data() as Map<String, dynamic>? ?? {};
+        final images = (data['imageUrls'] as List<dynamic>?) ?? [];
+        if (images.isEmpty) {
+          return const SizedBox(width: 45, height: 45);
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: CachedNetworkImage(
+            imageUrl: images.first as String,
+            width: 45,
+            height: 45,
+            fit: BoxFit.cover,
+            errorWidget: (_, __, ___) =>
+                const SizedBox(width: 45, height: 45),
+          ),
+        );
+      },
+    );
+  }
+}
+

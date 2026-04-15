@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -57,6 +58,18 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
   Widget build(BuildContext context) {
     final commentsAsync = ref.watch(commentsProvider(widget.post.id));
 
+    // Silent backfill: if the post doc's cached commentsCount is wrong
+    // (e.g. older posts from before client-side increment was wired), bring
+    // it in sync with the actual comments subcollection length.
+    commentsAsync.whenData((list) {
+      if (list.length != widget.post.commentsCount) {
+        FirebaseFirestore.instance
+            .collection('posts')
+            .doc(widget.post.id)
+            .update({'commentsCount': list.length}).catchError((_) {});
+      }
+    });
+
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.5,
@@ -81,14 +94,14 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Row(
                 children: [
-                  Text(
+                  const Text(
                     'Comments',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${widget.post.commentsCount}',
+                    '${commentsAsync.value?.length ?? widget.post.commentsCount}',
                     style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ],

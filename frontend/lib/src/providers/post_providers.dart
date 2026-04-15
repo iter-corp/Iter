@@ -16,3 +16,19 @@ final userPostsProvider = StreamProvider.family<List<Post>, String>(
 final isLikedProvider = StreamProvider.family<bool, String>(
   (ref, postId) => ref.watch(postServiceProvider).streamIsLiked(postId),
 );
+
+final isRepostedProvider = StreamProvider.family<bool, String>(
+  (ref, postId) => ref.watch(postServiceProvider).streamIsReposted(postId),
+);
+
+final userRepostsProvider = StreamProvider.family<List<Post>, String>(
+  (ref, uid) => ref.watch(postServiceProvider).streamUserReposts(uid),
+);
+
+final isSavedProvider = StreamProvider.family<bool, String>(
+  (ref, postId) => ref.watch(postServiceProvider).streamIsSaved(postId),
+);
+
+final userSavedProvider = StreamProvider.family<List<Post>, String>(
+  (ref, uid) => ref.watch(postServiceProvider).streamUserSaved(uid),
+);

@@ -1,68 +1,78 @@
-import 'package:flutter/material.dart';
 import 'dart:ui';
 
-/// COVER + AVATAR
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+
+/// COVER + AVATAR — uses live profile data
 class UserCoverAvatar extends StatelessWidget {
-  final String avatar;
-  final List<String> posts;
+  final String? avatarUrl;
+  final String? coverUrl;
   final bool isPrivate;
   final VoidCallback onBack;
 
   const UserCoverAvatar({
     super.key,
-    required this.avatar,
-    required this.posts,
+    required this.avatarUrl,
+    required this.coverUrl,
     required this.isPrivate,
     required this.onBack,
   });
 
+  ImageProvider? get _avatarImage =>
+      (avatarUrl != null && avatarUrl!.isNotEmpty)
+          ? CachedNetworkImageProvider(avatarUrl!)
+          : null;
+
   @override
   Widget build(BuildContext context) {
-    final coverImage = posts.isNotEmpty ? posts.first : "assets/img/2.png";
+    final backArrow = Positioned(
+      top: 40,
+      left: 12,
+      child: GestureDetector(
+        onTap: onBack,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+
+    final avatar = CircleAvatar(
+      radius: 40,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: _avatarImage,
+      child: _avatarImage == null
+          ? const Icon(Icons.person, size: 40, color: Colors.grey)
+          : null,
+    );
 
     if (isPrivate) {
       return SizedBox(
         height: 200,
         child: Stack(
           children: [
-            /// BLURRED COVER IMAGE
             ClipRect(
               child: ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: Image.asset(
-                  "assets/img/2.png",
-                  height: 140,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+                child: (coverUrl != null && coverUrl!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: coverUrl!,
+                        height: 140,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(height: 140, color: const Color(0xFFE0E0E0)),
               ),
             ),
-
-            /// DARK OVERLAY
             Container(
               height: 140,
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
             ),
-
-            /// BACK ARROW
-            Positioned(
-              top: 40,
-              left: 12,
-              child: GestureDetector(
-                onTap: onBack,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.arrow_back,
-                      color: Colors.white, size: 20),
-                ),
-              ),
-            ),
-
-            /// AVATAR
+            backArrow,
             Positioned(
               bottom: 0,
               left: 0,
@@ -74,10 +84,7 @@ class UserCoverAvatar extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: Colors.white,
                   ),
-                  child: const CircleAvatar(
-                    radius: 40,
-                    backgroundImage: AssetImage("assets/img/2.png"),
-                  ),
+                  child: avatar,
                 ),
               ),
             ),
@@ -86,55 +93,36 @@ class UserCoverAvatar extends StatelessWidget {
       );
     }
 
-    /// PUBLIC
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Image.asset(
-          coverImage,
-          height: 180,
-          width: double.infinity,
-          fit: BoxFit.cover,
-        ),
-
-        /// BACK ARROW
-        Positioned(
-          top: 40,
-          left: 12,
-          child: GestureDetector(
-            onTap: onBack,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                shape: BoxShape.circle,
-              ),
-              child:
-                  const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-            ),
+    return SizedBox(
+      height: 220,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          SizedBox(
+            height: 180,
+            width: double.infinity,
+            child: (coverUrl != null && coverUrl!.isNotEmpty)
+                ? CachedNetworkImage(imageUrl: coverUrl!, fit: BoxFit.cover)
+                : Container(color: const Color(0xFFE0E0E0)),
           ),
-        ),
-
-        /// AVATAR
-        Positioned(
-          bottom: -40,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-              ),
-              child: const CircleAvatar(
-                radius: 40,
-                backgroundImage: AssetImage("assets/img/1.png"),
+          backArrow,
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+                child: avatar,
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -234,12 +222,14 @@ class UserButtons extends StatelessWidget {
   final bool isFollowing;
   final bool isPrivate;
   final VoidCallback onFollowTap;
+  final VoidCallback? onMessageTap;
 
   const UserButtons({
     super.key,
     required this.isFollowing,
     required this.isPrivate,
     required this.onFollowTap,
+    this.onMessageTap,
   });
 
   @override
@@ -287,7 +277,7 @@ class UserButtons extends StatelessWidget {
               child: SizedBox(
                 height: 40,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: onMessageTap,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: Colors.grey.shade300),
                     shape: RoundedRectangleBorder(

@@ -91,4 +91,8 @@ class NotificationService {
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
+
+  /// Delete a single notification.
+  Future<void> deleteNotification(String uid, String notifId) =>
+      _items(uid).doc(notifId).delete();
 }

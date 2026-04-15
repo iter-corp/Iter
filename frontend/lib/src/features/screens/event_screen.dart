@@ -1,5 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/admin_providers.dart';
+import '../../services/admin_service.dart';
 import '../widgets/event_detail.dart';
 
 // 📌 SECTION: Event data model
@@ -114,15 +118,24 @@ final List<EventItem> kEvents = [
 ];
 
 // 📌 SECTION: EventBody — grid screen
-class EventBody extends StatefulWidget {
+class EventBody extends ConsumerStatefulWidget {
   const EventBody({super.key});
 
   @override
-  State<EventBody> createState() => _EventBodyState();
+  ConsumerState<EventBody> createState() => _EventBodyState();
 }
 
-class _EventBodyState extends State<EventBody> {
+class _EventBodyState extends ConsumerState<EventBody> {
   final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text);
+    });
+  }
 
   @override
   void dispose() {
@@ -132,6 +145,15 @@ class _EventBodyState extends State<EventBody> {
 
   @override
   Widget build(BuildContext context) {
+    final eventsAsync = ref.watch(adminEventsProvider);
+    final q = _query.trim().toLowerCase();
+    final events = (eventsAsync.value ?? const <AdminEvent>[]).where((e) {
+      if (q.isEmpty) return true;
+      return e.title.toLowerCase().contains(q) ||
+          e.subtitle.toLowerCase().contains(q) ||
+          e.location.toLowerCase().contains(q) ||
+          e.description.toLowerCase().contains(q);
+    }).toList();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -139,42 +161,57 @@ class _EventBodyState extends State<EventBody> {
           padding: const EdgeInsets.only(left: 14, right: 14, top: 14),
           child: Column(
             children: [
-              // 📌 Search Bar
               _SearchBar(controller: _searchController),
               const SizedBox(height: 14),
 
-              // 📌 Events Grid
               Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 0.82,
-                  ),
-                  itemCount: kEvents.length,
-                  itemBuilder: (context, index) {
-                    return _EventCard(
-                      event: kEvents[index],
-                      onSeeMore: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => EventDetailScreen(
-                              title: kEvents[index].title,
-                              subtitle: kEvents[index].subtitle,
-                              location: kEvents[index].location,
-                              imageUrls: kEvents[index].allImages,
-                              description: kEvents[index].description,
-                              phone: kEvents[index].phone,
-                              email: kEvents[index].email,
+                child: events.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.search_off,
+                                size: 48, color: Colors.grey),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No events matching "$_query"',
+                              style: const TextStyle(color: Colors.grey),
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.only(bottom: 100),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.82,
+                        ),
+                        itemCount: events.length,
+                        itemBuilder: (context, index) {
+                          final event = events[index];
+                          return _EventCard(
+                            event: event,
+                            onSeeMore: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => EventDetailScreen(
+                                    title: event.title,
+                                    subtitle: event.subtitle,
+                                    location: event.location,
+                                    imageUrls: event.imageUrls,
+                                    description: event.description,
+                                    phone: event.phone,
+                                    email: event.email,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -223,27 +260,31 @@ class _SearchBar extends StatelessWidget {
 
 // 📌 SECTION: Event Card
 class _EventCard extends StatelessWidget {
-  final EventItem event;
+  final AdminEvent event;
   final VoidCallback onSeeMore;
 
   const _EventCard({required this.event, required this.onSeeMore});
 
   @override
   Widget build(BuildContext context) {
+    final coverUrl = event.imageUrls.isNotEmpty ? event.imageUrls.first : null;
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Stack(
         fit: StackFit.expand,
         children: [
           // 🔹 Background image
-          Image.network(
-            event.imageUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (_, child, progress) =>
-                progress == null ? child : Container(color: const Color(0xFFE0E0E0)),
-            errorBuilder: (_, __, ___) =>
-                Container(color: const Color(0xFFBDBDBD)),
-          ),
+          if (coverUrl != null)
+            CachedNetworkImage(
+              imageUrl: coverUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) =>
+                  Container(color: const Color(0xFFE0E0E0)),
+              errorWidget: (_, __, ___) =>
+                  Container(color: const Color(0xFFBDBDBD)),
+            )
+          else
+            Container(color: const Color(0xFFBDBDBD)),
 
           // 🔹 Gradient overlay
           Positioned.fill(

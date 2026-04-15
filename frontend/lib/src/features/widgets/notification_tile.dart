@@ -13,6 +13,10 @@ class NotificationTile extends StatelessWidget {
   /// Called when the Follow / Follow Back button is tapped.
   final VoidCallback? onFollowTap;
 
+  /// Optional custom trailing widget (e.g. a post thumbnail loaded from Firestore).
+  /// When provided, this overrides the default [trailingType == image] rendering.
+  final Widget? trailingWidget;
+
   const NotificationTile({
     super.key,
     required this.avatar,
@@ -22,6 +26,7 @@ class NotificationTile extends StatelessWidget {
     this.isLike = false,
     required this.trailingType,
     this.onFollowTap,
+    this.trailingWidget,
   });
 
   @override
@@ -88,6 +93,8 @@ class NotificationTile extends StatelessWidget {
         return _buildButton('Follow', onFollowTap);
 
       case NotificationType.image:
+        // Use custom trailing widget if provided (e.g. post thumbnail).
+        if (trailingWidget != null) return trailingWidget!;
         if (postImage == null || postImage!.isEmpty) {
           return const SizedBox(width: 45, height: 45);
         }
@@ -121,3 +128,4 @@ class NotificationTile extends StatelessWidget {
     );
   }
 }
+
