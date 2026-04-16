@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../navigation/user_profile_nav.dart';
 import '../../services/chat_service.dart';
 import 'chat_screen.dart';
 
@@ -62,20 +63,28 @@ class HiddenRequestsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: msg.otherAvatarUrl.isNotEmpty
-                          ? NetworkImage(msg.otherAvatarUrl)
-                          : null,
-                      child: msg.otherAvatarUrl.isEmpty
-                          ? const Icon(Icons.person, color: Colors.white)
-                          : null,
+                    leading: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => openUserProfile(context, uid: msg.otherUid),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: msg.otherAvatarUrl.isNotEmpty
+                            ? NetworkImage(msg.otherAvatarUrl)
+                            : null,
+                        child: msg.otherAvatarUrl.isEmpty
+                            ? const Icon(Icons.person, color: Colors.white)
+                            : null,
+                      ),
                     ),
-                    title: Text(
-                      msg.otherUsername,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14),
+                    title: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => openUserProfile(context, uid: msg.otherUid),
+                      child: Text(
+                        msg.otherUsername,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
                     ),
                     subtitle: Text(
                       msg.lastMessage,
@@ -147,20 +156,28 @@ class RequestsTab extends StatelessWidget {
               final msg = requests[i];
               return ListTile(
                 onTap: () => onTap(msg),
-                leading: CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage: msg.otherAvatarUrl.isNotEmpty
-                      ? NetworkImage(msg.otherAvatarUrl)
-                      : null,
-                  child: msg.otherAvatarUrl.isEmpty
-                      ? const Icon(Icons.person, color: Colors.white)
-                      : null,
+                leading: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => openUserProfile(context, uid: msg.otherUid),
+                  child: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.grey.shade200,
+                    backgroundImage: msg.otherAvatarUrl.isNotEmpty
+                        ? NetworkImage(msg.otherAvatarUrl)
+                        : null,
+                    child: msg.otherAvatarUrl.isEmpty
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
+                  ),
                 ),
-                title: Text(
-                  msg.otherUsername,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14),
+                title: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => openUserProfile(context, uid: msg.otherUid),
+                  child: Text(
+                    msg.otherUsername,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
                 ),
                 subtitle: Text(
                   msg.lastMessage,

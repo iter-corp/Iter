@@ -19,17 +19,13 @@ class FollowService {
     if (currentUid == targetUid) return;
 
     final now = FieldValue.serverTimestamp();
+    final followingRef = _followingCol(currentUid).doc(targetUid);
+    final followerRef = _followersCol(targetUid).doc(currentUid);
 
-    await _db.runTransaction((tx) async {
-      final followingRef = _followingCol(currentUid).doc(targetUid);
-      final followerRef = _followersCol(targetUid).doc(currentUid);
-
-      final alreadyFollowing = await tx.get(followingRef);
-      if (alreadyFollowing.exists) return;
-
-      tx.set(followingRef, {'uid': targetUid, 'createdAt': now});
-      tx.set(followerRef, {'uid': currentUid, 'createdAt': now});
-    });
+    final batch = _db.batch();
+    batch.set(followingRef, {'uid': targetUid, 'createdAt': now});
+    batch.set(followerRef, {'uid': currentUid, 'createdAt': now});
+    await batch.commit();
   }
 
   Future<void> unfollow({
@@ -38,16 +34,13 @@ class FollowService {
   }) async {
     if (currentUid == targetUid) return;
 
-    await _db.runTransaction((tx) async {
-      final followingRef = _followingCol(currentUid).doc(targetUid);
-      final followerRef = _followersCol(targetUid).doc(currentUid);
+    final followingRef = _followingCol(currentUid).doc(targetUid);
+    final followerRef = _followersCol(targetUid).doc(currentUid);
 
-      final existing = await tx.get(followingRef);
-      if (!existing.exists) return;
-
-      tx.delete(followingRef);
-      tx.delete(followerRef);
-    });
+    final batch = _db.batch();
+    batch.delete(followingRef);
+    batch.delete(followerRef);
+    await batch.commit();
   }
 
   Stream<bool> isFollowing({
@@ -62,16 +55,34 @@ class FollowService {
   }
 
   Stream<List<String>> getFollowers(String uid) {
-    return _followersCol(uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map((d) => d.id).toList());
+    return _followersCol(uid).snapshots().map((snap) {
+      final docs = [...snap.docs]..sort((a, b) {
+          final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
+          final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
+
+          if (aCreatedAt == null && bCreatedAt == null) return 0;
+          if (aCreatedAt == null) return 1;
+          if (bCreatedAt == null) return -1;
+          return bCreatedAt.compareTo(aCreatedAt);
+        });
+
+      return docs.map((doc) => doc.id).toList();
+    });
   }
 
   Stream<List<String>> getFollowing(String uid) {
-    return _followingCol(uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map((d) => d.id).toList());
+    return _followingCol(uid).snapshots().map((snap) {
+      final docs = [...snap.docs]..sort((a, b) {
+          final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
+          final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
+
+          if (aCreatedAt == null && bCreatedAt == null) return 0;
+          if (aCreatedAt == null) return 1;
+          if (bCreatedAt == null) return -1;
+          return bCreatedAt.compareTo(aCreatedAt);
+        });
+
+      return docs.map((doc) => doc.id).toList();
+    });
   }
 }

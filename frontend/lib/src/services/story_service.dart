@@ -29,8 +29,7 @@ class Story {
       authorAvatar: d['authorAvatar'] as String?,
       imageUrl: (d['imageUrl'] as String?) ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      expiresAt:
-          (d['expiresAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      expiresAt: (d['expiresAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }
@@ -64,13 +63,17 @@ class StoryService {
 
   Stream<List<Story>> streamActiveStories() {
     final now = Timestamp.fromDate(DateTime.now());
-    return _col
-        .where('expiresAt', isGreaterThan: now)
-        .snapshots()
-        .map((s) {
+    return _col.where('expiresAt', isGreaterThan: now).snapshots().map((s) {
       final stories = s.docs.map(Story.fromDoc).toList();
       stories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return stories;
     });
+  }
+
+  Future<void> deleteStory(String storyId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+
+    await _col.doc(storyId).delete();
   }
 }

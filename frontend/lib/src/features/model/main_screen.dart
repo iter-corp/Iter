@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../providers/post_providers.dart';
 import '../screens/home_screen.dart';
-import '../screens/event_screen.dart';      // ✅ Added
+import '../screens/event_screen.dart'; // ✅ Added
 import '../screens/message_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/translate_screen.dart';
 
-class MainScreen extends StatefulWidget {
+class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen> {
   int _selectedIndex = 0;
+  final ScrollController _homeScrollController = ScrollController();
 
   final List<String> _navIcons = [
     "assets/icons/Home.svg",
@@ -24,13 +27,27 @@ class _MainScreenState extends State<MainScreen> {
     "assets/icons/Profile.svg",
   ];
 
-  final List<Widget> _screens = [
-    const HomeBody(),
-    const EventBody(),
-    const TranslateBody(),
-    const MessageBody(),
-    const ProfileScreen(),
-  ];
+  @override
+  void dispose() {
+    _homeScrollController.dispose();
+    super.dispose();
+  }
+
+  void _onNavTap(int index) {
+    if (index == 0 && _selectedIndex == 0) {
+      // Already on home — scroll to top and refresh feed
+      if (_homeScrollController.hasClients) {
+        _homeScrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
+      }
+      ref.invalidate(feedProvider);
+      return;
+    }
+    setState(() => _selectedIndex = index);
+  }
 
   // 📌 SECTION: Resolve background color per tab
   Color get _backgroundColor {
@@ -52,7 +69,16 @@ class _MainScreenState extends State<MainScreen> {
       body: Stack(
         children: [
           // 📌 SECTION: Current Screen
-          _screens[_selectedIndex],
+          IndexedStack(
+            index: _selectedIndex,
+            children: [
+              HomeBody(scrollController: _homeScrollController),
+              const EventBody(),
+              const TranslateBody(),
+              const MessageBody(),
+              const ProfileScreen(),
+            ],
+          ),
 
           // 📌 SECTION: Floating Bottom Nav
           Positioned(
@@ -77,7 +103,7 @@ class _MainScreenState extends State<MainScreen> {
                 children: List.generate(_navIcons.length, (index) {
                   final bool isSelected = _selectedIndex == index;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedIndex = index),
+                    onTap: () => _onNavTap(index),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       padding: const EdgeInsets.all(8),

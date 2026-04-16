@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../navigation/user_profile_nav.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../widgets/message_widget.dart';
@@ -62,10 +63,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
   Widget build(BuildContext context) {
     final acceptedInboxAsync = ref.watch(acceptedInboxProvider);
     final requestsAsync = ref.watch(requestsProvider);
-    final allConvs =
-        (acceptedInboxAsync.value ?? []).where(_matches).toList();
-    final requestConvs =
-        (requestsAsync.value ?? []).where(_matches).toList();
+    final allConvs = (acceptedInboxAsync.value ?? []).where(_matches).toList();
+    final requestConvs = (requestsAsync.value ?? []).where(_matches).toList();
 
     return SafeArea(
       child: Column(
@@ -159,19 +158,27 @@ class _ConvTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      leading: CircleAvatar(
-        radius: 26,
-        backgroundColor: Colors.grey.shade200,
-        backgroundImage: conv.otherAvatarUrl.isNotEmpty
-            ? NetworkImage(conv.otherAvatarUrl)
-            : null,
-        child: conv.otherAvatarUrl.isEmpty
-            ? const Icon(Icons.person, color: Colors.white)
-            : null,
+      leading: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => openUserProfile(context, uid: conv.otherUid),
+        child: CircleAvatar(
+          radius: 26,
+          backgroundColor: Colors.grey.shade200,
+          backgroundImage: conv.otherAvatarUrl.isNotEmpty
+              ? NetworkImage(conv.otherAvatarUrl)
+              : null,
+          child: conv.otherAvatarUrl.isEmpty
+              ? const Icon(Icons.person, color: Colors.white)
+              : null,
+        ),
       ),
-      title: Text(
-        conv.otherUsername,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      title: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => openUserProfile(context, uid: conv.otherUid),
+        child: Text(
+          conv.otherUsername,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
       ),
       subtitle: Text(
         conv.lastMessage,

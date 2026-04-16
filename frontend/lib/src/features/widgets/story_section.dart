@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/story_providers.dart';
+import '../../navigation/user_profile_nav.dart';
 import '../../services/story_service.dart';
 import '../screens/camera_story_screen.dart';
 import '../screens/story_viewer_screen.dart';
@@ -35,8 +36,8 @@ class StoriesList extends ConsumerWidget {
             children: [
               _MyStoryBubble(
                 avatarUrl: user?['avatarUrl'] as String?,
-                hasStory: user != null &&
-                    byAuthor.containsKey(user['uid'] ?? ''),
+                hasStory:
+                    user != null && byAuthor.containsKey(user['uid'] ?? ''),
                 stories: byAuthor[user?['uid']] ?? const [],
               ),
               ...byAuthor.entries
@@ -105,8 +106,7 @@ class _MyStoryBubble extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: hasStory
-                        ? Border.all(
-                            color: const Color(0xFFB05ECC), width: 2.5)
+                        ? Border.all(color: const Color(0xFFB05ECC), width: 2.5)
                         : null,
                   ),
                   child: CircleAvatar(
@@ -129,8 +129,7 @@ class _MyStoryBubble extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: const Icon(Icons.add,
-                        color: Colors.white, size: 14),
+                    child: const Icon(Icons.add, color: Colors.white, size: 14),
                   ),
               ],
             ),
@@ -148,6 +147,15 @@ class _StoryBubble extends StatelessWidget {
   final List<Story> stories;
   const _StoryBubble({required this.stories});
 
+  void _openStory(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StoryViewerScreen(stories: stories),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final first = stories.first;
@@ -156,18 +164,12 @@ class _StoryBubble extends StatelessWidget {
       child: Column(
         children: [
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StoryViewerScreen(stories: stories),
-              ),
-            ),
+            onTap: () => _openStory(context),
             child: Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                    color: const Color(0xFFB05ECC), width: 2.5),
+                border: Border.all(color: const Color(0xFFB05ECC), width: 2.5),
               ),
               child: CircleAvatar(
                 radius: 30,
@@ -184,12 +186,15 @@ class _StoryBubble extends StatelessWidget {
           const SizedBox(height: 4),
           SizedBox(
             width: 70,
-            child: Text(
-              first.authorUsername,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, color: Colors.black87),
+            child: GestureDetector(
+              onTap: () => openUserProfile(context, uid: first.authorUid),
+              child: Text(
+                first.authorUsername,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, color: Colors.black87),
+              ),
             ),
           ),
         ],

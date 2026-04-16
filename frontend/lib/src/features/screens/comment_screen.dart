@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/comment_providers.dart';
+import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
 import '../model/post_model.dart';
 
@@ -96,8 +97,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                 children: [
                   const Text(
                     'Comments',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -200,14 +200,17 @@ class _CommentTile extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundImage: (comment.authorAvatar?.isNotEmpty ?? false)
-                ? CachedNetworkImageProvider(comment.authorAvatar!)
-                : null,
-            child: (comment.authorAvatar?.isEmpty ?? true)
-                ? const Icon(Icons.person, size: 16)
-                : null,
+          GestureDetector(
+            onTap: () => openUserProfile(context, uid: comment.authorUid),
+            child: CircleAvatar(
+              radius: 16,
+              backgroundImage: (comment.authorAvatar?.isNotEmpty ?? false)
+                  ? CachedNetworkImageProvider(comment.authorAvatar!)
+                  : null,
+              child: (comment.authorAvatar?.isEmpty ?? true)
+                  ? const Icon(Icons.person, size: 16)
+                  : null,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -216,10 +219,14 @@ class _CommentTile extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      comment.authorUsername,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13),
+                    GestureDetector(
+                      onTap: () =>
+                          openUserProfile(context, uid: comment.authorUid),
+                      child: Text(
+                        comment.authorUsername,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Text(

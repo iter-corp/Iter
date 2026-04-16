@@ -103,7 +103,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserDocProvider);
-    final currentUid = ref.watch(authStateProvider).value?.uid;
+    final currentUid = (ref.watch(authStateProvider).value ??
+            ref.watch(authServiceProvider).currentUser)
+        ?.uid;
     final followersAsync = currentUid == null
         ? const AsyncValue<List<String>>.data([])
         : ref.watch(followersProvider(currentUid));
@@ -133,8 +135,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   bio: (user['bio'] as String?) ?? '',
                 ),
                 ProfileStats(
-                  followers: (user['followersCount'] as int?) ?? 0,
-                  following: (user['followingCount'] as int?) ?? 0,
+                  followers: followersAsync.valueOrNull?.length ??
+                      (user['followersCount'] as int?) ??
+                      0,
+                  following: followingAsync.valueOrNull?.length ??
+                      (user['followingCount'] as int?) ??
+                      0,
                   posts: (user['postsCount'] as int?) ?? 0,
                   onFollowersTap: () => _showUserListSheet(
                     title: 'Followers',
@@ -188,8 +194,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             if (isAdmin)
               ListTile(
-                leading: const Icon(Icons.shield_outlined,
-                    color: Color(0xFF7E3BE8)),
+                leading:
+                    const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
                 title: const Text('Admin panel',
                     style: TextStyle(
                       color: Color(0xFF7E3BE8),
@@ -238,20 +244,17 @@ class UserPostsGrid extends ConsumerWidget {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(2),
-          gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
             childAspectRatio: 1,
           ),
           itemCount: posts.length,
           itemBuilder: (_, i) {
             final post = posts[i];
-            final url = post.imageUrls.isNotEmpty
-                ? post.imageUrls.first
-                : null;
+            final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
@@ -262,30 +265,35 @@ class UserPostsGrid extends ConsumerWidget {
                   ),
                 ),
               ),
-              child: Container(
-                color: const Color(0xFFEDEDF2),
-                child: url != null
-                    ? CachedNetworkImage(
-                        imageUrl: url,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                            color: const Color(0xFFEDEDF2)),
-                        errorWidget: (_, __, ___) => const Icon(
-                            Icons.broken_image, color: Colors.grey),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Center(
-                          child: Text(
-                            post.caption,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.black87),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  color: const Color(0xFFEDEDF2),
+                  child: url != null
+                      ? CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) =>
+                              Container(color: const Color(0xFFEDEDF2)),
+                          errorWidget: (_, __, ___) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Center(
+                            child: Text(
+                              post.caption,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.black87),
+                            ),
                           ),
                         ),
-                      ),
+                ),
               ),
             );
           },
@@ -322,20 +330,17 @@ class UserRepostsGrid extends ConsumerWidget {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(2),
-          gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
             childAspectRatio: 1,
           ),
           itemCount: posts.length,
           itemBuilder: (_, i) {
             final post = posts[i];
-            final url = post.imageUrls.isNotEmpty
-                ? post.imageUrls.first
-                : null;
+            final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
@@ -346,30 +351,35 @@ class UserRepostsGrid extends ConsumerWidget {
                   ),
                 ),
               ),
-              child: Container(
-                color: const Color(0xFFEDEDF2),
-                child: url != null
-                    ? CachedNetworkImage(
-                        imageUrl: url,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: const Color(0xFFEDEDF2)),
-                        errorWidget: (_, __, ___) => const Icon(
-                            Icons.broken_image, color: Colors.grey),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Center(
-                          child: Text(
-                            post.caption,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.black87),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  color: const Color(0xFFEDEDF2),
+                  child: url != null
+                      ? CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) =>
+                              Container(color: const Color(0xFFEDEDF2)),
+                          errorWidget: (_, __, ___) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Center(
+                            child: Text(
+                              post.caption,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.black87),
+                            ),
                           ),
                         ),
-                      ),
+                ),
               ),
             );
           },
@@ -406,20 +416,17 @@ class UserSavedGrid extends ConsumerWidget {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(2),
-          gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
             childAspectRatio: 1,
           ),
           itemCount: posts.length,
           itemBuilder: (_, i) {
             final post = posts[i];
-            final url = post.imageUrls.isNotEmpty
-                ? post.imageUrls.first
-                : null;
+            final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
@@ -430,30 +437,35 @@ class UserSavedGrid extends ConsumerWidget {
                   ),
                 ),
               ),
-              child: Container(
-                color: const Color(0xFFEDEDF2),
-                child: url != null
-                    ? CachedNetworkImage(
-                        imageUrl: url,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: const Color(0xFFEDEDF2)),
-                        errorWidget: (_, __, ___) => const Icon(
-                            Icons.broken_image, color: Colors.grey),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Center(
-                          child: Text(
-                            post.caption,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.black87),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  color: const Color(0xFFEDEDF2),
+                  child: url != null
+                      ? CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) =>
+                              Container(color: const Color(0xFFEDEDF2)),
+                          errorWidget: (_, __, ___) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Center(
+                            child: Text(
+                              post.caption,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.black87),
+                            ),
                           ),
                         ),
-                      ),
+                ),
               ),
             );
           },
@@ -482,8 +494,8 @@ class _EmptyTab extends StatelessWidget {
           Icon(icon, size: 48, color: Colors.grey),
           const SizedBox(height: 12),
           Text(title,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 15)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 4),
           Text(subtitle,
               textAlign: TextAlign.center,

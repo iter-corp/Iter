@@ -30,7 +30,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   bool _messageBusy = false;
 
   Future<void> _toggleFollow(bool currentlyFollowing) async {
-    final currentUser = ref.read(authStateProvider).value;
+    final currentUser = ref.read(authStateProvider).value ??
+        ref.read(authServiceProvider).currentUser;
     if (currentUser == null || _followBusy) return;
 
     setState(() => _followBusy = true);
@@ -47,13 +48,20 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           targetUid: widget.uid,
         );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Follow action failed: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _followBusy = false);
     }
   }
 
   Future<void> _openMessage(String otherName, String otherAvatar) async {
-    final currentUser = ref.read(authStateProvider).value;
+    final currentUser = ref.read(authStateProvider).value ??
+        ref.read(authServiceProvider).currentUser;
     if (currentUser == null || _messageBusy) return;
     setState(() => _messageBusy = true);
     try {
@@ -162,7 +170,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(_otherUserProvider(widget.uid));
-    final currentUser = ref.watch(authStateProvider).value;
+    final currentUser = ref.watch(authStateProvider).value ??
+        ref.watch(authServiceProvider).currentUser;
     final isOwnProfile = currentUser?.uid == widget.uid;
     final isFollowingAsync = ref.watch(isFollowingProvider(widget.uid));
     final followersAsync = ref.watch(followersProvider(widget.uid));
@@ -183,8 +192,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           final coverUrl = user['coverUrl'] as String?;
           const isPrivate = false;
           final isFollowing = isFollowingAsync.value ?? false;
-          final followers = (user['followersCount'] as int?) ?? 0;
-          final following = (user['followingCount'] as int?) ?? 0;
+          final followers = followersAsync.valueOrNull?.length ??
+              (user['followersCount'] as int?) ??
+              0;
+          final following = followingAsync.valueOrNull?.length ??
+              (user['followingCount'] as int?) ??
+              0;
           final posts = (user['postsCount'] as int?) ?? 0;
 
           return SingleChildScrollView(
@@ -260,8 +273,7 @@ class _UserPostsGrid extends ConsumerWidget {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 60),
             child: Center(
-              child: Text('No posts yet',
-                  style: TextStyle(color: Colors.grey)),
+              child: Text('No posts yet', style: TextStyle(color: Colors.grey)),
             ),
           );
         }
@@ -292,8 +304,8 @@ class _UserRepostsGrid extends ConsumerWidget {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 60),
             child: Center(
-              child: Text('No reposts yet',
-                  style: TextStyle(color: Colors.grey)),
+              child:
+                  Text('No reposts yet', style: TextStyle(color: Colors.grey)),
             ),
           );
         }
@@ -307,11 +319,11 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
   return GridView.builder(
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
-    padding: const EdgeInsets.all(2),
+    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 3,
-      mainAxisSpacing: 2,
-      crossAxisSpacing: 2,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
       childAspectRatio: 1,
     ),
     itemCount: posts.length,
@@ -328,30 +340,33 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
             ),
           ),
         ),
-        child: Container(
-          color: const Color(0xFFEDEDF2),
-          child: url != null
-              ? CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      Container(color: const Color(0xFFEDEDF2)),
-                  errorWidget: (_, __, ___) =>
-                      const Icon(Icons.broken_image, color: Colors.grey),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Center(
-                    child: Text(
-                      post.caption,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 11, color: Colors.black87),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            color: const Color(0xFFEDEDF2),
+            child: url != null
+                ? CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        Container(color: const Color(0xFFEDEDF2)),
+                    errorWidget: (_, __, ___) =>
+                        const Icon(Icons.broken_image, color: Colors.grey),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Center(
+                      child: Text(
+                        post.caption,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.black87),
+                      ),
                     ),
                   ),
-                ),
+          ),
         ),
       );
     },
