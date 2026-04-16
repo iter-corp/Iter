@@ -92,6 +92,30 @@ class NotificationService {
     });
   }
 
+  /// Upserts a notification using a deterministic document ID so repeated
+  /// identical actions (e.g. like → unlike → like) never create duplicates.
+  /// The [docId] must be globally unique per actor+type+target combination.
+  Future<void> upsertNotification({
+    required String targetUid,
+    required String docId,
+    required String type,
+    required String actorUid,
+    String? targetId,
+  }) async {
+    await _items(targetUid).doc(docId).set({
+      'type': type,
+      'actorUid': actorUid,
+      if (targetId != null) 'targetId': targetId,
+      'read': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Removes the notification with [docId] for [targetUid].
+  /// Used to clean up like notifications on unlike.
+  Future<void> removeNotificationById(String targetUid, String docId) =>
+      _items(targetUid).doc(docId).delete();
+
   /// Delete a single notification.
   Future<void> deleteNotification(String uid, String notifId) =>
       _items(uid).doc(notifId).delete();

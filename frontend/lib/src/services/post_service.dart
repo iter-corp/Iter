@@ -2,10 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../features/model/post_model.dart';
+import 'notification_service.dart';
 
 class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationService _notifications = NotificationService();
 
   CollectionReference<Map<String, dynamic>> get _posts =>
       _db.collection('posts');
@@ -83,26 +85,52 @@ class PostService {
     if (user == null) throw Exception('Not signed in');
     final likeRef = _posts.doc(postId).collection('likes').doc(user.uid);
     final postRef = _posts.doc(postId);
+    bool didLike = false;
+    String? authorUid;
 
     await _db.runTransaction((tx) async {
+      final postSnap = await tx.get(postRef);
+      authorUid = postSnap.data()?['authorUid'] as String?;
+
       final likeSnap = await tx.get(likeRef);
       if (likeSnap.exists) {
+        didLike = false;
         tx.delete(likeRef);
         tx.update(postRef, {'likesCount': FieldValue.increment(-1)});
       } else {
+        didLike = true;
         tx.set(likeRef, {'createdAt': FieldValue.serverTimestamp()});
         tx.update(postRef, {'likesCount': FieldValue.increment(1)});
       }
     });
+
+    // Spark-only in-app notification — upsert/remove by deterministic ID so
+    // repeated like/unlike cycles never create duplicate notifications.
+    if (authorUid != null && authorUid != user.uid) {
+      final notifId = 'like_${user.uid}_$postId';
+      try {
+        if (didLike) {
+          await _notifications.upsertNotification(
+            targetUid: authorUid!,
+            docId: notifId,
+            type: 'like',
+            actorUid: user.uid,
+            targetId: postId,
+          );
+        } else {
+          await _notifications.removeNotificationById(authorUid!, notifId);
+        }
+      } catch (_) {}
+    }
   }
 
-  Stream<bool> streamIsLiked(String postId) {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return Stream.value(false);
+  Stream<bool> streamIsLiked(String postId, {String? uid}) {
+    final effectiveUid = uid ?? _auth.currentUser?.uid;
+    if (effectiveUid == null) return Stream.value(false);
     return _posts
         .doc(postId)
         .collection('likes')
-        .doc(uid)
+        .doc(effectiveUid)
         .snapshots()
         .map((s) => s.exists);
   }
@@ -128,12 +156,12 @@ class PostService {
     });
   }
 
-  Stream<bool> streamIsReposted(String postId) {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return Stream.value(false);
+  Stream<bool> streamIsReposted(String postId, {String? uid}) {
+    final effectiveUid = uid ?? _auth.currentUser?.uid;
+    if (effectiveUid == null) return Stream.value(false);
     return _db
         .collection('users')
-        .doc(uid)
+        .doc(effectiveUid)
         .collection('reposts')
         .doc(postId)
         .snapshots()
@@ -143,11 +171,8 @@ class PostService {
   Future<void> toggleSave(String postId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
-    final ref = _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('saved')
-        .doc(postId);
+    final ref =
+        _db.collection('users').doc(user.uid).collection('saved').doc(postId);
     final snap = await ref.get();
     if (snap.exists) {
       await ref.delete();
@@ -156,12 +181,12 @@ class PostService {
     }
   }
 
-  Stream<bool> streamIsSaved(String postId) {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return Stream.value(false);
+  Stream<bool> streamIsSaved(String postId, {String? uid}) {
+    final effectiveUid = uid ?? _auth.currentUser?.uid;
+    if (effectiveUid == null) return Stream.value(false);
     return _db
         .collection('users')
-        .doc(uid)
+        .doc(effectiveUid)
         .collection('saved')
         .doc(postId)
         .snapshots()

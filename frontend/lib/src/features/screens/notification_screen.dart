@@ -107,6 +107,39 @@ class NotificationScreen extends ConsumerWidget {
 // Private per-item widget
 // ─────────────────────────────────────────────
 
+class _FollowStateButton extends StatelessWidget {
+  final bool isFollowing;
+  final VoidCallback? onTap;
+
+  const _FollowStateButton({
+    required this.isFollowing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color:
+              isFollowing ? const Color(0xFFE5E5EA) : const Color(0xFFB44FFF),
+        ),
+        child: Text(
+          isFollowing ? 'Following' : 'Follow back',
+          style: TextStyle(
+            color: isFollowing ? Colors.black87 : Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NotificationItem extends ConsumerWidget {
   final AppNotification notif;
   final VoidCallback? onMarkRead;
@@ -136,6 +169,7 @@ class _NotificationItem extends ConsumerWidget {
         NotificationType trailingType;
         bool isLike = false;
         VoidCallback? onFollow;
+        Widget? trailingWidget;
 
         switch (notif.type) {
           case 'follow':
@@ -147,6 +181,16 @@ class _NotificationItem extends ConsumerWidget {
                     currentUid: currentUser.uid,
                     targetUid: notif.actorUid,
                   );
+
+              final isFollowingAsync =
+                  ref.watch(isFollowingProvider(notif.actorUid));
+              final isFollowing =
+                  isFollowingAsync.whenOrNull(data: (v) => v) ?? false;
+
+              trailingWidget = _FollowStateButton(
+                isFollowing: isFollowing,
+                onTap: isFollowing ? null : onFollow,
+              );
             }
             break;
           case 'like':
@@ -172,7 +216,6 @@ class _NotificationItem extends ConsumerWidget {
         }
 
         // Build the trailing widget for like/comment (post thumbnail).
-        Widget? trailingWidget;
         if ((notif.type == 'like' || notif.type == 'comment') &&
             notif.targetId != null) {
           trailingWidget = _PostThumbnail(postId: notif.targetId!);
@@ -247,8 +290,7 @@ class _NotificationItem extends ConsumerWidget {
   ) async {
     final db = FirebaseFirestore.instance;
     // Fetch actor (the sender) info for ChatScreen header.
-    final actorSnap =
-        await db.collection('users').doc(notif.actorUid).get();
+    final actorSnap = await db.collection('users').doc(notif.actorUid).get();
     final actorData = actorSnap.data() ?? {};
     final otherName = (actorData['username'] as String?) ?? 'User';
     final otherAvatar = (actorData['avatarUrl'] as String?) ?? '';
@@ -290,8 +332,7 @@ class _PostThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<DocumentSnapshot>(
-      future:
-          FirebaseFirestore.instance.collection('posts').doc(postId).get(),
+      future: FirebaseFirestore.instance.collection('posts').doc(postId).get(),
       builder: (context, snap) {
         if (!snap.hasData || !snap.data!.exists) {
           return const SizedBox(width: 45, height: 45);
@@ -308,12 +349,10 @@ class _PostThumbnail extends StatelessWidget {
             width: 45,
             height: 45,
             fit: BoxFit.cover,
-            errorWidget: (_, __, ___) =>
-                const SizedBox(width: 45, height: 45),
+            errorWidget: (_, __, ___) => const SizedBox(width: 45, height: 45),
           ),
         );
       },
     );
   }
 }
-

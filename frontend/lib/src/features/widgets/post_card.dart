@@ -11,14 +11,36 @@ import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
 import '../screens/user_screen.dart';
 
-class PostCard extends ConsumerWidget {
+class PostCard extends ConsumerStatefulWidget {
   final Post post;
   const PostCard({super.key, required this.post});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends ConsumerState<PostCard> {
+  // Optimistic UI: non-null while a like toggle is in-flight.
+  bool? _pendingLike;
+
+  Future<void> _toggleLike() async {
+    final currentLiked =
+        ref.read(isLikedProvider(widget.post.id)).value ?? false;
+    if (_pendingLike != null) return; // already in-flight, ignore tap
+    setState(() => _pendingLike = !currentLiked);
+    try {
+      await ref.read(postServiceProvider).toggleLike(widget.post.id);
+    } finally {
+      if (mounted) setState(() => _pendingLike = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final post = widget.post;
     final isLikedAsync = ref.watch(isLikedProvider(post.id));
-    final isLiked = isLikedAsync.value ?? false;
+    // Use optimistic value while in-flight, otherwise use live stream value.
+    final isLiked = _pendingLike ?? isLikedAsync.value ?? false;
     final isRepostedAsync = ref.watch(isRepostedProvider(post.id));
     final isReposted = isRepostedAsync.value ?? false;
     final isSaved = ref.watch(isSavedProvider(post.id)).value ?? false;
@@ -142,8 +164,7 @@ class PostCard extends ConsumerWidget {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: () =>
-                          ref.read(postServiceProvider).toggleLike(post.id),
+                      onTap: _toggleLike,
                       child: Row(
                         children: [
                           Icon(
@@ -178,9 +199,8 @@ class PostCard extends ConsumerWidget {
                           ref.read(postServiceProvider).toggleRepost(post.id),
                       child: Icon(
                         Icons.repeat,
-                        color: isReposted
-                            ? const Color(0xFFB05ECC)
-                            : Colors.white,
+                        color:
+                            isReposted ? const Color(0xFFB05ECC) : Colors.white,
                         size: 22,
                       ),
                     ),
@@ -195,9 +215,7 @@ class PostCard extends ConsumerWidget {
                           ref.read(postServiceProvider).toggleSave(post.id),
                       child: Icon(
                         isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        color: isSaved
-                            ? const Color(0xFFB05ECC)
-                            : Colors.white,
+                        color: isSaved ? const Color(0xFFB05ECC) : Colors.white,
                         size: 22,
                       ),
                     ),
@@ -211,8 +229,7 @@ class PostCard extends ConsumerWidget {
                       post.caption,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 13),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
                     ),
                   ),
                 ],
@@ -255,25 +272,24 @@ class PostCard extends ConsumerWidget {
                     CircleAvatar(
                       radius: 16,
                       backgroundColor: Colors.grey.shade200,
-                      backgroundImage: post.authorAvatar != null
-                          ? CachedNetworkImageProvider(post.authorAvatar!)
+                      backgroundImage: widget.post.authorAvatar != null
+                          ? CachedNetworkImageProvider(
+                              widget.post.authorAvatar!)
                           : null,
-                      child: post.authorAvatar == null
+                      child: widget.post.authorAvatar == null
                           ? const Icon(Icons.person, size: 16)
                           : null,
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      post.authorUsername,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14),
+                      widget.post.authorUsername,
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 SingleChildScrollView(
                   child: SelectableText(
-                    post.caption,
+                    widget.post.caption,
                     style: const TextStyle(fontSize: 14, height: 1.4),
                   ),
                 ),
@@ -327,8 +343,8 @@ class PostCard extends ConsumerWidget {
                     const Divider(height: 1),
                     Expanded(
                       child: inboxAsync.when(
-                        loading: () => const Center(
-                            child: CircularProgressIndicator()),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
                         error: (e, _) => Center(child: Text('Error: $e')),
                         data: (convs) {
                           if (convs.isEmpty) {
@@ -349,10 +365,9 @@ class PostCard extends ConsumerWidget {
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.grey.shade200,
-                                  backgroundImage:
-                                      c.otherAvatarUrl.isNotEmpty
-                                          ? NetworkImage(c.otherAvatarUrl)
-                                          : null,
+                                  backgroundImage: c.otherAvatarUrl.isNotEmpty
+                                      ? NetworkImage(c.otherAvatarUrl)
+                                      : null,
                                   child: c.otherAvatarUrl.isEmpty
                                       ? const Icon(Icons.person)
                                       : null,
@@ -367,14 +382,10 @@ class PostCard extends ConsumerWidget {
                                     color: Color(0xFFB05ECC)),
                                 onTap: () async {
                                   await _shareAs(
-                                      ref2,
-                                      c.chatId,
-                                      currentUid,
-                                      c.otherUid);
+                                      ref2, c.chatId, currentUid, c.otherUid);
                                   if (ctx.mounted) Navigator.pop(ctx);
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
                                             'Shared to ${c.otherUsername}'),
@@ -413,20 +424,20 @@ class PostCard extends ConsumerWidget {
     // imageUrl; for posts we want sharedPostId. Adding a dedicated method keeps
     // the contract clean — fall back to imageUrl so the receiver sees
     // something if sharedPostId isn't rendered.
-    if (post.imageUrls.isNotEmpty) {
+    if (widget.post.imageUrls.isNotEmpty) {
       await chat.sendMessage(
         chatId: chatId,
         senderUid: senderUid,
         receiverUid: receiverUid,
-        text: post.caption,
-        imageUrl: post.imageUrls.first,
+        text: widget.post.caption,
+        imageUrl: widget.post.imageUrls.first,
       );
     } else {
       await chat.sendMessage(
         chatId: chatId,
         senderUid: senderUid,
         receiverUid: receiverUid,
-        text: 'Shared post: ${post.caption}',
+        text: 'Shared post: ${widget.post.caption}',
       );
     }
   }
@@ -487,9 +498,7 @@ class _OwnerMenu extends StatelessWidget {
           PopupMenuItem(
             value: 'visibility',
             child: Row(children: [
-              Icon(post.isPrivate
-                  ? Icons.public
-                  : Icons.lock_outline,
+              Icon(post.isPrivate ? Icons.public : Icons.lock_outline,
                   size: 18),
               const SizedBox(width: 8),
               Text(post.isPrivate ? 'Make public' : 'Make followers-only'),

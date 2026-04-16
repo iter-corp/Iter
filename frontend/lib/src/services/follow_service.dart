@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'notification_service.dart';
+
 class FollowService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final NotificationService _notifications = NotificationService();
 
   DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
       _db.collection('users').doc(uid);
@@ -26,6 +29,16 @@ class FollowService {
     batch.set(followingRef, {'uid': targetUid, 'createdAt': now});
     batch.set(followerRef, {'uid': currentUid, 'createdAt': now});
     await batch.commit();
+
+    // Best-effort in-app notification write; follow should still succeed
+    // even if this secondary write fails.
+    try {
+      await _notifications.createNotification(
+        targetUid: targetUid,
+        type: 'follow',
+        actorUid: currentUid,
+      );
+    } catch (_) {}
   }
 
   Future<void> unfollow({

@@ -85,6 +85,9 @@ class NotificationTile extends StatelessWidget {
   }
 
   Widget _buildTrailing() {
+    // Allow caller to override the trailing area for any notification type.
+    if (trailingWidget != null) return trailingWidget!;
+
     switch (trailingType) {
       case NotificationType.followBack:
         return _buildButton('Follow back', onFollowTap);
@@ -93,8 +96,6 @@ class NotificationTile extends StatelessWidget {
         return _buildButton('Follow', onFollowTap);
 
       case NotificationType.image:
-        // Use custom trailing widget if provided (e.g. post thumbnail).
-        if (trailingWidget != null) return trailingWidget!;
         if (postImage == null || postImage!.isEmpty) {
           return const SizedBox(width: 45, height: 45);
         }
@@ -128,4 +129,3 @@ class NotificationTile extends StatelessWidget {
     );
   }
 }
-
