@@ -141,9 +141,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< Updated upstream
     final presenceAsync = ref.watch(presenceWatchProvider(widget.otherUid));
     final typingAsync =
         ref.watch(typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
+=======
+    final chatDocAsync = ref.watch(chatDocProvider(widget.chatId));
+    final chatDoc = chatDocAsync.value ?? const <String, dynamic>{};
+    final isGroup = (chatDoc['kind'] as String?) == 'group';
+    final groupName = (chatDoc['groupName'] as String?) ?? widget.otherName;
+    final participantCount = ((chatDoc['participants'] as List?)?.length ?? 0);
+
+    final presenceAsync =
+        isGroup ? null : ref.watch(presenceWatchProvider(widget.otherUid));
+    final typingAsync = isGroup
+        ? null
+        : ref.watch(typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
+>>>>>>> Stashed changes
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
 
     ref.listen(messagesProvider(widget.chatId), (_, __) {
@@ -271,6 +285,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
+<<<<<<< Updated upstream
+=======
+            if (isGroup)
+              PollsSection(
+                parentPath: 'chats/${widget.chatId}',
+                canCreate: true,
+              ),
+
+>>>>>>> Stashed changes
             // INPUT
             Padding(
               padding: const EdgeInsets.all(12),
@@ -342,7 +365,21 @@ class _MessageBubble extends StatelessWidget {
   }
 
   @override
+<<<<<<< Updated upstream
   Widget build(BuildContext context) {
+=======
+  Widget build(BuildContext context, WidgetRef ref) {
+    // In groups we look up each sender's live profile dynamically. In 1:1
+    // chats we reuse the cached otherAvatar passed into the screen.
+    final senderLive =
+        isGroup ? ref.watch(userByUidProvider(msg.senderUid)).value : null;
+    final senderAvatar =
+        isGroup ? ((senderLive?['avatarUrl'] as String?) ?? '') : otherAvatar;
+    final senderName =
+        isGroup ? ((senderLive?['username'] as String?) ?? 'Member') : '';
+    final senderUidForTap = isGroup ? msg.senderUid : otherUid;
+
+>>>>>>> Stashed changes
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -368,6 +405,7 @@ class _MessageBubble extends StatelessWidget {
             crossAxisAlignment:
                 isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
+<<<<<<< Updated upstream
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 260),
                 child: Container(
@@ -382,55 +420,98 @@ class _MessageBubble extends StatelessWidget {
                       topRight: const Radius.circular(16),
                       bottomLeft: Radius.circular(isMe ? 16 : 4),
                       bottomRight: Radius.circular(isMe ? 4 : 16),
+=======
+              if (isGroup && !isMe)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2, left: 4),
+                  child: Text(
+                    senderName,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
                     ),
                   ),
-                  child: (msg.sharedPostId != null &&
-                          msg.sharedPostId!.isNotEmpty)
-                      ? _SharedPostPreview(
-                          postId: msg.sharedPostId!,
-                          isMe: isMe,
-                        )
-                      : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: CachedNetworkImage(
-                                    imageUrl: msg.imageUrl!,
-                                    width: 240,
-                                    fit: BoxFit.cover,
-                                    placeholder: (_, __) => const SizedBox(
-                                      height: 180,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
+                ),
+              GestureDetector(
+                onLongPress: () => showReactionsSheet(
+                  context,
+                  ref: ref,
+                  parentPath: 'chats/$chatId/messages',
+                  messageId: msg.id,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? const Color(0xFFB05ECC)
+                          : const Color(0xFFF0F0F0),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 16),
+                      ),
+>>>>>>> Stashed changes
+                    ),
+                    child: (msg.sharedPostId != null &&
+                            msg.sharedPostId!.isNotEmpty)
+                        ? _SharedPostPreview(
+                            postId: msg.sharedPostId!,
+                            isMe: isMe,
+                          )
+                        : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: CachedNetworkImage(
+                                      imageUrl: msg.imageUrl!,
+                                      width: 240,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => const SizedBox(
+                                        height: 180,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                if (msg.text.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    msg.text,
-                                    style: TextStyle(
-                                      color:
-                                          isMe ? Colors.white : Colors.black,
-                                      fontSize: 14,
+                                  if (msg.text.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      msg.text,
+                                      style: TextStyle(
+                                        color:
+                                            isMe ? Colors.white : Colors.black,
+                                        fontSize: 14,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
-                            )
-                          : Text(
-                              msg.text,
-                              style: TextStyle(
-                                color: isMe ? Colors.white : Colors.black,
-                                fontSize: 14,
+                              )
+                            : Text(
+                                msg.text,
+                                style: TextStyle(
+                                  color: isMe ? Colors.white : Colors.black,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
+                  ),
                 ),
               ),
+<<<<<<< Updated upstream
+=======
+              MessageReactionsRow(
+                parentPath: 'chats/$chatId/messages',
+                messageId: msg.id,
+              ),
+>>>>>>> Stashed changes
               if (msg.sharedPostId != null &&
                   msg.sharedPostId!.isNotEmpty &&
                   msg.text.trim().isNotEmpty) ...[
@@ -572,3 +653,52 @@ class _SharedPostPreview extends StatelessWidget {
   }
 }
 
+<<<<<<< Updated upstream
+=======
+/// Shows "Member of <EventTitle>" under the username when the two users
+/// share at least one event group chat. Hidden otherwise.
+class _SharedEventLabel extends ConsumerWidget {
+  final String meUid;
+  final String otherUid;
+
+  const _SharedEventLabel({required this.meUid, required this.otherUid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = '$meUid|$otherUid';
+    final async = ref.watch(sharedEventProvider(key));
+    final shared = async.valueOrNull;
+    if (shared == null) return const SizedBox.shrink();
+    final title = shared['eventTitle'] ?? '';
+    if (title.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5E8FA),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.groups, size: 11, color: Color(0xFFB05ECC)),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                'Member of $title',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFB05ECC),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+>>>>>>> Stashed changes

@@ -95,6 +95,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   void _showUserListSheet({required String title, required List<String> uids}) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) {
         return SafeArea(
@@ -137,8 +138,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             final uid = uids[index];
                             final userAsync =
                                 ref.watch(_otherUserProvider(uid));
-                            final avatarUrl = userAsync.valueOrNull?['avatarUrl']
-                                as String?;
+                            final avatarUrl =
+                                userAsync.valueOrNull?['avatarUrl'] as String?;
                             return ListTile(
                               onTap: () {
                                 Navigator.pop(context);
@@ -196,7 +197,17 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (user) {
           if (user == null) {
-            return const Center(child: Text('User not found'));
+            return _UnavailableUserView(
+              message: 'User not found',
+              onBack: () => Navigator.of(context).maybePop(),
+            );
+          }
+          final deleted = (user['deleted'] as bool?) ?? false;
+          if (deleted) {
+            return _UnavailableUserView(
+              message: 'This account has been deleted',
+              onBack: () => Navigator.of(context).maybePop(),
+            );
           }
           final username = (user['username'] as String?) ?? 'User';
           final handle = (user['handle'] as String?) ?? '';
@@ -383,4 +394,39 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
       );
     },
   );
+}
+
+class _UnavailableUserView extends StatelessWidget {
+  final String message;
+  final VoidCallback onBack;
+
+  const _UnavailableUserView({
+    required this.message,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Stack(
+        children: [
+          Positioned(
+            top: 8,
+            left: 8,
+            child: IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back',
+            ),
+          ),
+          Center(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

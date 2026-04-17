@@ -25,6 +25,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _showUserListSheet({required String title, required List<String> uids}) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) {
         return SafeArea(
@@ -75,8 +76,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               stream: userAsync,
                               builder: (context, snapshot) {
                                 final data = snapshot.data;
-                                final avatarUrl =
-                                    data?['avatarUrl'] as String?;
+                                final avatarUrl = data?['avatarUrl'] as String?;
                                 return ListTile(
                                   onTap: () {
                                     Navigator.pop(context);
@@ -200,6 +200,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final isAdmin = ref.read(isAdminProvider);
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

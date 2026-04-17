@@ -52,8 +52,13 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
         builder: (_) => ChatScreen(
           chatId: conv.chatId,
           otherUid: conv.otherUid,
+<<<<<<< Updated upstream
           otherName: conv.otherUsername,
           otherAvatar: conv.otherAvatarUrl,
+=======
+          otherName: conv.isGroup ? conv.groupName : conv.otherUsername,
+          otherAvatar: conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl,
+>>>>>>> Stashed changes
         ),
       ),
     );
@@ -63,8 +68,19 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
   Widget build(BuildContext context) {
     final acceptedInboxAsync = ref.watch(acceptedInboxProvider);
     final requestsAsync = ref.watch(requestsProvider);
+<<<<<<< Updated upstream
     final allConvs = (acceptedInboxAsync.value ?? []).where(_matches).toList();
     final requestConvs = (requestsAsync.value ?? []).where(_matches).toList();
+=======
+    final eventChatsAsync = ref.watch(myEventChatsProvider);
+
+    final oneToOne =
+        (acceptedInboxAsync.valueOrNull ?? []).where(_matches).toList();
+    final eventRows =
+        (eventChatsAsync.valueOrNull ?? []).where(_matchesEvent).toList();
+    final requestConvs =
+        (requestsAsync.valueOrNull ?? []).where(_matches).toList();
+>>>>>>> Stashed changes
 
     return SafeArea(
       child: Column(
@@ -72,6 +88,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
           // ── Search bar ──────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+<<<<<<< Updated upstream
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -88,6 +105,48 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                   icon: Icon(Icons.search, color: Colors.grey),
                 ),
               ),
+=======
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F0F0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (v) => setState(() => _query = v),
+                      decoration: const InputDecoration(
+                        hintText: 'Search...',
+                        hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                        border: InputBorder.none,
+                        icon: Icon(Icons.search, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Material(
+                  color: const Color(0xFFB05ECC),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => showCreateGroupSheet(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      child: Icon(
+                        Icons.group_add_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+>>>>>>> Stashed changes
             ),
           ),
 
@@ -99,6 +158,28 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
             onTap: (i) => setState(() => selectedTab = i),
           ),
           const SizedBox(height: 8),
+
+          // ── Info banner for event chats initialization ────────────────
+          if (eventChatsAsync.isLoading)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: const Color(0xFFF0F7FF),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFF0066CC), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Event chats are initializing...',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF0066CC),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // ── Conversation list ────────────────────────────────────────
           Expanded(
@@ -158,6 +239,7 @@ class _ConvTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
+<<<<<<< Updated upstream
       leading: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => openUserProfile(context, uid: conv.otherUid),
@@ -179,6 +261,56 @@ class _ConvTile extends StatelessWidget {
           conv.otherUsername,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
+=======
+      leading: conv.isGroup
+          ? CircleAvatar(
+              radius: 26,
+              backgroundColor: const Color(0xFF7E3BE8),
+              backgroundImage:
+                  displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
+              child: displayAvatar.isEmpty
+                  ? const Icon(Icons.groups, color: Colors.white)
+                  : null,
+            )
+          : CircleAvatar(
+              radius: 26,
+              backgroundColor: Colors.grey.shade200,
+              backgroundImage:
+                  displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
+              child: displayAvatar.isEmpty
+                  ? const Icon(Icons.person, color: Colors.white)
+                  : null,
+            ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              displayName,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (conv.isGroup) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEADDF7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'GROUP',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Color(0xFF7E3BE8),
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ],
+>>>>>>> Stashed changes
       ),
       subtitle: Text(
         conv.lastMessage,

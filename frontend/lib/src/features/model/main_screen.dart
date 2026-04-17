@@ -63,9 +63,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final navBottomOffset = bottomInset + 12;
+
     return Scaffold(
       backgroundColor: _backgroundColor,
-      extendBody: true,
       body: Stack(
         children: [
           // 📌 SECTION: Current Screen
@@ -84,7 +86,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 16,
+            bottom: navBottomOffset,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(

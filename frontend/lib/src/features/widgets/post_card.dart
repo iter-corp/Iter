@@ -161,6 +161,16 @@ class _PostCardState extends ConsumerState<PostCard> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isMulti) ...[
+                  Align(
+                    alignment: Alignment.center,
+                    child: _PageDots(
+                      count: imageCount,
+                      activeIndex: _currentPage,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: [
                     GestureDetector(
@@ -182,6 +192,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                     GestureDetector(
                       onTap: () => showModalBottomSheet(
                         context: context,
+                        useSafeArea: true,
                         isScrollControlled: true,
                         backgroundColor: Colors.white,
                         shape: const RoundedRectangleBorder(
@@ -244,6 +255,7 @@ class _PostCardState extends ConsumerState<PostCard> {
   void _showFullCaption(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -307,6 +319,7 @@ class _PostCardState extends ConsumerState<PostCard> {
 
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -580,3 +593,41 @@ class _OwnerMenu extends StatelessWidget {
     }
   }
 }
+<<<<<<< Updated upstream
+=======
+
+class _PageDots extends StatelessWidget {
+  final int count;
+  final int activeIndex;
+
+  const _PageDots({required this.count, required this.activeIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(count, (i) {
+          final isActive = i == activeIndex;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: EdgeInsets.symmetric(horizontal: i == 0 ? 0 : 3),
+            width: isActive ? 7 : 5,
+            height: isActive ? 7 : 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color:
+                  isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+>>>>>>> Stashed changes

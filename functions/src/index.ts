@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 
+import * as adminUsers from './adminUsers';
 import * as comments from './comments';
 import * as follows from './follows';
 import * as likes from './likes';
@@ -12,6 +13,7 @@ import * as translate from './translate';
 admin.initializeApp();
 
 export {
+  adminUsers,
   comments,
   follows,
   likes,

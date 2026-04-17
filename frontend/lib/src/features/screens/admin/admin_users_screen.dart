@@ -45,8 +45,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
           ),
           Expanded(
             child: usersAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (users) {
                 if (users.isEmpty) {
@@ -141,11 +140,14 @@ class _UserTile extends ConsumerWidget {
         itemBuilder: (_) => [
           PopupMenuItem(
             value: 'role',
-            child: Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
+            child:
+                Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
           ),
           PopupMenuItem(
             value: 'suspend',
-            child: Text(suspended ? 'Unsuspend' : 'Suspend'),
+            child: Text(suspended
+                ? 'Unsuspend (allow login)'
+                : 'Suspend (block login)'),
           ),
           const PopupMenuItem(
             value: 'delete',
@@ -170,15 +172,15 @@ class _UserTile extends ConsumerWidget {
           builder: (_) => AlertDialog(
             title: const Text('Delete user?'),
             content: const Text(
-                'This removes their user doc. Content will not be removed automatically.'),
+                'This removes all their posts/comments and blocks this account from accessing the app.'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context, false),
                   child: const Text('Cancel')),
               TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child:
-                      const Text('Delete', style: TextStyle(color: Colors.red))),
+                  child: const Text('Delete',
+                      style: TextStyle(color: Colors.red))),
             ],
           ),
         );

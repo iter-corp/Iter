@@ -47,99 +47,99 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.black,
       ),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
           fit: StackFit.expand,
-        children: [
-          Hero(
-            tag: 'story_preview_${widget.file.path}',
-            child: Image.file(widget.file, fit: BoxFit.cover),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 140,
-            child: IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.55),
-                      Colors.transparent,
-                    ],
+          children: [
+            Hero(
+              tag: 'story_preview_${widget.file.path}',
+              child: Image.file(widget.file, fit: BoxFit.cover),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 140,
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.55),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 220,
-            child: IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.75),
-                      Colors.transparent,
-                    ],
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 220,
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.75),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: Row(
-                    children: [
-                      _CircleIcon(icon: Icons.close, onTap: _cancel),
-                      const Spacer(),
-                    ],
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: Row(
+                      children: [
+                        _CircleIcon(icon: Icons.close, onTap: _cancel),
+                        const Spacer(),
+                      ],
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                  child: Row(
-                    children: [
-                      _PillButton(
-                        label: 'Cancel',
-                        filled: false,
-                        onTap: _cancel,
-                      ),
-                      const Spacer(),
-                      _PillButton(
-                        label: 'Publish',
-                        icon: Icons.send_rounded,
-                        filled: true,
-                        onTap: _publish,
-                      ),
-                    ],
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    child: Row(
+                      children: [
+                        _PillButton(
+                          label: 'Cancel',
+                          filled: false,
+                          onTap: _cancel,
+                        ),
+                        const Spacer(),
+                        _PillButton(
+                          label: 'Publish',
+                          icon: Icons.send_rounded,
+                          filled: true,
+                          onTap: _publish,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (_uploading)
-            Container(
-              color: Colors.black.withValues(alpha: 0.55),
-              alignment: Alignment.center,
-              child: const CircularProgressIndicator(color: Colors.white),
-            ),
-        ],
+            if (_uploading)
+              Container(
+                color: Colors.black.withValues(alpha: 0.55),
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(color: Colors.white),
+              ),
+          ],
         ),
       ),
     );

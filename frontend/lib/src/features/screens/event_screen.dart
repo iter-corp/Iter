@@ -52,10 +52,7 @@ double? _distanceKm(dynamic a, dynamic b) {
   final sinLat = math.sin(dLat / 2);
   final sinLng = math.sin(dLng / 2);
   final h = sinLat * sinLat +
-      math.cos(_toRad(aLat)) *
-          math.cos(_toRad(bLat)) *
-          sinLng *
-          sinLng;
+      math.cos(_toRad(aLat)) * math.cos(_toRad(bLat)) * sinLng * sinLng;
   return r * 2 * math.atan2(math.sqrt(h), math.sqrt(1 - h));
 }
 
@@ -153,6 +150,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
   }) {
     return showModalBottomSheet<String>(
       context: context,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
@@ -458,8 +456,7 @@ class _PartnersView extends ConsumerWidget {
             .compareTo((a['postsCount'] as int?) ?? 0));
         return out;
       case 2: // Nearby — users with a location, sorted by distance from current user
-        final withLoc =
-            filtered.where((u) => u['location'] is Map).toList();
+        final withLoc = filtered.where((u) => u['location'] is Map).toList();
         final myLoc = currentUser?['location'];
         if (myLoc is Map) {
           withLoc.sort((a, b) {
@@ -917,9 +914,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                   runSpacing: 6,
                   children: [
                     if (widget.city.isNotEmpty)
-                      _Tag(
-                          label: widget.city,
-                          icon: Icons.location_on_rounded),
+                      _Tag(label: widget.city, icon: Icons.location_on_rounded),
                     if (widget.gender.isNotEmpty) _Tag(label: widget.gender),
                     if (widget.postsCount > 0)
                       _Tag(label: '${widget.postsCount} posts'),
@@ -1064,6 +1059,7 @@ class _EventsView extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
+<<<<<<< Updated upstream
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -1073,6 +1069,26 @@ class _EventsView extends ConsumerWidget {
             ),
             itemCount: filtered.length,
             itemBuilder: (context, i) => _EventCard(event: filtered[i]),
+=======
+            slivers: [
+              const SliverToBoxAdapter(child: _BecomeAdminBanner()),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.78,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _EventCard(event: filtered[i]),
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
+            ],
+>>>>>>> Stashed changes
           ),
         );
       },
@@ -1080,6 +1096,152 @@ class _EventsView extends ConsumerWidget {
   }
 }
 
+<<<<<<< Updated upstream
+=======
+class _BecomeAdminBanner extends ConsumerWidget {
+  const _BecomeAdminBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cfg = ref.watch(adminConfigProvider).valueOrNull;
+    final email = cfg?.contactEmail ?? '';
+    if (email.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+      child: Material(
+        color: const Color(0xFFFFF1F8),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _showContactSheet(context, email),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _kBrandPurple.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.workspace_premium_outlined,
+                  color: _kBrandPurple,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Want to host your own event?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Tap to contact our admin team.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFFB1B1B6),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showContactSheet(BuildContext context, String email) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Become an event admin',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Email us with your name, a short description of the event you\'d like to host, and why. We\'ll get back to you.',
+                style: TextStyle(color: Colors.black87, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.mail_outline, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SelectableText(
+                        email,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: email));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Email copied')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('Copy'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+>>>>>>> Stashed changes
 class _EventCard extends StatefulWidget {
   final AdminEvent event;
   const _EventCard({required this.event});
@@ -1488,12 +1650,10 @@ class _PickerSheetState extends State<_PickerSheet> {
                             isDense: true,
                             border: InputBorder.none,
                             hintText: 'Search',
-                            hintStyle:
-                                TextStyle(fontSize: 13, color: _kInk600),
+                            hintStyle: TextStyle(fontSize: 13, color: _kInk600),
                             contentPadding: EdgeInsets.zero,
                           ),
-                          style: const TextStyle(
-                              fontSize: 13, color: _kInk900),
+                          style: const TextStyle(fontSize: 13, color: _kInk900),
                         ),
                       ),
                     ],
@@ -1525,9 +1685,8 @@ class _PickerSheetState extends State<_PickerSheet> {
                             title: Text(
                               opt,
                               style: TextStyle(
-                                fontWeight: isSel
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                                fontWeight:
+                                    isSel ? FontWeight.w700 : FontWeight.w500,
                                 color: _kInk900,
                               ),
                             ),

@@ -167,115 +167,111 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.black,
       ),
       child: Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(child: _buildPreview()),
-
-            Positioned(
-              top: 12,
-              left: 16,
-              right: 16,
-              child: Row(
-                children: [
-                  _CircleButton(
-                    icon: Icons.close,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  const Spacer(),
-                  _CircleButton(
-                    icon: _flashIcon,
-                    onTap: _cycleFlash,
-                  ),
-                ],
-              ),
-            ),
-
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AddToStoryScreen(),
-                            ),
-                          ),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.photo_library_outlined,
-                                color: Colors.white),
-                          ),
-                        ),
-                        _ShutterButton(
-                          uploading: _uploading,
-                          onTap: _captureAndPreview,
-                        ),
-                        GestureDetector(
-                          onTap: _flipCamera,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                                Icons.cameraswitch_outlined,
-                                color: Colors.white),
-                          ),
-                        ),
-                      ],
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned.fill(child: _buildPreview()),
+              Positioned(
+                top: 12,
+                left: 16,
+                right: 16,
+                child: Row(
+                  children: [
+                    _CircleButton(
+                      icon: Icons.close,
+                      onTap: () => Navigator.pop(context),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildTab('Post', 0),
-                        const SizedBox(width: 24),
-                        _buildTab('Story', 1),
-                        const SizedBox(width: 24),
-                        _buildTab('Live', 2),
-                      ],
+                    const Spacer(),
+                    _CircleButton(
+                      icon: _flashIcon,
+                      onTap: _cycleFlash,
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            if (_uploading)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  child: const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
+                  ],
                 ),
               ),
-          ],
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AddToStoryScreen(),
+                              ),
+                            ),
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.photo_library_outlined,
+                                  color: Colors.white),
+                            ),
+                          ),
+                          _ShutterButton(
+                            uploading: _uploading,
+                            onTap: _captureAndPreview,
+                          ),
+                          GestureDetector(
+                            onTap: _flipCamera,
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.cameraswitch_outlined,
+                                  color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildTab('Post', 0),
+                          const SizedBox(width: 24),
+                          _buildTab('Story', 1),
+                          const SizedBox(width: 24),
+                          _buildTab('Live', 2),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_uploading)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    child: const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -295,7 +291,8 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
     }
     final c = _controller;
     if (c == null || !c.value.isInitialized || _initFuture == null) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(
+          child: CircularProgressIndicator(color: Colors.white));
     }
     return FutureBuilder<void>(
       future: _initFuture,

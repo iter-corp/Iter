@@ -132,6 +132,99 @@ service cloud.firestore {
       }
     }
 
+<<<<<<< Updated upstream
+=======
+    // ── Event registration requests ─────────────────────────
+    // Doc id is deterministic `{eventId}_{uid}` so a user can only have one
+    // in-flight request per event and can read their own record.
+    function isOwnRegistration(regId) {
+      return signedIn() && regId.matches('.*_' + request.auth.uid);
+    }
+
+    match /eventRegistrations/{regId} {
+      allow get: if isAdmin() || isOwnRegistration(regId);
+      allow list: if isAdmin();
+      allow create: if signedIn() &&
+        request.resource.data.userUid == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      // Only admins can approve/reject. Users may not edit a submitted request.
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Event group chats (members read, admin writes) ──────
+    match /eventChats/{eventId} {
+      allow read: if signedIn() && (
+        isAdmin() ||
+        exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+      );
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+
+      match /members/{uid} {
+        allow read: if signedIn() && (isSelf(uid) || isAdmin());
+        // Members are added by the admin on approval; users can only remove
+        // themselves (leave).
+        allow create: if isAdmin();
+        allow update: if false;
+        allow delete: if isSelf(uid) || isAdmin();
+      }
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && (
+          isAdmin() ||
+          exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+        );
+        // Only admins may send the message itself. Members may still react
+        // on the subcollection below.
+        allow create: if isAdmin() &&
+          request.resource.data.senderUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isAdmin();
+
+        match /reactions/{reactorUid} {
+          allow read: if signedIn() && (
+            isAdmin() ||
+            exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+          );
+          allow create, update, delete: if isSelf(reactorUid) && (
+            isAdmin() ||
+            exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+          );
+        }
+      }
+
+      match /polls/{pollId} {
+        allow read: if signedIn() && (
+          isAdmin() ||
+          exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+        );
+        // Only the event admin can create / close / delete polls.
+        allow create: if isAdmin()
+          && request.resource.data.createdByUid == request.auth.uid;
+        allow update, delete: if isAdmin();
+
+        match /votes/{voterUid} {
+          allow read: if signedIn() && (
+            isAdmin() ||
+            exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+          );
+          allow create, update, delete: if isSelf(voterUid) && (
+            isAdmin() ||
+            exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
+          );
+        }
+      }
+    }
+
+    // ── Collection-group query: members ─────────────────────
+    // Required so collectionGroup('members').where('uid', ==, uid) works.
+    // The rule condition must mirror the query constraint on the 'uid' field
+    // so Firestore can verify the query can only return the caller's own docs.
+    match /{path=**}/members/{memberId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+>>>>>>> Stashed changes
     match /feeds/{uid}/timeline/{postId} {
       allow read: if isSelf(uid);
       allow write: if false;

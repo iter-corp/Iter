@@ -122,6 +122,20 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                           style: TextStyle(color: Colors.grey)),
                     );
                   }
+<<<<<<< Updated upstream
+=======
+
+                  final tops = comments.where((c) => !c.isReply).toList();
+                  final repliesByParent = <String, List<Comment>>{};
+                  for (final c in comments) {
+                    if (c.parentCommentId != null) {
+                      repliesByParent
+                          .putIfAbsent(c.parentCommentId!, () => [])
+                          .add(c);
+                    }
+                  }
+
+>>>>>>> Stashed changes
                   return ListView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -135,13 +149,46 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
 
             const Divider(height: 1),
 
+<<<<<<< Updated upstream
+=======
+            // Reply target banner
+            if (_replyTo != null)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: const Color(0xFFF5F0F8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Replying to @${_replyTo!.username}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF8A3FB8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _cancelReply,
+                      child:
+                          const Icon(Icons.close, size: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+
+>>>>>>> Stashed changes
             // Input
             Padding(
               padding: EdgeInsets.only(
                 left: 12,
                 right: 12,
                 top: 8,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+                bottom: MediaQuery.of(context).viewInsets.bottom +
+                    MediaQuery.of(context).padding.bottom +
+                    12,
               ),
               child: Row(
                 children: [
@@ -195,6 +242,19 @@ class _CommentTile extends ConsumerWidget {
     final canDelete =
         currentUid == comment.authorUid || currentUid == post.authorUid;
 
+<<<<<<< Updated upstream
+=======
+    // Pull the author's current avatar/username from their user doc so
+    // profile changes are reflected on old comments. Fall back to the
+    // snapshot stored in the comment while the stream is loading.
+    final liveUser = ref.watch(userByUidProvider(comment.authorUid)).value;
+    final avatar = (liveUser?['avatarUrl'] as String?) ?? comment.authorAvatar;
+    final username =
+        (liveUser?['username'] as String?) ?? comment.authorUsername;
+    final hasAvatar = avatar != null && avatar.isNotEmpty;
+    final avatarRadius = comment.isReply ? 14.0 : 16.0;
+
+>>>>>>> Stashed changes
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
@@ -203,6 +263,7 @@ class _CommentTile extends ConsumerWidget {
           GestureDetector(
             onTap: () => openUserProfile(context, uid: comment.authorUid),
             child: CircleAvatar(
+<<<<<<< Updated upstream
               radius: 16,
               backgroundImage: (comment.authorAvatar?.isNotEmpty ?? false)
                   ? CachedNetworkImageProvider(comment.authorAvatar!)
@@ -210,6 +271,12 @@ class _CommentTile extends ConsumerWidget {
               child: (comment.authorAvatar?.isEmpty ?? true)
                   ? const Icon(Icons.person, size: 16)
                   : null,
+=======
+              radius: avatarRadius,
+              backgroundImage:
+                  hasAvatar ? CachedNetworkImageProvider(avatar) : null,
+              child: hasAvatar ? null : Icon(Icons.person, size: avatarRadius),
+>>>>>>> Stashed changes
             ),
           ),
           const SizedBox(width: 10),

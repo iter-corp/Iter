@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -30,6 +31,7 @@ class FcmMessageEvent {
 class FcmService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   static final StreamController<FcmMessageEvent> _eventsController =
       StreamController<FcmMessageEvent>.broadcast();
@@ -92,16 +94,33 @@ class FcmService {
   /// push notifications are delivered.
   Future<void> removeToken(String uid) async {
     if (kIsWeb) return;
+    // After sign-out, Firestore writes are unauthenticated and will be denied.
+    if (_auth.currentUser?.uid != uid) return;
     final token = await _messaging.getToken();
     if (token == null) return;
-    await _db.collection('users').doc(uid).update({
-      'fcmTokens': FieldValue.arrayRemove([token]),
-    });
+    try {
+      await _db.collection('users').doc(uid).set({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (e) {
+      // Avoid crashing auth flow on transient permission/not-found races.
+      if (e.code != 'permission-denied' && e.code != 'not-found') {
+        rethrow;
+      }
+    }
   }
 
   Future<void> _saveToken(String uid, String token) async {
-    await _db.collection('users').doc(uid).update({
-      'fcmTokens': FieldValue.arrayUnion([token]),
-    });
+    if (_auth.currentUser?.uid != uid) return;
+    try {
+      await _db.collection('users').doc(uid).set({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (e) {
+      // Avoid crashing auth flow on transient permission/not-found races.
+      if (e.code != 'permission-denied' && e.code != 'not-found') {
+        rethrow;
+      }
+    }
   }
 }

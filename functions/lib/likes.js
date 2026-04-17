@@ -33,24 +33,35 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.translate = exports.posts = exports.notifications = exports.messages = exports.live = exports.likes = exports.follows = exports.comments = exports.adminUsers = void 0;
+exports.onLikeCreate = void 0;
 const admin = __importStar(require("firebase-admin"));
-const adminUsers = __importStar(require("./adminUsers"));
-exports.adminUsers = adminUsers;
-const comments = __importStar(require("./comments"));
-exports.comments = comments;
-const follows = __importStar(require("./follows"));
-exports.follows = follows;
-const likes = __importStar(require("./likes"));
-exports.likes = likes;
-const live = __importStar(require("./live"));
-exports.live = live;
-const messages = __importStar(require("./messages"));
-exports.messages = messages;
-const notifications = __importStar(require("./notifications"));
-exports.notifications = notifications;
-const posts = __importStar(require("./posts"));
-exports.posts = posts;
-const translate = __importStar(require("./translate"));
-exports.translate = translate;
-admin.initializeApp();
+const firestore_1 = require("firebase-functions/v2/firestore");
+const db = admin.firestore();
+/**
+ * When a user likes a post, create a notification for the post author.
+ * Skips if the liker IS the post author (no self-notification).
+ */
+exports.onLikeCreate = (0, firestore_1.onDocumentCreated)('posts/{postId}/likes/{likerUid}', async (event) => {
+    const postId = event.params.postId;
+    const likerUid = event.params.likerUid;
+    // Look up the post to find the author.
+    const postSnap = await db.collection('posts').doc(postId).get();
+    const postData = postSnap.data();
+    if (!postData)
+        return;
+    const authorUid = String(postData.authorUid ?? '');
+    // Don't notify yourself.
+    if (!authorUid || authorUid === likerUid)
+        return;
+    await db
+        .collection('notifications')
+        .doc(authorUid)
+        .collection('items')
+        .add({
+        type: 'like',
+        actorUid: likerUid,
+        targetId: postId,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+});

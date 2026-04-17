@@ -89,7 +89,7 @@ class StoryService {
     final now = Timestamp.fromDate(DateTime.now());
     return _col.where('expiresAt', isGreaterThan: now).snapshots().map((s) {
       final stories = s.docs.map(Story.fromDoc).toList();
-      stories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      stories.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return stories;
     });
   }
@@ -124,11 +124,7 @@ class StoryService {
   }
 
   Stream<List<StoryViewer>> streamViewers(String storyId) {
-    return _col
-        .doc(storyId)
-        .collection('viewers')
-        .snapshots()
-        .map((s) {
+    return _col.doc(storyId).collection('viewers').snapshots().map((s) {
       final viewers = s.docs.map(StoryViewer.fromDoc).toList();
       viewers.sort((a, b) {
         final av = a.viewedAt;

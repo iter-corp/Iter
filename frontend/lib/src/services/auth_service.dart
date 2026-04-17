@@ -7,6 +7,29 @@ class AuthService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  Future<void> _ensureNotSuspended(User user) async {
+    final userSnap = await _db.collection('users').doc(user.uid).get();
+    final data = userSnap.data();
+
+    // Only check if document exists; if missing, likely a new user being synced
+    if (!userSnap.exists) {
+      return;
+    }
+
+    final suspended = (data?['suspended'] as bool?) ?? false;
+    final deleted = (data?['deleted'] as bool?) ?? false;
+    if (suspended || deleted) {
+      await _auth.signOut();
+      await _googleSignIn.signOut();
+      throw FirebaseAuthException(
+        code: 'user-disabled',
+        message: deleted
+            ? 'This account has been deleted by an administrator.'
+            : 'This account has been suspended by an administrator.',
+      );
+    }
+  }
+
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -49,7 +72,11 @@ class AuthService {
       email: email.trim(),
       password: password,
     );
-    return cred.user;
+    final user = cred.user;
+    if (user != null) {
+      await _ensureNotSuspended(user);
+    }
+    return user;
   }
 
   Future<User?> signInWithGoogle() async {
@@ -86,6 +113,8 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+
+    await _ensureNotSuspended(user);
     return user;
   }
 

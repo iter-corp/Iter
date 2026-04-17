@@ -100,9 +100,8 @@ const List<_Language> _kLanguages = [
   _Language('Esperanto', 'eo'),
 ];
 
-_Language _langByLabel(String label) =>
-    _kLanguages.firstWhere((l) => l.label == label,
-        orElse: () => _kLanguages.first);
+_Language _langByLabel(String label) => _kLanguages
+    .firstWhere((l) => l.label == label, orElse: () => _kLanguages.first);
 
 class TranslateBody extends StatefulWidget {
   const TranslateBody({super.key});
@@ -232,7 +231,8 @@ class _TranslateBodyState extends State<TranslateBody> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Speech-to-text not supported for $_sourceLang on this device.'),
+            content: Text(
+                'Speech-to-text not supported for $_sourceLang on this device.'),
           ),
         );
       }
@@ -256,8 +256,7 @@ class _TranslateBodyState extends State<TranslateBody> {
             offset: _inputController.text.length,
           );
         });
-        if (result.finalResult &&
-            result.recognizedWords.trim().isNotEmpty) {
+        if (result.finalResult && result.recognizedWords.trim().isNotEmpty) {
           _onTranslate();
         }
       },
@@ -406,93 +405,93 @@ class _TranslateBodyState extends State<TranslateBody> {
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 📌 Title
-              const Text(
-                'Translate',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 📌 Language Selector Row
-              _LanguageSelectorRow(
-                sourceLang: _sourceLang,
-                targetLang: _targetLang,
-                onSourceChanged: (val) => setState(() => _sourceLang = val),
-                onTargetChanged: (val) => setState(() => _targetLang = val),
-                onSwap: _swapLanguages,
-              ),
-              const SizedBox(height: 12),
-
-              // 📌 Input Box
-              _InputBox(
-                controller: _inputController,
-                isRecording: _isRecording,
-                onMicTap: _toggleListen,
-                sourceLang: _sourceLang,
-              ),
-              const SizedBox(height: 16),
-
-              // 📌 Translate Button
-              Center(
-                child: SizedBox(
-                  width: 200,
-                  height: 35,
-                  child: ElevatedButton(
-                    onPressed: _onTranslate,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFCE5DE5),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: _isTranslating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Translate',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 📌 Title
+                const Text(
+                  'Translate',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // 📌 Output Box
-              _OutputBox(
-                translatedText: _hasTranslation ? _translatedText : '',
-                isRTL: _langByLabel(_targetLang).rtl,
-                isBookmarked: _isBookmarked,
-                isSpeaking: _isSpeaking,
-                onBookmark: _toggleBookmark,
-                onCopy: _copyToClipboard,
-                onSpeak: _toggleSpeak,
-              ),
-            ],
+                // 📌 Language Selector Row
+                _LanguageSelectorRow(
+                  sourceLang: _sourceLang,
+                  targetLang: _targetLang,
+                  onSourceChanged: (val) => setState(() => _sourceLang = val),
+                  onTargetChanged: (val) => setState(() => _targetLang = val),
+                  onSwap: _swapLanguages,
+                ),
+                const SizedBox(height: 12),
+
+                // 📌 Input Box
+                _InputBox(
+                  controller: _inputController,
+                  isRecording: _isRecording,
+                  onMicTap: _toggleListen,
+                  sourceLang: _sourceLang,
+                ),
+                const SizedBox(height: 16),
+
+                // 📌 Translate Button
+                Center(
+                  child: SizedBox(
+                    width: 200,
+                    height: 35,
+                    child: ElevatedButton(
+                      onPressed: _onTranslate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCE5DE5),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: _isTranslating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Translate',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 📌 Output Box
+                _OutputBox(
+                  translatedText: _hasTranslation ? _translatedText : '',
+                  isRTL: _langByLabel(_targetLang).rtl,
+                  isBookmarked: _isBookmarked,
+                  isSpeaking: _isSpeaking,
+                  onBookmark: _toggleBookmark,
+                  onCopy: _copyToClipboard,
+                  onSpeak: _toggleSpeak,
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // 📌 SECTION: Language Selector Row
@@ -558,6 +557,7 @@ class _LanguageDropdown extends StatelessWidget {
   Future<void> _openPicker(BuildContext context) async {
     final selected = await showModalBottomSheet<String>(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(

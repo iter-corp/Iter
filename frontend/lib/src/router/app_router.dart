@@ -53,6 +53,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final needsOnboarding = userDoc != null && (userDoc['username'] == null);
+      final suspended = (userDoc?['suspended'] as bool?) ?? false;
+      final deleted = (userDoc?['deleted'] as bool?) ?? false;
+
+      if (suspended || deleted) {
+        Future.microtask(() => ref.read(authServiceProvider).signOut());
+        return loc == '/login' ? null : '/login';
+      }
 
       if (needsOnboarding && loc != '/onboarding' && loc != '/otp') {
         return '/onboarding';

@@ -128,6 +128,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progress.stop();
     await showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ViewersSheet(
@@ -207,151 +208,151 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.black,
       ),
       child: Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTapUp: (details) {
-          if (details.globalPosition.dx < width / 3) {
-            _prev();
-          } else {
-            _next();
-          }
-        },
-        onLongPressStart: (_) => _progress.stop(),
-        onLongPressEnd: (_) => _progress.forward(),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CachedNetworkImage(
-                  imageUrl: story.imageUrl,
-                  fit: BoxFit.contain,
-                  placeholder: (_, __) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                  errorWidget: (_, __, ___) => const Center(
-                    child: Icon(Icons.broken_image, color: Colors.white),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                right: 8,
-                child: Row(
-                  children: List.generate(_stories.length, (i) {
-                    return Expanded(
-                      child: Container(
-                        height: 2.5,
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: Stack(
-                            children: [
-                              Container(
-                                color: Colors.white.withValues(alpha: 0.35),
-                              ),
-                              if (i < _index)
-                                Container(color: Colors.white)
-                              else if (i == _index)
-                                AnimatedBuilder(
-                                  animation: _progress,
-                                  builder: (context, _) =>
-                                      FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
-                                    widthFactor: _progress.value,
-                                    child: Container(color: Colors.white),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-              Positioned(
-                top: 20,
-                left: 12,
-                right: 12,
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => _openAuthorProfile(story.authorUid),
-                      child: Row(
-                        children: [
-                          Hero(
-                            tag: 'story_avatar_${story.authorUid}',
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Colors.grey.shade700,
-                              backgroundImage: story.authorAvatar != null
-                                  ? CachedNetworkImageProvider(
-                                      story.authorAvatar!,
-                                    )
-                                  : null,
-                              child: story.authorAvatar == null
-                                  ? const Icon(
-                                      Icons.person,
-                                      size: 16,
-                                      color: Colors.white70,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            story.authorUsername,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _timeAgo(story.createdAt),
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          onTapUp: (details) {
+            if (details.globalPosition.dx < width / 3) {
+              _prev();
+            } else {
+              _next();
+            }
+          },
+          onLongPressStart: (_) => _progress.stop(),
+          onLongPressEnd: (_) => _progress.forward(),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CachedNetworkImage(
+                    imageUrl: story.imageUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
                     ),
-                    const Spacer(),
-                    if (isOwnStory)
-                      IconButton(
-                        onPressed: _deleteCurrentStory,
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.white,
-                        ),
-                      ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: Colors.white),
+                    errorWidget: (_, __, ___) => const Center(
+                      child: Icon(Icons.broken_image, color: Colors.white),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              if (isOwnStory)
                 Positioned(
-                  bottom: 20,
-                  left: 16,
-                  right: 16,
-                  child: _ViewsPill(
-                    storyId: story.id,
-                    service: _storyService,
-                    onTap: () => _showViewersSheet(story.id),
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    children: List.generate(_stories.length, (i) {
+                      return Expanded(
+                        child: Container(
+                          height: 2.5,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: Stack(
+                              children: [
+                                Container(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                                if (i < _index)
+                                  Container(color: Colors.white)
+                                else if (i == _index)
+                                  AnimatedBuilder(
+                                    animation: _progress,
+                                    builder: (context, _) =>
+                                        FractionallySizedBox(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: _progress.value,
+                                      child: Container(color: Colors.white),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
                   ),
                 ),
-            ],
+                Positioned(
+                  top: 20,
+                  left: 12,
+                  right: 12,
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _openAuthorProfile(story.authorUid),
+                        child: Row(
+                          children: [
+                            Hero(
+                              tag: 'story_avatar_${story.authorUid}',
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.grey.shade700,
+                                backgroundImage: story.authorAvatar != null
+                                    ? CachedNetworkImageProvider(
+                                        story.authorAvatar!,
+                                      )
+                                    : null,
+                                child: story.authorAvatar == null
+                                    ? const Icon(
+                                        Icons.person,
+                                        size: 16,
+                                        color: Colors.white70,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              story.authorUsername,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _timeAgo(story.createdAt),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      if (isOwnStory)
+                        IconButton(
+                          onPressed: _deleteCurrentStory,
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.white,
+                          ),
+                        ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isOwnStory)
+                  Positioned(
+                    bottom: 20,
+                    left: 16,
+                    right: 16,
+                    child: _ViewsPill(
+                      storyId: story.id,
+                      service: _storyService,
+                      onTap: () => _showViewersSheet(story.id),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
