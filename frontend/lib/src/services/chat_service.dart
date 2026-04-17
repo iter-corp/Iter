@@ -154,11 +154,16 @@ class ChatService {
     required String receiverUid,
     required String text,
     String? imageUrl,
+    String? sharedPostId,
   }) async {
     final trimmedText = text.trim();
     final normalizedImageUrl = imageUrl?.trim();
+    final normalizedSharedPostId = sharedPostId?.trim();
+    final hasSharedPost =
+        normalizedSharedPostId != null && normalizedSharedPostId.isNotEmpty;
     if (trimmedText.isEmpty &&
-        (normalizedImageUrl == null || normalizedImageUrl.isEmpty)) {
+        (normalizedImageUrl == null || normalizedImageUrl.isEmpty) &&
+        !hasSharedPost) {
       return;
     }
 
@@ -167,15 +172,18 @@ class ChatService {
     final chatRef = _chatDoc(chatId);
     final lastMessage = trimmedText.isNotEmpty
         ? trimmedText
-        : (normalizedImageUrl?.isNotEmpty ?? false)
-            ? 'Sent a photo'
-            : '';
+        : hasSharedPost
+            ? 'Shared a post'
+            : (normalizedImageUrl?.isNotEmpty ?? false)
+                ? 'Sent a photo'
+                : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,
       'receiverUid': receiverUid,
       'text': trimmedText,
       'imageUrl': normalizedImageUrl,
+      if (hasSharedPost) 'sharedPostId': normalizedSharedPostId,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
     });

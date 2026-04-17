@@ -14,7 +14,7 @@ import '../../providers/chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/storage_service.dart';
 import '../model/post_model.dart';
-import '../widgets/post_card.dart';
+import 'post_detail_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String chatId;
@@ -509,7 +509,7 @@ class _SharedPostPreview extends StatelessWidget {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => _SharedPostViewScreen(post: post),
+              builder: (_) => PostDetailScreen(postId: postId),
             ),
           ),
           child: Container(
@@ -572,27 +572,3 @@ class _SharedPostPreview extends StatelessWidget {
   }
 }
 
-class _SharedPostViewScreen extends StatelessWidget {
-  final Post post;
-
-  const _SharedPostViewScreen({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Post'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
-        children: [
-          PostCard(post: post),
-        ],
-      ),
-    );
-  }
-}

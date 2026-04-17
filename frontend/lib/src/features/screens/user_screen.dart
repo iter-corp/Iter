@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
@@ -136,10 +137,21 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             final uid = uids[index];
                             final userAsync =
                                 ref.watch(_otherUserProvider(uid));
+                            final avatarUrl = userAsync.valueOrNull?['avatarUrl']
+                                as String?;
                             return ListTile(
+                              onTap: () {
+                                Navigator.pop(context);
+                                openUserProfile(context, uid: uid);
+                              },
                               leading: CircleAvatar(
                                 backgroundColor: Colors.grey.shade200,
-                                child: const Icon(Icons.person, size: 18),
+                                backgroundImage: avatarUrl != null
+                                    ? NetworkImage(avatarUrl)
+                                    : null,
+                                child: avatarUrl == null
+                                    ? const Icon(Icons.person, size: 18)
+                                    : null,
                               ),
                               title: userAsync.when(
                                 loading: () => const Text('Loading...'),

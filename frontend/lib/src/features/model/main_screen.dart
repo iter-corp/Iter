@@ -111,15 +111,21 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         color: isSelected ? Colors.white : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
-                      child: SvgPicture.asset(
-                        _navIcons[index],
-                        width: 24,
-                        height: 24,
-                        colorFilter: ColorFilter.mode(
-                          isSelected ? Colors.black : Colors.white,
-                          BlendMode.srcIn,
-                        ),
-                      ),
+                      child: index == 1
+                          ? Icon(
+                              Icons.diversity_3_rounded,
+                              size: 24,
+                              color: isSelected ? Colors.black : Colors.white,
+                            )
+                          : SvgPicture.asset(
+                              _navIcons[index],
+                              width: 24,
+                              height: 24,
+                              colorFilter: ColorFilter.mode(
+                                isSelected ? Colors.black : Colors.white,
+                                BlendMode.srcIn,
+                              ),
+                            ),
                     ),
                   );
                 }),

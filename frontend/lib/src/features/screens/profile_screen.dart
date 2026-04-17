@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/follow_providers.dart';
@@ -74,10 +75,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               stream: userAsync,
                               builder: (context, snapshot) {
                                 final data = snapshot.data;
+                                final avatarUrl =
+                                    data?['avatarUrl'] as String?;
                                 return ListTile(
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    openUserProfile(context, uid: uid);
+                                  },
                                   leading: CircleAvatar(
                                     backgroundColor: Colors.grey.shade200,
-                                    child: const Icon(Icons.person, size: 18),
+                                    backgroundImage: avatarUrl != null
+                                        ? NetworkImage(avatarUrl)
+                                        : null,
+                                    child: avatarUrl == null
+                                        ? const Icon(Icons.person, size: 18)
+                                        : null,
                                   ),
                                   title: Text(
                                     (data?['username'] as String?) ?? uid,

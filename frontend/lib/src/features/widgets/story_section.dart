@@ -83,12 +83,7 @@ class _MyStoryBubble extends StatelessWidget {
           GestureDetector(
             onTap: () {
               if (hasStory) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => StoryViewerScreen(stories: stories),
-                  ),
-                );
+                openStoryViewer(context, stories);
               } else {
                 Navigator.push(
                   context,
@@ -109,15 +104,20 @@ class _MyStoryBubble extends StatelessWidget {
                         ? Border.all(color: const Color(0xFFB05ECC), width: 2.5)
                         : null,
                   ),
-                  child: CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.grey.shade200,
-                    backgroundImage: avatarUrl != null
-                        ? CachedNetworkImageProvider(avatarUrl!)
-                        : null,
-                    child: avatarUrl == null
-                        ? const Icon(Icons.person, color: Colors.grey)
-                        : null,
+                  child: Hero(
+                    tag: hasStory && stories.isNotEmpty
+                        ? 'story_avatar_${stories.first.authorUid}'
+                        : 'story_avatar_me_${avatarUrl ?? 'none'}',
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: avatarUrl != null
+                          ? CachedNetworkImageProvider(avatarUrl!)
+                          : null,
+                      child: avatarUrl == null
+                          ? const Icon(Icons.person, color: Colors.grey)
+                          : null,
+                    ),
                   ),
                 ),
                 if (!hasStory)
@@ -148,12 +148,7 @@ class _StoryBubble extends StatelessWidget {
   const _StoryBubble({required this.stories});
 
   void _openStory(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => StoryViewerScreen(stories: stories),
-      ),
-    );
+    openStoryViewer(context, stories);
   }
 
   @override
@@ -171,15 +166,18 @@ class _StoryBubble extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFFB05ECC), width: 2.5),
               ),
-              child: CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.grey.shade200,
-                backgroundImage: first.authorAvatar != null
-                    ? CachedNetworkImageProvider(first.authorAvatar!)
-                    : null,
-                child: first.authorAvatar == null
-                    ? const Icon(Icons.person, color: Colors.grey)
-                    : null,
+              child: Hero(
+                tag: 'story_avatar_${first.authorUid}',
+                child: CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: first.authorAvatar != null
+                      ? CachedNetworkImageProvider(first.authorAvatar!)
+                      : null,
+                  child: first.authorAvatar == null
+                      ? const Icon(Icons.person, color: Colors.grey)
+                      : null,
+                ),
               ),
             ),
           ),

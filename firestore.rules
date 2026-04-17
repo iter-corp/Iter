@@ -108,6 +108,16 @@ service cloud.firestore {
       allow update, delete: if signedIn() && (
         resource.data.authorUid == request.auth.uid || isAdmin()
       );
+
+      match /viewers/{viewerUid} {
+        allow read: if signedIn() && (
+          isSelf(viewerUid) ||
+          get(/databases/$(database)/documents/stories/$(storyId)).data.authorUid == request.auth.uid ||
+          isAdmin()
+        );
+        allow create: if isSelf(viewerUid);
+        allow update, delete: if false;
+      }
     }
 
     match /events/{eventId} {

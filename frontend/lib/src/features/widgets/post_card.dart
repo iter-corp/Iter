@@ -415,31 +415,13 @@ class _PostCardState extends ConsumerState<PostCard> {
     String senderUid,
     String receiverUid,
   ) async {
-    // Use the existing chat message model's sharedPostId field.
-    // We go through the raw collection because sendMessage doesn't
-    // expose sharedPostId yet.
-    final chat = ref.read(chatServiceProvider);
-    // Write a shared-post message via a direct Firestore call inside ChatService
-    // would be cleaner, but we can piggy-back: sendMessage already supports
-    // imageUrl; for posts we want sharedPostId. Adding a dedicated method keeps
-    // the contract clean — fall back to imageUrl so the receiver sees
-    // something if sharedPostId isn't rendered.
-    if (widget.post.imageUrls.isNotEmpty) {
-      await chat.sendMessage(
-        chatId: chatId,
-        senderUid: senderUid,
-        receiverUid: receiverUid,
-        text: widget.post.caption,
-        imageUrl: widget.post.imageUrls.first,
-      );
-    } else {
-      await chat.sendMessage(
-        chatId: chatId,
-        senderUid: senderUid,
-        receiverUid: receiverUid,
-        text: 'Shared post: ${widget.post.caption}',
-      );
-    }
+    await ref.read(chatServiceProvider).sendMessage(
+          chatId: chatId,
+          senderUid: senderUid,
+          receiverUid: receiverUid,
+          text: '',
+          sharedPostId: widget.post.id,
+        );
   }
 
   Widget _miniIcon(String svgPath, String text) {

@@ -5,11 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:photo_manager/photo_manager.dart';
 
-import '../../services/story_service.dart';
-import '../../services/storage_service.dart';
-import 'create_post_screen.dart';
 import 'camera_story_screen.dart';
+import 'create_post_screen.dart';
 import 'live_screen.dart';
+import 'story_preview_screen.dart';
 
 class AddToStoryScreen extends ConsumerStatefulWidget {
   const AddToStoryScreen({super.key});
@@ -21,7 +20,6 @@ class AddToStoryScreen extends ConsumerStatefulWidget {
 class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
   int _bottomTab = 1;
   bool _loading = true;
-  bool _uploading = false;
   String? _permissionMessage;
   List<AssetEntity> _assets = const [];
 
@@ -75,36 +73,23 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
       maxWidth: 1600,
     );
     if (picked == null) return;
-    await _uploadAndPublish(File(picked.path));
+    _openPreview(File(picked.path));
   }
 
   Future<void> _pickAsset(AssetEntity asset) async {
     final file = await asset.file;
     if (file == null) return;
-    await _uploadAndPublish(file);
+    _openPreview(file);
   }
 
-  Future<void> _uploadAndPublish(File file) async {
-    if (_uploading) return;
-    setState(() => _uploading = true);
-    try {
-      final url = await StorageService().uploadStoryImage(file);
-      await StoryService().createStory(imageUrl: url);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Story added')),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add story: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
+  void _openPreview(File file) {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StoryPreviewScreen(file: file),
+      ),
+    );
   }
 
   @override
@@ -146,13 +131,6 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
                 Expanded(child: _buildBody()),
               ],
             ),
-            if (_uploading)
-              Container(
-                color: Colors.black.withValues(alpha: 0.5),
-                child: const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
-              ),
             Positioned(
               bottom: 16,
               left: 0,

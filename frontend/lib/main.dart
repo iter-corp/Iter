@@ -53,8 +53,16 @@ Future<void> _configureAndroidSystemUi() async {
     return;
   }
 
-  await SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.immersiveSticky,
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarDividerColor: Colors.transparent,
+    ),
   );
 }
 
@@ -81,19 +89,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_configureAndroidSystemUi());
-    }
-  }
-
-  @override
-  void didChangeMetrics() {
-    final view = View.maybeOf(context);
-    if (view == null) {
-      return;
-    }
-
-    final bottomInset = view.viewInsets.bottom / view.devicePixelRatio;
-    if (bottomInset == 0) {
       unawaited(_configureAndroidSystemUi());
     }
   }

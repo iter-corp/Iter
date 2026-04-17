@@ -2,12 +2,12 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../../services/storage_service.dart';
-import '../../services/story_service.dart';
 import 'add_to_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_screen.dart';
+import 'story_preview_screen.dart';
 
 class CameraStoryScreen extends StatefulWidget {
   const CameraStoryScreen({super.key});
@@ -119,20 +119,19 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
     }
   }
 
-  Future<void> _captureAndPublish() async {
+  Future<void> _captureAndPreview() async {
     final c = _controller;
     if (_uploading || c == null || !c.value.isInitialized) return;
     setState(() => _uploading = true);
     try {
       final pic = await c.takePicture();
-      final url = await StorageService().uploadStoryImage(File(pic.path));
-      await StoryService().createStory(imageUrl: url);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Story added')),
-        );
-        Navigator.pop(context);
-      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StoryPreviewScreen(file: File(pic.path)),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +164,12 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
@@ -224,7 +228,7 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
                         ),
                         _ShutterButton(
                           uploading: _uploading,
-                          onTap: _captureAndPublish,
+                          onTap: _captureAndPreview,
                         ),
                         GestureDetector(
                           onTap: _flipCamera,
@@ -271,6 +275,7 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
               ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -34,6 +34,8 @@
 	<string>Iter needs access to your photos so you can post images, set your avatar, and share stories.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Iter saves images you capture to your photo library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Iter uses your location to show people near you in the Connect tab. You can skip this and enter your city manually instead.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

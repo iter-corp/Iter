@@ -10,6 +10,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_core
   flutter_tts
   gal
+  geolocator_windows
   iris_method_channel
   permission_handler_windows
   speech_to_text_windows

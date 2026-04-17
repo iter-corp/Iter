@@ -49,6 +49,10 @@ dependencies:
   gal: ^2.3.1
   flutter_tts: ^4.2.5
 
+  # Location (GPS + reverse-geocode for onboarding "Nearby")
+  geolocator: ^13.0.1
+  geocoding: ^3.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

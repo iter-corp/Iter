@@ -11,3 +11,8 @@ frontend/ios/Flutter/Flutter.podspec
 *.so
 *.dill
 node_modules
+
+# Service account keys — NEVER commit these.
+service-account.json
+**/service-account*.json
+*-firebase-adminsdk-*.json
