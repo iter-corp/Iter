@@ -28,7 +28,10 @@
       "Bash(xargs basename *)",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(grep \".dart$\")",
-      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('d:/COIL-project-demo/functions/scripts/seed.js', 'utf8'\\); new Function\\(s.replace\\(/^#!.*\\\\n/, ''\\)\\);\")"
+      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('d:/COIL-project-demo/functions/scripts/seed.js', 'utf8'\\); new Function\\(s.replace\\(/^#!.*\\\\n/, ''\\)\\);\")",
+      "Bash(xargs grep *)",
+      "Bash(xargs cat *)",
+      "Bash(xargs ls *)"
     ]
   }
 }

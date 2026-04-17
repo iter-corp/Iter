@@ -56,6 +56,25 @@ export const sendPushOnNotificationCreate = onDocumentCreated(
         actorUid,
         targetId: String(data.targetId ?? ''),
       },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'high_importance_channel',
+          sound: 'default',
+          defaultVibrateTimings: true,
+          visibility: 'public',
+        },
+      },
+      apns: {
+        headers: { 'apns-priority': '10' },
+        payload: {
+          aps: {
+            sound: 'default',
+            contentAvailable: true,
+            mutableContent: true,
+          },
+        },
+      },
     });
   },
 );
