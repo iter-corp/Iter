@@ -16,3 +16,12 @@ final currentUserDocProvider = StreamProvider<Map<String, dynamic>?>((ref) {
   if (user == null) return Stream.value(null);
   return ref.watch(userServiceProvider).streamUser(user.uid);
 });
+
+/// Live user doc for any uid. Used to render an author's current avatar and
+/// username on content that was written in the past (comments, posts, etc.)
+/// so updated profile info is reflected retroactively.
+final userByUidProvider =
+    StreamProvider.autoDispose.family<Map<String, dynamic>?, String>((ref, uid) {
+  if (uid.isEmpty) return Stream.value(null);
+  return ref.watch(userServiceProvider).streamUser(uid);
+});

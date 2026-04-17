@@ -89,6 +89,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progress.stop();
     _progress.value = 0;
     _loadingForStoryId = story.id;
+
+    // Record the view immediately — don't gate it behind image preload so
+    // fast taps through stories are still counted.
+    _storyService
+        .recordView(story.id, authorUid: story.authorUid)
+        .catchError((Object e, StackTrace _) {
+      debugPrint('recordView failed for ${story.id}: $e');
+    });
+
     try {
       await precacheImage(
         CachedNetworkImageProvider(story.imageUrl),
@@ -98,7 +107,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       // Fall through — still start the timer so the viewer never locks up.
     }
     if (!mounted || _loadingForStoryId != story.id) return;
-    _storyService.recordView(story.id).catchError((_) {});
     _progress.forward(from: 0);
   }
 

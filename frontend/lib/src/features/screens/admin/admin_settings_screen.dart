@@ -15,6 +15,7 @@ class AdminSettingsScreen extends ConsumerStatefulWidget {
 class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   final _announcementCtrl = TextEditingController();
   final _minVersionCtrl = TextEditingController();
+  final _contactEmailCtrl = TextEditingController();
   bool _hydrated = false;
   bool _saving = false;
   AdminConfig _cfg = const AdminConfig();
@@ -24,6 +25,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     _cfg = cfg;
     _announcementCtrl.text = cfg.announcement;
     _minVersionCtrl.text = cfg.minAppVersion;
+    _contactEmailCtrl.text = cfg.contactEmail;
     _hydrated = true;
   }
 
@@ -31,6 +33,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   void dispose() {
     _announcementCtrl.dispose();
     _minVersionCtrl.dispose();
+    _contactEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -40,6 +43,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       final next = _cfg.copyWith(
         announcement: _announcementCtrl.text.trim(),
         minAppVersion: _minVersionCtrl.text.trim(),
+        contactEmail: _contactEmailCtrl.text.trim(),
       );
       await ref.read(adminServiceProvider).saveConfig(next);
       if (mounted) {
@@ -153,6 +157,25 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   controller: _minVersionCtrl,
                   decoration: const InputDecoration(
                     hintText: 'e.g. 1.0.0',
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _section('Contact email'),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFEDEDF2)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TextField(
+                  controller: _contactEmailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Email shown on "Become an event admin" mailto link',
                     border: InputBorder.none,
                   ),
                 ),

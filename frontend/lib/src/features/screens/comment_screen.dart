@@ -10,6 +10,15 @@ import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
 import '../model/post_model.dart';
 
+class _ReplyTarget {
+  final String parentCommentId;
+  final String username;
+  const _ReplyTarget({
+    required this.parentCommentId,
+    required this.username,
+  });
+}
+
 class CommentScreen extends ConsumerStatefulWidget {
   final Post post;
 
@@ -21,7 +30,39 @@ class CommentScreen extends ConsumerStatefulWidget {
 
 class _CommentScreenState extends ConsumerState<CommentScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   bool _sending = false;
+  _ReplyTarget? _replyTo;
+  final Set<String> _expandedParents = <String>{};
+
+  void _startReply(Comment parent) {
+    // For replies-to-replies, still thread under the top-level parent so we
+    // stay at a single nesting level (Instagram-style). Use the @username
+    // prefix to show who is being addressed.
+    final parentId = parent.parentCommentId ?? parent.id;
+    setState(() {
+      _replyTo = _ReplyTarget(
+        parentCommentId: parentId,
+        username: parent.authorUsername,
+      );
+      _expandedParents.add(parentId);
+    });
+    _focusNode.requestFocus();
+  }
+
+  void _cancelReply() {
+    setState(() => _replyTo = null);
+  }
+
+  void _toggleReplies(String parentId) {
+    setState(() {
+      if (_expandedParents.contains(parentId)) {
+        _expandedParents.remove(parentId);
+      } else {
+        _expandedParents.add(parentId);
+      }
+    });
+  }
 
   Future<void> _submit() async {
     final text = _controller.text.trim();
@@ -32,6 +73,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
     final username =
         userDoc?['username'] as String? ?? user.displayName ?? 'user';
     final avatar = userDoc?['avatarUrl'] as String?;
+    final target = _replyTo;
 
     setState(() => _sending = true);
     _controller.clear();
@@ -43,7 +85,10 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
             authorUsername: username,
             authorAvatar: avatar,
             text: text,
+            parentCommentId: target?.parentCommentId,
+            replyToUsername: target?.username,
           );
+      if (mounted) setState(() => _replyTo = null);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -52,6 +97,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -122,18 +168,117 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                           style: TextStyle(color: Colors.grey)),
                     );
                   }
+
+                  final tops =
+                      comments.where((c) => !c.isReply).toList();
+                  final repliesByParent = <String, List<Comment>>{};
+                  for (final c in comments) {
+                    if (c.parentCommentId != null) {
+                      repliesByParent
+                          .putIfAbsent(c.parentCommentId!, () => [])
+                          .add(c);
+                    }
+                  }
+
                   return ListView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: comments.length,
-                    itemBuilder: (context, i) =>
-                        _CommentTile(comment: comments[i], post: widget.post),
+                    itemCount: tops.length,
+                    itemBuilder: (context, i) {
+                      final parent = tops[i];
+                      final replies = repliesByParent[parent.id] ?? const [];
+                      final expanded = _expandedParents.contains(parent.id);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _CommentTile(
+                            comment: parent,
+                            post: widget.post,
+                            onReply: () => _startReply(parent),
+                          ),
+                          if (replies.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 56),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _toggleReplies(parent.id),
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 24,
+                                            height: 1,
+                                            color: Colors.grey.shade400,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            expanded
+                                                ? 'Hide replies'
+                                                : 'View ${replies.length} '
+                                                    '${replies.length == 1 ? "reply" : "replies"}',
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (expanded)
+                                    ...replies.map(
+                                      (r) => _CommentTile(
+                                        comment: r,
+                                        post: widget.post,
+                                        onReply: () => _startReply(r),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
             ),
 
             const Divider(height: 1),
+
+            // Reply target banner
+            if (_replyTo != null)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: const Color(0xFFF5F0F8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Replying to @${_replyTo!.username}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF8A3FB8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _cancelReply,
+                      child: const Icon(Icons.close,
+                          size: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
 
             // Input
             Padding(
@@ -154,8 +299,11 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                       ),
                       child: TextField(
                         controller: _controller,
-                        decoration: const InputDecoration(
-                          hintText: 'Add a comment...',
+                        focusNode: _focusNode,
+                        decoration: InputDecoration(
+                          hintText: _replyTo != null
+                              ? 'Reply to @${_replyTo!.username}...'
+                              : 'Add a comment...',
                           border: InputBorder.none,
                         ),
                         onSubmitted: (_) => _submit(),
@@ -186,14 +334,30 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
 class _CommentTile extends ConsumerWidget {
   final Comment comment;
   final Post post;
+  final VoidCallback onReply;
 
-  const _CommentTile({required this.comment, required this.post});
+  const _CommentTile({
+    required this.comment,
+    required this.post,
+    required this.onReply,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider).value?.uid;
     final canDelete =
         currentUid == comment.authorUid || currentUid == post.authorUid;
+
+    // Pull the author's current avatar/username from their user doc so
+    // profile changes are reflected on old comments. Fall back to the
+    // snapshot stored in the comment while the stream is loading.
+    final liveUser = ref.watch(userByUidProvider(comment.authorUid)).value;
+    final avatar =
+        (liveUser?['avatarUrl'] as String?) ?? comment.authorAvatar;
+    final username =
+        (liveUser?['username'] as String?) ?? comment.authorUsername;
+    final hasAvatar = avatar != null && avatar.isNotEmpty;
+    final avatarRadius = comment.isReply ? 14.0 : 16.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -203,13 +367,12 @@ class _CommentTile extends ConsumerWidget {
           GestureDetector(
             onTap: () => openUserProfile(context, uid: comment.authorUid),
             child: CircleAvatar(
-              radius: 16,
-              backgroundImage: (comment.authorAvatar?.isNotEmpty ?? false)
-                  ? CachedNetworkImageProvider(comment.authorAvatar!)
-                  : null,
-              child: (comment.authorAvatar?.isEmpty ?? true)
-                  ? const Icon(Icons.person, size: 16)
-                  : null,
+              radius: avatarRadius,
+              backgroundImage:
+                  hasAvatar ? CachedNetworkImageProvider(avatar) : null,
+              child: hasAvatar
+                  ? null
+                  : Icon(Icons.person, size: avatarRadius),
             ),
           ),
           const SizedBox(width: 10),
@@ -223,7 +386,7 @@ class _CommentTile extends ConsumerWidget {
                       onTap: () =>
                           openUserProfile(context, uid: comment.authorUid),
                       child: Text(
-                        comment.authorUsername,
+                        username,
                         style: const TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13),
                       ),
@@ -236,7 +399,39 @@ class _CommentTile extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(comment.text, style: const TextStyle(fontSize: 13)),
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 13, color: Colors.black),
+                    children: [
+                      if (comment.replyToUsername != null &&
+                          comment.replyToUsername!.isNotEmpty)
+                        TextSpan(
+                          text: '@${comment.replyToUsername} ',
+                          style: const TextStyle(
+                            color: Color(0xFF8A3FB8),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      TextSpan(text: comment.text),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: onReply,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      'Reply',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

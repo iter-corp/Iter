@@ -49,6 +49,13 @@ class ChatConversation {
   /// true = the other person initiated and this user hasn't replied yet
   final bool isRequest;
 
+  // Group-chat additions
+  final bool isGroup;
+  final String groupName;
+  final String groupAvatarUrl;
+  final String adminUid;
+  final List<String> participants;
+
   const ChatConversation({
     required this.chatId,
     required this.otherUid,
@@ -58,6 +65,11 @@ class ChatConversation {
     this.lastTime,
     required this.unreadCount,
     required this.isRequest,
+    this.isGroup = false,
+    this.groupName = '',
+    this.groupAvatarUrl = '',
+    this.adminUid = '',
+    this.participants = const [],
   });
 
   factory ChatConversation.fromDoc(
@@ -66,24 +78,41 @@ class ChatConversation {
   ) {
     final d = doc.data() ?? {};
     final participants = List<String>.from(d['participants'] as List? ?? []);
-    final otherUid = participants.firstWhere(
-      (uid) => uid != currentUid,
-      orElse: () => '',
-    );
+    final kind = (d['kind'] as String?) ?? 'direct';
+    final isGroup = kind == 'group';
     final userData = (d['userData'] as Map<String, dynamic>?) ?? {};
-    final otherData = (userData[otherUid] as Map<String, dynamic>?) ?? {};
     final acceptedBy = List<String>.from(d['acceptedBy'] as List? ?? []);
     final unread = (d['unread'] as Map<String, dynamic>?) ?? {};
+
+    String otherUid = '';
+    String otherUsername = 'User';
+    String otherAvatarUrl = '';
+
+    if (!isGroup) {
+      otherUid = participants.firstWhere(
+        (uid) => uid != currentUid,
+        orElse: () => '',
+      );
+      final otherData = (userData[otherUid] as Map<String, dynamic>?) ?? {};
+      otherUsername = (otherData['username'] as String?) ?? 'User';
+      otherAvatarUrl = (otherData['avatarUrl'] as String?) ?? '';
+    }
 
     return ChatConversation(
       chatId: doc.id,
       otherUid: otherUid,
-      otherUsername: (otherData['username'] as String?) ?? 'User',
-      otherAvatarUrl: (otherData['avatarUrl'] as String?) ?? '',
+      otherUsername: otherUsername,
+      otherAvatarUrl: otherAvatarUrl,
       lastMessage: (d['lastMessage'] as String?) ?? '',
       lastTime: (d['lastTime'] as Timestamp?)?.toDate(),
       unreadCount: (unread[currentUid] as int?) ?? 0,
-      isRequest: !acceptedBy.contains(currentUid),
+      // Groups are always "accepted" since you explicitly opted in.
+      isRequest: !isGroup && !acceptedBy.contains(currentUid),
+      isGroup: isGroup,
+      groupName: (d['groupName'] as String?) ?? '',
+      groupAvatarUrl: (d['groupAvatarUrl'] as String?) ?? '',
+      adminUid: (d['adminUid'] as String?) ?? '',
+      participants: participants,
     );
   }
 }
@@ -148,6 +177,8 @@ class ChatService {
   }
 
   /// Sends a text message and updates the chat summary atomically.
+  /// Works for both 1:1 and group chats: if the chat has more than 2
+  /// participants, unread counters are incremented for every recipient.
   Future<void> sendMessage({
     required String chatId,
     required String senderUid,
@@ -167,6 +198,18 @@ class ChatService {
       return;
     }
 
+    // Determine recipients for unread bookkeeping. For 1:1 we use the
+    // receiverUid passed in. For groups we read participants from the
+    // chat doc so every other member's unread count bumps.
+    final chatSnap = await _chatDoc(chatId).get();
+    final chatData = chatSnap.data() ?? {};
+    final isGroup = (chatData['kind'] as String?) == 'group';
+    final recipients = isGroup
+        ? ((chatData['participants'] as List?)?.cast<String>() ?? const [])
+            .where((u) => u != senderUid)
+            .toList()
+        : <String>[receiverUid];
+
     final batch = _db.batch();
     final msgRef = _messagesCol(chatId).doc();
     final chatRef = _chatDoc(chatId);
@@ -180,25 +223,26 @@ class ChatService {
 
     batch.set(msgRef, {
       'senderUid': senderUid,
-      'receiverUid': receiverUid,
+      if (!isGroup) 'receiverUid': receiverUid,
       'text': trimmedText,
       'imageUrl': normalizedImageUrl,
       if (hasSharedPost) 'sharedPostId': normalizedSharedPostId,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
     });
-    batch.set(
-      chatRef,
-      {
-        'lastMessage': lastMessage,
-        'lastMessageSenderUid': senderUid,
-        'lastTime': FieldValue.serverTimestamp(),
-        'acceptedBy': FieldValue.arrayUnion([senderUid]),
-        'unread.$receiverUid': FieldValue.increment(1),
-        'unread.$senderUid': 0,
-      },
-      SetOptions(merge: true),
-    );
+
+    final summary = <String, Object?>{
+      'lastMessage': lastMessage,
+      'lastMessageSenderUid': senderUid,
+      'lastTime': FieldValue.serverTimestamp(),
+      'acceptedBy': FieldValue.arrayUnion([senderUid]),
+      'unread.$senderUid': 0,
+    };
+    for (final uid in recipients) {
+      if (uid.isEmpty) continue;
+      summary['unread.$uid'] = FieldValue.increment(1);
+    }
+    batch.set(chatRef, summary, SetOptions(merge: true));
 
     await batch.commit();
   }
@@ -252,5 +296,83 @@ class ChatService {
           .where((conversation) => !conversation.isRequest)
           .toList(),
     );
+  }
+
+  /// Create a multi-party group chat. [creatorUid] becomes the group admin.
+  Future<String> createGroup({
+    required String creatorUid,
+    required List<String> memberUids,
+    required String groupName,
+    String? groupAvatarUrl,
+  }) async {
+    final ids = <String>{creatorUid, ...memberUids}.toList();
+    if (ids.length < 2) throw Exception('Need at least 2 participants');
+    if (groupName.trim().isEmpty) throw Exception('Group name required');
+
+    // Denormalize each participant's display info.
+    final userDataEntries = await Future.wait(
+      ids.map((uid) async {
+        final snap = await _db.collection('users').doc(uid).get();
+        final d = snap.data() ?? {};
+        return MapEntry(uid, {
+          'username': d['username'] ?? '',
+          'avatarUrl': d['avatarUrl'] ?? '',
+        });
+      }),
+    );
+
+    final ref = await _db.collection('chats').add({
+      'kind': 'group',
+      'participants': ids,
+      'userData': Map.fromEntries(userDataEntries),
+      'adminUid': creatorUid,
+      'groupName': groupName.trim(),
+      'groupAvatarUrl': groupAvatarUrl ?? '',
+      'lastMessage': '',
+      'lastMessageSenderUid': '',
+      'lastTime': FieldValue.serverTimestamp(),
+      'unread': {for (final id in ids) id: 0},
+      // Everyone who's invited has already "accepted" (no request gate).
+      'acceptedBy': ids,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  /// Admin-only: add a new member to an existing group.
+  Future<void> addGroupMember({
+    required String chatId,
+    required String uid,
+  }) async {
+    final snap = await _db.collection('users').doc(uid).get();
+    final d = snap.data() ?? {};
+    await _chatDoc(chatId).update({
+      'participants': FieldValue.arrayUnion([uid]),
+      'acceptedBy': FieldValue.arrayUnion([uid]),
+      'userData.$uid': {
+        'username': d['username'] ?? '',
+        'avatarUrl': d['avatarUrl'] ?? '',
+      },
+      'unread.$uid': 0,
+    });
+  }
+
+  /// Admin can remove anyone; anyone can remove themselves (leave).
+  Future<void> leaveOrRemoveGroupMember({
+    required String chatId,
+    required String uid,
+  }) async {
+    await _chatDoc(chatId).update({
+      'participants': FieldValue.arrayRemove([uid]),
+      'acceptedBy': FieldValue.arrayRemove([uid]),
+    });
+  }
+
+  /// Admin can rename. Enforced in Firestore rules.
+  Future<void> renameGroup({
+    required String chatId,
+    required String name,
+  }) async {
+    await _chatDoc(chatId).update({'groupName': name.trim()});
   }
 }

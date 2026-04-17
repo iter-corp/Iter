@@ -101,13 +101,10 @@ class StoryService {
     await _col.doc(storyId).delete();
   }
 
-  Future<void> recordView(String storyId) async {
+  Future<void> recordView(String storyId, {required String authorUid}) async {
     final user = _auth.currentUser;
     if (user == null) return;
-
-    final storySnap = await _col.doc(storyId).get();
-    final authorUid = storySnap.data()?['authorUid'] as String?;
-    if (authorUid == null || authorUid == user.uid) return;
+    if (authorUid.isEmpty || authorUid == user.uid) return;
 
     final viewerRef = _col.doc(storyId).collection('viewers').doc(user.uid);
     final existing = await viewerRef.get();

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../navigation/user_profile_nav.dart';
@@ -1060,22 +1061,174 @@ class _EventsView extends ConsumerWidget {
             ref.invalidate(adminEventsProvider);
             await Future.delayed(const Duration(milliseconds: 400));
           },
-          child: GridView.builder(
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.78,
-            ),
-            itemCount: filtered.length,
-            itemBuilder: (context, i) => _EventCard(event: filtered[i]),
+            slivers: [
+              const SliverToBoxAdapter(child: _BecomeAdminBanner()),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                sliver: SliverGrid(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.78,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _EventCard(event: filtered[i]),
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+class _BecomeAdminBanner extends ConsumerWidget {
+  const _BecomeAdminBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cfg = ref.watch(adminConfigProvider).valueOrNull;
+    final email = cfg?.contactEmail ?? '';
+    if (email.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+      child: Material(
+        color: const Color(0xFFFFF1F8),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _showContactSheet(context, email),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _kBrandPurple.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.workspace_premium_outlined,
+                  color: _kBrandPurple,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Want to host your own event?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Tap to contact our admin team.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFFB1B1B6),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showContactSheet(BuildContext context, String email) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Become an event admin',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Email us with your name, a short description of the event you\'d like to host, and why. We\'ll get back to you.',
+                style: TextStyle(color: Colors.black87, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.mail_outline, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SelectableText(
+                        email,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: email));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Email copied')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('Copy'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1097,6 +1250,7 @@ class _EventCardState extends State<_EventCard> {
       context,
       MaterialPageRoute(
         builder: (_) => EventDetailScreen(
+          eventId: e.id,
           title: e.title,
           subtitle: e.subtitle,
           location: e.location,

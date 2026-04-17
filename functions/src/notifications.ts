@@ -39,6 +39,10 @@ export const sendPushOnNotificationCreate = onDocumentCreated(
         title = 'New comment';
         body = `${actorName} commented on your post`;
         break;
+      case 'reply':
+        title = 'New reply';
+        body = `${actorName} replied to your comment`;
+        break;
       case 'message':
         title = 'New message';
         body = `${actorName} sent you a message`;

@@ -24,6 +24,15 @@ class HomeBody extends ConsumerWidget {
 
   const HomeBody({super.key, this.scrollController});
 
+  Future<void> _refresh(WidgetRef ref) async {
+    ref.invalidate(feedProvider);
+    try {
+      await ref.read(feedProvider.future);
+    } catch (_) {
+      // Swallow — the error state already renders in the list.
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = ref.watch(feedProvider);
@@ -38,69 +47,77 @@ class HomeBody extends ConsumerWidget {
         children: [
           const HeaderWidget(),
           Expanded(
-            child: feedAsync.when(
-              loading: () => ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  if (announcement.isNotEmpty)
-                    _AnnouncementBanner(announcement: announcement),
-                  if (maintenance) const _MaintenanceBanner(),
-                  const StoriesList(),
-                  const SizedBox(height: 24),
-                  const Center(child: CircularProgressIndicator()),
-                ],
-              ),
-              error: (e, _) => ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  if (announcement.isNotEmpty)
-                    _AnnouncementBanner(announcement: announcement),
-                  if (maintenance) const _MaintenanceBanner(),
-                  const StoriesList(),
-                  const SizedBox(height: 24),
-                  Center(child: Text('Error: $e')),
-                ],
-              ),
-              data: (posts) {
-                if (posts.isEmpty) {
-                  return ListView(
+            child: RefreshIndicator(
+              onRefresh: () => _refresh(ref),
+              child: feedAsync.when(
+                loading: () => ListView(
+                  controller: scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
+                    if (announcement.isNotEmpty)
+                      _AnnouncementBanner(announcement: announcement),
+                    if (maintenance) const _MaintenanceBanner(),
+                    const StoriesList(),
+                    const SizedBox(height: 24),
+                    const Center(child: CircularProgressIndicator()),
+                  ],
+                ),
+                error: (e, _) => ListView(
+                  controller: scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
+                    if (announcement.isNotEmpty)
+                      _AnnouncementBanner(announcement: announcement),
+                    if (maintenance) const _MaintenanceBanner(),
+                    const StoriesList(),
+                    const SizedBox(height: 24),
+                    Center(child: Text('Error: $e')),
+                  ],
+                ),
+                data: (posts) {
+                  if (posts.isEmpty) {
+                    return ListView(
+                      controller: scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 100),
+                      children: [
+                        if (announcement.isNotEmpty)
+                          _AnnouncementBanner(announcement: announcement),
+                        if (maintenance) const _MaintenanceBanner(),
+                        const StoriesList(),
+                        const SizedBox(height: 24),
+                        const Center(
+                          child: Text('No posts yet. Create the first one!'),
+                        ),
+                      ],
+                    );
+                  }
+                  return CustomScrollView(
                     controller: scrollController,
-                    padding: const EdgeInsets.only(bottom: 100),
-                    children: [
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
                       if (announcement.isNotEmpty)
-                        _AnnouncementBanner(announcement: announcement),
-                      if (maintenance) const _MaintenanceBanner(),
-                      const StoriesList(),
-                      const SizedBox(height: 24),
-                      const Center(
-                        child: Text('No posts yet. Create the first one!'),
+                        SliverToBoxAdapter(
+                          child:
+                              _AnnouncementBanner(announcement: announcement),
+                        ),
+                      if (maintenance)
+                        const SliverToBoxAdapter(child: _MaintenanceBanner()),
+                      const SliverToBoxAdapter(child: StoriesList()),
+                      SliverPadding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 100),
+                        sliver: SliverList.builder(
+                          itemCount: posts.length,
+                          itemBuilder: (context, index) =>
+                              PostCard(post: posts[index]),
+                        ),
                       ),
                     ],
                   );
-                }
-                return CustomScrollView(
-                  controller: scrollController,
-                  slivers: [
-                    if (announcement.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _AnnouncementBanner(announcement: announcement),
-                      ),
-                    if (maintenance)
-                      const SliverToBoxAdapter(child: _MaintenanceBanner()),
-                    const SliverToBoxAdapter(child: StoriesList()),
-                    SliverPadding(
-                      padding: const EdgeInsets.only(top: 8, bottom: 100),
-                      sliver: SliverList.builder(
-                        itemCount: posts.length,
-                        itemBuilder: (context, index) =>
-                            PostCard(post: posts[index]),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                },
+              ),
             ),
           ),
         ],

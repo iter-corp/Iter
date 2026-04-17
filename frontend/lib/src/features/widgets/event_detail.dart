@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class EventDetailScreen extends StatefulWidget {
+import '../../providers/event_registration_providers.dart';
+import '../../services/event_registration_service.dart';
+import 'event_registration_sheet.dart';
+
+class EventDetailScreen extends ConsumerStatefulWidget {
+  final String eventId;
   final String title;
   final String subtitle;
   final String location;
@@ -11,6 +17,7 @@ class EventDetailScreen extends StatefulWidget {
 
   const EventDetailScreen({
     super.key,
+    required this.eventId,
     required this.title,
     required this.subtitle,
     required this.location,
@@ -21,10 +28,10 @@ class EventDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<EventDetailScreen> createState() => _EventDetailScreenState();
+  ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
+class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   int _currentImage = 0;
   late final PageController _pageController;
 
@@ -210,7 +217,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'If you would like to become one of us, you\ncan register at the following link:',
+                      'If you would like to become one of us, you\ncan register below:',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
@@ -219,33 +226,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // 🔹 Purple button — right aligned
-                    Align(
-                      alignment: Alignment.center,
-                      child: GestureDetector(
-                        onTap: () {
-                          // TODO: open registration URL
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 28,
-                            vertical: 5
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCE5DE5),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: const Text(
-                            'Registration',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
+                    _RegistrationButton(
+                      eventId: widget.eventId,
+                      eventTitle: widget.title,
                     ),
                   ],
                 ),
@@ -351,6 +334,78 @@ class _ContactRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// 📌 SECTION: Registration Button (state-aware)
+class _RegistrationButton extends ConsumerWidget {
+  final String eventId;
+  final String eventTitle;
+
+  const _RegistrationButton({required this.eventId, required this.eventTitle});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final regAsync = ref.watch(myRegistrationProvider(eventId));
+    final reg = regAsync.value;
+
+    String label;
+    Color color;
+    VoidCallback? onTap;
+
+    if (reg == null) {
+      label = 'Registration';
+      color = const Color(0xFFCE5DE5);
+      onTap = () => showEventRegistrationSheet(
+            context,
+            eventId: eventId,
+            eventTitle: eventTitle,
+          );
+    } else {
+      switch (reg.status) {
+        case RegistrationStatus.pending:
+          label = 'Request pending';
+          color = Colors.grey.shade500;
+          onTap = null;
+          break;
+        case RegistrationStatus.approved:
+          label = 'Approved ✓';
+          color = const Color(0xFF2EBD6B);
+          onTap = null;
+          break;
+        case RegistrationStatus.rejected:
+          label = 'Rejected — tap to retry';
+          color = const Color(0xFFE04E5C);
+          onTap = () => showEventRegistrationSheet(
+                context,
+                eventId: eventId,
+                eventTitle: eventTitle,
+              );
+          break;
+      }
+    }
+
+    return Align(
+      alignment: Alignment.center,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ),
     );
   }

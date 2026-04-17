@@ -8,6 +8,7 @@ class AdminConfig {
   final String announcement;
   final bool maintenanceMode;
   final String minAppVersion;
+  final String contactEmail;
 
   const AdminConfig({
     this.storiesEnabled = true,
@@ -17,6 +18,7 @@ class AdminConfig {
     this.announcement = '',
     this.maintenanceMode = false,
     this.minAppVersion = '1.0.0',
+    this.contactEmail = '',
   });
 
   factory AdminConfig.fromMap(Map<String, dynamic>? d) {
@@ -29,6 +31,7 @@ class AdminConfig {
       announcement: (m['announcement'] as String?) ?? '',
       maintenanceMode: (m['maintenanceMode'] as bool?) ?? false,
       minAppVersion: (m['minAppVersion'] as String?) ?? '1.0.0',
+      contactEmail: (m['contactEmail'] as String?) ?? '',
     );
   }
 
@@ -40,6 +43,7 @@ class AdminConfig {
         'announcement': announcement,
         'maintenanceMode': maintenanceMode,
         'minAppVersion': minAppVersion,
+        'contactEmail': contactEmail,
       };
 
   AdminConfig copyWith({
@@ -50,6 +54,7 @@ class AdminConfig {
     String? announcement,
     bool? maintenanceMode,
     String? minAppVersion,
+    String? contactEmail,
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
@@ -59,6 +64,7 @@ class AdminConfig {
       announcement: announcement ?? this.announcement,
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
       minAppVersion: minAppVersion ?? this.minAppVersion,
+      contactEmail: contactEmail ?? this.contactEmail,
     );
   }
 }
