@@ -234,6 +234,41 @@ export const adminDeleteUser = onCall(async (request) => {
   };
 });
 
+// App Store requirement: users must be able to delete their own account
+// from within the app. This mirrors `adminDeleteUser` but the caller is the
+// target — no admin role required.
+export const selfDeleteAccount = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+
+  const cleanup = await cleanupUserData(callerUid);
+
+  await db.collection('users').doc(callerUid).set(
+    {
+      deleted: true,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      deletedBy: callerUid,
+    },
+    { merge: true },
+  );
+
+  try {
+    await auth.deleteUser(callerUid);
+  } catch (error: unknown) {
+    const code = (error as { code?: string } | undefined)?.code;
+    if (code !== 'auth/user-not-found') {
+      throw error;
+    }
+  }
+
+  return {
+    uid: callerUid,
+    ...cleanup,
+  };
+});
+
 export const onUserDeletedCascadeCleanup = onDocumentDeleted('users/{uid}', async (event) => {
   const targetUid = event.params.uid;
   if (!targetUid) return;

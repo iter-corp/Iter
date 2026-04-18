@@ -197,7 +197,9 @@ class _UserTile extends ConsumerWidget {
           }
         }
       }
-    } catch (e) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[admin] action=$action failed: $e\n$st');
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed: $e')));

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onUserDeletedCascadeCleanup = exports.adminDeleteUser = exports.adminSuspendUser = void 0;
+exports.onUserDeletedCascadeCleanup = exports.selfDeleteAccount = exports.adminDeleteUser = exports.adminSuspendUser = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
@@ -195,7 +195,12 @@ exports.adminDeleteUser = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('failed-precondition', 'Admins cannot delete themselves');
     }
     const cleanup = await cleanupUserData(targetUid);
-    await db.recursiveDelete(db.collection('users').doc(targetUid));
+    // Mark user as deleted instead of removing document entirely
+    await db.collection('users').doc(targetUid).set({
+        deleted: true,
+        deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        deletedBy: callerUid,
+    }, { merge: true });
     try {
         await auth.deleteUser(targetUid);
     }
@@ -207,6 +212,34 @@ exports.adminDeleteUser = (0, https_1.onCall)(async (request) => {
     }
     return {
         uid: targetUid,
+        ...cleanup,
+    };
+});
+// App Store requirement: users must be able to delete their own account
+// from within the app. This mirrors `adminDeleteUser` but the caller is the
+// target — no admin role required.
+exports.selfDeleteAccount = (0, https_1.onCall)(async (request) => {
+    const callerUid = request.auth?.uid;
+    if (!callerUid) {
+        throw new https_1.HttpsError('unauthenticated', 'Sign in required');
+    }
+    const cleanup = await cleanupUserData(callerUid);
+    await db.collection('users').doc(callerUid).set({
+        deleted: true,
+        deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        deletedBy: callerUid,
+    }, { merge: true });
+    try {
+        await auth.deleteUser(callerUid);
+    }
+    catch (error) {
+        const code = error?.code;
+        if (code !== 'auth/user-not-found') {
+            throw error;
+        }
+    }
+    return {
+        uid: callerUid,
         ...cleanup,
     };
 });

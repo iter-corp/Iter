@@ -16,3 +16,9 @@ node_modules
 service-account.json
 **/service-account*.json
 *-firebase-adminsdk-*.json
+
+# Secrets / environment files — NEVER commit.
+.env
+.env.*
+frontend/.env
+frontend/.env.*

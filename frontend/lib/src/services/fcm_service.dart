@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -59,8 +60,30 @@ class FcmService {
 
     // Persist the current token. Skip on web (needs VAPID key separately).
     if (!kIsWeb) {
-      final token = await _messaging.getToken();
-      if (token != null) await _saveToken(uid, token);
+      // On iOS/macOS, getToken() fails unless the APNS token is already set by
+      // the OS. On first launch (and occasionally on cold start) APNS registration
+      // hasn't completed yet, so poll briefly before giving up.
+      if (Platform.isIOS || Platform.isMacOS) {
+        String? apns;
+        for (var i = 0; i < 10; i++) {
+          apns = await _messaging.getAPNSToken();
+          if (apns != null) break;
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
+        if (apns == null) {
+          // No APNS token (e.g. simulator, permission denied, no provisioning).
+          // Skip FCM token fetch this session; onTokenRefresh will fire later.
+          _messaging.onTokenRefresh.listen((t) => _saveToken(uid, t));
+          return;
+        }
+      }
+
+      try {
+        final token = await _messaging.getToken();
+        if (token != null) await _saveToken(uid, token);
+      } catch (_) {
+        // APNS token race or transient FCM error — let onTokenRefresh recover.
+      }
 
       // Keep the token fresh across app restarts.
       _messaging.onTokenRefresh.listen((t) => _saveToken(uid, t));
@@ -92,11 +115,15 @@ class FcmService {
   /// push notifications are delivered.
   Future<void> removeToken(String uid) async {
     if (kIsWeb) return;
-    final token = await _messaging.getToken();
-    if (token == null) return;
-    await _db.collection('users').doc(uid).update({
-      'fcmTokens': FieldValue.arrayRemove([token]),
-    });
+    try {
+      final token = await _messaging.getToken();
+      if (token == null) return;
+      await _db.collection('users').doc(uid).update({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      });
+    } catch (_) {
+      // No APNS/FCM token to remove — ignore.
+    }
   }
 
   Future<void> _saveToken(String uid, String token) async {

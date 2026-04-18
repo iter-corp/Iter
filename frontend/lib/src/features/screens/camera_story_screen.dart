@@ -3,20 +3,23 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/admin_providers.dart';
+import '../widgets/feature_disabled_view.dart';
 import 'add_to_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_screen.dart';
 import 'story_preview_screen.dart';
 
-class CameraStoryScreen extends StatefulWidget {
+class CameraStoryScreen extends ConsumerStatefulWidget {
   const CameraStoryScreen({super.key});
 
   @override
-  State<CameraStoryScreen> createState() => _CameraStoryScreenState();
+  ConsumerState<CameraStoryScreen> createState() => _CameraStoryScreenState();
 }
 
-class _CameraStoryScreenState extends State<CameraStoryScreen>
+class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
     with WidgetsBindingObserver {
   int _bottomTab = 1;
   CameraController? _controller;
@@ -164,6 +167,14 @@ class _CameraStoryScreenState extends State<CameraStoryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final storiesEnabled =
+        ref.watch(adminConfigProvider).valueOrNull?.storiesEnabled ?? true;
+    if (!storiesEnabled) {
+      return const FeatureDisabledView(
+        feature: 'Stories',
+        icon: Icons.auto_stories_outlined,
+      );
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,

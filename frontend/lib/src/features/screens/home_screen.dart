@@ -42,6 +42,7 @@ class HomeBody extends ConsumerWidget {
     final cfg = ref.watch(adminConfigProvider).valueOrNull;
     final announcement = cfg?.announcement ?? '';
     final maintenance = cfg?.maintenanceMode ?? false;
+    final showStories = cfg?.storiesEnabled ?? true;
 
     return SafeArea(
       child: Column(
@@ -59,7 +60,7 @@ class HomeBody extends ConsumerWidget {
                     if (announcement.isNotEmpty)
                       _AnnouncementBanner(announcement: announcement),
                     if (maintenance) const _MaintenanceBanner(),
-                    const StoriesList(),
+                    if (showStories) const StoriesList(),
                     const SizedBox(height: 24),
                     const Center(child: CircularProgressIndicator()),
                   ],
@@ -72,7 +73,7 @@ class HomeBody extends ConsumerWidget {
                     if (announcement.isNotEmpty)
                       _AnnouncementBanner(announcement: announcement),
                     if (maintenance) const _MaintenanceBanner(),
-                    const StoriesList(),
+                    if (showStories) const StoriesList(),
                     const SizedBox(height: 24),
                     Center(child: Text('Error: $e')),
                   ],
@@ -87,7 +88,7 @@ class HomeBody extends ConsumerWidget {
                         if (announcement.isNotEmpty)
                           _AnnouncementBanner(announcement: announcement),
                         if (maintenance) const _MaintenanceBanner(),
-                        const StoriesList(),
+                        if (showStories) const StoriesList(),
                         const SizedBox(height: 24),
                         const Center(
                           child: Text('No posts yet. Create the first one!'),
@@ -106,7 +107,8 @@ class HomeBody extends ConsumerWidget {
                         ),
                       if (maintenance)
                         const SliverToBoxAdapter(child: _MaintenanceBanner()),
-                      const SliverToBoxAdapter(child: StoriesList()),
+                      if (showStories)
+                        const SliverToBoxAdapter(child: StoriesList()),
                       SliverPadding(
                         padding: const EdgeInsets.only(top: 8, bottom: 100),
                         sliver: SliverList.builder(

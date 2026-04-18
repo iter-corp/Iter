@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -251,10 +252,94 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 }
               },
             ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_forever, color: Colors.redAccent),
+              title: const Text('Delete account',
+                  style: TextStyle(color: Colors.redAccent)),
+              subtitle: const Text(
+                  'Permanently remove your account and all your data.'),
+              onTap: () => _confirmDeleteAccount(context, ref),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(
+      BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+            'This permanently deletes your profile, posts, comments, stories, '
+            'followers, and notifications. This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete everything',
+                  style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Deleting your account...')),
+    );
+
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) return;
+    final uid = authUser.uid;
+
+    try {
+      await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
+      await authUser.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'For security, please log out and log back in, then try again.'),
+            ),
+          );
+        }
+        return;
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: ${e.message ?? e.code}')),
+        );
+      }
+      return;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await ref.read(authServiceProvider).signOut();
+    } catch (_) {
+      // Auth user is already gone — signOut may no-op.
+    }
+    ref.invalidate(adminConfigProvider);
+    ref.invalidate(adminPostsProvider);
+    ref.invalidate(adminEventsProvider);
+    ref.invalidate(blacklistProvider);
+    if (context.mounted) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      context.go('/login');
+    }
   }
 }
 

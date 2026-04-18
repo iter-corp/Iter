@@ -29,7 +29,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Iter needs camera access to capture photos for posts, stories, and live video.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Iter needs microphone access to broadcast live audio.</string>
+	<string>Iter needs microphone access to broadcast live audio and capture speech for the Translate feature.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Iter uses speech recognition to convert your voice to text in the Translate feature.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Iter needs access to your photos so you can post images, set your avatar, and share stories.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

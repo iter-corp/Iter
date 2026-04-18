@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
@@ -55,6 +56,8 @@ class _PostCardState extends ConsumerState<PostCard> {
     final isRepostedAsync = ref.watch(isRepostedProvider(post.id));
     final isReposted = isRepostedAsync.value ?? false;
     final isSaved = ref.watch(isSavedProvider(post.id)).value ?? false;
+    final repostsEnabled =
+        ref.watch(adminConfigProvider).valueOrNull?.repostsEnabled ?? true;
     final hasImage = post.imageUrls.isNotEmpty;
     final currentUid = ref.watch(authStateProvider).value?.uid;
     final isOwner = currentUid != null && currentUid == post.authorUid;
@@ -62,8 +65,24 @@ class _PostCardState extends ConsumerState<PostCard> {
     final imageCount = post.imageUrls.length;
     final isMulti = imageCount > 1;
 
+    final isDark = context.isDark;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: isDark
+            ? Border.all(color: Colors.white.withValues(alpha: 0.08))
+            : null,
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
       child: Stack(
         children: [
           ClipRRect(
@@ -112,7 +131,15 @@ class _PostCardState extends ConsumerState<PostCard> {
                 : Container(
                     height: 400,
                     width: double.infinity,
-                    color: const Color(0xFF2B2D30),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark
+                            ? const [Color(0xFF3A2F52), Color(0xFF23202E)]
+                            : const [Color(0xFF3A2F52), Color(0xFF2B2D30)],
+                      ),
+                    ),
                     alignment: Alignment.center,
                     padding: const EdgeInsets.all(24),
                     child: Text(
@@ -238,17 +265,20 @@ class _PostCardState extends ConsumerState<PostCard> {
                       child: _miniIcon(
                           'assets/icons/Group.svg', '${post.commentsCount}'),
                     ),
-                    const SizedBox(width: 16),
-                    GestureDetector(
-                      onTap: () =>
-                          ref.read(postServiceProvider).toggleRepost(post.id),
-                      child: Icon(
-                        Icons.repeat,
-                        color:
-                            isReposted ? const Color(0xFFB05ECC) : Colors.white,
-                        size: 22,
+                    if (repostsEnabled) ...[
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () =>
+                            ref.read(postServiceProvider).toggleRepost(post.id),
+                        child: Icon(
+                          Icons.repeat,
+                          color: isReposted
+                              ? const Color(0xFFB05ECC)
+                              : Colors.white,
+                          size: 22,
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(width: 16),
                     GestureDetector(
                       onTap: () => _openShareSheet(context, ref),

@@ -2,12 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../../providers/admin_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/feature_disabled_view.dart';
+import 'saved_translations_screen.dart';
 
 // 📌 SECTION: Supported Languages
 //
@@ -104,14 +108,14 @@ const List<_Language> _kLanguages = [
 _Language _langByLabel(String label) => _kLanguages
     .firstWhere((l) => l.label == label, orElse: () => _kLanguages.first);
 
-class TranslateBody extends StatefulWidget {
+class TranslateBody extends ConsumerStatefulWidget {
   const TranslateBody({super.key});
 
   @override
-  State<TranslateBody> createState() => _TranslateBodyState();
+  ConsumerState<TranslateBody> createState() => _TranslateBodyState();
 }
 
-class _TranslateBodyState extends State<TranslateBody> {
+class _TranslateBodyState extends ConsumerState<TranslateBody> {
   String _sourceLang = 'English (USA)';
   String _targetLang = 'Kurdish (Sorani)';
   final TextEditingController _inputController = TextEditingController();
@@ -346,6 +350,26 @@ class _TranslateBodyState extends State<TranslateBody> {
     await _tts.speak(_translatedText);
   }
 
+  Future<void> _openSaved() async {
+    final result = await Navigator.push<SavedTranslation?>(
+      context,
+      MaterialPageRoute(builder: (_) => const SavedTranslationsScreen()),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      if (_kLanguages.any((l) => l.label == result.sourceLangLabel)) {
+        _sourceLang = result.sourceLangLabel;
+      }
+      if (_kLanguages.any((l) => l.label == result.targetLangLabel)) {
+        _targetLang = result.targetLangLabel;
+      }
+      _inputController.text = result.sourceText;
+      _translatedText = result.translatedText;
+      _hasTranslation = true;
+      _isBookmarked = true;
+    });
+  }
+
   // ── Bookmark: Save translation to Firestore ──
   Future<void> _toggleBookmark() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -400,6 +424,14 @@ class _TranslateBodyState extends State<TranslateBody> {
 
   @override
   Widget build(BuildContext context) {
+    final translateEnabled =
+        ref.watch(adminConfigProvider).valueOrNull?.translateEnabled ?? true;
+    if (!translateEnabled) {
+      return const FeatureDisabledView(
+        feature: 'Translate',
+        icon: Icons.translate_outlined,
+      );
+    }
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       body: SafeArea(
@@ -409,14 +441,25 @@ class _TranslateBodyState extends State<TranslateBody> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 📌 Title
-                Text(
-                  'Translate',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: context.textPrimary,
-                  ),
+                // 📌 Title + saved translations shortcut
+                Row(
+                  children: [
+                    Text(
+                      'Translate',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Saved translations',
+                      onPressed: _openSaved,
+                      icon: Icon(Icons.bookmarks_outlined,
+                          color: context.textPrimary),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 
@@ -481,10 +524,8 @@ class _TranslateBodyState extends State<TranslateBody> {
                   translatedText: _hasTranslation ? _translatedText : '',
                   isRTL: _langByLabel(_targetLang).rtl,
                   isBookmarked: _isBookmarked,
-                  isSpeaking: _isSpeaking,
                   onBookmark: _toggleBookmark,
                   onCopy: _copyToClipboard,
-                  onSpeak: _toggleSpeak,
                 ),
               ],
             ),
@@ -885,19 +926,15 @@ class _OutputBox extends StatelessWidget {
   final String translatedText;
   final bool isRTL;
   final bool isBookmarked;
-  final bool isSpeaking;
   final VoidCallback onBookmark;
   final VoidCallback onCopy;
-  final VoidCallback onSpeak;
 
   const _OutputBox({
     required this.translatedText,
     required this.isRTL,
     this.isBookmarked = false,
-    this.isSpeaking = false,
     required this.onBookmark,
     required this.onCopy,
-    required this.onSpeak,
   });
 
   @override
@@ -977,36 +1014,6 @@ class _OutputBox extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 25),
-          // 🔊 TTS — tappable with visual feedback
-          Align(
-            alignment: Alignment.bottomRight,
-            child: GestureDetector(
-              onTap: translatedText.isNotEmpty ? onSpeak : null,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: isSpeaking
-                    ? const Icon(
-                        Icons.stop_circle_outlined,
-                        key: ValueKey('stop'),
-                        size: 22,
-                        color: Color(0xFFCE5DE5),
-                      )
-                    : SvgPicture.asset(
-                        key: const ValueKey('speaker'),
-                        'assets/icons/speech.svg',
-                        width: 20,
-                        height: 20,
-                        colorFilter: ColorFilter.mode(
-                          translatedText.isNotEmpty
-                              ? context.textPrimary
-                              : context.textMuted,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-              ),
-            ),
-          ),
         ],
       ),
     );

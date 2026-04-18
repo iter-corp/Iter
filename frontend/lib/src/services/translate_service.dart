@@ -45,9 +45,6 @@ class TranslateService {
       }
     };
 
-    // Google keys starting with "AIza" go in the ?key= query param.
-    // Other token formats (OAuth bearer tokens, etc.) go in the
-    // Authorization header.
     final isApiKey = key.startsWith('AIza');
     final uri = Uri.https(
       _host,

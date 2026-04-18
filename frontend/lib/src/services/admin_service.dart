@@ -144,12 +144,12 @@ class AdminService {
       _db.collection('users').doc(uid).update({'role': role});
 
   /// Cascade-deletes ALL user data and adds their email to the blacklist.
+  /// Runs client-side — relies on Firestore rules that grant admin delete
+  /// permission on all traversed paths.
   Future<void> deleteUser(String uid) async {
-    // 1. Get user email before deletion for blacklist.
     final userSnap = await _db.collection('users').doc(uid).get();
     final email = (userSnap.data()?['email'] as String?) ?? '';
 
-    // 2. Delete user's posts and their subcollections (likes, comments, reposts).
     final posts = await _db
         .collection('posts')
         .where('authorUid', isEqualTo: uid)
@@ -161,7 +161,6 @@ class AdminService {
       await post.reference.delete();
     }
 
-    // 3. Delete user's stories and their viewers.
     final stories = await _db
         .collection('stories')
         .where('authorUid', isEqualTo: uid)
@@ -171,7 +170,6 @@ class AdminService {
       await story.reference.delete();
     }
 
-    // 4. Delete user's comments on other posts.
     final comments = await _db
         .collectionGroup('comments')
         .where('authorUid', isEqualTo: uid)
@@ -180,7 +178,6 @@ class AdminService {
       await c.reference.delete();
     }
 
-    // 5. Delete chats where user is participant.
     final chats = await _db
         .collection('chats')
         .where('participants', arrayContains: uid)
@@ -190,14 +187,13 @@ class AdminService {
       await chat.reference.delete();
     }
 
-    // 6. Delete followers/following subcollections.
     final userRef = _db.collection('users').doc(uid);
     await _deleteSubcollection(userRef, 'followers');
     await _deleteSubcollection(userRef, 'following');
     await _deleteSubcollection(userRef, 'reposts');
     await _deleteSubcollection(userRef, 'saved');
+    await _deleteSubcollection(userRef, 'savedTranslations');
 
-    // 7. Remove user from others' followers/following lists.
     final followersOfOthers = await _db
         .collectionGroup('followers')
         .where('uid', isEqualTo: uid)
@@ -213,23 +209,19 @@ class AdminService {
       await doc.reference.delete();
     }
 
-    // 8. Delete notifications.
     await _deleteSubcollection(
         _db.collection('notifications').doc(uid), 'items');
 
-    // 9. Delete event registrations.
     final regs = await _db
         .collection('eventRegistrations')
-        .where('uid', isEqualTo: uid)
+        .where('userUid', isEqualTo: uid)
         .get();
     for (final r in regs.docs) {
       await r.reference.delete();
     }
 
-    // 10. Delete the user document itself.
     await userRef.delete();
 
-    // 11. Add email to blacklist.
     if (email.isNotEmpty) {
       await _db.collection('blacklist').doc(email).set({
         'email': email,
@@ -239,7 +231,40 @@ class AdminService {
     }
   }
 
-  /// Helper to delete all documents in a subcollection.
+  /// Best-effort self-delete: the user removes their own data (what Firestore
+  /// rules permit) and their Firebase Auth user. Leaves cross-user traces
+  /// (followers on others, likes on others' posts) since collection-group
+  /// writes aren't permitted for non-admin callers.
+  Future<void> selfDeleteCurrentUser(String uid) async {
+    final posts = await _db
+        .collection('posts')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final post in posts.docs) {
+      await post.reference.delete();
+    }
+
+    final stories = await _db
+        .collection('stories')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final story in stories.docs) {
+      await story.reference.delete();
+    }
+
+    final userRef = _db.collection('users').doc(uid);
+    await _deleteSubcollection(userRef, 'followers');
+    await _deleteSubcollection(userRef, 'following');
+    await _deleteSubcollection(userRef, 'reposts');
+    await _deleteSubcollection(userRef, 'saved');
+    await _deleteSubcollection(userRef, 'savedTranslations');
+
+    await _deleteSubcollection(
+        _db.collection('notifications').doc(uid), 'items');
+
+    await userRef.delete();
+  }
+
   Future<void> _deleteSubcollection(
       DocumentReference parent, String subcollection) async {
     final snap = await parent.collection(subcollection).get();

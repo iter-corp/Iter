@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/live_providers.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/feature_disabled_view.dart';
 import 'camera_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_viewer_screen.dart';
@@ -72,6 +74,14 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   // ── Build ────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final liveEnabled =
+        ref.watch(adminConfigProvider).valueOrNull?.liveEnabled ?? true;
+    if (!liveEnabled) {
+      return const FeatureDisabledView(
+        feature: 'Live streaming',
+        icon: Icons.live_tv_outlined,
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFF2B2D30),
       body: SafeArea(

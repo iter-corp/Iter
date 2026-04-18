@@ -69,10 +69,6 @@ exports.sendPushOnNotificationCreate = (0, firestore_1.onDocumentCreated)('notif
             title = 'New comment';
             body = `${actorName} commented on your post`;
             break;
-        case 'reply':
-            title = 'New reply';
-            body = `${actorName} replied to your comment`;
-            break;
         case 'message':
             title = 'New message';
             body = `${actorName} sent you a message`;
@@ -88,25 +84,6 @@ exports.sendPushOnNotificationCreate = (0, firestore_1.onDocumentCreated)('notif
             type: String(data.type ?? ''),
             actorUid,
             targetId: String(data.targetId ?? ''),
-        },
-        android: {
-            priority: 'high',
-            notification: {
-                channelId: 'high_importance_channel',
-                sound: 'default',
-                defaultVibrateTimings: true,
-                visibility: 'public',
-            },
-        },
-        apns: {
-            headers: { 'apns-priority': '10' },
-            payload: {
-                aps: {
-                    sound: 'default',
-                    contentAvailable: true,
-                    mutableContent: true,
-                },
-            },
         },
     });
 });
