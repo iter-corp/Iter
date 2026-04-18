@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/notification_providers.dart';
+import '../../theme/app_theme.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/notification_screen.dart';
 
@@ -17,7 +18,7 @@ class HeaderWidget extends ConsumerWidget {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.add, size: 28),
+            icon: Icon(Icons.add, size: 28, color: context.textPrimary),
             onPressed: () {
               Navigator.push(
                 context,
@@ -28,13 +29,14 @@ class HeaderWidget extends ConsumerWidget {
             },
           ),
 
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Iter',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
+                  color: context.textPrimary,
                 ),
               ),
             ),
@@ -45,7 +47,7 @@ class HeaderWidget extends ConsumerWidget {
             clipBehavior: Clip.none,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, size: 26),
+                icon: Icon(Icons.notifications_outlined, size: 26, color: context.textPrimary),
                 onPressed: () {
                   Navigator.push(
                     context,

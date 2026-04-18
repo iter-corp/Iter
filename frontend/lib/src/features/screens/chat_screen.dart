@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../navigation/user_profile_nav.dart';
+import '../../theme/app_theme.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/event_chat_providers.dart';
@@ -169,7 +170,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isTyping = typingAsync?.whenOrNull(data: (t) => t) ?? false;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -213,7 +214,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 color: Colors.green,
                                 shape: BoxShape.circle,
                                 border:
-                                    Border.all(color: Colors.white, width: 1.5),
+                                    Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 1.5),
                               ),
                             ),
                           ),
@@ -241,7 +242,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         ? 'Online'
                                         : 'Offline'),
                             style: TextStyle(
-                              color: isTyping ? Colors.purple : Colors.grey,
+                              color: isTyping ? Colors.purple : context.textSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -266,7 +267,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
 
             // MESSAGES
             Expanded(
@@ -276,9 +277,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 data: (msgs) {
                   final currentUid = _currentUid ?? '';
                   if (msgs.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text('Say hello!',
-                          style: TextStyle(color: Colors.grey)),
+                          style: TextStyle(color: context.textSecondary)),
                     );
                   }
                   return ListView.builder(
@@ -321,23 +322,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Color(0xFFB05ECC)),
                           )
-                        : const Icon(Icons.camera_alt_outlined,
-                            color: Colors.grey),
+                        : Icon(Icons.camera_alt_outlined,
+                            color: context.textSecondary),
                   ),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
+                        color: context.inputFill,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
                         controller: _controller,
                         onChanged: _onTextChanged,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Message...',
                           hintStyle:
-                              TextStyle(color: Colors.grey, fontSize: 14),
+                              TextStyle(color: context.textMuted, fontSize: 14),
                           border: InputBorder.none,
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -429,7 +430,11 @@ class _MessageBubble extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
+<<<<<<< HEAD
                       color: Colors.grey.shade700,
+=======
+                      color: context.textSecondary,
+>>>>>>> demo
                     ),
                   ),
                 ),
@@ -448,7 +453,7 @@ class _MessageBubble extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: isMe
                         ? const Color(0xFFB05ECC)
-                        : const Color(0xFFF0F0F0),
+                        : context.inputFill,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -487,7 +492,7 @@ class _MessageBubble extends ConsumerWidget {
                                     msg.text,
                                     style: TextStyle(
                                       color:
-                                          isMe ? Colors.white : Colors.black,
+                                          isMe ? Colors.white : context.textPrimary,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -497,7 +502,7 @@ class _MessageBubble extends ConsumerWidget {
                           : Text(
                               msg.text,
                               style: TextStyle(
-                                color: isMe ? Colors.white : Colors.black,
+                                color: isMe ? Colors.white : context.textPrimary,
                                 fontSize: 14,
                               ),
                             ),
@@ -517,7 +522,7 @@ class _MessageBubble extends ConsumerWidget {
                   child: Text(
                     msg.text,
                     style: TextStyle(
-                      color: Colors.grey.shade700,
+                      color: context.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -528,13 +533,13 @@ class _MessageBubble extends ConsumerWidget {
                 children: [
                   Text(
                     _fmt(msg.createdAt),
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    style: TextStyle(color: context.textMuted, fontSize: 11),
                   ),
                   if (isMe && msg.seenBy.length > 1) ...[
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       'Seen',
-                      style: TextStyle(color: Colors.grey, fontSize: 11),
+                      style: TextStyle(color: context.textMuted, fontSize: 11),
                     ),
                   ],
                 ],
@@ -592,12 +597,12 @@ class _SharedPostPreview extends StatelessWidget {
           child: Container(
             width: 240,
             decoration: BoxDecoration(
-              color: isMe ? Colors.white.withValues(alpha: 0.12) : Colors.white,
+              color: isMe ? Colors.white.withValues(alpha: 0.12) : context.cardBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isMe
                     ? Colors.white.withValues(alpha: 0.35)
-                    : Colors.grey.shade300,
+                    : context.borderColor,
               ),
             ),
             child: Column(
@@ -624,7 +629,7 @@ class _SharedPostPreview extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
-                          color: isMe ? Colors.white : Colors.black,
+                          color: isMe ? Colors.white : context.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -634,7 +639,7 @@ class _SharedPostPreview extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isMe ? Colors.white : Colors.black87,
+                          color: isMe ? Colors.white : context.textSecondary,
                         ),
                       ),
                     ],
@@ -661,6 +666,11 @@ class _SharedEventLabel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final key = '$meUid|$otherUid';
     final async = ref.watch(sharedEventProvider(key));
+<<<<<<< HEAD
+=======
+    // Silently hide on error (e.g. permission-denied from collectionGroup).
+    if (async.hasError || !async.hasValue) return const SizedBox.shrink();
+>>>>>>> demo
     final shared = async.value;
     if (shared == null) return const SizedBox.shrink();
     final title = shared['eventTitle'] ?? '';
@@ -670,7 +680,11 @@ class _SharedEventLabel extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
+<<<<<<< HEAD
           color: const Color(0xFFF5E8FA),
+=======
+          color: context.purpleSoft,
+>>>>>>> demo
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

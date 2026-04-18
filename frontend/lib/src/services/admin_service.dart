@@ -143,8 +143,122 @@ class AdminService {
   Future<void> setRole(String uid, String role) =>
       _db.collection('users').doc(uid).update({'role': role});
 
-  Future<void> deleteUser(String uid) =>
-      _db.collection('users').doc(uid).delete();
+  /// Cascade-deletes ALL user data and adds their email to the blacklist.
+  Future<void> deleteUser(String uid) async {
+    // 1. Get user email before deletion for blacklist.
+    final userSnap = await _db.collection('users').doc(uid).get();
+    final email = (userSnap.data()?['email'] as String?) ?? '';
+
+    // 2. Delete user's posts and their subcollections (likes, comments, reposts).
+    final posts = await _db
+        .collection('posts')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final post in posts.docs) {
+      await _deleteSubcollection(post.reference, 'likes');
+      await _deleteSubcollection(post.reference, 'comments');
+      await _deleteSubcollection(post.reference, 'reposts');
+      await post.reference.delete();
+    }
+
+    // 3. Delete user's stories and their viewers.
+    final stories = await _db
+        .collection('stories')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final story in stories.docs) {
+      await _deleteSubcollection(story.reference, 'viewers');
+      await story.reference.delete();
+    }
+
+    // 4. Delete user's comments on other posts.
+    final comments = await _db
+        .collectionGroup('comments')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final c in comments.docs) {
+      await c.reference.delete();
+    }
+
+    // 5. Delete chats where user is participant.
+    final chats = await _db
+        .collection('chats')
+        .where('participants', arrayContains: uid)
+        .get();
+    for (final chat in chats.docs) {
+      await _deleteSubcollection(chat.reference, 'messages');
+      await chat.reference.delete();
+    }
+
+    // 6. Delete followers/following subcollections.
+    final userRef = _db.collection('users').doc(uid);
+    await _deleteSubcollection(userRef, 'followers');
+    await _deleteSubcollection(userRef, 'following');
+    await _deleteSubcollection(userRef, 'reposts');
+    await _deleteSubcollection(userRef, 'saved');
+
+    // 7. Remove user from others' followers/following lists.
+    final followersOfOthers = await _db
+        .collectionGroup('followers')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final doc in followersOfOthers.docs) {
+      await doc.reference.delete();
+    }
+    final followingOfOthers = await _db
+        .collectionGroup('following')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final doc in followingOfOthers.docs) {
+      await doc.reference.delete();
+    }
+
+    // 8. Delete notifications.
+    await _deleteSubcollection(
+        _db.collection('notifications').doc(uid), 'items');
+
+    // 9. Delete event registrations.
+    final regs = await _db
+        .collection('eventRegistrations')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final r in regs.docs) {
+      await r.reference.delete();
+    }
+
+    // 10. Delete the user document itself.
+    await userRef.delete();
+
+    // 11. Add email to blacklist.
+    if (email.isNotEmpty) {
+      await _db.collection('blacklist').doc(email).set({
+        'email': email,
+        'uid': uid,
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  /// Helper to delete all documents in a subcollection.
+  Future<void> _deleteSubcollection(
+      DocumentReference parent, String subcollection) async {
+    final snap = await parent.collection(subcollection).get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // -------- Blacklist --------
+  Stream<List<Map<String, dynamic>>> streamBlacklist() {
+    return _db
+        .collection('blacklist')
+        .orderBy('deletedAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => d.data()).toList());
+  }
+
+  Future<void> removeFromBlacklist(String email) =>
+      _db.collection('blacklist').doc(email).delete();
 
   // -------- Posts --------
   Stream<List<Map<String, dynamic>>> streamAllPosts({int limit = 100}) {

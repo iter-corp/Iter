@@ -10,13 +10,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
 import 'src/providers/auth_providers.dart';
+import 'src/providers/theme_provider.dart';
 import 'src/router/app_router.dart';
 import 'src/services/fcm_service.dart';
+import 'src/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[boot] WidgetsFlutterBinding ready');
-  await _configureAndroidSystemUi();
+  await _configureSystemUi();
 
   try {
     await dotenv.load(fileName: '.env');
@@ -48,12 +50,9 @@ Future<void> main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
-Future<void> _configureAndroidSystemUi() async {
-  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-    return;
-  }
+Future<void> _configureSystemUi() async {
+  if (kIsWeb) return;
 
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -64,6 +63,10 @@ Future<void> _configureAndroidSystemUi() async {
       systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
+
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -89,7 +92,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_configureAndroidSystemUi());
+      unawaited(_configureSystemUi());
     }
   }
 
@@ -108,10 +111,24 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     });
 
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
+        // Update system UI to match current theme.
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+        ));
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),

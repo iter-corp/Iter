@@ -6,14 +6,45 @@ import '../../providers/auth_providers.dart';
 import '../../providers/story_providers.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../services/story_service.dart';
+import '../../theme/app_theme.dart';
 import '../screens/camera_story_screen.dart';
 import '../screens/story_viewer_screen.dart';
 
-class StoriesList extends ConsumerWidget {
+class StoriesList extends ConsumerStatefulWidget {
   const StoriesList({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StoriesList> createState() => _StoriesListState();
+}
+
+class _StoriesListState extends ConsumerState<StoriesList> {
+  /// Tracks which authors have all stories viewed by current user.
+  final Map<String, bool> _seenByAuthor = {};
+
+  Future<void> _computeSeen(
+    Map<String, List<Story>> byAuthor,
+    String currentUid,
+  ) async {
+    final storyService = ref.read(storyServiceProvider);
+    for (final entry in byAuthor.entries) {
+      if (entry.key == currentUid) continue;
+      // Author is "seen" only if ALL their stories have been viewed.
+      bool allSeen = true;
+      for (final story in entry.value) {
+        final viewed = await storyService.hasViewed(story.id);
+        if (!viewed) {
+          allSeen = false;
+          break;
+        }
+      }
+      if (mounted && _seenByAuthor[entry.key] != allSeen) {
+        setState(() => _seenByAuthor[entry.key] = allSeen);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final storiesAsync = ref.watch(activeStoriesProvider);
     final user = ref.watch(currentUserDocProvider).value;
 
@@ -24,25 +55,41 @@ class StoriesList extends ConsumerWidget {
         loading: () => _skeleton(user),
         error: (_, __) => _skeleton(user),
         data: (stories) {
-          // Group by author
+          // Group by author (stories are already oldest-first).
           final byAuthor = <String, List<Story>>{};
           for (final s in stories) {
             byAuthor.putIfAbsent(s.authorUid, () => []).add(s);
           }
 
-          // Entries: own story (tap to create) first, then others.
+          final currentUid = user?['uid'] as String? ?? '';
+
+          // Compute seen state asynchronously.
+          _computeSeen(byAuthor, currentUid);
+
+          // Sort authors: unseen first, then seen.
+          final otherAuthors = byAuthor.entries
+              .where((e) => e.key != currentUid)
+              .toList();
+          otherAuthors.sort((a, b) {
+            final aSeen = _seenByAuthor[a.key] ?? false;
+            final bSeen = _seenByAuthor[b.key] ?? false;
+            if (aSeen != bSeen) return aSeen ? 1 : -1;
+            // Within same seen-status, newest story author first.
+            return b.value.last.createdAt.compareTo(a.value.last.createdAt);
+          });
+
           return ListView(
             scrollDirection: Axis.horizontal,
             children: [
               _MyStoryBubble(
                 avatarUrl: user?['avatarUrl'] as String?,
-                hasStory:
-                    user != null && byAuthor.containsKey(user['uid'] ?? ''),
-                stories: byAuthor[user?['uid']] ?? const [],
+                hasStory: byAuthor.containsKey(currentUid),
+                stories: byAuthor[currentUid] ?? const [],
               ),
-              ...byAuthor.entries
-                  .where((e) => e.key != (user?['uid'] ?? ''))
-                  .map((entry) => _StoryBubble(stories: entry.value)),
+              ...otherAuthors.map((entry) => _StoryBubble(
+                    stories: entry.value,
+                    seen: _seenByAuthor[entry.key] ?? false,
+                  )),
             ],
           );
         },
@@ -127,7 +174,7 @@ class _MyStoryBubble extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: const Color(0xFFB05ECC),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: context.cardBg, width: 2),
                     ),
                     child: const Icon(Icons.add, color: Colors.white, size: 14),
                   ),
@@ -135,8 +182,8 @@ class _MyStoryBubble extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text('Your story',
-              style: TextStyle(fontSize: 11, color: Colors.black87)),
+          Text('Your story',
+              style: TextStyle(fontSize: 11, color: context.textSecondary)),
         ],
       ),
     );
@@ -145,7 +192,8 @@ class _MyStoryBubble extends StatelessWidget {
 
 class _StoryBubble extends StatelessWidget {
   final List<Story> stories;
-  const _StoryBubble({required this.stories});
+  final bool seen;
+  const _StoryBubble({required this.stories, this.seen = false});
 
   void _openStory(BuildContext context) {
     openStoryViewer(context, stories);
@@ -164,7 +212,10 @@ class _StoryBubble extends StatelessWidget {
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFB05ECC), width: 2.5),
+                border: Border.all(
+                  color: seen ? Colors.grey.shade300 : const Color(0xFFB05ECC),
+                  width: 2.5,
+                ),
               ),
               child: Hero(
                 tag: 'story_avatar_${first.authorUid}',
@@ -191,7 +242,7 @@ class _StoryBubble extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, color: Colors.black87),
+                style: TextStyle(fontSize: 11, color: context.textSecondary),
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/live_providers.dart';
+import '../../theme/app_theme.dart';
 import 'camera_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_viewer_screen.dart';
@@ -396,9 +397,9 @@ class _LiveTitleSheetState extends ConsumerState<_LiveTitleSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
@@ -455,15 +456,15 @@ class _LiveTitleSheetState extends ConsumerState<_LiveTitleSheet> {
                 child: TextField(
                   controller: _controller,
                   autofocus: false,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                     fontWeight: FontWeight.w400,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Add a title...',
                     hintStyle:
-                        TextStyle(color: Color(0xFFAAAAAA), fontSize: 16),
+                        TextStyle(color: context.textMuted, fontSize: 16),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                     isDense: true,

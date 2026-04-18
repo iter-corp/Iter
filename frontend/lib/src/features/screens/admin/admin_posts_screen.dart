@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/admin_providers.dart';
+import '../../../theme/app_theme.dart';
 
 class AdminPostsScreen extends ConsumerWidget {
   const AdminPostsScreen({super.key});
@@ -11,11 +12,11 @@ class AdminPostsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(adminPostsProvider);
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: const Text('Posts'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: postsAsync.when(
@@ -23,15 +24,17 @@ class AdminPostsScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (posts) {
           if (posts.isEmpty) {
-            return const Center(
-                child: Text('No posts', style: TextStyle(color: Colors.grey)));
+            return Center(
+                child: Text('No posts',
+                    style: TextStyle(color: context.textSecondary)));
           }
           return ListView.separated(
             itemCount: posts.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final p = posts[i];
-              final imgs = (p['imageUrls'] as List?)?.cast<String>() ?? const [];
+              final imgs =
+                  (p['imageUrls'] as List?)?.cast<String>() ?? const [];
               final url = imgs.isNotEmpty ? imgs.first : null;
               return ListTile(
                 leading: SizedBox(
@@ -42,9 +45,9 @@ class AdminPostsScreen extends ConsumerWidget {
                     child: url != null
                         ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)
                         : Container(
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.text_fields,
-                                color: Colors.grey),
+                            color: context.inputFill,
+                            child: Icon(Icons.text_fields,
+                                color: context.textSecondary),
                           ),
                   ),
                 ),
@@ -55,7 +58,7 @@ class AdminPostsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'by ${p['authorUsername'] ?? 'unknown'}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
                 trailing: IconButton(
                   onPressed: () => _delete(context, ref, p['id'] as String),

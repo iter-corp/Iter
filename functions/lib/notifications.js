@@ -47,15 +47,66 @@ exports.sendPushOnNotificationCreate = (0, firestore_1.onDocumentCreated)('notif
     const tokens = (userData.fcmTokens ?? []).filter((t) => t.length > 0);
     if (tokens.length === 0)
         return;
-    const title = data.type === 'message' ? 'New message' : 'New notification';
-    const body = `${data.type ?? 'activity'} from ${data.actorUid ?? 'someone'}`;
+    // Resolve actor username for a human-readable push body.
+    const actorUid = String(data.actorUid ?? '');
+    let actorName = 'Someone';
+    if (actorUid.length > 0) {
+        const actorSnap = await db.collection('users').doc(actorUid).get();
+        actorName = actorSnap.data()?.username || actorName;
+    }
+    let title;
+    let body;
+    switch (data.type) {
+        case 'follow':
+            title = 'New follower';
+            body = `${actorName} started following you`;
+            break;
+        case 'like':
+            title = 'New like';
+            body = `${actorName} liked your post`;
+            break;
+        case 'comment':
+            title = 'New comment';
+            body = `${actorName} commented on your post`;
+            break;
+        case 'reply':
+            title = 'New reply';
+            body = `${actorName} replied to your comment`;
+            break;
+        case 'message':
+            title = 'New message';
+            body = `${actorName} sent you a message`;
+            break;
+        default:
+            title = 'COIL';
+            body = `${actorName} interacted with you`;
+    }
     await admin.messaging().sendEachForMulticast({
         tokens,
         notification: { title, body },
         data: {
             type: String(data.type ?? ''),
-            actorUid: String(data.actorUid ?? ''),
+            actorUid,
             targetId: String(data.targetId ?? ''),
+        },
+        android: {
+            priority: 'high',
+            notification: {
+                channelId: 'high_importance_channel',
+                sound: 'default',
+                defaultVibrateTimings: true,
+                visibility: 'public',
+            },
+        },
+        apns: {
+            headers: { 'apns-priority': '10' },
+            payload: {
+                aps: {
+                    sound: 'default',
+                    contentAvailable: true,
+                    mutableContent: true,
+                },
+            },
         },
     });
 });

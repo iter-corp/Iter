@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/event_registration_providers.dart';
 import '../../services/event_registration_service.dart';
+<<<<<<< HEAD
+=======
+import '../../theme/app_theme.dart';
+>>>>>>> demo
 import 'event_registration_sheet.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
@@ -68,7 +72,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -80,10 +84,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 padding: const EdgeInsets.only(left: 14, top: 10, bottom: 6),
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
-                  child: const Icon(
+                  child: Icon(
                     Icons.arrow_back,
                     size: 22,
-                    color: Colors.black,
+                    color: context.textPrimary,
                   ),
                 ),
               ),
@@ -116,10 +120,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       children: [
                         Text(
                           widget.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: context.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -200,9 +204,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   widget.description,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                     height: 1.6,
                   ),
                 ),
@@ -216,12 +220,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+<<<<<<< HEAD
                     const Text(
+=======
+                    Text(
+>>>>>>> demo
                       'If you would like to become one of us, you\ncan register below:',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: context.textPrimary,
                         height: 1.6,
                       ),
                     ),
@@ -237,22 +245,22 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               const SizedBox(height: 28),
 
               // 📌 SECTION: Divider
-              const Divider(
+              Divider(
                 height: 1,
                 thickness: 1,
-                color: Color(0xFFE0E0E0),
+                color: context.borderColor,
               ),
 
               const SizedBox(height: 20),
 
               // 📌 SECTION: Contact title
-              const Center(
+              Center(
                 child: Text(
                   'Contact',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: context.textPrimary,
                   ),
                 ),
               ),
@@ -328,9 +336,9 @@ class _ContactRow extends StatelessWidget {
           const SizedBox(width: 16),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Colors.black87,
+              color: context.textPrimary,
             ),
           ),
         ],

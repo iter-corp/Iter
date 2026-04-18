@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/admin_providers.dart';
 import '../../../services/admin_service.dart';
+import '../../../theme/app_theme.dart';
 
 class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -65,11 +66,11 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   Widget build(BuildContext context) {
     final cfgAsync = ref.watch(adminConfigProvider);
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: const Text('App settings'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
         actions: [
           TextButton(
@@ -121,9 +122,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               _section('Announcement'),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.cardBg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFEDEDF2)),
+                  border: Border.all(color: context.borderColor),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: TextField(
@@ -148,9 +149,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               _section('Minimum app version'),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.cardBg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFEDEDF2)),
+                  border: Border.all(color: context.borderColor),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: TextField(
@@ -165,9 +166,15 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               _section('Contact email'),
               Container(
                 decoration: BoxDecoration(
+<<<<<<< HEAD
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFEDEDF2)),
+=======
+                  color: context.cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+>>>>>>> demo
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: TextField(
@@ -193,9 +200,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: Colors.grey,
+          color: context.textSecondary,
           fontSize: 12,
           letterSpacing: 0.3,
         ),
@@ -211,9 +218,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEDEDF2)),
+        border: Border.all(color: context.borderColor),
       ),
       child: SwitchListTile(
         title: Text(title),

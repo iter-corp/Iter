@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/auth_providers.dart';
+import '../../theme/app_theme.dart';
 import '../../providers/comment_providers.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
@@ -131,7 +132,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: context.borderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -148,13 +149,13 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${commentsAsync.value?.length ?? widget.post.commentsCount}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    style: TextStyle(color: context.textSecondary, fontSize: 14),
                   ),
                 ],
               ),
             ),
 
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
 
             // Comment list
             Expanded(
@@ -163,9 +164,9 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (comments) {
                   if (comments.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text('No comments yet. Be the first!',
-                          style: TextStyle(color: Colors.grey)),
+                          style: TextStyle(color: context.textSecondary)),
                     );
                   }
 
@@ -213,7 +214,11 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                                           Container(
                                             width: 24,
                                             height: 1,
+<<<<<<< HEAD
                                             color: Colors.grey.shade400,
+=======
+                                            color: context.textMuted,
+>>>>>>> demo
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
@@ -221,8 +226,13 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                                                 ? 'Hide replies'
                                                 : 'View ${replies.length} '
                                                     '${replies.length == 1 ? "reply" : "replies"}',
+<<<<<<< HEAD
                                             style: const TextStyle(
                                               color: Colors.grey,
+=======
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+>>>>>>> demo
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -250,7 +260,35 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               ),
             ),
 
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
+
+            // Reply target banner
+            if (_replyTo != null)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: context.purpleSoft,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Replying to @${_replyTo!.username}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF8A3FB8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _cancelReply,
+                      child: Icon(Icons.close,
+                          size: 16, color: context.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
 
             // Reply target banner
             if (_replyTo != null)
@@ -294,7 +332,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
+                        color: context.inputFill,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
@@ -394,14 +432,18 @@ class _CommentTile extends ConsumerWidget {
                     const SizedBox(width: 6),
                     Text(
                       DateFormat('MMM d').format(comment.createdAt),
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                      style: TextStyle(color: context.textMuted, fontSize: 11),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 RichText(
                   text: TextSpan(
+<<<<<<< HEAD
                     style: const TextStyle(fontSize: 13, color: Colors.black),
+=======
+                    style: TextStyle(fontSize: 13, color: context.textPrimary),
+>>>>>>> demo
                     children: [
                       if (comment.replyToUsername != null &&
                           comment.replyToUsername!.isNotEmpty)
@@ -420,12 +462,21 @@ class _CommentTile extends ConsumerWidget {
                 GestureDetector(
                   onTap: onReply,
                   behavior: HitTestBehavior.opaque,
+<<<<<<< HEAD
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 2),
                     child: Text(
                       'Reply',
                       style: TextStyle(
                         color: Colors.grey,
+=======
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      'Reply',
+                      style: TextStyle(
+                        color: context.textSecondary,
+>>>>>>> demo
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -442,9 +493,9 @@ class _CommentTile extends ConsumerWidget {
                     .read(commentServiceProvider)
                     .deleteComment(postId: post.id, commentId: comment.id);
               },
-              child: const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(Icons.close, size: 16, color: Colors.grey),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Icon(Icons.close, size: 16, color: context.textSecondary),
               ),
             ),
         ],

@@ -11,21 +11,16 @@ import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/admin_service.dart';
+import '../../theme/app_theme.dart';
 import '../widgets/event_detail.dart';
 import 'chat_screen.dart';
 
 const _kBrandPurple = Color(0xFFB05ECC);
 const _kBrandDeep = Color(0xFF8A3FB8);
-const _kInk900 = Color(0xFF0F0F10);
-const _kInk600 = Color(0xFF6B6B70);
-const _kInk200 = Color(0xFFE8E8EE);
-const _kSurfaceSoft = Color(0xFFF7F6FB);
-const _kTagOrangeBg = Color(0xFFFFF2E3);
 const _kTagOrangeText = Color(0xFFD27B2B);
 
 const List<String> _kPartnerFilters = [
   'All',
-  'Serious Learners',
   'Nearby',
   'City',
   'Gender',
@@ -116,7 +111,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
   }
 
   Future<void> _onPartnerFilterTap(int i) async {
-    if (i == 3) {
+    if (i == 2) {
       final users = ref.read(_partnersStreamProvider).valueOrNull ?? const [];
       final cities = users
           .map((u) => (u['city'] as String? ?? '').trim())
@@ -124,7 +119,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
           .toSet()
           .toList()
         ..sort();
-      setState(() => _partnerFilter = 3);
+      setState(() => _partnerFilter = 2);
       if (cities.isEmpty) return;
       final chosen = await _pickFromSheet(
         title: 'Filter by city',
@@ -133,8 +128,8 @@ class _EventBodyState extends ConsumerState<EventBody> {
       );
       if (chosen == null) return; // dismissed
       setState(() => _selectedCity = chosen.isEmpty ? null : chosen);
-    } else if (i == 4) {
-      setState(() => _partnerFilter = 4);
+    } else if (i == 3) {
+      setState(() => _partnerFilter = 3);
       final chosen = await _pickFromSheet(
         title: 'Filter by gender',
         options: _kGenderOptions,
@@ -169,7 +164,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kSurfaceSoft,
+      backgroundColor: context.surfaceSoft,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -248,9 +243,9 @@ class _MainToggle extends StatelessWidget {
           height: 48,
           padding: const EdgeInsets.all(padding),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.cardBg,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _kInk200),
+            border: Border.all(color: context.borderColor),
           ),
           child: Stack(
             children: [
@@ -326,7 +321,7 @@ class _ToggleItem extends StatelessWidget {
         child: AnimatedDefaultTextStyle(
           duration: const Duration(milliseconds: 220),
           style: TextStyle(
-            color: active ? Colors.white : _kInk600,
+            color: active ? Colors.white : context.textSecondary,
             fontWeight: FontWeight.w600,
             fontSize: 13.5,
           ),
@@ -337,7 +332,7 @@ class _ToggleItem extends StatelessWidget {
               Icon(
                 icon,
                 size: 17,
-                color: active ? Colors.white : _kInk600,
+                color: active ? Colors.white : context.textSecondary,
               ),
               const SizedBox(width: 6),
               Text(label),
@@ -363,9 +358,9 @@ class _SearchBar extends StatelessWidget {
       height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kInk200),
+        border: Border.all(color: context.borderColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -385,11 +380,11 @@ class _SearchBar extends StatelessWidget {
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: hint,
-                hintStyle: const TextStyle(fontSize: 14, color: _kInk600),
+                hintStyle: TextStyle(fontSize: 14, color: context.textSecondary),
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
-              style: const TextStyle(fontSize: 14, color: _kInk900),
+              style: TextStyle(fontSize: 14, color: context.textPrimary),
             ),
           ),
           ValueListenableBuilder<TextEditingValue>(
@@ -398,10 +393,10 @@ class _SearchBar extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : GestureDetector(
                     onTap: controller.clear,
-                    child: const Icon(
+                    child: Icon(
                       Icons.close_rounded,
                       size: 18,
-                      color: _kInk600,
+                      color: context.textSecondary,
                     ),
                   ),
           ),
@@ -449,16 +444,8 @@ class _PartnersView extends ConsumerWidget {
           city.contains(q);
     }).toList();
 
-    List<Map<String, dynamic>> out;
     switch (filterIndex) {
-      case 1: // Serious Learners — users with at least one post
-        out = filtered
-            .where((u) => ((u['postsCount'] as int?) ?? 0) > 0)
-            .toList();
-        out.sort((a, b) => ((b['postsCount'] as int?) ?? 0)
-            .compareTo((a['postsCount'] as int?) ?? 0));
-        return out;
-      case 2: // Nearby — users with a location, sorted by distance from current user
+      case 1: // Nearby
         final withLoc =
             filtered.where((u) => u['location'] is Map).toList();
         final myLoc = currentUser?['location'];
@@ -470,7 +457,7 @@ class _PartnersView extends ConsumerWidget {
           });
         }
         return withLoc;
-      case 3: // City — filter by picked city (fallback: any user with city set)
+      case 2: // City
         final pick = selectedCity?.toLowerCase().trim();
         if (pick == null || pick.isEmpty) {
           return filtered
@@ -481,7 +468,7 @@ class _PartnersView extends ConsumerWidget {
             .where((u) =>
                 (u['city'] as String? ?? '').toLowerCase().trim() == pick)
             .toList();
-      case 4: // Gender — filter by picked gender (fallback: any user with gender set)
+      case 3: // Gender
         final pick = selectedGender;
         if (pick == null || pick.isEmpty) {
           return filtered
@@ -501,12 +488,10 @@ class _PartnersView extends ConsumerWidget {
   IconData _emptyIcon(int i) {
     switch (i) {
       case 1:
-        return Icons.auto_awesome_rounded;
-      case 2:
         return Icons.near_me_outlined;
-      case 3:
+      case 2:
         return Icons.location_city_outlined;
-      case 4:
+      case 3:
         return Icons.person_outline_rounded;
       default:
         return Icons.search_off_rounded;
@@ -516,12 +501,10 @@ class _PartnersView extends ConsumerWidget {
   String _emptySubtitle(int i) {
     switch (i) {
       case 1:
-        return 'Users who post will appear here first.';
-      case 2:
         return 'No one nearby yet — invite someone around you.';
-      case 3:
+      case 2:
         return 'No one from your city has joined yet.';
-      case 4:
+      case 3:
         return 'Users who set their gender will appear here.';
       default:
         return 'Be the first to say hi — invite someone.';
@@ -536,7 +519,6 @@ class _PartnersView extends ConsumerWidget {
 
     final chipLabels = <String>[
       'All',
-      'Serious Learners',
       'Nearby',
       selectedCity ?? 'City',
       selectedGender ?? 'Gender',
@@ -547,7 +529,7 @@ class _PartnersView extends ConsumerWidget {
         _FilterChipRow(
           active: filterIndex,
           labels: chipLabels,
-          dropdownIndices: const {3, 4},
+          dropdownIndices: const {2, 3},
           onTap: onFilterTap,
         ),
         const SizedBox(height: 4),
@@ -643,10 +625,10 @@ class _FilterChipRow extends StatelessWidget {
               curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: BoxDecoration(
-                color: selected ? _kBrandPurple : Colors.white,
+                color: selected ? _kBrandPurple : context.cardBg,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: selected ? _kBrandPurple : _kInk200,
+                  color: selected ? _kBrandPurple : context.borderColor,
                 ),
                 boxShadow: selected
                     ? [
@@ -664,7 +646,7 @@ class _FilterChipRow extends StatelessWidget {
                   Text(
                     labels[i],
                     style: TextStyle(
-                      color: selected ? Colors.white : _kInk600,
+                      color: selected ? Colors.white : context.textSecondary,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                       height: 1.1,
@@ -675,7 +657,7 @@ class _FilterChipRow extends StatelessWidget {
                     Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 16,
-                      color: selected ? Colors.white : _kInk600,
+                      color: selected ? Colors.white : context.textSecondary,
                     ),
                   ],
                 ],
@@ -782,9 +764,9 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.cardBg,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _kInk200),
+            border: Border.all(color: context.borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.035),
@@ -812,7 +794,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                               : null,
                           border: isOnline
                               ? null
-                              : Border.all(color: _kInk200, width: 2),
+                              : Border.all(color: context.borderColor, width: 2),
                         ),
                         child: CircleAvatar(
                           radius: 28,
@@ -836,7 +818,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                               color: const Color(0xFF3BD671),
                               shape: BoxShape.circle,
                               border:
-                                  Border.all(color: Colors.white, width: 2.5),
+                                  Border.all(color: context.cardBg, width: 2.5),
                             ),
                           ),
                         ),
@@ -851,10 +833,10 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                           widget.username,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w700,
-                            color: _kInk900,
+                            color: context.textPrimary,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -867,7 +849,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                               decoration: BoxDecoration(
                                 color: isOnline
                                     ? const Color(0xFF3BD671)
-                                    : _kInk600.withValues(alpha: 0.4),
+                                    : context.textSecondary.withValues(alpha: 0.4),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -881,7 +863,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                                   fontSize: 12,
                                   color: isOnline
                                       ? const Color(0xFF3BD671)
-                                      : _kInk600,
+                                      : context.textSecondary,
                                   fontWeight: isOnline
                                       ? FontWeight.w600
                                       : FontWeight.w400,
@@ -902,9 +884,9 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                   widget.bio,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: _kInk900,
+                    color: context.textPrimary,
                     height: 1.35,
                   ),
                 ),
@@ -993,7 +975,7 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: _kTagOrangeBg,
+        color: context.tagBg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1158,7 +1140,11 @@ class _BecomeAdminBanner extends ConsumerWidget {
   void _showContactSheet(BuildContext context, String email) {
     showModalBottomSheet(
       context: context,
+<<<<<<< HEAD
       backgroundColor: Colors.white,
+=======
+      backgroundColor: context.cardBg,
+>>>>>>> demo
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1354,10 +1340,10 @@ class _EventCardState extends State<_EventCard> {
                         const SizedBox(width: 4),
                         Text(
                           e.location.split(',').first,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w600,
-                            color: _kInk900,
+                            color: context.textPrimary,
                           ),
                         ),
                       ],
@@ -1581,9 +1567,9 @@ class _PickerSheetState extends State<_PickerSheet> {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -1592,7 +1578,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: _kInk200,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -1603,10 +1589,10 @@ class _PickerSheetState extends State<_PickerSheet> {
                   children: [
                     Text(
                       widget.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: _kInk900,
+                        color: context.textPrimary,
                       ),
                     ),
                     const Spacer(),
@@ -1627,27 +1613,27 @@ class _PickerSheetState extends State<_PickerSheet> {
                   height: 42,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: _kSurfaceSoft,
+                    color: context.surfaceSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.search_rounded,
-                          size: 18, color: _kInk600),
+                      Icon(Icons.search_rounded,
+                          size: 18, color: context.textSecondary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _search,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             isDense: true,
                             border: InputBorder.none,
                             hintText: 'Search',
                             hintStyle:
-                                TextStyle(fontSize: 13, color: _kInk600),
+                                TextStyle(fontSize: 13, color: context.textSecondary),
                             contentPadding: EdgeInsets.zero,
                           ),
-                          style: const TextStyle(
-                              fontSize: 13, color: _kInk900),
+                          style: TextStyle(
+                              fontSize: 13, color: context.textPrimary),
                         ),
                       ),
                     ],
@@ -1657,12 +1643,12 @@ class _PickerSheetState extends State<_PickerSheet> {
               const Divider(height: 1),
               Expanded(
                 child: filtered.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
                           child: Text(
                             'No matches',
-                            style: TextStyle(color: _kInk600),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         ),
                       )
@@ -1682,7 +1668,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                                 fontWeight: isSel
                                     ? FontWeight.w700
                                     : FontWeight.w500,
-                                color: _kInk900,
+                                color: context.textPrimary,
                               ),
                             ),
                             trailing: isSel
@@ -1741,17 +1727,17 @@ class _EmptyState extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15.5,
                 fontWeight: FontWeight.w700,
-                color: _kInk900,
+                color: context.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: _kInk600, fontSize: 13),
+              style: TextStyle(color: context.textSecondary, fontSize: 13),
             ),
           ],
         ),

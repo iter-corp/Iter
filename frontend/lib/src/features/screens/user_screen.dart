@@ -7,6 +7,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/user_profile_widget.dart';
 import 'chat_screen.dart';
@@ -190,7 +191,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final followingAsync = ref.watch(followingProvider(widget.uid));
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -282,10 +283,11 @@ class _UserPostsGrid extends ConsumerWidget {
       ),
       data: (posts) {
         if (posts.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 60),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 60),
             child: Center(
-              child: Text('No posts yet', style: TextStyle(color: Colors.grey)),
+              child: Text('No posts yet',
+                  style: TextStyle(color: context.textSecondary)),
             ),
           );
         }
@@ -313,11 +315,11 @@ class _UserRepostsGrid extends ConsumerWidget {
       ),
       data: (posts) {
         if (posts.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 60),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 60),
             child: Center(
-              child:
-                  Text('No reposts yet', style: TextStyle(color: Colors.grey)),
+              child: Text('No reposts yet',
+                  style: TextStyle(color: context.textSecondary)),
             ),
           );
         }
@@ -355,15 +357,15 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            color: const Color(0xFFEDEDF2),
+            color: context.borderColor,
             child: url != null
                 ? CachedNetworkImage(
                     imageUrl: url,
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
-                        Container(color: const Color(0xFFEDEDF2)),
+                        Container(color: context.borderColor),
                     errorWidget: (_, __, ___) =>
-                        const Icon(Icons.broken_image, color: Colors.grey),
+                        Icon(Icons.broken_image, color: context.textSecondary),
                   )
                 : Padding(
                     padding: const EdgeInsets.all(6),
@@ -373,8 +375,8 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
                         maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.black87),
+                        style: TextStyle(
+                            fontSize: 11, color: context.textPrimary),
                       ),
                     ),
                   ),

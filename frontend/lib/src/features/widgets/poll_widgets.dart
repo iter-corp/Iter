@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/poll_providers.dart';
 import '../../services/poll_service.dart';
+import '../../theme/app_theme.dart';
 
 /// Bottom sheet to create a new poll. Caller supplies [parentPath] — either
 /// "chats/{id}" or "eventChats/{id}".
@@ -14,7 +15,7 @@ Future<void> showCreatePollSheet(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: context.cardBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -208,7 +209,7 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
   InputDecoration _decoration(String hint) => InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: const Color(0xFFF0F0F0),
+        fillColor: context.inputFill,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
@@ -241,12 +242,12 @@ class _VisibilityChip extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color:
-              active ? const Color(0xFFF5E8FA) : const Color(0xFFF7F7FB),
+              active ? context.purpleSoft : context.surfaceSoft,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active
                 ? const Color(0xFFB05ECC)
-                : const Color(0xFFEDEDF2),
+                : context.borderColor,
           ),
         ),
         child: Column(
@@ -292,8 +293,8 @@ class PollsSection extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFEDEDF2))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.borderColor)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,9 +350,9 @@ class PollTile extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F7FB),
+        color: context.surfaceSoft,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEDEDF2)),
+        border: Border.all(color: context.borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +371,7 @@ class PollTile extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: isSecret
                       ? Colors.grey.shade200
-                      : const Color(0xFFF5E8FA),
+                      : context.purpleSoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -474,7 +475,7 @@ class _PollOptionRow extends StatelessWidget {
                   border: Border.all(
                     color: isMine
                         ? const Color(0xFFB05ECC)
-                        : const Color(0xFFEDEDF2),
+                        : context.borderColor,
                   ),
                   borderRadius: BorderRadius.circular(10),
                 ),

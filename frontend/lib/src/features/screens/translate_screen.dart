@@ -7,6 +7,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/translate_service.dart';
+import '../../theme/app_theme.dart';
 
 // 📌 SECTION: Supported Languages
 //
@@ -401,7 +402,7 @@ class _TranslateBodyState extends State<TranslateBody> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE8EAF0),
+      backgroundColor: context.surfaceSoft,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -410,12 +411,12 @@ class _TranslateBodyState extends State<TranslateBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 📌 Title
-              const Text(
+              Text(
                 'Translate',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: context.textPrimary,
                 ),
               ),
               const SizedBox(height: 16),

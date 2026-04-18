@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
+
 enum NotificationType { follow, followBack, image }
 
 class NotificationTile extends StatelessWidget {
@@ -71,7 +73,7 @@ class NotificationTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
               ],
             ),

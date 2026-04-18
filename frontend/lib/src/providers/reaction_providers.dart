@@ -2,28 +2,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/reaction_service.dart';
 
-final reactionServiceProvider =
-    Provider<ReactionService>((_) => ReactionService());
+final reactionServiceProvider = Provider<ReactionService>((_) => ReactionService());
 
-/// Key format: "{parentPath}::{messageId}"
-final reactionCountsProvider =
-    StreamProvider.family.autoDispose<Map<String, int>, String>((ref, key) {
-  final i = key.indexOf('::');
-  final parentPath = key.substring(0, i);
-  final messageId = key.substring(i + 2);
-  return ref.watch(reactionServiceProvider).streamCounts(
-        parentPath: parentPath,
-        messageId: messageId,
+/// Key format: "parentPath::messageId"
+/// Streams the current user's emoji reaction for a specific message.
+final myReactionProvider = StreamProvider.family<String?, String>((ref, key) {
+  final parts = key.split('::');
+  if (parts.length != 2) return Stream.value(null);
+  return ref.watch(reactionServiceProvider).streamMyReaction(
+        parentPath: parts[0],
+        messageId: parts[1],
       );
 });
 
-final myReactionProvider =
-    StreamProvider.family.autoDispose<String?, String>((ref, key) {
-  final i = key.indexOf('::');
-  final parentPath = key.substring(0, i);
-  final messageId = key.substring(i + 2);
-  return ref.watch(reactionServiceProvider).streamMine(
-        parentPath: parentPath,
-        messageId: messageId,
+/// Key format: "parentPath::messageId"
+/// Streams aggregated emoji → count map for a specific message.
+final reactionCountsProvider =
+    StreamProvider.family<Map<String, int>, String>((ref, key) {
+  final parts = key.split('::');
+  if (parts.length != 2) return Stream.value({});
+  return ref.watch(reactionServiceProvider).streamReactionCounts(
+        parentPath: parts[0],
+        messageId: parts[1],
       );
 });

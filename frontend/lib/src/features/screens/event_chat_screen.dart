@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../navigation/user_profile_nav.dart';
+<<<<<<< HEAD
+=======
+import '../../theme/app_theme.dart';
+>>>>>>> demo
 import '../../providers/auth_providers.dart';
 import '../../providers/event_chat_providers.dart';
 import '../../services/event_chat_service.dart';
@@ -85,7 +89,11 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
     });
 
     return Scaffold(
+<<<<<<< HEAD
       backgroundColor: Colors.white,
+=======
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+>>>>>>> demo
       body: SafeArea(
         child: Column(
           children: [
@@ -146,7 +154,11 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
               ),
             ),
 
+<<<<<<< HEAD
             const Divider(height: 1),
+=======
+            Divider(height: 1, color: Theme.of(context).dividerColor),
+>>>>>>> demo
 
             // MESSAGES
             Expanded(
@@ -156,10 +168,17 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (msgs) {
                   if (msgs.isEmpty) {
+<<<<<<< HEAD
                     return const Center(
                       child: Text(
                         'No messages yet.',
                         style: TextStyle(color: Colors.grey),
+=======
+                    return Center(
+                      child: Text(
+                        'No messages yet.',
+                        style: TextStyle(color: context.textSecondary),
+>>>>>>> demo
                       ),
                     );
                   }
@@ -197,15 +216,26 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
+<<<<<<< HEAD
                           color: const Color(0xFFF0F0F0),
+=======
+                          color: context.inputFill,
+>>>>>>> demo
                           borderRadius: BorderRadius.circular(24),
                         ),
                         child: TextField(
                           controller: _controller,
+<<<<<<< HEAD
                           decoration: const InputDecoration(
                             hintText: 'Broadcast a message...',
                             hintStyle:
                                 TextStyle(color: Colors.grey, fontSize: 14),
+=======
+                          decoration: InputDecoration(
+                            hintText: 'Broadcast a message...',
+                            hintStyle:
+                                TextStyle(color: context.textMuted, fontSize: 14),
+>>>>>>> demo
                             border: InputBorder.none,
                           ),
                           onSubmitted: (_) => _sendMessage(),
@@ -224,7 +254,11 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
+<<<<<<< HEAD
                 color: const Color(0xFFF5F0F8),
+=======
+                color: context.purpleSoft,
+>>>>>>> demo
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -311,7 +345,11 @@ class _EventMessageBubble extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                         color: isFromAdmin
                             ? const Color(0xFFB05ECC)
+<<<<<<< HEAD
                             : Colors.grey.shade700,
+=======
+                            : context.textSecondary,
+>>>>>>> demo
                       ),
                     ),
                   ),
@@ -330,7 +368,11 @@ class _EventMessageBubble extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: isMe
                             ? const Color(0xFFB05ECC)
+<<<<<<< HEAD
                             : const Color(0xFFF0F0F0),
+=======
+                            : context.inputFill,
+>>>>>>> demo
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(16),
                           topRight: const Radius.circular(16),
@@ -356,7 +398,11 @@ class _EventMessageBubble extends ConsumerWidget {
                                     msg.text,
                                     style: TextStyle(
                                       color:
+<<<<<<< HEAD
                                           isMe ? Colors.white : Colors.black,
+=======
+                                          isMe ? Colors.white : context.textPrimary,
+>>>>>>> demo
                                       fontSize: 14,
                                     ),
                                   ),
@@ -366,7 +412,11 @@ class _EventMessageBubble extends ConsumerWidget {
                           : Text(
                               msg.text,
                               style: TextStyle(
+<<<<<<< HEAD
                                 color: isMe ? Colors.white : Colors.black,
+=======
+                                color: isMe ? Colors.white : context.textPrimary,
+>>>>>>> demo
                                 fontSize: 14,
                               ),
                             ),
@@ -380,7 +430,11 @@ class _EventMessageBubble extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   _fmt(msg.createdAt),
+<<<<<<< HEAD
                   style: const TextStyle(color: Colors.grey, fontSize: 11),
+=======
+                  style: TextStyle(color: context.textMuted, fontSize: 11),
+>>>>>>> demo
                 ),
               ],
             ),

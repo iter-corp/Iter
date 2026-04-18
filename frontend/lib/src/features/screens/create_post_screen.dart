@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/storage_service.dart';
+import '../../theme/app_theme.dart';
 import 'camera_story_screen.dart';
 import 'live_screen.dart';
 
@@ -90,7 +91,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final avatarUrl = user?['avatarUrl'] as String?;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       body: GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         behavior: HitTestBehavior.translucent,
@@ -448,7 +449,7 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.cardBg,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -458,14 +459,14 @@ class _ActionTile extends StatelessWidget {
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFEDEDF2)),
+            border: Border.all(color: context.borderColor),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3ECFF),
+                  color: context.purpleSoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon,

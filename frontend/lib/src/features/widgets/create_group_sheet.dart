@@ -6,6 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
+<<<<<<< HEAD
+=======
+import '../../theme/app_theme.dart';
+>>>>>>> demo
 import '../screens/chat_screen.dart';
 
 /// Opens a bottom sheet that lets the signed-in user create a new group chat
@@ -14,7 +18,11 @@ Future<void> showCreateGroupSheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+<<<<<<< HEAD
     backgroundColor: Colors.white,
+=======
+    backgroundColor: context.cardBg,
+>>>>>>> demo
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -126,7 +134,11 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   decoration: InputDecoration(
                     hintText: 'Group name',
                     filled: true,
+<<<<<<< HEAD
                     fillColor: const Color(0xFFF0F0F0),
+=======
+                    fillColor: context.inputFill,
+>>>>>>> demo
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(

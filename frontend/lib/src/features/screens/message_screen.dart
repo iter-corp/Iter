@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/chat_providers.dart';
+<<<<<<< HEAD
+=======
+import '../../theme/app_theme.dart';
+>>>>>>> demo
 import '../../providers/event_chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/event_chat_service.dart';
@@ -35,9 +39,9 @@ class MessageScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: MessageBody(),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: const MessageBody(),
     );
   }
 }
@@ -136,18 +140,31 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
+<<<<<<< HEAD
                       color: const Color(0xFFF0F0F0),
+=======
+                      color: context.inputFill,
+>>>>>>> demo
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (v) => setState(() => _query = v),
+<<<<<<< HEAD
                       decoration: const InputDecoration(
                         hintText: 'Search...',
                         hintStyle:
                             TextStyle(color: Colors.grey, fontSize: 14),
                         border: InputBorder.none,
                         icon: Icon(Icons.search, color: Colors.grey),
+=======
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        hintStyle:
+                            TextStyle(color: context.textMuted, fontSize: 14),
+                        border: InputBorder.none,
+                        icon: Icon(Icons.search, color: context.textSecondary),
+>>>>>>> demo
                       ),
                     ),
                   ),
@@ -192,10 +209,14 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (_) {
                       if (merged.isEmpty) {
+<<<<<<< HEAD
                         return const Center(
+=======
+                        return Center(
+>>>>>>> demo
                           child: Text(
                             'No messages yet',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         );
                       }
@@ -269,12 +290,20 @@ class _ConvTile extends StatelessWidget {
             )
           : CircleAvatar(
               radius: 26,
+<<<<<<< HEAD
               backgroundColor: Colors.grey.shade200,
+=======
+              backgroundColor: context.inputFill,
+>>>>>>> demo
               backgroundImage: displayAvatar.isNotEmpty
                   ? NetworkImage(displayAvatar)
                   : null,
               child: displayAvatar.isEmpty
+<<<<<<< HEAD
                   ? const Icon(Icons.person, color: Colors.white)
+=======
+                  ? Icon(Icons.person, color: context.textSecondary)
+>>>>>>> demo
                   : null,
             ),
       title: Row(
@@ -310,7 +339,7 @@ class _ConvTile extends StatelessWidget {
       ),
       subtitle: Text(
         conv.lastMessage,
-        style: const TextStyle(color: Colors.grey, fontSize: 12),
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -327,7 +356,7 @@ class _ConvTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-          const Icon(Icons.camera_alt_outlined, size: 20, color: Colors.grey),
+          Icon(Icons.camera_alt_outlined, size: 20, color: context.textSecondary),
         ],
       ),
     );
@@ -370,7 +399,11 @@ class _EventConvTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
+<<<<<<< HEAD
               color: const Color(0xFFF5E8FA),
+=======
+              color: context.purpleSoft,
+>>>>>>> demo
               borderRadius: BorderRadius.circular(6),
             ),
             child: const Text(
@@ -387,7 +420,11 @@ class _EventConvTile extends StatelessWidget {
       ),
       subtitle: Text(
         preview,
+<<<<<<< HEAD
         style: const TextStyle(color: Colors.grey, fontSize: 12),
+=======
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
+>>>>>>> demo
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

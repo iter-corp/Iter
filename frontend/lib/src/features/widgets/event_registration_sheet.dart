@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/event_registration_providers.dart';
+import '../../theme/app_theme.dart';
 
 /// Small curated list of common country calling codes. Keeps the sheet
 /// lightweight without pulling in a full country library.
@@ -47,7 +48,7 @@ Future<void> showEventRegistrationSheet(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: context.cardBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -200,7 +201,7 @@ class _EventRegistrationFormState
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
+                          color: context.inputFill,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -287,7 +288,7 @@ class _EventRegistrationFormState
   InputDecoration _inputDecoration(String hint) => InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: const Color(0xFFF0F0F0),
+        fillColor: context.inputFill,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(

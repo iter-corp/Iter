@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -59,10 +56,22 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyA2Smk8UwnMv1BfdphO0odGITNBYT4A848',
-    appId: '1:398881924784:android:5be7efa816feee2ef13d75',
-    messagingSenderId: '398881924784',
-    projectId: 'coil-9239e',
-    storageBucket: 'coil-9239e.firebasestorage.app',
+    apiKey: 'AIzaSyBBqeOrAoIPgBzOVvfXc6NP93_KbHwXMl0',
+    appId: '1:751233585713:android:d39edcd910ac1c08a97b10',
+    messagingSenderId: '751233585713',
+    projectId: 'coil-50528',
+    storageBucket: 'coil-50528.firebasestorage.app',
+    databaseURL: 'https://coil-50528-default-rtdb.asia-southeast1.firebasedatabase.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCUvwy72IH_gaMZ0eGjrkQaBKbrTEPeigU',
+    appId: '1:751233585713:ios:767585b42bdad187a97b10',
+    messagingSenderId: '751233585713',
+    projectId: 'coil-50528',
+    storageBucket: 'coil-50528.firebasestorage.app',
+    iosBundleId: 'com.iter.ai',
+    iosClientId: '751233585713-tgffet0qbu9em9mlhsbh84jiqrh24a8o.apps.googleusercontent.com',
+    databaseURL: 'https://coil-50528-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 }

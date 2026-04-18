@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/reaction_providers.dart';
 import '../../services/reaction_service.dart';
+import '../../theme/app_theme.dart';
 
 /// Bottom-sheet picker of popular reaction emojis. Tapping one toggles it
 /// on the message referenced by [parentPath] + [messageId].
@@ -14,7 +15,7 @@ void showReactionsSheet(
 }) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: Colors.white,
+    backgroundColor: context.cardBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -45,7 +46,7 @@ void showReactionsSheet(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: selected
-                          ? const Color(0xFFF5E8FA)
+                          ? context.purpleSoft
                           : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
@@ -101,8 +102,8 @@ class MessageReactionsRow extends ConsumerWidget {
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: isMine
-                    ? const Color(0xFFF5E8FA)
-                    : const Color(0xFFF0F0F0),
+                    ? context.purpleSoft
+                    : context.inputFill,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isMine

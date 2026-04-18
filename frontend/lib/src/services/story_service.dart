@@ -89,9 +89,19 @@ class StoryService {
     final now = Timestamp.fromDate(DateTime.now());
     return _col.where('expiresAt', isGreaterThan: now).snapshots().map((s) {
       final stories = s.docs.map(Story.fromDoc).toList();
-      stories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Oldest first so new stories play last (Instagram-style).
+      stories.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return stories;
     });
+  }
+
+  /// Checks whether the current user has viewed a specific story.
+  Future<bool> hasViewed(String storyId) async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    final doc =
+        await _col.doc(storyId).collection('viewers').doc(user.uid).get();
+    return doc.exists;
   }
 
   Future<void> deleteStory(String storyId) async {

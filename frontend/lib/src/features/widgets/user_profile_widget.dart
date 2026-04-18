@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
+
 /// COVER + AVATAR — uses live profile data
 class UserCoverAvatar extends StatelessWidget {
   final String? avatarUrl;
@@ -182,11 +184,11 @@ class UserStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(_fmt(followers), "Followers", onFollowersTap),
-          _divider(),
-          _statItem(_fmt(following), "Following", onFollowingTap),
-          _divider(),
-          _statItem(_fmt(posts), "Posts", null),
+          _statItem(context, _fmt(followers), "Followers", onFollowersTap),
+          _divider(context),
+          _statItem(context, _fmt(following), "Following", onFollowingTap),
+          _divider(context),
+          _statItem(context, _fmt(posts), "Posts", null),
         ],
       ),
     );
@@ -198,13 +200,17 @@ class UserStats extends StatelessWidget {
     return '$n';
   }
 
-  Widget _statItem(String value, String label, VoidCallback? onTap) {
+  Widget _statItem(BuildContext context, String value, String label, VoidCallback? onTap) {
     final content = Column(
       children: [
         Text(value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary)),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label,
+            style: TextStyle(fontSize: 12, color: context.textSecondary)),
       ],
     );
 
@@ -213,8 +219,8 @@ class UserStats extends StatelessWidget {
         onTap: onTap, borderRadius: BorderRadius.circular(8), child: content);
   }
 
-  Widget _divider() =>
-      Container(width: 1, height: 36, color: Colors.grey.shade300);
+  Widget _divider(BuildContext context) =>
+      Container(width: 1, height: 36, color: context.borderColor);
 }
 
 /// FOLLOW + MESSAGE BUTTONS

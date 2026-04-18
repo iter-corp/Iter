@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/admin_providers.dart';
+<<<<<<< HEAD
+=======
+import '../../../theme/app_theme.dart';
+import 'admin_blacklist_screen.dart';
+>>>>>>> demo
 import 'admin_event_registrations_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
@@ -18,12 +23,12 @@ class AdminDashboardScreen extends ConsumerWidget {
     if (!isAdmin) {
       return Scaffold(
         appBar: AppBar(title: const Text('Admin')),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Text(
               'You do not have admin access.',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(fontSize: 16, color: context.textSecondary),
             ),
           ),
         ),
@@ -31,11 +36,11 @@ class AdminDashboardScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: const Text('Admin dashboard'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: ListView(
@@ -88,6 +93,22 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _AdminTile(
+<<<<<<< HEAD
+=======
+            icon: Icons.block_outlined,
+            title: 'Blacklisted emails',
+            subtitle: 'Deleted users who cannot re-register',
+            color: Colors.red,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AdminBlacklistScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AdminTile(
+>>>>>>> demo
             icon: Icons.settings_outlined,
             title: 'App settings',
             subtitle: 'Feature flags, announcement, maintenance',
@@ -121,7 +142,7 @@ class _AdminTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.cardBg,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -130,7 +151,7 @@ class _AdminTile extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFEDEDF2)),
+            border: Border.all(color: context.borderColor),
           ),
           child: Row(
             children: [
@@ -149,17 +170,18 @@ class _AdminTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
+                        color: context.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey,
+                        color: context.textSecondary,
                       ),
                     ),
                   ],

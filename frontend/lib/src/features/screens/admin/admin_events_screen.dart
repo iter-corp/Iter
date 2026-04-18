@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../services/admin_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../theme/app_theme.dart';
 
 class AdminEventsScreen extends ConsumerWidget {
   const AdminEventsScreen({super.key});
@@ -17,11 +18,11 @@ class AdminEventsScreen extends ConsumerWidget {
     final eventsAsync = ref.watch(adminEventsProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: const Text('Events'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -38,9 +39,9 @@ class AdminEventsScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (events) {
           if (events.isEmpty) {
-            return const Center(
+            return Center(
               child: Text('No events yet. Tap "New event" to add one.',
-                  style: TextStyle(color: Colors.grey)),
+                  style: TextStyle(color: context.textSecondary)),
             );
           }
           return ListView.separated(
@@ -58,8 +59,9 @@ class AdminEventsScreen extends ConsumerWidget {
                     child: url != null
                         ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)
                         : Container(
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.event, color: Colors.grey),
+                            color: context.inputFill,
+                            child: Icon(Icons.event,
+                                color: context.textSecondary),
                           ),
                   ),
                 ),
@@ -69,7 +71,7 @@ class AdminEventsScreen extends ConsumerWidget {
                   e.location,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
                 onTap: () => Navigator.push(
                   context,
@@ -233,11 +235,11 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   Widget build(BuildContext context) {
     final isNew = widget.existing == null;
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: Text(isNew ? 'New event' : 'Edit event'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
         actions: [
           TextButton(
@@ -262,9 +264,10 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           _field('Phone', _phoneCtrl),
           _field('Email', _emailCtrl),
           const SizedBox(height: 8),
-          const Text('Images',
-              style:
-                  TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+          Text('Images',
+              style: TextStyle(
+                  color: context.textSecondary,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -305,16 +308,16 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                   width: 86,
                   height: 86,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.cardBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: context.borderColor),
                   ),
                   child: _uploadingImage
                       ? const Center(
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.add_a_photo_outlined,
-                          color: Colors.grey),
+                      : Icon(Icons.add_a_photo_outlined,
+                          color: context.textSecondary),
                 ),
               ),
             ],
@@ -330,9 +333,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEDEDF2)),
+          border: Border.all(color: context.borderColor),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         child: TextField(

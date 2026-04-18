@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../services/chat_service.dart';
+import '../../theme/app_theme.dart';
 import 'chat_screen.dart';
 
 class HiddenRequestsScreen extends StatelessWidget {
@@ -12,7 +13,7 @@ class HiddenRequestsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,11 +36,11 @@ class HiddenRequestsScreen extends StatelessWidget {
             ),
 
             /// SUBTITLE
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Text(
                 "Requests containing messages that may be offensive or unwanted are moved to this folder.",
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+                style: TextStyle(color: context.textSecondary, fontSize: 13),
               ),
             ),
 
@@ -88,7 +89,7 @@ class HiddenRequestsScreen extends StatelessWidget {
                     ),
                     subtitle: Text(
                       msg.lastMessage,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: TextStyle(color: context.textMuted, fontSize: 12),
                     ),
                     trailing: msg.unreadCount > 0
                         ? Container(
@@ -130,7 +131,7 @@ class RequestsTab extends StatelessWidget {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0F0F0),
+              color: context.inputFill,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.notifications_off_outlined, size: 24),
@@ -146,7 +147,7 @@ class RequestsTab extends StatelessWidget {
           ),
         ),
 
-        const Divider(),
+        Divider(color: Theme.of(context).dividerColor),
 
         /// REQUEST LIST
         Expanded(
@@ -181,7 +182,7 @@ class RequestsTab extends StatelessWidget {
                 ),
                 subtitle: Text(
                   msg.lastMessage,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: TextStyle(color: context.textMuted, fontSize: 12),
                 ),
                 trailing: msg.unreadCount > 0
                     ? Container(

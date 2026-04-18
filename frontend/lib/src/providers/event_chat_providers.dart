@@ -39,30 +39,34 @@ final eventChatMembersProvider =
 /// Key format: "uidA|uidB"
 final sharedEventProvider = FutureProvider.autoDispose
     .family<Map<String, String>?, String>((ref, key) async {
-  final parts = key.split('|');
-  if (parts.length != 2 || parts[0] == parts[1]) return null;
-  final uidA = parts[0];
-  final uidB = parts[1];
-  final svc = ref.watch(eventChatServiceProvider);
+  try {
+    final parts = key.split('|');
+    if (parts.length != 2 || parts[0] == parts[1]) return null;
+    final uidA = parts[0];
+    final uidB = parts[1];
+    final svc = ref.watch(eventChatServiceProvider);
 
-  // Stream once — FutureProvider.first effectively takes the first emission.
-  final aChats = await svc.streamMyEventChats(uidA).first;
-  final bChats = await svc.streamMyEventChats(uidB).first;
-  if (aChats.isEmpty || bChats.isEmpty) return null;
+    final aChats = await svc.streamMyEventChats(uidA).first;
+    final bChats = await svc.streamMyEventChats(uidB).first;
+    if (aChats.isEmpty || bChats.isEmpty) return null;
 
-  final bIds = {for (final c in bChats) c.eventId};
-  final shared = aChats.where((c) => bIds.contains(c.eventId)).toList();
-  if (shared.isEmpty) return null;
+    final bIds = {for (final c in bChats) c.eventId};
+    final shared = aChats.where((c) => bIds.contains(c.eventId)).toList();
+    if (shared.isEmpty) return null;
 
-  shared.sort((x, y) {
-    final xt = x.lastTime;
-    final yt = y.lastTime;
-    if (xt == null) return 1;
-    if (yt == null) return -1;
-    return yt.compareTo(xt);
-  });
-  return {
-    'eventId': shared.first.eventId,
-    'eventTitle': shared.first.eventTitle,
-  };
+    shared.sort((x, y) {
+      final xt = x.lastTime;
+      final yt = y.lastTime;
+      if (xt == null) return 1;
+      if (yt == null) return -1;
+      return yt.compareTo(xt);
+    });
+    return {
+      'eventId': shared.first.eventId,
+      'eventTitle': shared.first.eventTitle,
+    };
+  } catch (_) {
+    // Silently return null on permission-denied or missing index errors.
+    return null;
+  }
 });

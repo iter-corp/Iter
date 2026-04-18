@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/post_card.dart';
 
@@ -14,11 +15,10 @@ class PostDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Post'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -31,10 +31,10 @@ class PostDetailScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snap.hasData || !snap.data!.exists) {
-            return const Center(
+            return Center(
               child: Text(
                 'Post not found',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: context.textSecondary),
               ),
             );
           }

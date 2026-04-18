@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
@@ -229,7 +230,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                       onTap: () => showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
-                        backgroundColor: Colors.white,
+                        backgroundColor: context.cardBg,
                         shape: const RoundedRectangleBorder(
                           borderRadius:
                               BorderRadius.vertical(top: Radius.circular(20)),
@@ -290,7 +291,7 @@ class _PostCardState extends ConsumerState<PostCard> {
   void _showFullCaption(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -354,7 +355,7 @@ class _PostCardState extends ConsumerState<PostCard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
