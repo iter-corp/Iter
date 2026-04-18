@@ -99,11 +99,11 @@ class ProfileStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(_fmt(followers), "Followers", onFollowersTap),
-          _divider(),
-          _statItem(_fmt(following), "Following", onFollowingTap),
-          _divider(),
-          _statItem(_fmt(posts), "Posts", null),
+          _statItem(_fmt(followers), "Followers", onFollowersTap, context),
+          _divider(context),
+          _statItem(_fmt(following), "Following", onFollowingTap, context),
+          _divider(context),
+          _statItem(_fmt(posts), "Posts", null, context),
         ],
       ),
     );

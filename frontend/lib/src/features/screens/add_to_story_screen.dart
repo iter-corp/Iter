@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../../theme/app_theme.dart';
 import 'camera_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_screen.dart';
@@ -95,7 +96,7 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       body: SafeArea(
         child: Stack(
           children: [
@@ -170,12 +171,12 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.photo_library_outlined,
-                  size: 48, color: Colors.grey),
+              Icon(Icons.photo_library_outlined,
+                  size: 48, color: context.textSecondary),
               const SizedBox(height: 12),
               Text(_permissionMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey)),
+                  style: TextStyle(color: context.textSecondary)),
               const SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () => PhotoManager.openSetting(),

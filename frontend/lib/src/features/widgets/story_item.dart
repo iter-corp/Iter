@@ -24,9 +24,9 @@ class StoryItem extends StatelessWidget {
             ),
             child: Container(
               padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
+                color: context.cardBg,
               ),
               child: const CircleAvatar(
                 radius: 26,

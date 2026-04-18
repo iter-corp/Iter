@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../services/storage_service.dart';
+import '../../theme/app_theme.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -126,7 +127,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final userAsync = ref.watch(currentUserDocProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEEEFF4),
+      backgroundColor: context.surfaceSoft,
       body: SafeArea(
         child: userAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -291,9 +292,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 onTap: _pickAndUploadAvatar,
                 child: Container(
                   padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
+                    color: context.cardBg,
                   ),
                   child: Stack(
                     alignment: Alignment.center,
@@ -331,17 +332,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardBg,
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextField(
           controller: controller,
           maxLines: maxLines,
-          style: const TextStyle(fontSize: 14),
+          style: TextStyle(fontSize: 14, color: context.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle:
-                const TextStyle(color: Colors.grey, fontSize: 14),
+                TextStyle(color: context.textMuted, fontSize: 14),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: InputBorder.none,
