@@ -560,7 +560,7 @@ class _LanguageDropdown extends StatelessWidget {
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -576,9 +576,9 @@ class _LanguageDropdown extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFD7D7D7),
+          color: context.inputFill,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: context.borderColor),
         ),
         child: Row(
           children: [
@@ -586,15 +586,15 @@ class _LanguageDropdown extends StatelessWidget {
               child: Text(
                 value,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: context.textPrimary,
                 ),
               ),
             ),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                color: Colors.black, size: 20),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                color: context.textPrimary, size: 20),
           ],
         ),
       ),
@@ -646,25 +646,27 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: Icon(Icons.search, color: context.textSecondary),
                   hintText: 'Search languages',
+                  hintStyle: TextStyle(color: context.textMuted),
                   filled: true,
-                  fillColor: const Color(0xFFF0F0F5),
+                  fillColor: context.inputFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 4),
                 ),
+                style: TextStyle(color: context.textPrimary),
               ),
             ),
             const SizedBox(height: 8),
             Expanded(
               child: filtered.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'No languages match',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: context.textSecondary),
                       ),
                     )
                   : ListView.separated(
@@ -674,12 +676,13 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                         final lang = filtered[i];
                         final isCurrent = lang.label == widget.current;
                         return ListTile(
-                          title: Text(lang.label),
+                          title: Text(lang.label,
+                              style: TextStyle(color: context.textPrimary)),
                           subtitle: Text(
                             lang.code,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey,
+                              color: context.textSecondary,
                             ),
                           ),
                           trailing: isCurrent
@@ -718,7 +721,7 @@ class _InputBox extends StatelessWidget {
       height: 120,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F5),
+        color: context.inputFill,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Stack(
@@ -731,13 +734,13 @@ class _InputBox extends StatelessWidget {
             decoration: InputDecoration(
               border: InputBorder.none,
               hintText: 'Enter text...',
-              hintStyle: TextStyle(fontSize: 15, color: Colors.grey.shade400),
+              hintStyle: TextStyle(fontSize: 15, color: context.textMuted),
               isDense: true,
               contentPadding: EdgeInsets.zero,
             ),
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 15,
-                color: Colors.black87,
+                color: context.textPrimary,
                 fontWeight: FontWeight.bold),
           ),
 
@@ -756,8 +759,8 @@ class _InputBox extends StatelessWidget {
                         'assets/icons/voice.svg',
                         width: 22,
                         height: 22,
-                        colorFilter: const ColorFilter.mode(
-                            Colors.black, BlendMode.srcIn),
+                        colorFilter: ColorFilter.mode(
+                            context.textPrimary, BlendMode.srcIn),
                       ),
               ),
             ),

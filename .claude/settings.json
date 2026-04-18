@@ -29,9 +29,36 @@
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(grep \".dart$\")",
       "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('d:/COIL-project-demo/functions/scripts/seed.js', 'utf8'\\); new Function\\(s.replace\\(/^#!.*\\\\n/, ''\\)\\);\")",
+<<<<<<< HEAD
       "Bash(xargs grep *)",
       "Bash(xargs cat *)",
       "Bash(xargs ls *)"
+=======
+      "Bash(firebase apps:list --project coil-50528)",
+      "Bash(security find-identity *)",
+      "Bash(security find-certificate *)",
+      "Bash(openssl x509 *)",
+      "Bash(firebase apps:create ios --bundle-id com.team.coil --project coil-50528)",
+      "Bash(firebase apps:sdkconfig IOS 1:751233585713:ios:86699cb5103815aea97b10 --project coil-50528 -o /Users/mohammednawzadahmed/Documents/GitHub/COIL-project/frontend/ios/Runner/GoogleService-Info.plist)",
+      "Bash(pod install *)",
+      "Bash(pkill -f \"flutter run\")",
+      "Bash(pkill -f \"xcodebuild\")",
+      "Bash(firebase apps:create ios --bundle-id com.iter.ai --project coil-50528)",
+      "Bash(firebase apps:sdkconfig IOS 1:751233585713:ios:767585b42bdad187a97b10 --project coil-50528 -o /Users/mohammednawzadahmed/Documents/GitHub/COIL-project/frontend/ios/Runner/GoogleService-Info.plist)",
+      "Bash(flutter analyze *)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :CFBundleIdentifier\" /Users/mohammednawzadahmed/Documents/GitHub/COIL-project/frontend/build/ios/Debug-iphoneos/Runner.app/Info.plist)",
+      "Bash(firebase apps:sdkconfig ANDROID 1:751233585713:android:5dce8e83bba17fa4a97b10 --project coil-50528)",
+      "Bash(firebase apps:create android --package-name com.iter.ai --project coil-50528)",
+      "Bash(firebase apps:sdkconfig ANDROID 1:751233585713:android:d39edcd910ac1c08a97b10 --project coil-50528 -o /Users/mohammednawzadahmed/Documents/GitHub/COIL-project/frontend/android/app/google-services.json)",
+      "Bash(tee /tmp/flutter_run_output.log)",
+      "Bash(echo \"Flutter build started, PID: $!\")",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "Bash(pkill -f \"flutter.*run.*00008120\")"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+>>>>>>> demo
     ]
   }
 }
