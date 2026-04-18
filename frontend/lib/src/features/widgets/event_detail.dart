@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/event_registration_providers.dart';
 import '../../services/event_registration_service.dart';
-<<<<<<< HEAD
-=======
 import '../../theme/app_theme.dart';
->>>>>>> demo
 import 'event_registration_sheet.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
@@ -220,11 +217,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-<<<<<<< HEAD
-                    const Text(
-=======
                     Text(
->>>>>>> demo
                       'If you would like to become one of us, you\ncan register below:',
                       style: TextStyle(
                         fontSize: 13.5,

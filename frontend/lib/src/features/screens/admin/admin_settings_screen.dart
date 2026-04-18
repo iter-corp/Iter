@@ -166,15 +166,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               _section('Contact email'),
               Container(
                 decoration: BoxDecoration(
-<<<<<<< HEAD
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFEDEDF2)),
-=======
                   color: context.cardBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: context.borderColor),
->>>>>>> demo
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: TextField(

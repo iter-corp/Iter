@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/event_registration_providers.dart';
 import '../../../services/event_registration_service.dart';
-<<<<<<< HEAD
-=======
 import '../../../theme/app_theme.dart';
->>>>>>> demo
 
 class AdminEventRegistrationsScreen extends ConsumerWidget {
   const AdminEventRegistrationsScreen({super.key});
@@ -16,19 +13,11 @@ class AdminEventRegistrationsScreen extends ConsumerWidget {
     final pendingAsync = ref.watch(pendingRegistrationsProvider);
 
     return Scaffold(
-<<<<<<< HEAD
-      backgroundColor: const Color(0xFFF7F7FB),
-      appBar: AppBar(
-        title: const Text('Event registrations'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-=======
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: const Text('Event registrations'),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
->>>>>>> demo
         elevation: 0,
       ),
       body: pendingAsync.when(
@@ -36,17 +25,10 @@ class AdminEventRegistrationsScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (items) {
           if (items.isEmpty) {
-<<<<<<< HEAD
-            return const Center(
-              child: Text(
-                'No pending requests',
-                style: TextStyle(color: Colors.grey),
-=======
             return Center(
               child: Text(
                 'No pending requests',
                 style: TextStyle(color: context.textSecondary),
->>>>>>> demo
               ),
             );
           }
@@ -98,30 +80,18 @@ class _RegistrationCardState extends ConsumerState<_RegistrationCard> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-<<<<<<< HEAD
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEDEDF2)),
-=======
         color: context.cardBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: context.borderColor),
->>>>>>> demo
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             r.eventTitle,
-<<<<<<< HEAD
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-=======
             style: TextStyle(
               fontSize: 12,
               color: context.textSecondary,
->>>>>>> demo
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -174,20 +144,12 @@ class _RegistrationCardState extends ConsumerState<_RegistrationCard> {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-<<<<<<< HEAD
-          Icon(icon, size: 15, color: Colors.grey),
-=======
           Icon(icon, size: 15, color: context.textSecondary),
->>>>>>> demo
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-<<<<<<< HEAD
-              style: const TextStyle(fontSize: 13, color: Colors.black87),
-=======
               style: TextStyle(fontSize: 13, color: context.textPrimary),
->>>>>>> demo
             ),
           ),
         ],

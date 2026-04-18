@@ -430,11 +430,7 @@ class _MessageBubble extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-<<<<<<< HEAD
-                      color: Colors.grey.shade700,
-=======
                       color: context.textSecondary,
->>>>>>> demo
                     ),
                   ),
                 ),
@@ -666,11 +662,8 @@ class _SharedEventLabel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final key = '$meUid|$otherUid';
     final async = ref.watch(sharedEventProvider(key));
-<<<<<<< HEAD
-=======
     // Silently hide on error (e.g. permission-denied from collectionGroup).
     if (async.hasError || !async.hasValue) return const SizedBox.shrink();
->>>>>>> demo
     final shared = async.value;
     if (shared == null) return const SizedBox.shrink();
     final title = shared['eventTitle'] ?? '';
@@ -680,11 +673,7 @@ class _SharedEventLabel extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-<<<<<<< HEAD
-          color: const Color(0xFFF5E8FA),
-=======
           color: context.purpleSoft,
->>>>>>> demo
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

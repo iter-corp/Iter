@@ -214,11 +214,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                                           Container(
                                             width: 24,
                                             height: 1,
-<<<<<<< HEAD
-                                            color: Colors.grey.shade400,
-=======
                                             color: context.textMuted,
->>>>>>> demo
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
@@ -226,13 +222,8 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                                                 ? 'Hide replies'
                                                 : 'View ${replies.length} '
                                                     '${replies.length == 1 ? "reply" : "replies"}',
-<<<<<<< HEAD
-                                            style: const TextStyle(
-                                              color: Colors.grey,
-=======
                                             style: TextStyle(
                                               color: context.textSecondary,
->>>>>>> demo
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -285,34 +276,6 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                       onTap: _cancelReply,
                       child: Icon(Icons.close,
                           size: 16, color: context.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Reply target banner
-            if (_replyTo != null)
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: const Color(0xFFF5F0F8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Replying to @${_replyTo!.username}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF8A3FB8),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _cancelReply,
-                      child: const Icon(Icons.close,
-                          size: 16, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -439,11 +402,7 @@ class _CommentTile extends ConsumerWidget {
                 const SizedBox(height: 2),
                 RichText(
                   text: TextSpan(
-<<<<<<< HEAD
-                    style: const TextStyle(fontSize: 13, color: Colors.black),
-=======
                     style: TextStyle(fontSize: 13, color: context.textPrimary),
->>>>>>> demo
                     children: [
                       if (comment.replyToUsername != null &&
                           comment.replyToUsername!.isNotEmpty)
@@ -462,21 +421,12 @@ class _CommentTile extends ConsumerWidget {
                 GestureDetector(
                   onTap: onReply,
                   behavior: HitTestBehavior.opaque,
-<<<<<<< HEAD
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 2),
-                    child: Text(
-                      'Reply',
-                      style: TextStyle(
-                        color: Colors.grey,
-=======
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text(
                       'Reply',
                       style: TextStyle(
                         color: context.textSecondary,
->>>>>>> demo
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),

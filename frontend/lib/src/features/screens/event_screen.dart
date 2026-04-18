@@ -1140,11 +1140,7 @@ class _BecomeAdminBanner extends ConsumerWidget {
   void _showContactSheet(BuildContext context, String email) {
     showModalBottomSheet(
       context: context,
-<<<<<<< HEAD
-      backgroundColor: Colors.white,
-=======
       backgroundColor: context.cardBg,
->>>>>>> demo
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

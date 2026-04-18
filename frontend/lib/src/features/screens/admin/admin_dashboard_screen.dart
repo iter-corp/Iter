@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/admin_providers.dart';
-<<<<<<< HEAD
-=======
 import '../../../theme/app_theme.dart';
 import 'admin_blacklist_screen.dart';
->>>>>>> demo
 import 'admin_event_registrations_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
@@ -93,8 +90,6 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _AdminTile(
-<<<<<<< HEAD
-=======
             icon: Icons.block_outlined,
             title: 'Blacklisted emails',
             subtitle: 'Deleted users who cannot re-register',
@@ -108,7 +103,6 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _AdminTile(
->>>>>>> demo
             icon: Icons.settings_outlined,
             title: 'App settings',
             subtitle: 'Feature flags, announcement, maintenance',
