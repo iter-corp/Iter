@@ -8,6 +8,7 @@ class AdminConfig {
   final String announcement;
   final bool maintenanceMode;
   final String minAppVersion;
+  final String contactEmail;
 
   const AdminConfig({
     this.storiesEnabled = true,
@@ -17,6 +18,7 @@ class AdminConfig {
     this.announcement = '',
     this.maintenanceMode = false,
     this.minAppVersion = '1.0.0',
+    this.contactEmail = '',
   });
 
   factory AdminConfig.fromMap(Map<String, dynamic>? d) {
@@ -29,6 +31,7 @@ class AdminConfig {
       announcement: (m['announcement'] as String?) ?? '',
       maintenanceMode: (m['maintenanceMode'] as bool?) ?? false,
       minAppVersion: (m['minAppVersion'] as String?) ?? '1.0.0',
+      contactEmail: (m['contactEmail'] as String?) ?? '',
     );
   }
 
@@ -40,6 +43,7 @@ class AdminConfig {
         'announcement': announcement,
         'maintenanceMode': maintenanceMode,
         'minAppVersion': minAppVersion,
+        'contactEmail': contactEmail,
       };
 
   AdminConfig copyWith({
@@ -50,6 +54,7 @@ class AdminConfig {
     String? announcement,
     bool? maintenanceMode,
     String? minAppVersion,
+    String? contactEmail,
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
@@ -59,6 +64,7 @@ class AdminConfig {
       announcement: announcement ?? this.announcement,
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
       minAppVersion: minAppVersion ?? this.minAppVersion,
+      contactEmail: contactEmail ?? this.contactEmail,
     );
   }
 }
@@ -105,8 +111,6 @@ class AdminEvent {
 class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  static const int _batchWriteLimit = 450;
-
   DocumentReference<Map<String, dynamic>> get _configRef =>
       _db.collection('adminConfig').doc('app');
 
@@ -133,194 +137,128 @@ class AdminService {
     });
   }
 
-  Future<void> suspendUser(String uid, bool suspended) => _db
-      .collection('users')
-      .doc(uid)
-      .set({'suspended': suspended}, SetOptions(merge: true));
+  Future<void> suspendUser(String uid, bool suspended) =>
+      _db.collection('users').doc(uid).update({'suspended': suspended});
 
   Future<void> setRole(String uid, String role) =>
       _db.collection('users').doc(uid).update({'role': role});
 
+  /// Cascade-deletes ALL user data and adds their email to the blacklist.
   Future<void> deleteUser(String uid) async {
-    await _deletePostsByAuthor(uid);
-    await _deleteCommentsByAuthor(uid);
-    await _deleteDocsByField('stories', 'authorUid', uid);
-    await _deleteDocsByField('liveStreams', 'hostUid', uid);
+    // 1. Get user email before deletion for blacklist.
+    final userSnap = await _db.collection('users').doc(uid).get();
+    final email = (userSnap.data()?['email'] as String?) ?? '';
 
-    await _deleteUserSubcollection(uid, 'followers');
-    await _deleteUserSubcollection(uid, 'following');
-    await _deleteUserSubcollection(uid, 'reposts');
-    await _deleteUserSubcollection(uid, 'saved');
-    await _deleteUserSubcollection(uid, 'savedTranslations');
+    // 2. Delete user's posts and their subcollections (likes, comments, reposts).
+    final posts = await _db
+        .collection('posts')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final post in posts.docs) {
+      await _deleteSubcollection(post.reference, 'likes');
+      await _deleteSubcollection(post.reference, 'comments');
+      await _deleteSubcollection(post.reference, 'reposts');
+      await post.reference.delete();
+    }
 
-    await _deleteNotificationItems(uid);
-    await _deleteFeedTimeline(uid);
+    // 3. Delete user's stories and their viewers.
+    final stories = await _db
+        .collection('stories')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final story in stories.docs) {
+      await _deleteSubcollection(story.reference, 'viewers');
+      await story.reference.delete();
+    }
 
-    // Spark plan cannot delete Firebase Auth users server-side.
-    // Keep a tombstone so the account is blocked in app login/route guards.
-    await _db.collection('users').doc(uid).set(
-      {
+    // 4. Delete user's comments on other posts.
+    final comments = await _db
+        .collectionGroup('comments')
+        .where('authorUid', isEqualTo: uid)
+        .get();
+    for (final c in comments.docs) {
+      await c.reference.delete();
+    }
+
+    // 5. Delete chats where user is participant.
+    final chats = await _db
+        .collection('chats')
+        .where('participants', arrayContains: uid)
+        .get();
+    for (final chat in chats.docs) {
+      await _deleteSubcollection(chat.reference, 'messages');
+      await chat.reference.delete();
+    }
+
+    // 6. Delete followers/following subcollections.
+    final userRef = _db.collection('users').doc(uid);
+    await _deleteSubcollection(userRef, 'followers');
+    await _deleteSubcollection(userRef, 'following');
+    await _deleteSubcollection(userRef, 'reposts');
+    await _deleteSubcollection(userRef, 'saved');
+
+    // 7. Remove user from others' followers/following lists.
+    final followersOfOthers = await _db
+        .collectionGroup('followers')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final doc in followersOfOthers.docs) {
+      await doc.reference.delete();
+    }
+    final followingOfOthers = await _db
+        .collectionGroup('following')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final doc in followingOfOthers.docs) {
+      await doc.reference.delete();
+    }
+
+    // 8. Delete notifications.
+    await _deleteSubcollection(
+        _db.collection('notifications').doc(uid), 'items');
+
+    // 9. Delete event registrations.
+    final regs = await _db
+        .collection('eventRegistrations')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final r in regs.docs) {
+      await r.reference.delete();
+    }
+
+    // 10. Delete the user document itself.
+    await userRef.delete();
+
+    // 11. Add email to blacklist.
+    if (email.isNotEmpty) {
+      await _db.collection('blacklist').doc(email).set({
+        'email': email,
         'uid': uid,
-        'deleted': true,
-        'suspended': true,
         'deletedAt': FieldValue.serverTimestamp(),
-        'role': 'user',
-        'username': '[deleted]',
-        'handle': null,
-        'bio': '',
-        'avatarUrl': null,
-        'coverUrl': null,
-        'fcmTokens': <String>[],
-      },
-      SetOptions(merge: true),
-    );
-  }
-
-  Future<void> _deletePostsByAuthor(String authorUid) async {
-    while (true) {
-      final snap = await _db
-          .collection('posts')
-          .where('authorUid', isEqualTo: authorUid)
-          .limit(50)
-          .get();
-      if (snap.docs.isEmpty) return;
-
-      for (final postDoc in snap.docs) {
-        await _deletePostWithSubcollections(postDoc.reference);
-      }
+      });
     }
   }
 
-  Future<void> _deletePostWithSubcollections(
-    DocumentReference<Map<String, dynamic>> postRef,
-  ) async {
-    await _deleteCollection(postRef.collection('likes'));
-    await _deleteCollection(postRef.collection('comments'));
-    await _deleteCollection(postRef.collection('reposts'));
-    await postRef.delete();
-  }
-
-  Future<void> _deleteCommentsByAuthor(String authorUid) async {
-    while (true) {
-      final snap = await _db
-          .collectionGroup('comments')
-          .where('authorUid', isEqualTo: authorUid)
-          .limit(200)
-          .get();
-      if (snap.docs.isEmpty) return;
-
-      final decrements = <String, int>{};
-      var batch = _db.batch();
-      var writes = 0;
-
-      for (final commentDoc in snap.docs) {
-        final postRef = commentDoc.reference.parent.parent;
-        if (postRef != null) {
-          decrements[postRef.id] = (decrements[postRef.id] ?? 0) + 1;
-        }
-
-        batch.delete(commentDoc.reference);
-        writes++;
-
-        if (writes >= _batchWriteLimit) {
-          await batch.commit();
-          batch = _db.batch();
-          writes = 0;
-        }
-      }
-
-      for (final entry in decrements.entries) {
-        batch.set(
-          _db.collection('posts').doc(entry.key),
-          {'commentsCount': FieldValue.increment(-entry.value)},
-          SetOptions(merge: true),
-        );
-        writes++;
-
-        if (writes >= _batchWriteLimit) {
-          await batch.commit();
-          batch = _db.batch();
-          writes = 0;
-        }
-      }
-
-      if (writes > 0) {
-        await batch.commit();
-      }
+  /// Helper to delete all documents in a subcollection.
+  Future<void> _deleteSubcollection(
+      DocumentReference parent, String subcollection) async {
+    final snap = await parent.collection(subcollection).get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
     }
   }
 
-  Future<void> _deleteDocsByField(
-    String collection,
-    String field,
-    String value,
-  ) async {
-    while (true) {
-      final snap = await _db
-          .collection(collection)
-          .where(field, isEqualTo: value)
-          .limit(200)
-          .get();
-      if (snap.docs.isEmpty) return;
-
-      var batch = _db.batch();
-      var writes = 0;
-      for (final d in snap.docs) {
-        batch.delete(d.reference);
-        writes++;
-
-        if (writes >= _batchWriteLimit) {
-          await batch.commit();
-          batch = _db.batch();
-          writes = 0;
-        }
-      }
-      if (writes > 0) {
-        await batch.commit();
-      }
-    }
+  // -------- Blacklist --------
+  Stream<List<Map<String, dynamic>>> streamBlacklist() {
+    return _db
+        .collection('blacklist')
+        .orderBy('deletedAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => d.data()).toList());
   }
 
-  Future<void> _deleteUserSubcollection(
-      String uid, String subcollection) async {
-    final col = _db.collection('users').doc(uid).collection(subcollection);
-    await _deleteCollection(col);
-  }
-
-  Future<void> _deleteNotificationItems(String uid) async {
-    final col = _db.collection('notifications').doc(uid).collection('items');
-    await _deleteCollection(col);
-  }
-
-  Future<void> _deleteFeedTimeline(String uid) async {
-    final col = _db.collection('feeds').doc(uid).collection('timeline');
-    await _deleteCollection(col);
-  }
-
-  Future<void> _deleteCollection(
-    CollectionReference<Map<String, dynamic>> collection,
-  ) async {
-    while (true) {
-      final snap = await collection.limit(200).get();
-      if (snap.docs.isEmpty) return;
-
-      var batch = _db.batch();
-      var writes = 0;
-      for (final doc in snap.docs) {
-        batch.delete(doc.reference);
-        writes++;
-        if (writes >= _batchWriteLimit) {
-          await batch.commit();
-          batch = _db.batch();
-          writes = 0;
-        }
-      }
-
-      if (writes > 0) {
-        await batch.commit();
-      }
-    }
-  }
+  Future<void> removeFromBlacklist(String email) =>
+      _db.collection('blacklist').doc(email).delete();
 
   // -------- Posts --------
   Stream<List<Map<String, dynamic>>> streamAllPosts({int limit = 100}) {
@@ -329,7 +267,8 @@ class AdminService {
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+        .map((s) =>
+            s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
   }
 
   Future<void> deletePost(String postId) =>

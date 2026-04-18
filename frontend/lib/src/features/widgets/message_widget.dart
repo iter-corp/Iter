@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/chat_service.dart';
+import '../../theme/app_theme.dart';
 
 /// TAB BAR
 class MessageTabBar extends StatelessWidget {
@@ -23,15 +24,15 @@ class MessageTabBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Expanded(child: _tab("All $allCount", 0)),
+          Expanded(child: _tab(context, "All $allCount", 0)),
           const SizedBox(width: 8),
-          Expanded(child: _tab("Requests $requestCount", 1)),
+          Expanded(child: _tab(context, "Requests $requestCount", 1)),
         ],
       ),
     );
   }
 
-  Widget _tab(String label, int index) {
+  Widget _tab(BuildContext context, String label, int index) {
     final bool isActive = selectedTab == index;
     return GestureDetector(
       onTap: () => onTap(index),
@@ -39,14 +40,14 @@ class MessageTabBar extends StatelessWidget {
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFB05ECC) : const Color(0xFFF0F0F0),
+          color: isActive ? const Color(0xFFB05ECC) : context.inputFill,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? Colors.white : Colors.black,
+              color: isActive ? Colors.white : context.textPrimary,
               fontWeight: FontWeight.w600,
               fontSize: 13,
             ),

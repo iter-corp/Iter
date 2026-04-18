@@ -5,10 +5,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/auth_providers.dart';
+import '../../theme/app_theme.dart';
 import '../../providers/comment_providers.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
 import '../model/post_model.dart';
+
+class _ReplyTarget {
+  final String parentCommentId;
+  final String username;
+  const _ReplyTarget({
+    required this.parentCommentId,
+    required this.username,
+  });
+}
 
 class CommentScreen extends ConsumerStatefulWidget {
   final Post post;
@@ -21,7 +31,39 @@ class CommentScreen extends ConsumerStatefulWidget {
 
 class _CommentScreenState extends ConsumerState<CommentScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   bool _sending = false;
+  _ReplyTarget? _replyTo;
+  final Set<String> _expandedParents = <String>{};
+
+  void _startReply(Comment parent) {
+    // For replies-to-replies, still thread under the top-level parent so we
+    // stay at a single nesting level (Instagram-style). Use the @username
+    // prefix to show who is being addressed.
+    final parentId = parent.parentCommentId ?? parent.id;
+    setState(() {
+      _replyTo = _ReplyTarget(
+        parentCommentId: parentId,
+        username: parent.authorUsername,
+      );
+      _expandedParents.add(parentId);
+    });
+    _focusNode.requestFocus();
+  }
+
+  void _cancelReply() {
+    setState(() => _replyTo = null);
+  }
+
+  void _toggleReplies(String parentId) {
+    setState(() {
+      if (_expandedParents.contains(parentId)) {
+        _expandedParents.remove(parentId);
+      } else {
+        _expandedParents.add(parentId);
+      }
+    });
+  }
 
   Future<void> _submit() async {
     final text = _controller.text.trim();
@@ -32,6 +74,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
     final username =
         userDoc?['username'] as String? ?? user.displayName ?? 'user';
     final avatar = userDoc?['avatarUrl'] as String?;
+    final target = _replyTo;
 
     setState(() => _sending = true);
     _controller.clear();
@@ -43,7 +86,10 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
             authorUsername: username,
             authorAvatar: avatar,
             text: text,
+            parentCommentId: target?.parentCommentId,
+            replyToUsername: target?.username,
           );
+      if (mounted) setState(() => _replyTo = null);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -52,6 +98,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -85,7 +132,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: context.borderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -102,13 +149,13 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${commentsAsync.value?.length ?? widget.post.commentsCount}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    style: TextStyle(color: context.textSecondary, fontSize: 14),
                   ),
                 ],
               ),
             ),
 
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
 
             // Comment list
             Expanded(
@@ -117,15 +164,14 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (comments) {
                   if (comments.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text('No comments yet. Be the first!',
-                          style: TextStyle(color: Colors.grey)),
+                          style: TextStyle(color: context.textSecondary)),
                     );
                   }
-<<<<<<< Updated upstream
-=======
 
-                  final tops = comments.where((c) => !c.isReply).toList();
+                  final tops =
+                      comments.where((c) => !c.isReply).toList();
                   final repliesByParent = <String, List<Comment>>{};
                   for (final c in comments) {
                     if (c.parentCommentId != null) {
@@ -135,29 +181,85 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                     }
                   }
 
->>>>>>> Stashed changes
                   return ListView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: comments.length,
-                    itemBuilder: (context, i) =>
-                        _CommentTile(comment: comments[i], post: widget.post),
+                    itemCount: tops.length,
+                    itemBuilder: (context, i) {
+                      final parent = tops[i];
+                      final replies = repliesByParent[parent.id] ?? const [];
+                      final expanded = _expandedParents.contains(parent.id);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _CommentTile(
+                            comment: parent,
+                            post: widget.post,
+                            onReply: () => _startReply(parent),
+                          ),
+                          if (replies.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 56),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _toggleReplies(parent.id),
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 24,
+                                            height: 1,
+                                            color: context.textMuted,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            expanded
+                                                ? 'Hide replies'
+                                                : 'View ${replies.length} '
+                                                    '${replies.length == 1 ? "reply" : "replies"}',
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (expanded)
+                                    ...replies.map(
+                                      (r) => _CommentTile(
+                                        comment: r,
+                                        post: widget.post,
+                                        onReply: () => _startReply(r),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
             ),
 
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
 
-<<<<<<< Updated upstream
-=======
             // Reply target banner
             if (_replyTo != null)
               Container(
                 width: double.infinity,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: const Color(0xFFF5F0F8),
+                color: context.purpleSoft,
                 child: Row(
                   children: [
                     Expanded(
@@ -172,23 +274,20 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                     ),
                     GestureDetector(
                       onTap: _cancelReply,
-                      child:
-                          const Icon(Icons.close, size: 16, color: Colors.grey),
+                      child: Icon(Icons.close,
+                          size: 16, color: context.textSecondary),
                     ),
                   ],
                 ),
               ),
 
->>>>>>> Stashed changes
             // Input
             Padding(
               padding: EdgeInsets.only(
                 left: 12,
                 right: 12,
                 top: 8,
-                bottom: MediaQuery.of(context).viewInsets.bottom +
-                    MediaQuery.of(context).padding.bottom +
-                    12,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
               ),
               child: Row(
                 children: [
@@ -196,13 +295,16 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
+                        color: context.inputFill,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
                         controller: _controller,
-                        decoration: const InputDecoration(
-                          hintText: 'Add a comment...',
+                        focusNode: _focusNode,
+                        decoration: InputDecoration(
+                          hintText: _replyTo != null
+                              ? 'Reply to @${_replyTo!.username}...'
+                              : 'Add a comment...',
                           border: InputBorder.none,
                         ),
                         onSubmitted: (_) => _submit(),
@@ -233,8 +335,13 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
 class _CommentTile extends ConsumerWidget {
   final Comment comment;
   final Post post;
+  final VoidCallback onReply;
 
-  const _CommentTile({required this.comment, required this.post});
+  const _CommentTile({
+    required this.comment,
+    required this.post,
+    required this.onReply,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -242,19 +349,17 @@ class _CommentTile extends ConsumerWidget {
     final canDelete =
         currentUid == comment.authorUid || currentUid == post.authorUid;
 
-<<<<<<< Updated upstream
-=======
     // Pull the author's current avatar/username from their user doc so
     // profile changes are reflected on old comments. Fall back to the
     // snapshot stored in the comment while the stream is loading.
     final liveUser = ref.watch(userByUidProvider(comment.authorUid)).value;
-    final avatar = (liveUser?['avatarUrl'] as String?) ?? comment.authorAvatar;
+    final avatar =
+        (liveUser?['avatarUrl'] as String?) ?? comment.authorAvatar;
     final username =
         (liveUser?['username'] as String?) ?? comment.authorUsername;
     final hasAvatar = avatar != null && avatar.isNotEmpty;
     final avatarRadius = comment.isReply ? 14.0 : 16.0;
 
->>>>>>> Stashed changes
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
@@ -263,20 +368,12 @@ class _CommentTile extends ConsumerWidget {
           GestureDetector(
             onTap: () => openUserProfile(context, uid: comment.authorUid),
             child: CircleAvatar(
-<<<<<<< Updated upstream
-              radius: 16,
-              backgroundImage: (comment.authorAvatar?.isNotEmpty ?? false)
-                  ? CachedNetworkImageProvider(comment.authorAvatar!)
-                  : null,
-              child: (comment.authorAvatar?.isEmpty ?? true)
-                  ? const Icon(Icons.person, size: 16)
-                  : null,
-=======
               radius: avatarRadius,
               backgroundImage:
                   hasAvatar ? CachedNetworkImageProvider(avatar) : null,
-              child: hasAvatar ? null : Icon(Icons.person, size: avatarRadius),
->>>>>>> Stashed changes
+              child: hasAvatar
+                  ? null
+                  : Icon(Icons.person, size: avatarRadius),
             ),
           ),
           const SizedBox(width: 10),
@@ -290,7 +387,7 @@ class _CommentTile extends ConsumerWidget {
                       onTap: () =>
                           openUserProfile(context, uid: comment.authorUid),
                       child: Text(
-                        comment.authorUsername,
+                        username,
                         style: const TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13),
                       ),
@@ -298,12 +395,44 @@ class _CommentTile extends ConsumerWidget {
                     const SizedBox(width: 6),
                     Text(
                       DateFormat('MMM d').format(comment.createdAt),
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                      style: TextStyle(color: context.textMuted, fontSize: 11),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(comment.text, style: const TextStyle(fontSize: 13)),
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 13, color: context.textPrimary),
+                    children: [
+                      if (comment.replyToUsername != null &&
+                          comment.replyToUsername!.isNotEmpty)
+                        TextSpan(
+                          text: '@${comment.replyToUsername} ',
+                          style: const TextStyle(
+                            color: Color(0xFF8A3FB8),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      TextSpan(text: comment.text),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: onReply,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      'Reply',
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -314,9 +443,9 @@ class _CommentTile extends ConsumerWidget {
                     .read(commentServiceProvider)
                     .deleteComment(postId: post.id, commentId: comment.id);
               },
-              child: const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(Icons.close, size: 16, color: Colors.grey),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Icon(Icons.close, size: 16, color: context.textSecondary),
               ),
             ),
         ],

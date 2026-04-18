@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../providers/auth_providers.dart';
+import '../../../theme/app_theme.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -52,7 +53,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -65,8 +66,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 Container(
                   width: 72,
                   height: 72,
-                  decoration: const BoxDecoration(
-                    color: Color.fromARGB(255, 244, 198, 255),
+                  decoration: BoxDecoration(
+                    color: context.purpleSoft,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -76,21 +77,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Sign Up',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Please enter the code we just sent\nto email',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFFAAAAAA),
+                    color: context.textMuted,
                     height: 1.5,
                   ),
                 ),
@@ -129,7 +130,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFEEEE),
+                      color: context.isDark ? const Color(0xFF3D1F1F) : const Color(0xFFFFEEEE),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -168,18 +169,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Row(
+                Row(
                   children: [
-                    Expanded(child: Divider(color: Color(0xFFDDDDDD))),
+                    Expanded(child: Divider(color: context.borderColor)),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
                         'Or',
                         style:
-                            TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                            TextStyle(fontSize: 13, color: context.textMuted),
                       ),
                     ),
-                    Expanded(child: Divider(color: Color(0xFFDDDDDD))),
+                    Expanded(child: Divider(color: context.borderColor)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -198,9 +199,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Already have an account? ',
-                      style: TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                      style: TextStyle(fontSize: 13, color: context.textMuted),
                     ),
                     GestureDetector(
                       onTap: () => context.go('/login'),
@@ -236,11 +237,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       validator: validator,
       keyboardType: keyboardType,
       obscureText: isPassword ? _obscurePassword : false,
-      style: const TextStyle(fontSize: 14, color: Colors.black87),
+      style: TextStyle(fontSize: 14, color: context.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFFAAAAAA)),
-        prefixIcon: Icon(prefixIcon, size: 20, color: const Color(0xFFAAAAAA)),
+        hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+        prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
@@ -248,7 +249,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 20,
-                  color: const Color(0xFFAAAAAA),
+                  color: context.textMuted,
                 ),
                 onPressed: () {
                   setState(() => _obscurePassword = !_obscurePassword);
@@ -260,7 +261,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           borderSide: BorderSide.none,
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: context.cardBg,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
     );
@@ -279,14 +280,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         icon: icon,
         label: Text(
           label,
-          style: const TextStyle(
-            color: Colors.black87,
+          style: TextStyle(
+            color: context.textPrimary,
             fontWeight: FontWeight.w500,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFFDDDDDD)),
+          backgroundColor: context.cardBg,
+          side: BorderSide(color: context.borderColor),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
 import '../widgets/header.dart';
 import '../widgets/post_card.dart';
@@ -12,9 +13,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFFE8EAF0),
-      body: HomeBody(),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: const HomeBody(),
     );
   }
 }
@@ -23,6 +24,15 @@ class HomeBody extends ConsumerWidget {
   final ScrollController? scrollController;
 
   const HomeBody({super.key, this.scrollController});
+
+  Future<void> _refresh(WidgetRef ref) async {
+    ref.invalidate(feedProvider);
+    try {
+      await ref.read(feedProvider.future);
+    } catch (_) {
+      // Swallow — the error state already renders in the list.
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,69 +48,77 @@ class HomeBody extends ConsumerWidget {
         children: [
           const HeaderWidget(),
           Expanded(
-            child: feedAsync.when(
-              loading: () => ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  if (announcement.isNotEmpty)
-                    _AnnouncementBanner(announcement: announcement),
-                  if (maintenance) const _MaintenanceBanner(),
-                  const StoriesList(),
-                  const SizedBox(height: 24),
-                  const Center(child: CircularProgressIndicator()),
-                ],
-              ),
-              error: (e, _) => ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  if (announcement.isNotEmpty)
-                    _AnnouncementBanner(announcement: announcement),
-                  if (maintenance) const _MaintenanceBanner(),
-                  const StoriesList(),
-                  const SizedBox(height: 24),
-                  Center(child: Text('Error: $e')),
-                ],
-              ),
-              data: (posts) {
-                if (posts.isEmpty) {
-                  return ListView(
+            child: RefreshIndicator(
+              onRefresh: () => _refresh(ref),
+              child: feedAsync.when(
+                loading: () => ListView(
+                  controller: scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
+                    if (announcement.isNotEmpty)
+                      _AnnouncementBanner(announcement: announcement),
+                    if (maintenance) const _MaintenanceBanner(),
+                    const StoriesList(),
+                    const SizedBox(height: 24),
+                    const Center(child: CircularProgressIndicator()),
+                  ],
+                ),
+                error: (e, _) => ListView(
+                  controller: scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
+                    if (announcement.isNotEmpty)
+                      _AnnouncementBanner(announcement: announcement),
+                    if (maintenance) const _MaintenanceBanner(),
+                    const StoriesList(),
+                    const SizedBox(height: 24),
+                    Center(child: Text('Error: $e')),
+                  ],
+                ),
+                data: (posts) {
+                  if (posts.isEmpty) {
+                    return ListView(
+                      controller: scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 100),
+                      children: [
+                        if (announcement.isNotEmpty)
+                          _AnnouncementBanner(announcement: announcement),
+                        if (maintenance) const _MaintenanceBanner(),
+                        const StoriesList(),
+                        const SizedBox(height: 24),
+                        const Center(
+                          child: Text('No posts yet. Create the first one!'),
+                        ),
+                      ],
+                    );
+                  }
+                  return CustomScrollView(
                     controller: scrollController,
-                    padding: const EdgeInsets.only(bottom: 100),
-                    children: [
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
                       if (announcement.isNotEmpty)
-                        _AnnouncementBanner(announcement: announcement),
-                      if (maintenance) const _MaintenanceBanner(),
-                      const StoriesList(),
-                      const SizedBox(height: 24),
-                      const Center(
-                        child: Text('No posts yet. Create the first one!'),
+                        SliverToBoxAdapter(
+                          child:
+                              _AnnouncementBanner(announcement: announcement),
+                        ),
+                      if (maintenance)
+                        const SliverToBoxAdapter(child: _MaintenanceBanner()),
+                      const SliverToBoxAdapter(child: StoriesList()),
+                      SliverPadding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 100),
+                        sliver: SliverList.builder(
+                          itemCount: posts.length,
+                          itemBuilder: (context, index) =>
+                              PostCard(post: posts[index]),
+                        ),
                       ),
                     ],
                   );
-                }
-                return CustomScrollView(
-                  controller: scrollController,
-                  slivers: [
-                    if (announcement.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _AnnouncementBanner(announcement: announcement),
-                      ),
-                    if (maintenance)
-                      const SliverToBoxAdapter(child: _MaintenanceBanner()),
-                    const SliverToBoxAdapter(child: StoriesList()),
-                    SliverPadding(
-                      padding: const EdgeInsets.only(top: 8, bottom: 100),
-                      sliver: SliverList.builder(
-                        itemCount: posts.length,
-                        itemBuilder: (context, index) =>
-                            PostCard(post: posts[index]),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
@@ -121,7 +139,7 @@ class _AnnouncementBanner extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F8),
+        color: context.isDark ? const Color(0xFF2D1A30) : const Color(0xFFFFF1F8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFFD044E8).withValues(alpha: 0.3),
@@ -138,9 +156,9 @@ class _AnnouncementBanner extends StatelessWidget {
           Expanded(
             child: Text(
               announcement,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Colors.black87,
+                color: context.textPrimary,
               ),
             ),
           ),
@@ -160,18 +178,18 @@ class _MaintenanceBanner extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: context.isDark ? const Color(0xFF3D2E1A) : Colors.orange.shade50,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.orange.shade300),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
-          SizedBox(width: 8),
+          const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Maintenance mode — some features may be unavailable.',
-              style: TextStyle(fontSize: 13, color: Colors.black87),
+              style: TextStyle(fontSize: 13, color: context.textPrimary),
             ),
           ),
         ],

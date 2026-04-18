@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../theme/app_theme.dart';
+
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key, this.email});
 
@@ -41,7 +43,7 @@ class _OtpScreenState extends State<OtpScreen> {
         : '(400)650-1111';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: context.surfaceSoft,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -53,13 +55,13 @@ class _OtpScreenState extends State<OtpScreen> {
                 child: Container(
                   width: 38,
                   height: 38,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: context.cardBg,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.chevron_left,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                     size: 22,
                   ),
                 ),
@@ -75,7 +77,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     decoration: BoxDecoration(
                       color: index == 1
                           ? const Color(0xFFCE5DE5)
-                          : const Color(0xFFDDDDDD),
+                          : context.borderColor,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   );
@@ -98,13 +100,13 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              const Center(
+              Center(
                 child: Text(
                   'Enter OTP code',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                   ),
                 ),
               ),
@@ -113,9 +115,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 child: Text(
                   'OTP code has been send\nto$destination',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFFAAAAAA),
+                    color: context.textMuted,
                     height: 1.6,
                   ),
                 ),
@@ -134,26 +136,26 @@ class _OtpScreenState extends State<OtpScreen> {
                       keyboardType: TextInputType.number,
                       maxLength: 1,
                       onChanged: (value) => _onChanged(value, index),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: context.textPrimary,
                       ),
                       decoration: InputDecoration(
                         counterText: '',
                         filled: true,
-                        fillColor: const Color(0xFFF5F5F5),
+                        fillColor: context.surfaceSoft,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(50),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFDDDDDD),
+                          borderSide: BorderSide(
+                            color: context.borderColor,
                             width: 1.5,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(50),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFDDDDDD),
+                          borderSide: BorderSide(
+                            color: context.borderColor,
                             width: 1.5,
                           ),
                         ),
@@ -195,17 +197,17 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  const Text(
+                  Text(
                     "Didn't get OTP? ",
-                    style: TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                    style: TextStyle(fontSize: 13, color: context.textMuted),
                   ),
                   GestureDetector(
                     onTap: () {},
-                    child: const Text(
+                    child: Text(
                       'Resend OTP',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.black87,
+                        color: context.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

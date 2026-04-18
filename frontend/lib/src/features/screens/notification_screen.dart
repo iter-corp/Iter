@@ -7,6 +7,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../services/notification_service.dart';
+import '../../theme/app_theme.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
 import 'post_detail_screen.dart';
@@ -21,7 +22,7 @@ class NotificationScreen extends ConsumerWidget {
     final user = ref.watch(authStateProvider).value;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: context.surfaceSoft,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,10 +69,10 @@ class NotificationScreen extends ConsumerWidget {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (notifications) {
                   if (notifications.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         'No notifications yet',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: context.textMuted),
                       ),
                     );
                   }
@@ -125,12 +126,12 @@ class _FollowStateButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           color:
-              isFollowing ? const Color(0xFFE5E5EA) : const Color(0xFFB44FFF),
+              isFollowing ? context.borderColor : const Color(0xFFB44FFF),
         ),
         child: Text(
           isFollowing ? 'Following' : 'Follow back',
           style: TextStyle(
-            color: isFollowing ? Colors.black87 : Colors.white,
+            color: isFollowing ? context.textPrimary : Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),

@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
+
 /// COVER + AVATAR — uses live profile data
 class UserCoverAvatar extends StatelessWidget {
   final String? avatarUrl;

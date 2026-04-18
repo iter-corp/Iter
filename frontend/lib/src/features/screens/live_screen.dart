@@ -26,7 +26,6 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   void _showTitleSheet() {
     showModalBottomSheet(
       context: context,
-      useSafeArea: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _LiveTitleSheet(

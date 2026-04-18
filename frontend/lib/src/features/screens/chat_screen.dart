@@ -9,11 +9,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../navigation/user_profile_nav.dart';
+import '../../theme/app_theme.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
+import '../../providers/event_chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/storage_service.dart';
 import '../model/post_model.dart';
+import '../widgets/message_reactions_bar.dart';
+import '../widgets/poll_widgets.dart';
 import 'post_detail_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -65,6 +69,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _typingTimer?.cancel();
     final uid = _currentUid;
     if (uid == null) return;
+    // Typing indicator is only meaningful in 1:1 chats where otherUid is set.
+    if (widget.otherUid.isEmpty) return;
     if (text.isNotEmpty) {
       ref.read(typingServiceProvider).setTyping(widget.chatId, uid, true);
       _typingTimer = Timer(const Duration(seconds: 2), () {
@@ -141,34 +147,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< Updated upstream
-    final presenceAsync = ref.watch(presenceWatchProvider(widget.otherUid));
-    final typingAsync =
-        ref.watch(typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
-=======
     final chatDocAsync = ref.watch(chatDocProvider(widget.chatId));
     final chatDoc = chatDocAsync.value ?? const <String, dynamic>{};
     final isGroup = (chatDoc['kind'] as String?) == 'group';
     final groupName = (chatDoc['groupName'] as String?) ?? widget.otherName;
-    final participantCount = ((chatDoc['participants'] as List?)?.length ?? 0);
+    final participantCount =
+        ((chatDoc['participants'] as List?)?.length ?? 0);
 
     final presenceAsync =
         isGroup ? null : ref.watch(presenceWatchProvider(widget.otherUid));
     final typingAsync = isGroup
         ? null
-        : ref.watch(typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
->>>>>>> Stashed changes
+        : ref.watch(
+            typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
 
     ref.listen(messagesProvider(widget.chatId), (_, __) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     });
 
-    final isOnline = presenceAsync.whenOrNull(data: (p) => p.online) ?? false;
-    final isTyping = typingAsync.whenOrNull(data: (t) => t) ?? false;
+    final isOnline = presenceAsync?.whenOrNull(data: (p) => p.online) ?? false;
+    final isTyping = typingAsync?.whenOrNull(data: (t) => t) ?? false;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -182,19 +184,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     icon: const Icon(Icons.arrow_back, size: 22),
                   ),
                   GestureDetector(
-                    onTap: _openOtherProfile,
+                    onTap: isGroup ? null : _openOtherProfile,
                     child: Stack(
                       children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundImage: widget.otherAvatar.isNotEmpty
-                              ? NetworkImage(widget.otherAvatar)
-                              : null,
-                          child: widget.otherAvatar.isEmpty
-                              ? const Icon(Icons.person)
-                              : null,
-                        ),
-                        if (isOnline)
+                        isGroup
+                            ? const CircleAvatar(
+                                radius: 18,
+                                backgroundColor: Color(0xFF7E3BE8),
+                                child: Icon(Icons.groups,
+                                    color: Colors.white, size: 20),
+                              )
+                            : CircleAvatar(
+                                radius: 18,
+                                backgroundImage: widget.otherAvatar.isNotEmpty
+                                    ? NetworkImage(widget.otherAvatar)
+                                    : null,
+                                child: widget.otherAvatar.isEmpty
+                                    ? const Icon(Icons.person)
+                                    : null,
+                              ),
+                        if (!isGroup && isOnline)
                           Positioned(
                             right: 0,
                             bottom: 0,
@@ -205,7 +214,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 color: Colors.green,
                                 shape: BoxShape.circle,
                                 border:
-                                    Border.all(color: Colors.white, width: 1.5),
+                                    Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 1.5),
                               ),
                             ),
                           ),
@@ -215,26 +224,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: GestureDetector(
-                      onTap: _openOtherProfile,
+                      onTap: isGroup ? null : _openOtherProfile,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.otherName,
+                            isGroup ? groupName : widget.otherName,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 15),
                           ),
                           Text(
-                            isTyping
-                                ? 'Typing...'
-                                : isOnline
-                                    ? 'Online'
-                                    : 'Offline',
+                            isGroup
+                                ? '$participantCount members'
+                                : (isTyping
+                                    ? 'Typing...'
+                                    : isOnline
+                                        ? 'Online'
+                                        : 'Offline'),
                             style: TextStyle(
-                              color: isTyping ? Colors.purple : Colors.grey,
+                              color: isTyping ? Colors.purple : context.textSecondary,
                               fontSize: 12,
                             ),
                           ),
+                          if (!isGroup && _currentUid != null)
+                            _SharedEventLabel(
+                              meUid: _currentUid!,
+                              otherUid: widget.otherUid,
+                            ),
                         ],
                       ),
                     ),
@@ -251,7 +267,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
 
             // MESSAGES
             Expanded(
@@ -261,9 +277,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 data: (msgs) {
                   final currentUid = _currentUid ?? '';
                   if (msgs.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text('Say hello!',
-                          style: TextStyle(color: Colors.grey)),
+                          style: TextStyle(color: context.textSecondary)),
                     );
                   }
                   return ListView.builder(
@@ -274,10 +290,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     itemBuilder: (context, i) {
                       final msg = msgs[i];
                       return _MessageBubble(
+                        chatId: widget.chatId,
                         msg: msg,
                         isMe: msg.senderUid == currentUid,
                         otherUid: widget.otherUid,
                         otherAvatar: widget.otherAvatar,
+                        isGroup: isGroup,
                       );
                     },
                   );
@@ -285,15 +303,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-<<<<<<< Updated upstream
-=======
-            if (isGroup)
-              PollsSection(
-                parentPath: 'chats/${widget.chatId}',
-                canCreate: true,
-              ),
+            PollsSection(
+              parentPath: 'chats/${widget.chatId}',
+              canCreate: true,
+            ),
 
->>>>>>> Stashed changes
             // INPUT
             Padding(
               padding: const EdgeInsets.all(12),
@@ -308,23 +322,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Color(0xFFB05ECC)),
                           )
-                        : const Icon(Icons.camera_alt_outlined,
-                            color: Colors.grey),
+                        : Icon(Icons.camera_alt_outlined,
+                            color: context.textSecondary),
                   ),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
+                        color: context.inputFill,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
                         controller: _controller,
                         onChanged: _onTextChanged,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Message...',
                           hintStyle:
-                              TextStyle(color: Colors.grey, fontSize: 14),
+                              TextStyle(color: context.textMuted, fontSize: 14),
                           border: InputBorder.none,
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -346,17 +360,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends ConsumerWidget {
+  final String chatId;
   final ChatMessage msg;
   final bool isMe;
   final String otherUid;
   final String otherAvatar;
+  final bool isGroup;
 
   const _MessageBubble({
+    required this.chatId,
     required this.msg,
     required this.isMe,
     required this.otherUid,
     required this.otherAvatar,
+    this.isGroup = false,
   });
 
   String _fmt(DateTime? dt) {
@@ -365,21 +383,20 @@ class _MessageBubble extends StatelessWidget {
   }
 
   @override
-<<<<<<< Updated upstream
-  Widget build(BuildContext context) {
-=======
   Widget build(BuildContext context, WidgetRef ref) {
     // In groups we look up each sender's live profile dynamically. In 1:1
     // chats we reuse the cached otherAvatar passed into the screen.
-    final senderLive =
-        isGroup ? ref.watch(userByUidProvider(msg.senderUid)).value : null;
-    final senderAvatar =
-        isGroup ? ((senderLive?['avatarUrl'] as String?) ?? '') : otherAvatar;
-    final senderName =
-        isGroup ? ((senderLive?['username'] as String?) ?? 'Member') : '';
+    final senderLive = isGroup
+        ? ref.watch(userByUidProvider(msg.senderUid)).value
+        : null;
+    final senderAvatar = isGroup
+        ? ((senderLive?['avatarUrl'] as String?) ?? '')
+        : otherAvatar;
+    final senderName = isGroup
+        ? ((senderLive?['username'] as String?) ?? 'Member')
+        : '';
     final senderUidForTap = isGroup ? msg.senderUid : otherUid;
 
->>>>>>> Stashed changes
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -389,12 +406,12 @@ class _MessageBubble extends StatelessWidget {
         children: [
           if (!isMe) ...[
             GestureDetector(
-              onTap: () => openUserProfile(context, uid: otherUid),
+              onTap: () => openUserProfile(context, uid: senderUidForTap),
               child: CircleAvatar(
                 radius: 16,
                 backgroundImage:
-                    otherAvatar.isNotEmpty ? NetworkImage(otherAvatar) : null,
-                child: otherAvatar.isEmpty
+                    senderAvatar.isNotEmpty ? NetworkImage(senderAvatar) : null,
+                child: senderAvatar.isEmpty
                     ? const Icon(Icons.person, size: 16)
                     : null,
               ),
@@ -405,22 +422,6 @@ class _MessageBubble extends StatelessWidget {
             crossAxisAlignment:
                 isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-<<<<<<< Updated upstream
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? const Color(0xFFB05ECC)
-                        : const Color(0xFFF0F0F0),
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMe ? 16 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 16),
-=======
               if (isGroup && !isMe)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 2, left: 4),
@@ -429,7 +430,7 @@ class _MessageBubble extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
+                      color: context.textSecondary,
                     ),
                   ),
                 ),
@@ -441,77 +442,73 @@ class _MessageBubble extends StatelessWidget {
                   messageId: msg.id,
                 ),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? const Color(0xFFB05ECC)
-                          : const Color(0xFFF0F0F0),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
-                      ),
->>>>>>> Stashed changes
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? const Color(0xFFB05ECC)
+                        : context.inputFill,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isMe ? 16 : 4),
+                      bottomRight: Radius.circular(isMe ? 4 : 16),
                     ),
-                    child: (msg.sharedPostId != null &&
-                            msg.sharedPostId!.isNotEmpty)
-                        ? _SharedPostPreview(
-                            postId: msg.sharedPostId!,
-                            isMe: isMe,
-                          )
-                        : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: CachedNetworkImage(
-                                      imageUrl: msg.imageUrl!,
-                                      width: 240,
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, __) => const SizedBox(
-                                        height: 180,
-                                        child: Center(
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2),
-                                        ),
+                  ),
+                  child: (msg.sharedPostId != null &&
+                          msg.sharedPostId!.isNotEmpty)
+                      ? _SharedPostPreview(
+                          postId: msg.sharedPostId!,
+                          isMe: isMe,
+                        )
+                      : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: CachedNetworkImage(
+                                    imageUrl: msg.imageUrl!,
+                                    width: 240,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => const SizedBox(
+                                      height: 180,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
                                       ),
                                     ),
                                   ),
-                                  if (msg.text.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      msg.text,
-                                      style: TextStyle(
-                                        color:
-                                            isMe ? Colors.white : Colors.black,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              )
-                            : Text(
-                                msg.text,
-                                style: TextStyle(
-                                  color: isMe ? Colors.white : Colors.black,
-                                  fontSize: 14,
                                 ),
+                                if (msg.text.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    msg.text,
+                                    style: TextStyle(
+                                      color:
+                                          isMe ? Colors.white : context.textPrimary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            )
+                          : Text(
+                              msg.text,
+                              style: TextStyle(
+                                color: isMe ? Colors.white : context.textPrimary,
+                                fontSize: 14,
                               ),
-                  ),
+                            ),
                 ),
               ),
-<<<<<<< Updated upstream
-=======
+              ),
               MessageReactionsRow(
                 parentPath: 'chats/$chatId/messages',
                 messageId: msg.id,
               ),
->>>>>>> Stashed changes
               if (msg.sharedPostId != null &&
                   msg.sharedPostId!.isNotEmpty &&
                   msg.text.trim().isNotEmpty) ...[
@@ -521,7 +518,7 @@ class _MessageBubble extends StatelessWidget {
                   child: Text(
                     msg.text,
                     style: TextStyle(
-                      color: Colors.grey.shade700,
+                      color: context.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -532,13 +529,13 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   Text(
                     _fmt(msg.createdAt),
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    style: TextStyle(color: context.textMuted, fontSize: 11),
                   ),
                   if (isMe && msg.seenBy.length > 1) ...[
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       'Seen',
-                      style: TextStyle(color: Colors.grey, fontSize: 11),
+                      style: TextStyle(color: context.textMuted, fontSize: 11),
                     ),
                   ],
                 ],
@@ -596,12 +593,12 @@ class _SharedPostPreview extends StatelessWidget {
           child: Container(
             width: 240,
             decoration: BoxDecoration(
-              color: isMe ? Colors.white.withValues(alpha: 0.12) : Colors.white,
+              color: isMe ? Colors.white.withValues(alpha: 0.12) : context.cardBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isMe
                     ? Colors.white.withValues(alpha: 0.35)
-                    : Colors.grey.shade300,
+                    : context.borderColor,
               ),
             ),
             child: Column(
@@ -628,7 +625,7 @@ class _SharedPostPreview extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
-                          color: isMe ? Colors.white : Colors.black,
+                          color: isMe ? Colors.white : context.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -638,7 +635,7 @@ class _SharedPostPreview extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isMe ? Colors.white : Colors.black87,
+                          color: isMe ? Colors.white : context.textSecondary,
                         ),
                       ),
                     ],
@@ -653,8 +650,6 @@ class _SharedPostPreview extends StatelessWidget {
   }
 }
 
-<<<<<<< Updated upstream
-=======
 /// Shows "Member of <EventTitle>" under the username when the two users
 /// share at least one event group chat. Hidden otherwise.
 class _SharedEventLabel extends ConsumerWidget {
@@ -667,7 +662,9 @@ class _SharedEventLabel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final key = '$meUid|$otherUid';
     final async = ref.watch(sharedEventProvider(key));
-    final shared = async.valueOrNull;
+    // Silently hide on error (e.g. permission-denied from collectionGroup).
+    if (async.hasError || !async.hasValue) return const SizedBox.shrink();
+    final shared = async.value;
     if (shared == null) return const SizedBox.shrink();
     final title = shared['eventTitle'] ?? '';
     if (title.isEmpty) return const SizedBox.shrink();
@@ -676,7 +673,7 @@ class _SharedEventLabel extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5E8FA),
+          color: context.purpleSoft,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -701,4 +698,4 @@ class _SharedEventLabel extends ConsumerWidget {
     );
   }
 }
->>>>>>> Stashed changes
+

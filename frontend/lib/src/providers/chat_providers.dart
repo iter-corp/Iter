@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/chat_service.dart';
@@ -33,6 +34,17 @@ final acceptedInboxProvider = StreamProvider<List<ChatConversation>>((ref) {
 final messagesProvider =
     StreamProvider.family<List<ChatMessage>, String>((ref, chatId) {
   return ref.watch(chatServiceProvider).streamMessages(chatId);
+});
+
+/// Raw chat doc stream — used by the chat screen to detect group vs
+/// direct, and to render the correct header.
+final chatDocProvider =
+    StreamProvider.family<Map<String, dynamic>?, String>((ref, chatId) {
+  return FirebaseFirestore.instance
+      .collection('chats')
+      .doc(chatId)
+      .snapshots()
+      .map((s) => s.data());
 });
 
 /// Whether [otherUid] is typing in [chatId].

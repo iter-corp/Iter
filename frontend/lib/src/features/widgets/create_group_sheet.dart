@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
+import '../../theme/app_theme.dart';
 import '../screens/chat_screen.dart';
 
 /// Opens a bottom sheet that lets the signed-in user create a new group chat
@@ -13,9 +14,8 @@ import '../screens/chat_screen.dart';
 Future<void> showCreateGroupSheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
-    useSafeArea: true,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: context.cardBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -114,7 +114,8 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'New group',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -126,7 +127,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   decoration: InputDecoration(
                     hintText: 'Group name',
                     filled: true,
-                    fillColor: const Color(0xFFF0F0F0),
+                    fillColor: context.inputFill,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(
@@ -210,8 +211,8 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                           : Text(
                               'Create'
                               '${_selected.isEmpty ? '' : ' (${_selected.length})'}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600),
                             ),
                     ),
                   ),
@@ -239,8 +240,10 @@ class _UserRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream:
-          FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots(),
       builder: (context, snap) {
         final d = snap.data?.data() ?? {};
         final username = (d['username'] as String?) ?? uid;
@@ -252,8 +255,9 @@ class _UserRow extends ConsumerWidget {
           secondary: CircleAvatar(
             radius: 20,
             backgroundColor: Colors.grey.shade200,
-            backgroundImage:
-                avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
+            backgroundImage: avatar.isNotEmpty
+                ? CachedNetworkImageProvider(avatar)
+                : null,
             child: avatar.isEmpty
                 ? const Icon(Icons.person, color: Colors.grey)
                 : null,

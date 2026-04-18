@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/poll_providers.dart';
 import '../../services/poll_service.dart';
+import '../../theme/app_theme.dart';
 
 /// Bottom sheet to create a new poll. Caller supplies [parentPath] — either
 /// "chats/{id}" or "eventChats/{id}".
@@ -13,9 +14,8 @@ Future<void> showCreatePollSheet(
 }) {
   return showModalBottomSheet(
     context: context,
-    useSafeArea: true,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: context.cardBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -85,13 +85,10 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final bottomInset = mediaQuery.viewInsets.bottom;
-    final bottomSafe = mediaQuery.viewPadding.bottom;
-    final paddingBottom = bottomInset > 0 ? bottomInset : bottomSafe;
-
     return Padding(
-      padding: EdgeInsets.only(bottom: paddingBottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
@@ -111,7 +108,8 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
               ),
               const SizedBox(height: 14),
               const Text('Create poll',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  style:
+                      TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               TextField(
                 controller: _questionCtrl,
@@ -160,8 +158,8 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                       description: 'Voters visible',
                       icon: Icons.public,
                       active: _visibility == PollVisibility.public,
-                      onTap: () =>
-                          setState(() => _visibility = PollVisibility.public),
+                      onTap: () => setState(
+                          () => _visibility = PollVisibility.public),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -171,8 +169,8 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                       description: 'Only counts visible',
                       icon: Icons.lock_outline,
                       active: _visibility == PollVisibility.secret,
-                      onTap: () =>
-                          setState(() => _visibility = PollVisibility.secret),
+                      onTap: () => setState(
+                          () => _visibility = PollVisibility.secret),
                     ),
                   ),
                 ],
@@ -211,7 +209,7 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
   InputDecoration _decoration(String hint) => InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: const Color(0xFFF0F0F0),
+        fillColor: context.inputFill,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
@@ -243,10 +241,13 @@ class _VisibilityChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFF5E8FA) : const Color(0xFFF7F7FB),
+          color:
+              active ? context.purpleSoft : context.surfaceSoft,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: active ? const Color(0xFFB05ECC) : const Color(0xFFEDEDF2),
+            color: active
+                ? const Color(0xFFB05ECC)
+                : context.borderColor,
           ),
         ),
         child: Column(
@@ -254,9 +255,12 @@ class _VisibilityChip extends StatelessWidget {
           children: [
             Icon(icon,
                 size: 18,
-                color: active ? const Color(0xFFB05ECC) : Colors.grey.shade600),
+                color: active
+                    ? const Color(0xFFB05ECC)
+                    : Colors.grey.shade600),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(label,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
             Text(description,
                 style: const TextStyle(fontSize: 11, color: Colors.grey)),
@@ -289,8 +293,8 @@ class PollsSection extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFEDEDF2))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.borderColor)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,7 +304,8 @@ class PollsSection extends ConsumerWidget {
               const Icon(Icons.bar_chart, size: 16, color: Color(0xFFB05ECC)),
               const SizedBox(width: 6),
               const Text('Polls',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (canCreate)
                 TextButton.icon(
@@ -345,9 +350,9 @@ class PollTile extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F7FB),
+        color: context.surfaceSoft,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEDEDF2)),
+        border: Border.all(color: context.borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,10 +366,12 @@ class PollTile extends ConsumerWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color:
-                      isSecret ? Colors.grey.shade200 : const Color(0xFFF5E8FA),
+                  color: isSecret
+                      ? Colors.grey.shade200
+                      : context.purpleSoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -462,13 +469,13 @@ class _PollOptionRow extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: isMine
                         ? const Color(0xFFB05ECC)
-                        : const Color(0xFFEDEDF2),
+                        : context.borderColor,
                   ),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -485,13 +492,16 @@ class _PollOptionRow extends StatelessWidget {
                         label,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight:
-                              isMine ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isMine
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
                     Text(
-                      total == 0 ? '0%' : '${(pct * 100).round()}%',
+                      total == 0
+                          ? '0%'
+                          : '${(pct * 100).round()}%',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

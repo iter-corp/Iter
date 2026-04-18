@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
@@ -22,6 +23,16 @@ class PostCard extends ConsumerStatefulWidget {
 class _PostCardState extends ConsumerState<PostCard> {
   // Optimistic UI: non-null while a like toggle is in-flight.
   bool? _pendingLike;
+
+  // Carousel state for multi-image posts.
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   Future<void> _toggleLike() async {
     final currentLiked =
@@ -48,6 +59,9 @@ class _PostCardState extends ConsumerState<PostCard> {
     final currentUid = ref.watch(authStateProvider).value?.uid;
     final isOwner = currentUid != null && currentUid == post.authorUid;
 
+    final imageCount = post.imageUrls.length;
+    final isMulti = imageCount > 1;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Stack(
@@ -55,21 +69,45 @@ class _PostCardState extends ConsumerState<PostCard> {
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: hasImage
-                ? GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ImageViewerScreen(
-                          urls: post.imageUrls,
-                        ),
-                      ),
-                    ),
-                    child: CachedNetworkImage(
-                      imageUrl: post.imageUrls.first,
-                      height: 400,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
+                ? SizedBox(
+                    height: 400,
+                    width: double.infinity,
+                    child: isMulti
+                        ? PageView.builder(
+                            controller: _pageController,
+                            itemCount: imageCount,
+                            onPageChanged: (i) =>
+                                setState(() => _currentPage = i),
+                            itemBuilder: (_, i) => GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ImageViewerScreen(
+                                    urls: post.imageUrls,
+                                    initialIndex: i,
+                                  ),
+                                ),
+                              ),
+                              child: CachedNetworkImage(
+                                imageUrl: post.imageUrls[i],
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          )
+                        : GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ImageViewerScreen(
+                                  urls: post.imageUrls,
+                                ),
+                              ),
+                            ),
+                            child: CachedNetworkImage(
+                              imageUrl: post.imageUrls.first,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                   )
                 : Container(
                     height: 400,
@@ -107,6 +145,15 @@ class _PostCardState extends ConsumerState<PostCard> {
               top: 12,
               right: 12,
               child: _OwnerMenu(post: post, ref: ref),
+            ),
+          if (isMulti)
+            Positioned(
+              top: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _PageDots(count: imageCount, activeIndex: _currentPage),
+              ),
             ),
           Positioned(
             top: 12,
@@ -161,16 +208,6 @@ class _PostCardState extends ConsumerState<PostCard> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isMulti) ...[
-                  Align(
-                    alignment: Alignment.center,
-                    child: _PageDots(
-                      count: imageCount,
-                      activeIndex: _currentPage,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
                 Row(
                   children: [
                     GestureDetector(
@@ -192,9 +229,8 @@ class _PostCardState extends ConsumerState<PostCard> {
                     GestureDetector(
                       onTap: () => showModalBottomSheet(
                         context: context,
-                        useSafeArea: true,
                         isScrollControlled: true,
-                        backgroundColor: Colors.white,
+                        backgroundColor: context.cardBg,
                         shape: const RoundedRectangleBorder(
                           borderRadius:
                               BorderRadius.vertical(top: Radius.circular(20)),
@@ -255,8 +291,7 @@ class _PostCardState extends ConsumerState<PostCard> {
   void _showFullCaption(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -319,9 +354,8 @@ class _PostCardState extends ConsumerState<PostCard> {
 
     showModalBottomSheet(
       context: context,
-      useSafeArea: true,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -593,8 +627,6 @@ class _OwnerMenu extends StatelessWidget {
     }
   }
 }
-<<<<<<< Updated upstream
-=======
 
 class _PageDots extends StatelessWidget {
   final int count;
@@ -621,8 +653,9 @@ class _PageDots extends StatelessWidget {
             height: isActive ? 7 : 5,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color:
-                  isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
+              color: isActive
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.5),
             ),
           );
         }),
@@ -630,4 +663,3 @@ class _PageDots extends StatelessWidget {
     );
   }
 }
->>>>>>> Stashed changes

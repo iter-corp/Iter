@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../providers/auth_providers.dart';
+import '../../../theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,8 +21,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passCtrl = TextEditingController();
   bool _loading = false;
   bool _googleLoading = false;
+  bool _appleLoading = false;
   bool _obscurePassword = true;
   String? _error;
+
+  final bool _isIOS = Platform.isIOS;
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _appleLoading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authServiceProvider).signInWithApple();
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = e.message ?? 'Apple sign-in failed');
+    } catch (e) {
+      setState(() => _error = 'Apple sign-in failed: $e');
+    } finally {
+      if (mounted) setState(() => _appleLoading = false);
+    }
+  }
 
   Future<void> _signInWithGoogle() async {
     setState(() {
@@ -65,7 +87,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -78,8 +100,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Container(
                   width: 72,
                   height: 72,
-                  decoration: const BoxDecoration(
-                    color: Color.fromARGB(255, 244, 198, 255),
+                  decoration: BoxDecoration(
+                    color: context.purpleSoft,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -89,21 +111,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Sign In',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Please enter the code we just sent\nto email',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFFAAAAAA),
+                    color: context.textMuted,
                     height: 1.5,
                   ),
                 ),
@@ -145,7 +167,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFEEEE),
+                      color: context.isDark ? const Color(0xFF3D1F1F) : const Color(0xFFFFEEEE),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -184,18 +206,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Row(
+                Row(
                   children: [
-                    Expanded(child: Divider(color: Color(0xFFDDDDDD))),
+                    Expanded(child: Divider(color: context.borderColor)),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
                         'Or',
                         style:
-                            TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                            TextStyle(fontSize: 13, color: context.textMuted),
                       ),
                     ),
-                    Expanded(child: Divider(color: Color(0xFFDDDDDD))),
+                    Expanded(child: Divider(color: context.borderColor)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -212,13 +234,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       : _buildSocialBadge('G', const Color(0xFF4285F4)),
                   onTap: _googleLoading ? () {} : _signInWithGoogle,
                 ),
+                if (_isIOS) ...[
+                  const SizedBox(height: 12),
+                  _buildSocialButton(
+                    label: _appleLoading
+                        ? 'Signing in...'
+                        : 'Sign In with Apple',
+                    icon: _appleLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.apple, size: 24, color: context.textPrimary),
+                    onTap: _appleLoading ? () {} : _signInWithApple,
+                  ),
+                ],
                 const SizedBox(height: 30),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       "Don't have account? ",
-                      style: TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                      style: TextStyle(fontSize: 13, color: context.textMuted),
                     ),
                     GestureDetector(
                       onTap: () => context.push('/signup'),
@@ -252,11 +290,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       controller: controller,
       validator: validator,
       obscureText: isPassword ? _obscurePassword : false,
-      style: const TextStyle(fontSize: 14, color: Colors.black87),
+      style: TextStyle(fontSize: 14, color: context.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFFAAAAAA)),
-        prefixIcon: Icon(prefixIcon, size: 20, color: const Color(0xFFAAAAAA)),
+        hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+        prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
@@ -264,7 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 20,
-                  color: const Color(0xFFAAAAAA),
+                  color: context.textMuted,
                 ),
                 onPressed: () {
                   setState(() => _obscurePassword = !_obscurePassword);
@@ -276,7 +314,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           borderSide: BorderSide.none,
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: context.cardBg,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
     );
@@ -295,14 +333,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         icon: icon,
         label: Text(
           label,
-          style: const TextStyle(
-            color: Colors.black87,
+          style: TextStyle(
+            color: context.textPrimary,
             fontWeight: FontWeight.w500,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFFDDDDDD)),
+          backgroundColor: context.cardBg,
+          side: BorderSide(color: context.borderColor),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

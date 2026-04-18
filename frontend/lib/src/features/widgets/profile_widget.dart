@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../theme/app_theme.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/edit_profile.dart';
 
@@ -20,7 +22,7 @@ class ProfileCoverAvatar extends StatelessWidget {
           width: double.infinity,
           child: coverUrl != null
               ? CachedNetworkImage(imageUrl: coverUrl!, fit: BoxFit.cover)
-              : Container(color: const Color(0xFFF0F0F0)),
+              : Container(color: context.inputFill),
         ),
         Positioned(
           bottom: -40,
@@ -29,9 +31,9 @@ class ProfileCoverAvatar extends StatelessWidget {
           child: Center(
             child: Container(
               padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
+                color: context.cardBg,
               ),
               child: CircleAvatar(
                 radius: 40,
@@ -65,9 +67,9 @@ class ProfileNameBio extends StatelessWidget {
         children: [
           Text(name,
               style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textPrimary)),
           const SizedBox(height: 4),
-          Text(bio, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text(bio, style: TextStyle(fontSize: 13, color: context.textSecondary)),
         ],
       ),
     );
@@ -113,13 +115,13 @@ class ProfileStats extends StatelessWidget {
     return '$n';
   }
 
-  Widget _statItem(String value, String label, VoidCallback? onTap) {
+  Widget _statItem(String value, String label, VoidCallback? onTap, BuildContext context) {
     final content = Column(
       children: [
         Text(value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textPrimary)),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label, style: TextStyle(fontSize: 12, color: context.textSecondary)),
       ],
     );
 
@@ -128,8 +130,8 @@ class ProfileStats extends StatelessWidget {
         onTap: onTap, borderRadius: BorderRadius.circular(8), child: content);
   }
 
-  Widget _divider() =>
-      Container(width: 1, height: 36, color: Colors.grey.shade300);
+  Widget _divider(BuildContext context) =>
+      Container(width: 1, height: 36, color: context.borderColor);
 }
 
 /// EDIT PROFILE + SETTING BUTTONS

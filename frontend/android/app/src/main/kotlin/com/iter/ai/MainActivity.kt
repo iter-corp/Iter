@@ -1,4 +1,4 @@
-package com.team.coil
+package com.iter.ai
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,21 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../navigation/user_profile_nav.dart';
 import '../../providers/chat_providers.dart';
+import '../../theme/app_theme.dart';
+import '../../providers/event_chat_providers.dart';
 import '../../services/chat_service.dart';
+import '../../services/event_chat_service.dart';
+import '../widgets/create_group_sheet.dart';
 import '../widgets/message_widget.dart';
 import 'chat_screen.dart';
+import 'event_chat_screen.dart';
 import 'request_screen.dart';
+
+/// Unified row in the chat list — either a 1:1 chat or an event group chat.
+sealed class InboxRow {
+  DateTime? get sortTime;
+}
+
+class OneToOneRow extends InboxRow {
+  final ChatConversation conv;
+  OneToOneRow(this.conv);
+  @override
+  DateTime? get sortTime => conv.lastTime;
+}
+
+class EventRow extends InboxRow {
+  final EventChatSummary chat;
+  EventRow(this.chat);
+  @override
+  DateTime? get sortTime => chat.lastTime;
+}
 
 class MessageScreen extends StatelessWidget {
   const MessageScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: MessageBody(),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: const MessageBody(),
     );
   }
 }
@@ -52,77 +75,80 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
         builder: (_) => ChatScreen(
           chatId: conv.chatId,
           otherUid: conv.otherUid,
-<<<<<<< Updated upstream
-          otherName: conv.otherUsername,
-          otherAvatar: conv.otherAvatarUrl,
-=======
           otherName: conv.isGroup ? conv.groupName : conv.otherUsername,
-          otherAvatar: conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl,
->>>>>>> Stashed changes
+          otherAvatar:
+              conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl,
         ),
       ),
     );
+  }
+
+  void _openEventChat(EventChatSummary chat) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventChatScreen(
+          eventId: chat.eventId,
+          eventTitle: chat.eventTitle,
+          adminUid: chat.adminUid,
+        ),
+      ),
+    );
+  }
+
+  bool _matchesEvent(EventChatSummary c) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return c.eventTitle.toLowerCase().contains(q) ||
+        c.lastMessage.toLowerCase().contains(q);
   }
 
   @override
   Widget build(BuildContext context) {
     final acceptedInboxAsync = ref.watch(acceptedInboxProvider);
     final requestsAsync = ref.watch(requestsProvider);
-<<<<<<< Updated upstream
-    final allConvs = (acceptedInboxAsync.value ?? []).where(_matches).toList();
-    final requestConvs = (requestsAsync.value ?? []).where(_matches).toList();
-=======
     final eventChatsAsync = ref.watch(myEventChatsProvider);
 
-    final oneToOne =
-        (acceptedInboxAsync.valueOrNull ?? []).where(_matches).toList();
+    final oneToOne = (acceptedInboxAsync.value ?? []).where(_matches).toList();
     final eventRows =
-        (eventChatsAsync.valueOrNull ?? []).where(_matchesEvent).toList();
-    final requestConvs =
-        (requestsAsync.valueOrNull ?? []).where(_matches).toList();
->>>>>>> Stashed changes
+        (eventChatsAsync.value ?? []).where(_matchesEvent).toList();
+    final requestConvs = (requestsAsync.value ?? []).where(_matches).toList();
+
+    // Merge + sort by lastTime (newest first).
+    final merged = <InboxRow>[
+      ...oneToOne.map((c) => OneToOneRow(c)),
+      ...eventRows.map((c) => EventRow(c)),
+    ];
+    merged.sort((a, b) {
+      if (a.sortTime == null) return 1;
+      if (b.sortTime == null) return -1;
+      return b.sortTime!.compareTo(a.sortTime!);
+    });
 
     return SafeArea(
       child: Column(
         children: [
-          // ── Search bar ──────────────────────────────────────────────
+          // ── Search bar + New group ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-<<<<<<< Updated upstream
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F0F0),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (v) => setState(() => _query = v),
-                decoration: const InputDecoration(
-                  hintText: 'Search...',
-                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                  border: InputBorder.none,
-                  icon: Icon(Icons.search, color: Colors.grey),
-                ),
-              ),
-=======
             child: Row(
               children: [
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0F0F0),
+                      color: context.inputFill,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (v) => setState(() => _query = v),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Search...',
-                        hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                        hintStyle:
+                            TextStyle(color: context.textMuted, fontSize: 14),
                         border: InputBorder.none,
-                        icon: Icon(Icons.search, color: Colors.grey),
+                        icon: Icon(Icons.search, color: context.textSecondary),
                       ),
                     ),
                   ),
@@ -135,8 +161,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                     onTap: () => showCreateGroupSheet(context),
                     borderRadius: BorderRadius.circular(12),
                     child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
                       child: Icon(
                         Icons.group_add_outlined,
                         color: Colors.white,
@@ -146,40 +172,17 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                   ),
                 ),
               ],
->>>>>>> Stashed changes
             ),
           ),
 
           // ── Tab bar ─────────────────────────────────────────────────
           MessageTabBar(
             selectedTab: selectedTab,
-            allCount: allConvs.length,
+            allCount: merged.length,
             requestCount: requestConvs.length,
             onTap: (i) => setState(() => selectedTab = i),
           ),
           const SizedBox(height: 8),
-
-          // ── Info banner for event chats initialization ────────────────
-          if (eventChatsAsync.isLoading)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: const Color(0xFFF0F7FF),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFF0066CC), size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Event chats are initializing...',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF0066CC),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
           // ── Conversation list ────────────────────────────────────────
           Expanded(
@@ -189,21 +192,33 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                         const Center(child: CircularProgressIndicator()),
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (_) {
-                      if (allConvs.isEmpty) {
-                        return const Center(
+                      if (merged.isEmpty) {
+                        return Center(
                           child: Text(
                             'No messages yet',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         );
                       }
                       return ListView.builder(
                         padding: const EdgeInsets.only(bottom: 100),
-                        itemCount: allConvs.length,
-                        itemBuilder: (_, i) => _ConvTile(
-                          conv: allConvs[i],
-                          onTap: () => _openChat(allConvs[i]),
-                        ),
+                        itemCount: merged.length,
+                        itemBuilder: (_, i) {
+                          final row = merged[i];
+                          if (row is OneToOneRow) {
+                            return _ConvTile(
+                              conv: row.conv,
+                              onTap: () => _openChat(row.conv),
+                            );
+                          }
+                          if (row is EventRow) {
+                            return _EventConvTile(
+                              chat: row.chat,
+                              onTap: () => _openEventChat(row.chat),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
                       );
                     },
                   )
@@ -237,48 +252,30 @@ class _ConvTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayName = conv.isGroup ? conv.groupName : conv.otherUsername;
+    final displayAvatar =
+        conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl;
     return ListTile(
       onTap: onTap,
-<<<<<<< Updated upstream
-      leading: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => openUserProfile(context, uid: conv.otherUid),
-        child: CircleAvatar(
-          radius: 26,
-          backgroundColor: Colors.grey.shade200,
-          backgroundImage: conv.otherAvatarUrl.isNotEmpty
-              ? NetworkImage(conv.otherAvatarUrl)
-              : null,
-          child: conv.otherAvatarUrl.isEmpty
-              ? const Icon(Icons.person, color: Colors.white)
-              : null,
-        ),
-      ),
-      title: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => openUserProfile(context, uid: conv.otherUid),
-        child: Text(
-          conv.otherUsername,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-=======
       leading: conv.isGroup
           ? CircleAvatar(
               radius: 26,
               backgroundColor: const Color(0xFF7E3BE8),
-              backgroundImage:
-                  displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
+              backgroundImage: displayAvatar.isNotEmpty
+                  ? NetworkImage(displayAvatar)
+                  : null,
               child: displayAvatar.isEmpty
                   ? const Icon(Icons.groups, color: Colors.white)
                   : null,
             )
           : CircleAvatar(
               radius: 26,
-              backgroundColor: Colors.grey.shade200,
-              backgroundImage:
-                  displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
+              backgroundColor: context.inputFill,
+              backgroundImage: displayAvatar.isNotEmpty
+                  ? NetworkImage(displayAvatar)
+                  : null,
               child: displayAvatar.isEmpty
-                  ? const Icon(Icons.person, color: Colors.white)
+                  ? Icon(Icons.person, color: context.textSecondary)
                   : null,
             ),
       title: Row(
@@ -286,7 +283,8 @@ class _ConvTile extends StatelessWidget {
           Flexible(
             child: Text(
               displayName,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600, fontSize: 14),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -310,11 +308,10 @@ class _ConvTile extends StatelessWidget {
             ),
           ],
         ],
->>>>>>> Stashed changes
       ),
       subtitle: Text(
         conv.lastMessage,
-        style: const TextStyle(color: Colors.grey, fontSize: 12),
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -331,9 +328,80 @@ class _ConvTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-          const Icon(Icons.camera_alt_outlined, size: 20, color: Colors.grey),
+          Icon(Icons.camera_alt_outlined, size: 20, color: context.textSecondary),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Event group chat tile
+// ─────────────────────────────────────────────
+
+class _EventConvTile extends StatelessWidget {
+  final EventChatSummary chat;
+  final VoidCallback onTap;
+
+  const _EventConvTile({required this.chat, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = chat.lastMessage.isEmpty ? 'Event group' : chat.lastMessage;
+    return ListTile(
+      onTap: onTap,
+      leading: const CircleAvatar(
+        radius: 26,
+        backgroundColor: Color(0xFFB05ECC),
+        child: Icon(Icons.groups, color: Colors.white),
+      ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              chat.eventTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: context.purpleSoft,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'EVENT',
+              style: TextStyle(
+                fontSize: 9,
+                color: Color(0xFFB05ECC),
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        preview,
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: chat.unreadCount > 0
+          ? Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Color(0xFFB05ECC),
+                shape: BoxShape.circle,
+              ),
+            )
+          : null,
     );
   }
 }

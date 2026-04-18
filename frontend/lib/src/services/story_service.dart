@@ -89,9 +89,19 @@ class StoryService {
     final now = Timestamp.fromDate(DateTime.now());
     return _col.where('expiresAt', isGreaterThan: now).snapshots().map((s) {
       final stories = s.docs.map(Story.fromDoc).toList();
+      // Oldest first so new stories play last (Instagram-style).
       stories.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return stories;
     });
+  }
+
+  /// Checks whether the current user has viewed a specific story.
+  Future<bool> hasViewed(String storyId) async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    final doc =
+        await _col.doc(storyId).collection('viewers').doc(user.uid).get();
+    return doc.exists;
   }
 
   Future<void> deleteStory(String storyId) async {
@@ -101,13 +111,10 @@ class StoryService {
     await _col.doc(storyId).delete();
   }
 
-  Future<void> recordView(String storyId) async {
+  Future<void> recordView(String storyId, {required String authorUid}) async {
     final user = _auth.currentUser;
     if (user == null) return;
-
-    final storySnap = await _col.doc(storyId).get();
-    final authorUid = storySnap.data()?['authorUid'] as String?;
-    if (authorUid == null || authorUid == user.uid) return;
+    if (authorUid.isEmpty || authorUid == user.uid) return;
 
     final viewerRef = _col.doc(storyId).collection('viewers').doc(user.uid);
     final existing = await viewerRef.get();
@@ -124,7 +131,11 @@ class StoryService {
   }
 
   Stream<List<StoryViewer>> streamViewers(String storyId) {
-    return _col.doc(storyId).collection('viewers').snapshots().map((s) {
+    return _col
+        .doc(storyId)
+        .collection('viewers')
+        .snapshots()
+        .map((s) {
       final viewers = s.docs.map(StoryViewer.fromDoc).toList();
       viewers.sort((a, b) {
         final av = a.viewedAt;

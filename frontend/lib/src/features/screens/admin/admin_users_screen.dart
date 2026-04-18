@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/admin_providers.dart';
+import '../../../theme/app_theme.dart';
 
 class AdminUsersScreen extends ConsumerStatefulWidget {
   const AdminUsersScreen({super.key});
@@ -18,11 +19,11 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
   Widget build(BuildContext context) {
     final usersAsync = ref.watch(adminUsersProvider(_query));
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: context.surfaceSoft,
       appBar: AppBar(
         title: const Text('Users'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: Column(
@@ -35,7 +36,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                 prefixIcon: const Icon(Icons.search),
                 hintText: 'Search by username or email',
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: context.cardBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey.shade300),
@@ -45,13 +46,14 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
           ),
           Expanded(
             child: usersAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (users) {
                 if (users.isEmpty) {
-                  return const Center(
+                  return Center(
                       child: Text('No users match',
-                          style: TextStyle(color: Colors.grey)));
+                          style: TextStyle(color: context.textSecondary)));
                 }
                 return ListView.separated(
                   itemCount: users.length,
@@ -132,7 +134,7 @@ class _UserTile extends ConsumerWidget {
       subtitle: Text(email,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          style: TextStyle(color: context.textSecondary, fontSize: 12)),
       trailing: PopupMenuButton<String>(
         icon: const Icon(Icons.more_vert),
         onSelected: (action) =>
@@ -140,14 +142,11 @@ class _UserTile extends ConsumerWidget {
         itemBuilder: (_) => [
           PopupMenuItem(
             value: 'role',
-            child:
-                Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
+            child: Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
           ),
           PopupMenuItem(
             value: 'suspend',
-            child: Text(suspended
-                ? 'Unsuspend (allow login)'
-                : 'Suspend (block login)'),
+            child: Text(suspended ? 'Unsuspend' : 'Suspend'),
           ),
           const PopupMenuItem(
             value: 'delete',
@@ -170,21 +169,33 @@ class _UserTile extends ConsumerWidget {
         final ok = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('Delete user?'),
+            title: const Text('Delete user permanently?'),
             content: const Text(
-                'This removes all their posts/comments and blocks this account from accessing the app.'),
+                'This will delete ALL user data: posts, comments, stories, chats, followers, and notifications. Their email will be blacklisted.\n\nThis cannot be undone.'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context, false),
                   child: const Text('Cancel')),
               TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Delete',
-                      style: TextStyle(color: Colors.red))),
+                  child:
+                      const Text('Delete everything', style: TextStyle(color: Colors.red))),
             ],
           ),
         );
-        if (ok == true) await admin.deleteUser(uid);
+        if (ok == true) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Deleting all user data...')),
+            );
+          }
+          await admin.deleteUser(uid);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('User deleted and blacklisted')),
+            );
+          }
+        }
       }
     } catch (e) {
       if (context.mounted) {

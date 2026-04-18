@@ -8,6 +8,8 @@ import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/theme_provider.dart';
+import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
@@ -25,7 +27,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _showUserListSheet({required String title, required List<String> uids}) {
     showModalBottomSheet(
       context: context,
-      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) {
         return SafeArea(
@@ -76,7 +77,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               stream: userAsync,
                               builder: (context, snapshot) {
                                 final data = snapshot.data;
-                                final avatarUrl = data?['avatarUrl'] as String?;
+                                final avatarUrl =
+                                    data?['avatarUrl'] as String?;
                                 return ListTile(
                                   onTap: () {
                                     Navigator.pop(context);
@@ -126,7 +128,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         : ref.watch(followingProvider(currentUid));
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -200,11 +202,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final isAdmin = ref.read(isAdminProvider);
     showModalBottomSheet(
       context: context,
-      useSafeArea: true,
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Consumer(
+              builder: (context, ref, _) {
+                final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
+                return ListTile(
+                  leading: Icon(
+                    isDark ? Icons.dark_mode : Icons.light_mode,
+                    color: isDark ? Colors.amber : Colors.grey,
+                  ),
+                  title: const Text('Dark mode'),
+                  trailing: Switch.adaptive(
+                    value: isDark,
+                    activeTrackColor: const Color(0xFFB05ECC),
+                    onChanged: (_) =>
+                        ref.read(themeModeProvider.notifier).toggle(),
+                  ),
+                  onTap: () =>
+                      ref.read(themeModeProvider.notifier).toggle(),
+                );
+              },
+            ),
             if (isAdmin)
               ListTile(
                 leading:
@@ -281,13 +302,13 @@ class UserPostsGrid extends ConsumerWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  color: const Color(0xFFEDEDF2),
+                  color: context.borderColor,
                   child: url != null
                       ? CachedNetworkImage(
                           imageUrl: url,
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
-                              Container(color: const Color(0xFFEDEDF2)),
+                              Container(color: context.borderColor),
                           errorWidget: (_, __, ___) => const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
@@ -301,8 +322,8 @@ class UserPostsGrid extends ConsumerWidget {
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.black87),
+                              style: TextStyle(
+                                  fontSize: 11, color: context.textPrimary),
                             ),
                           ),
                         ),
@@ -367,13 +388,13 @@ class UserRepostsGrid extends ConsumerWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  color: const Color(0xFFEDEDF2),
+                  color: context.borderColor,
                   child: url != null
                       ? CachedNetworkImage(
                           imageUrl: url,
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
-                              Container(color: const Color(0xFFEDEDF2)),
+                              Container(color: context.borderColor),
                           errorWidget: (_, __, ___) => const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
@@ -387,8 +408,8 @@ class UserRepostsGrid extends ConsumerWidget {
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.black87),
+                              style: TextStyle(
+                                  fontSize: 11, color: context.textPrimary),
                             ),
                           ),
                         ),
@@ -453,13 +474,13 @@ class UserSavedGrid extends ConsumerWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  color: const Color(0xFFEDEDF2),
+                  color: context.borderColor,
                   child: url != null
                       ? CachedNetworkImage(
                           imageUrl: url,
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
-                              Container(color: const Color(0xFFEDEDF2)),
+                              Container(color: context.borderColor),
                           errorWidget: (_, __, ___) => const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
@@ -473,8 +494,8 @@ class UserSavedGrid extends ConsumerWidget {
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.black87),
+                              style: TextStyle(
+                                  fontSize: 11, color: context.textPrimary),
                             ),
                           ),
                         ),
@@ -504,15 +525,15 @@ class _EmptyTab extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
       child: Column(
         children: [
-          Icon(icon, size: 48, color: Colors.grey),
+          Icon(icon, size: 48, color: context.textMuted),
           const SizedBox(height: 12),
           Text(title,
               style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textPrimary)),
           const SizedBox(height: 4),
           Text(subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              style: TextStyle(color: context.textSecondary, fontSize: 13)),
         ],
       ),
     );
@@ -553,11 +574,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardBg,
       appBar: AppBar(
         title: const Text('Posts'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: ListView.builder(

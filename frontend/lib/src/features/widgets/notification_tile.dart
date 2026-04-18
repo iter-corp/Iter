@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
+
 enum NotificationType { follow, followBack, image }
 
 class NotificationTile extends StatelessWidget {

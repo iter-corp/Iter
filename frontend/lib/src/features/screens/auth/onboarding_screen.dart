@@ -4,6 +4,7 @@ import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 
 import '../../../providers/auth_providers.dart';
+import '../../../theme/app_theme.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -225,9 +226,9 @@ class _LocationSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F6FB),
+        color: context.surfaceSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8E8EE)),
+        border: Border.all(color: context.borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,11 +238,12 @@ class _LocationSection extends StatelessWidget {
               const Icon(Icons.near_me_rounded,
                   color: Color(0xFFB05ECC), size: 20),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Where are you?',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
+                  color: context.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -265,9 +267,9 @@ class _LocationSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Lets the Connect tab show people near you. Optional — you can skip and just enter your city.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B6B70), height: 1.3),
+            style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.3),
           ),
           const SizedBox(height: 12),
           Row(

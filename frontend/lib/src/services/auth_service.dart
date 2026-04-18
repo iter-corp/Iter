@@ -1,34 +1,16 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-
-  Future<void> _ensureNotSuspended(User user) async {
-    final userSnap = await _db.collection('users').doc(user.uid).get();
-    final data = userSnap.data();
-
-    // Only check if document exists; if missing, likely a new user being synced
-    if (!userSnap.exists) {
-      return;
-    }
-
-    final suspended = (data?['suspended'] as bool?) ?? false;
-    final deleted = (data?['deleted'] as bool?) ?? false;
-    if (suspended || deleted) {
-      await _auth.signOut();
-      await _googleSignIn.signOut();
-      throw FirebaseAuthException(
-        code: 'user-disabled',
-        message: deleted
-            ? 'This account has been deleted by an administrator.'
-            : 'This account has been suspended by an administrator.',
-      );
-    }
-  }
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -72,11 +54,7 @@ class AuthService {
       email: email.trim(),
       password: password,
     );
-    final user = cred.user;
-    if (user != null) {
-      await _ensureNotSuspended(user);
-    }
-    return user;
+    return cred.user;
   }
 
   Future<User?> signInWithGoogle() async {
@@ -113,9 +91,68 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
-
-    await _ensureNotSuspended(user);
     return user;
+  }
+
+  Future<User?> signInWithApple() async {
+    final rawNonce = _generateNonce();
+    final nonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+      nonce: nonce,
+    );
+
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: appleCredential.identityToken,
+      rawNonce: rawNonce,
+    );
+
+    final cred = await _auth.signInWithCredential(oauthCredential);
+    final user = cred.user;
+    if (user == null) return null;
+
+    final isNew = cred.additionalUserInfo?.isNewUser ?? false;
+    if (isNew) {
+      final displayName = [
+        appleCredential.givenName,
+        appleCredential.familyName,
+      ].where((s) => s != null && s.isNotEmpty).join(' ');
+
+      if (displayName.isNotEmpty) {
+        await user.updateDisplayName(displayName);
+      }
+
+      await _db.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email ?? appleCredential.email,
+        'username': null,
+        'handle': null,
+        'bio': '',
+        'avatarUrl': null,
+        'coverUrl': null,
+        'gender': null,
+        'role': 'user',
+        'suspended': false,
+        'followersCount': 0,
+        'followingCount': 0,
+        'postsCount': 0,
+        'fcmTokens': <String>[],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    return user;
+  }
+
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)])
+        .join();
   }
 
   Future<void> signOut() async {

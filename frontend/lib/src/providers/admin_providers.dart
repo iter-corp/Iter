@@ -26,3 +26,7 @@ final adminPostsProvider = StreamProvider<List<Map<String, dynamic>>>(
 final adminEventsProvider = StreamProvider<List<AdminEvent>>(
   (ref) => ref.watch(adminServiceProvider).streamEvents(),
 );
+
+final blacklistProvider = StreamProvider<List<Map<String, dynamic>>>(
+  (ref) => ref.watch(adminServiceProvider).streamBlacklist(),
+);
