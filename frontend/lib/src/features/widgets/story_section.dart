@@ -77,18 +77,32 @@ class _StoriesListState extends ConsumerState<StoriesList> {
             return b.value.last.createdAt.compareTo(a.value.last.createdAt);
           });
 
+          // Build ordered groups list for cross-user swipe navigation.
+          final allGroups = <List<Story>>[];
+          final hasOwnStory = byAuthor.containsKey(currentUid);
+          if (hasOwnStory) allGroups.add(byAuthor[currentUid]!);
+          for (final entry in otherAuthors) allGroups.add(entry.value);
+
           return ListView(
             scrollDirection: Axis.horizontal,
             children: [
               _MyStoryBubble(
                 avatarUrl: user?['avatarUrl'] as String?,
-                hasStory: byAuthor.containsKey(currentUid),
+                hasStory: hasOwnStory,
                 stories: byAuthor[currentUid] ?? const [],
+                allGroups: allGroups,
+                groupIndex: 0,
               ),
-              ...otherAuthors.map((entry) => _StoryBubble(
-                    stories: entry.value,
-                    seen: _seenByAuthor[entry.key] ?? false,
-                  )),
+              ...List.generate(otherAuthors.length, (i) {
+                final entry = otherAuthors[i];
+                final groupIndex = (hasOwnStory ? 1 : 0) + i;
+                return _StoryBubble(
+                  stories: entry.value,
+                  seen: _seenByAuthor[entry.key] ?? false,
+                  allGroups: allGroups,
+                  groupIndex: groupIndex,
+                );
+              }),
             ],
           );
         },
@@ -104,6 +118,8 @@ class _StoriesListState extends ConsumerState<StoriesList> {
           avatarUrl: user?['avatarUrl'] as String?,
           hasStory: false,
           stories: const [],
+          allGroups: const [],
+          groupIndex: 0,
         ),
       ],
     );
@@ -114,10 +130,14 @@ class _MyStoryBubble extends StatelessWidget {
   final String? avatarUrl;
   final bool hasStory;
   final List<Story> stories;
+  final List<List<Story>> allGroups;
+  final int groupIndex;
   const _MyStoryBubble({
     required this.avatarUrl,
     required this.hasStory,
     required this.stories,
+    required this.allGroups,
+    required this.groupIndex,
   });
 
   @override
@@ -129,7 +149,7 @@ class _MyStoryBubble extends StatelessWidget {
           GestureDetector(
             onTap: () {
               if (hasStory) {
-                openStoryViewer(context, stories);
+                openStoryViewer(context, allGroups, groupIndex);
               } else {
                 Navigator.push(
                   context,
@@ -192,10 +212,17 @@ class _MyStoryBubble extends StatelessWidget {
 class _StoryBubble extends StatelessWidget {
   final List<Story> stories;
   final bool seen;
-  const _StoryBubble({required this.stories, this.seen = false});
+  final List<List<Story>> allGroups;
+  final int groupIndex;
+  const _StoryBubble({
+    required this.stories,
+    this.seen = false,
+    required this.allGroups,
+    required this.groupIndex,
+  });
 
   void _openStory(BuildContext context) {
-    openStoryViewer(context, stories);
+    openStoryViewer(context, allGroups, groupIndex);
   }
 
   @override

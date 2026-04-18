@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'src/providers/auth_providers.dart';
@@ -46,8 +47,12 @@ Future<void> main() async {
     },
   ).then((u) => debugPrint('[boot] first auth event: ${u?.uid ?? 'null'}'));
 
+  final prefs = await SharedPreferences.getInstance();
   debugPrint('[boot] runApp');
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(ProviderScope(
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    child: const MyApp(),
+  ));
 }
 
 Future<void> _configureSystemUi() async {

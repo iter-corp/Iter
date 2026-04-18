@@ -122,7 +122,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     ),
                   ),
                 ),
-                const Divider(height: 1),
                 Expanded(
                   child: uids.isEmpty
                       ? Center(
@@ -133,7 +132,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         )
                       : ListView.separated(
                           itemCount: uids.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, __) => const SizedBox.shrink(),
                           itemBuilder: (context, index) {
                             final uid = uids[index];
                             final userAsync =
