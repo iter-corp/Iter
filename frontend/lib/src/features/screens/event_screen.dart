@@ -48,10 +48,7 @@ double? _distanceKm(dynamic a, dynamic b) {
   final sinLat = math.sin(dLat / 2);
   final sinLng = math.sin(dLng / 2);
   final h = sinLat * sinLat +
-      math.cos(_toRad(aLat)) *
-          math.cos(_toRad(bLat)) *
-          sinLng *
-          sinLng;
+      math.cos(_toRad(aLat)) * math.cos(_toRad(bLat)) * sinLng * sinLng;
   return r * 2 * math.atan2(math.sqrt(h), math.sqrt(1 - h));
 }
 
@@ -379,8 +376,10 @@ class _SearchBar extends StatelessWidget {
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
                 border: InputBorder.none,
+                filled: false,
                 hintText: hint,
-                hintStyle: TextStyle(fontSize: 14, color: context.textSecondary),
+                hintStyle:
+                    TextStyle(fontSize: 14, color: context.textSecondary),
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -446,8 +445,7 @@ class _PartnersView extends ConsumerWidget {
 
     switch (filterIndex) {
       case 1: // Nearby
-        final withLoc =
-            filtered.where((u) => u['location'] is Map).toList();
+        final withLoc = filtered.where((u) => u['location'] is Map).toList();
         final myLoc = currentUser?['location'];
         if (myLoc is Map) {
           withLoc.sort((a, b) {
@@ -794,7 +792,8 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                               : null,
                           border: isOnline
                               ? null
-                              : Border.all(color: context.borderColor, width: 2),
+                              : Border.all(
+                                  color: context.borderColor, width: 2),
                         ),
                         child: CircleAvatar(
                           radius: 28,
@@ -803,7 +802,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                               ? CachedNetworkImageProvider(widget.avatarUrl!)
                               : null,
                           child: widget.avatarUrl == null
-                              ? const Icon(Icons.person, color: Colors.grey)
+                              ? Icon(Icons.person, color: context.textMuted)
                               : null,
                         ),
                       ),
@@ -849,7 +848,8 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                               decoration: BoxDecoration(
                                 color: isOnline
                                     ? const Color(0xFF3BD671)
-                                    : context.textSecondary.withValues(alpha: 0.4),
+                                    : context.textSecondary
+                                        .withValues(alpha: 0.4),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -900,9 +900,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                   runSpacing: 6,
                   children: [
                     if (widget.city.isNotEmpty)
-                      _Tag(
-                          label: widget.city,
-                          icon: Icons.location_on_rounded),
+                      _Tag(label: widget.city, icon: Icons.location_on_rounded),
                     if (widget.gender.isNotEmpty) _Tag(label: widget.gender),
                     if (widget.postsCount > 0)
                       _Tag(label: '${widget.postsCount} posts'),
@@ -1052,8 +1050,7 @@ class _EventsView extends ConsumerWidget {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
                 sliver: SliverGrid(
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
@@ -1085,7 +1082,7 @@ class _BecomeAdminBanner extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
       child: Material(
-        color: const Color(0xFFFFF1F8),
+        color: context.purpleSoft,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -1105,22 +1102,23 @@ class _BecomeAdminBanner extends ConsumerWidget {
                   color: _kBrandPurple,
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      const Text(
                         'Want to host your own event?',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Tap to contact our admin team.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(
+                            fontSize: 12, color: context.textSecondary),
                       ),
                     ],
                   ),
@@ -1156,7 +1154,7 @@ class _BecomeAdminBanner extends ConsumerWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: context.borderColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -1170,16 +1168,16 @@ class _BecomeAdminBanner extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Email us with your name, a short description of the event you\'d like to host, and why. We\'ll get back to you.',
-                style: TextStyle(color: Colors.black87, fontSize: 13),
+                style: TextStyle(color: context.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 16),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F0F0),
+                  color: context.inputFill,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -1322,7 +1320,7 @@ class _EventCardState extends State<_EventCard> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.92),
+                      color: context.cardBg.withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
@@ -1502,10 +1500,10 @@ class _ShimmerBlockState extends State<_ShimmerBlock>
             gradient: LinearGradient(
               begin: Alignment(-1 - t * 2, 0),
               end: Alignment(1 - t * 2, 0),
-              colors: const [
-                Color(0xFFEDEDF4),
-                Color(0xFFF6F6FA),
-                Color(0xFFEDEDF4),
+              colors: [
+                context.inputFill,
+                context.surfaceSoft,
+                context.inputFill,
               ],
             ),
           ),
@@ -1624,8 +1622,8 @@ class _PickerSheetState extends State<_PickerSheet> {
                             isDense: true,
                             border: InputBorder.none,
                             hintText: 'Search',
-                            hintStyle:
-                                TextStyle(fontSize: 13, color: context.textSecondary),
+                            hintStyle: TextStyle(
+                                fontSize: 13, color: context.textSecondary),
                             contentPadding: EdgeInsets.zero,
                           ),
                           style: TextStyle(
@@ -1661,9 +1659,8 @@ class _PickerSheetState extends State<_PickerSheet> {
                             title: Text(
                               opt,
                               style: TextStyle(
-                                fontWeight: isSel
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                                fontWeight:
+                                    isSel ? FontWeight.w700 : FontWeight.w500,
                                 color: context.textPrimary,
                               ),
                             ),

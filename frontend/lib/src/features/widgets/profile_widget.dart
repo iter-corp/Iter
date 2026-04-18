@@ -37,12 +37,12 @@ class ProfileCoverAvatar extends StatelessWidget {
               ),
               child: CircleAvatar(
                 radius: 40,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: context.inputFill,
                 backgroundImage: avatarUrl != null
                     ? CachedNetworkImageProvider(avatarUrl!)
                     : null,
                 child: avatarUrl == null
-                    ? const Icon(Icons.person, size: 40, color: Colors.grey)
+                    ? Icon(Icons.person, size: 40, color: context.textMuted)
                     : null,
               ),
             ),
@@ -66,10 +66,13 @@ class ProfileNameBio extends StatelessWidget {
       child: Column(
         children: [
           Text(name,
-              style:
-                  TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textPrimary)),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: context.textPrimary)),
           const SizedBox(height: 4),
-          Text(bio, style: TextStyle(fontSize: 13, color: context.textSecondary)),
+          Text(bio,
+              style: TextStyle(fontSize: 13, color: context.textSecondary)),
         ],
       ),
     );
@@ -115,13 +118,18 @@ class ProfileStats extends StatelessWidget {
     return '$n';
   }
 
-  Widget _statItem(String value, String label, VoidCallback? onTap, BuildContext context) {
+  Widget _statItem(
+      String value, String label, VoidCallback? onTap, BuildContext context) {
     final content = Column(
       children: [
         Text(value,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textPrimary)),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary)),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 12, color: context.textSecondary)),
+        Text(label,
+            style: TextStyle(fontSize: 12, color: context.textSecondary)),
       ],
     );
 
@@ -156,26 +164,26 @@ class ProfileButtons extends StatelessWidget {
                 );
               },
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey.shade300),
+                side: BorderSide(color: context.borderColor),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(vertical: 11),
               ),
-              child: const Text("Edit Profile",
+              child: Text("Edit Profile",
                   style: TextStyle(
-                      color: Colors.black, fontWeight: FontWeight.w600)),
+                      color: context.textPrimary, fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton.icon(
               onPressed: onSettings,
-              icon: const Icon(Icons.settings, size: 16, color: Colors.black),
-              label: const Text("Setting",
+              icon: Icon(Icons.settings, size: 16, color: context.textPrimary),
+              label: Text("Setting",
                   style: TextStyle(
-                      color: Colors.black, fontWeight: FontWeight.w600)),
+                      color: context.textPrimary, fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey.shade300),
+                side: BorderSide(color: context.borderColor),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(vertical: 11),
@@ -203,14 +211,14 @@ class ProfileTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _tab(Icons.grid_on, 0),
-        _tab(Icons.repeat, 1),
-        _tab(Icons.bookmark_border, 2),
+        _tab(Icons.grid_on, 0, context),
+        _tab(Icons.repeat, 1, context),
+        _tab(Icons.bookmark_border, 2, context),
       ],
     );
   }
 
-  Widget _tab(IconData icon, int index) {
+  Widget _tab(IconData icon, int index, BuildContext context) {
     final bool isActive = selectedTab == index;
     return Expanded(
       child: GestureDetector(
@@ -218,17 +226,17 @@ class ProfileTabBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.cardBg,
             border: Border(
               bottom: BorderSide(
-                color: isActive ? Colors.black : Colors.transparent,
+                color: isActive ? context.textPrimary : Colors.transparent,
                 width: 2,
               ),
             ),
           ),
           child: Icon(
             icon,
-            color: isActive ? Colors.black : Colors.grey,
+            color: isActive ? context.textPrimary : context.textSecondary,
             size: 22,
           ),
         ),
@@ -248,13 +256,16 @@ class ProfileEmpty extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.image_outlined, size: 48, color: Colors.grey),
+            Icon(Icons.image_outlined, size: 48, color: context.textSecondary),
             const SizedBox(height: 12),
-            const Text("Create your first post",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Text("Create your first post",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: context.textPrimary)),
             const SizedBox(height: 4),
-            const Text("Share your content",
-                style: TextStyle(color: Colors.grey, fontSize: 13)),
+            Text("Share your content",
+                style: TextStyle(color: context.textSecondary, fontSize: 13)),
             const SizedBox(height: 16),
             Builder(builder: (ctx) {
               return ElevatedButton(
@@ -273,8 +284,8 @@ class ProfileEmpty extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
                 ),
-                child: const Text("Create",
-                    style: TextStyle(color: Colors.white)),
+                child:
+                    const Text("Create", style: TextStyle(color: Colors.white)),
               );
             }),
           ],

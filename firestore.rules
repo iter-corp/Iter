@@ -154,6 +154,15 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ── Collection-group rule for members ────────────────────
+    // Required to allow collectionGroup('members').where('uid', ...) queries
+    // used to look up which event chats the current user belongs to.
+    // Only the member themselves (or an admin) may read their own member doc
+    // via the collection group.
+    match /{path=**}/members/{uid} {
+      allow read: if signedIn() && (isSelf(uid) || isAdmin());
+    }
+
     // ── Event group chats (members read, admin writes) ──────
     match /eventChats/{eventId} {
       allow read: if signedIn() && (

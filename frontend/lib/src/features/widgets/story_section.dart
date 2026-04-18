@@ -67,9 +67,8 @@ class _StoriesListState extends ConsumerState<StoriesList> {
           _computeSeen(byAuthor, currentUid);
 
           // Sort authors: unseen first, then seen.
-          final otherAuthors = byAuthor.entries
-              .where((e) => e.key != currentUid)
-              .toList();
+          final otherAuthors =
+              byAuthor.entries.where((e) => e.key != currentUid).toList();
           otherAuthors.sort((a, b) {
             final aSeen = _seenByAuthor[a.key] ?? false;
             final bSeen = _seenByAuthor[b.key] ?? false;
@@ -157,12 +156,12 @@ class _MyStoryBubble extends StatelessWidget {
                         : 'story_avatar_me_${avatarUrl ?? 'none'}',
                     child: CircleAvatar(
                       radius: 30,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor: context.inputFill,
                       backgroundImage: avatarUrl != null
                           ? CachedNetworkImageProvider(avatarUrl!)
                           : null,
                       child: avatarUrl == null
-                          ? const Icon(Icons.person, color: Colors.grey)
+                          ? Icon(Icons.person, color: context.textMuted)
                           : null,
                     ),
                   ),
@@ -213,7 +212,7 @@ class _StoryBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: seen ? Colors.grey.shade300 : const Color(0xFFB05ECC),
+                  color: seen ? context.borderColor : const Color(0xFFB05ECC),
                   width: 2.5,
                 ),
               ),
@@ -221,12 +220,12 @@ class _StoryBubble extends StatelessWidget {
                 tag: 'story_avatar_${first.authorUid}',
                 child: CircleAvatar(
                   radius: 30,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: context.inputFill,
                   backgroundImage: first.authorAvatar != null
                       ? CachedNetworkImageProvider(first.authorAvatar!)
                       : null,
                   child: first.authorAvatar == null
-                      ? const Icon(Icons.person, color: Colors.grey)
+                      ? Icon(Icons.person, color: context.textMuted)
                       : null,
                 ),
               ),

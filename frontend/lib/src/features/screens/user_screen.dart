@@ -108,7 +108,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: context.borderColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -125,10 +125,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 const Divider(height: 1),
                 Expanded(
                   child: uids.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'No users yet',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         )
                       : ListView.separated(
@@ -138,15 +138,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             final uid = uids[index];
                             final userAsync =
                                 ref.watch(_otherUserProvider(uid));
-                            final avatarUrl = userAsync.valueOrNull?['avatarUrl']
-                                as String?;
+                            final avatarUrl =
+                                userAsync.valueOrNull?['avatarUrl'] as String?;
                             return ListTile(
                               onTap: () {
                                 Navigator.pop(context);
                                 openUserProfile(context, uid: uid);
                               },
                               leading: CircleAvatar(
-                                backgroundColor: Colors.grey.shade200,
+                                backgroundColor: context.inputFill,
                                 backgroundImage: avatarUrl != null
                                     ? NetworkImage(avatarUrl)
                                     : null,
@@ -165,7 +165,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                 error: (_, __) => const SizedBox.shrink(),
                                 data: (user) => Text(
                                   (user?['handle'] as String?) ?? '',
-                                  style: const TextStyle(color: Colors.grey),
+                                  style:
+                                      TextStyle(color: context.textSecondary),
                                 ),
                               ),
                             );
@@ -251,7 +252,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   selectedTab: selectedTab,
                   onTap: (i) => setState(() => selectedTab = i),
                 ),
-                const Divider(height: 1),
                 if (selectedTab == 0)
                   _UserPostsGrid(uid: widget.uid)
                 else
@@ -375,8 +375,8 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
                         maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 11, color: context.textPrimary),
+                        style:
+                            TextStyle(fontSize: 11, color: context.textPrimary),
                       ),
                     ),
                   ),

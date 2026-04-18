@@ -42,11 +42,11 @@ class NotificationTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: context.inputFill,
                 backgroundImage:
                     avatar.isNotEmpty ? NetworkImage(avatar) : null,
                 child: avatar.isEmpty
-                    ? const Icon(Icons.person, color: Colors.white)
+                    ? Icon(Icons.person, color: context.textMuted)
                     : null,
               ),
               if (isLike)
@@ -80,22 +80,22 @@ class NotificationTile extends StatelessWidget {
           ),
 
           /// TRAILING
-          _buildTrailing(),
+          _buildTrailing(context),
         ],
       ),
     );
   }
 
-  Widget _buildTrailing() {
+  Widget _buildTrailing(BuildContext context) {
     // Allow caller to override the trailing area for any notification type.
     if (trailingWidget != null) return trailingWidget!;
 
     switch (trailingType) {
       case NotificationType.followBack:
-        return _buildButton('Follow back', onFollowTap);
+        return _buildButton(context, 'Follow back', onFollowTap);
 
       case NotificationType.follow:
-        return _buildButton('Follow', onFollowTap);
+        return _buildButton(context, 'Follow', onFollowTap);
 
       case NotificationType.image:
         if (postImage == null || postImage!.isEmpty) {
@@ -114,7 +114,7 @@ class NotificationTile extends StatelessWidget {
     }
   }
 
-  Widget _buildButton(String text, VoidCallback? onTap) {
+  Widget _buildButton(BuildContext context, String text, VoidCallback? onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

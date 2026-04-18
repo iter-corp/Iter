@@ -146,15 +146,6 @@ class _PostCardState extends ConsumerState<PostCard> {
               right: 12,
               child: _OwnerMenu(post: post, ref: ref),
             ),
-          if (isMulti)
-            Positioned(
-              top: 16,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _PageDots(count: imageCount, activeIndex: _currentPage),
-              ),
-            ),
           Positioned(
             top: 12,
             left: 12,
@@ -208,6 +199,13 @@ class _PostCardState extends ConsumerState<PostCard> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isMulti) ...[
+                  Center(
+                    child:
+                        _PageDots(count: imageCount, activeIndex: _currentPage),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: [
                     GestureDetector(
@@ -653,9 +651,8 @@ class _PageDots extends StatelessWidget {
             height: isActive ? 7 : 5,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isActive
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.5),
+              color:
+                  isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
             ),
           );
         }),

@@ -151,7 +151,7 @@ class _EventRegistrationFormState
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: context.borderColor,
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
@@ -159,7 +159,7 @@ class _EventRegistrationFormState
                 const SizedBox(height: 16),
                 Text(
                   'Register for',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  style: TextStyle(color: context.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -313,9 +313,9 @@ class _LabeledField extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Colors.grey,
+              color: context.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),

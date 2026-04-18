@@ -5,9 +5,11 @@ import 'auth_providers.dart';
 
 final adminServiceProvider = Provider<AdminService>((_) => AdminService());
 
-final adminConfigProvider = StreamProvider<AdminConfig>(
-  (ref) => ref.watch(adminServiceProvider).streamConfig(),
-);
+final adminConfigProvider = StreamProvider<AdminConfig>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamConfig();
+});
 
 final isAdminProvider = Provider<bool>((ref) {
   final user = ref.watch(currentUserDocProvider).value;
@@ -15,18 +17,26 @@ final isAdminProvider = Provider<bool>((ref) {
 });
 
 final adminUsersProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, query) => ref.watch(adminServiceProvider).streamUsers(query: query),
-);
+    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, query) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamUsers(query: query);
+});
 
-final adminPostsProvider = StreamProvider<List<Map<String, dynamic>>>(
-  (ref) => ref.watch(adminServiceProvider).streamAllPosts(),
-);
+final adminPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamAllPosts();
+});
 
-final adminEventsProvider = StreamProvider<List<AdminEvent>>(
-  (ref) => ref.watch(adminServiceProvider).streamEvents(),
-);
+final adminEventsProvider = StreamProvider<List<AdminEvent>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamEvents();
+});
 
-final blacklistProvider = StreamProvider<List<Map<String, dynamic>>>(
-  (ref) => ref.watch(adminServiceProvider).streamBlacklist(),
-);
+final blacklistProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamBlacklist();
+});

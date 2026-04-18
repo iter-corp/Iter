@@ -69,12 +69,12 @@ class HiddenRequestsScreen extends StatelessWidget {
                       onTap: () => openUserProfile(context, uid: msg.otherUid),
                       child: CircleAvatar(
                         radius: 24,
-                        backgroundColor: Colors.grey.shade200,
+                        backgroundColor: context.inputFill,
                         backgroundImage: msg.otherAvatarUrl.isNotEmpty
                             ? NetworkImage(msg.otherAvatarUrl)
                             : null,
                         child: msg.otherAvatarUrl.isEmpty
-                            ? const Icon(Icons.person, color: Colors.white)
+                            ? Icon(Icons.person, color: context.textMuted)
                             : null,
                       ),
                     ),
@@ -162,12 +162,12 @@ class RequestsTab extends StatelessWidget {
                   onTap: () => openUserProfile(context, uid: msg.otherUid),
                   child: CircleAvatar(
                     radius: 24,
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: context.inputFill,
                     backgroundImage: msg.otherAvatarUrl.isNotEmpty
                         ? NetworkImage(msg.otherAvatarUrl)
                         : null,
                     child: msg.otherAvatarUrl.isEmpty
-                        ? const Icon(Icons.person, color: Colors.white)
+                        ? Icon(Icons.person, color: context.textMuted)
                         : null,
                   ),
                 ),

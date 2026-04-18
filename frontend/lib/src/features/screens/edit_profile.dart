@@ -140,8 +140,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   child: Row(
                     children: [
                       IconButton(
@@ -192,8 +192,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         _buildField("Gender", _genderController),
                         const SizedBox(height: 32),
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: SizedBox(
                             width: double.infinity,
                             height: 48,
@@ -210,8 +209,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                       width: 22,
                                       height: 22,
                                       child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2),
+                                          color: Colors.white, strokeWidth: 2),
                                     )
                                   : const Text(
                                       "Save",
@@ -250,7 +248,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               height: 180,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: const Color(0xFFE0E0E0),
+                color: context.inputFill,
                 image: _coverUrl != null
                     ? DecorationImage(
                         image: CachedNetworkImageProvider(_coverUrl!),
@@ -301,13 +299,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 44,
-                        backgroundColor: Colors.grey.shade200,
+                        backgroundColor: context.inputFill,
                         backgroundImage: _avatarUrl != null
                             ? CachedNetworkImageProvider(_avatarUrl!)
                             : null,
                         child: _avatarUrl == null
-                            ? const Icon(Icons.person,
-                                size: 44, color: Colors.grey)
+                            ? Icon(Icons.person,
+                                size: 44, color: context.textSecondary)
                             : null,
                       ),
                       if (_uploadingAvatar)
@@ -341,8 +339,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           style: TextStyle(fontSize: 14, color: context.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle:
-                TextStyle(color: context.textMuted, fontSize: 14),
+            hintStyle: TextStyle(color: context.textMuted, fontSize: 14),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: InputBorder.none,

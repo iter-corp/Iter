@@ -32,14 +32,14 @@ final acceptedInboxProvider = StreamProvider<List<ChatConversation>>((ref) {
 
 /// Messages for a specific chat, oldest first.
 final messagesProvider =
-    StreamProvider.family<List<ChatMessage>, String>((ref, chatId) {
+    StreamProvider.autoDispose.family<List<ChatMessage>, String>((ref, chatId) {
   return ref.watch(chatServiceProvider).streamMessages(chatId);
 });
 
 /// Raw chat doc stream — used by the chat screen to detect group vs
 /// direct, and to render the correct header.
-final chatDocProvider =
-    StreamProvider.family<Map<String, dynamic>?, String>((ref, chatId) {
+final chatDocProvider = StreamProvider.autoDispose
+    .family<Map<String, dynamic>?, String>((ref, chatId) {
   return FirebaseFirestore.instance
       .collection('chats')
       .doc(chatId)

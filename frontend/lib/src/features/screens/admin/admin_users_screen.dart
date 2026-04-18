@@ -39,15 +39,14 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                 fillColor: context.cardBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: context.borderColor),
                 ),
               ),
             ),
           ),
           Expanded(
             child: usersAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (users) {
                 if (users.isEmpty) {
@@ -84,7 +83,7 @@ class _UserTile extends ConsumerWidget {
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Colors.grey.shade200,
+        backgroundColor: context.inputFill,
         backgroundImage: (avatar != null && avatar.isNotEmpty)
             ? CachedNetworkImageProvider(avatar)
             : null,
@@ -106,7 +105,7 @@ class _UserTile extends ConsumerWidget {
               margin: const EdgeInsets.only(left: 6),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F8),
+                color: context.purpleSoft,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text('ADMIN',
@@ -142,7 +141,8 @@ class _UserTile extends ConsumerWidget {
         itemBuilder: (_) => [
           PopupMenuItem(
             value: 'role',
-            child: Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
+            child:
+                Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
           ),
           PopupMenuItem(
             value: 'suspend',
@@ -178,8 +178,8 @@ class _UserTile extends ConsumerWidget {
                   child: const Text('Cancel')),
               TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child:
-                      const Text('Delete everything', style: TextStyle(color: Colors.red))),
+                  child: const Text('Delete everything',
+                      style: TextStyle(color: Colors.red))),
             ],
           ),
         );

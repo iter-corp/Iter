@@ -67,7 +67,7 @@ class UserCoverAvatar extends StatelessWidget {
                         width: double.infinity,
                         fit: BoxFit.cover,
                       )
-                    : Container(height: 140, color: const Color(0xFFE0E0E0)),
+                    : Container(height: 140, color: context.inputFill),
               ),
             ),
             Container(
@@ -82,9 +82,9 @@ class UserCoverAvatar extends StatelessWidget {
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
+                    color: context.cardBg,
                   ),
                   child: avatar,
                 ),
@@ -105,7 +105,7 @@ class UserCoverAvatar extends StatelessWidget {
             width: double.infinity,
             child: (coverUrl != null && coverUrl!.isNotEmpty)
                 ? CachedNetworkImage(imageUrl: coverUrl!, fit: BoxFit.cover)
-                : Container(color: const Color(0xFFE0E0E0)),
+                : Container(color: context.inputFill),
           ),
           backArrow,
           Positioned(
@@ -115,9 +115,9 @@ class UserCoverAvatar extends StatelessWidget {
             child: Center(
               child: Container(
                 padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white,
+                  color: context.cardBg,
                 ),
                 child: avatar,
               ),
@@ -152,7 +152,7 @@ class UserNameBio extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             handle,
-            style: const TextStyle(fontSize: 13, color: Colors.grey),
+            style: TextStyle(fontSize: 13, color: context.textSecondary),
           ),
         ],
       ),
@@ -200,7 +200,8 @@ class UserStats extends StatelessWidget {
     return '$n';
   }
 
-  Widget _statItem(BuildContext context, String value, String label, VoidCallback? onTap) {
+  Widget _statItem(
+      BuildContext context, String value, String label, VoidCallback? onTap) {
     final content = Column(
       children: [
         Text(value,
@@ -253,11 +254,12 @@ class UserButtons extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
-                    color: isFollowing ? Colors.white : const Color(0xFFB05ECC),
+                    color:
+                        isFollowing ? context.cardBg : const Color(0xFFB05ECC),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isFollowing
-                          ? Colors.grey.shade300
+                          ? context.borderColor
                           : const Color(0xFFB05ECC),
                     ),
                   ),
@@ -265,7 +267,7 @@ class UserButtons extends StatelessWidget {
                     child: Text(
                       isFollowing ? "Following" : "Follow",
                       style: TextStyle(
-                        color: isFollowing ? Colors.black : Colors.white,
+                        color: isFollowing ? context.textPrimary : Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -285,7 +287,7 @@ class UserButtons extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: onMessageTap,
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey.shade300),
+                    side: BorderSide(color: context.borderColor),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -293,10 +295,10 @@ class UserButtons extends StatelessWidget {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text(
+                  child: Text(
                     "Message",
                     style: TextStyle(
-                      color: Colors.black,
+                      color: context.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
@@ -338,17 +340,17 @@ class UserTabBar extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.cardBg,
                 border: Border(
                   bottom: BorderSide(
-                    color: isActive ? Colors.black : Colors.transparent,
+                    color: isActive ? context.textPrimary : Colors.transparent,
                     width: 2,
                   ),
                 ),
               ),
               child: Icon(
                 icons[index],
-                color: isActive ? Colors.black : Colors.grey,
+                color: isActive ? context.textPrimary : context.textSecondary,
                 size: 22,
               ),
             ),
@@ -370,13 +372,13 @@ class UserPrivateMessage extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
+          color: context.inputFill,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.lock_outline, size: 24, color: Colors.black),
-            SizedBox(width: 12),
+            Icon(Icons.lock_outline, size: 24, color: context.textPrimary),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,13 +388,14 @@ class UserPrivateMessage extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
+                      color: context.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     "Follow this account to see their contents.",
                     style: TextStyle(
-                      color: Colors.grey,
+                      color: context.textSecondary,
                       fontSize: 12,
                     ),
                   ),

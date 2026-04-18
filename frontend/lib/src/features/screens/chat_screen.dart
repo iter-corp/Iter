@@ -151,15 +151,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final chatDoc = chatDocAsync.value ?? const <String, dynamic>{};
     final isGroup = (chatDoc['kind'] as String?) == 'group';
     final groupName = (chatDoc['groupName'] as String?) ?? widget.otherName;
-    final participantCount =
-        ((chatDoc['participants'] as List?)?.length ?? 0);
+    final participantCount = ((chatDoc['participants'] as List?)?.length ?? 0);
 
     final presenceAsync =
         isGroup ? null : ref.watch(presenceWatchProvider(widget.otherUid));
     final typingAsync = isGroup
         ? null
-        : ref.watch(
-            typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
+        : ref.watch(typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
 
     ref.listen(messagesProvider(widget.chatId), (_, __) {
@@ -213,8 +211,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.green,
                                 shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 1.5),
+                                border: Border.all(
+                                    color: Theme.of(context)
+                                        .scaffoldBackgroundColor,
+                                    width: 1.5),
                               ),
                             ),
                           ),
@@ -242,7 +242,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         ? 'Online'
                                         : 'Offline'),
                             style: TextStyle(
-                              color: isTyping ? Colors.purple : context.textSecondary,
+                              color: isTyping
+                                  ? Colors.purple
+                                  : context.textSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -303,10 +305,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-            PollsSection(
-              parentPath: 'chats/${widget.chatId}',
-              canCreate: true,
-            ),
+            if (isGroup)
+              PollsSection(
+                parentPath: 'chats/${widget.chatId}',
+                canCreate: true,
+              ),
 
             // INPUT
             Padding(
@@ -386,15 +389,12 @@ class _MessageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // In groups we look up each sender's live profile dynamically. In 1:1
     // chats we reuse the cached otherAvatar passed into the screen.
-    final senderLive = isGroup
-        ? ref.watch(userByUidProvider(msg.senderUid)).value
-        : null;
-    final senderAvatar = isGroup
-        ? ((senderLive?['avatarUrl'] as String?) ?? '')
-        : otherAvatar;
-    final senderName = isGroup
-        ? ((senderLive?['username'] as String?) ?? 'Member')
-        : '';
+    final senderLive =
+        isGroup ? ref.watch(userByUidProvider(msg.senderUid)).value : null;
+    final senderAvatar =
+        isGroup ? ((senderLive?['avatarUrl'] as String?) ?? '') : otherAvatar;
+    final senderName =
+        isGroup ? ((senderLive?['username'] as String?) ?? 'Member') : '';
     final senderUidForTap = isGroup ? msg.senderUid : otherUid;
 
     return Padding(
@@ -442,68 +442,68 @@ class _MessageBubble extends ConsumerWidget {
                   messageId: msg.id,
                 ),
                 child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? const Color(0xFFB05ECC)
-                        : context.inputFill,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMe ? 16 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isMe ? const Color(0xFFB05ECC) : context.inputFill,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 16),
+                      ),
                     ),
-                  ),
-                  child: (msg.sharedPostId != null &&
-                          msg.sharedPostId!.isNotEmpty)
-                      ? _SharedPostPreview(
-                          postId: msg.sharedPostId!,
-                          isMe: isMe,
-                        )
-                      : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: CachedNetworkImage(
-                                    imageUrl: msg.imageUrl!,
-                                    width: 240,
-                                    fit: BoxFit.cover,
-                                    placeholder: (_, __) => const SizedBox(
-                                      height: 180,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
+                    child: (msg.sharedPostId != null &&
+                            msg.sharedPostId!.isNotEmpty)
+                        ? _SharedPostPreview(
+                            postId: msg.sharedPostId!,
+                            isMe: isMe,
+                          )
+                        : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: CachedNetworkImage(
+                                      imageUrl: msg.imageUrl!,
+                                      width: 240,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => const SizedBox(
+                                        height: 180,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                if (msg.text.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    msg.text,
-                                    style: TextStyle(
-                                      color:
-                                          isMe ? Colors.white : context.textPrimary,
-                                      fontSize: 14,
+                                  if (msg.text.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      msg.text,
+                                      style: TextStyle(
+                                        color: isMe
+                                            ? Colors.white
+                                            : context.textPrimary,
+                                        fontSize: 14,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
-                            )
-                          : Text(
-                              msg.text,
-                              style: TextStyle(
-                                color: isMe ? Colors.white : context.textPrimary,
-                                fontSize: 14,
+                              )
+                            : Text(
+                                msg.text,
+                                style: TextStyle(
+                                  color:
+                                      isMe ? Colors.white : context.textPrimary,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
+                  ),
                 ),
-              ),
               ),
               MessageReactionsRow(
                 parentPath: 'chats/$chatId/messages',
@@ -593,7 +593,8 @@ class _SharedPostPreview extends StatelessWidget {
           child: Container(
             width: 240,
             decoration: BoxDecoration(
-              color: isMe ? Colors.white.withValues(alpha: 0.12) : context.cardBg,
+              color:
+                  isMe ? Colors.white.withValues(alpha: 0.12) : context.cardBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isMe
@@ -698,4 +699,3 @@ class _SharedEventLabel extends ConsumerWidget {
     );
   }
 }
-

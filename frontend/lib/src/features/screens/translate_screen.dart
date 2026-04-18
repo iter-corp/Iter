@@ -101,9 +101,8 @@ const List<_Language> _kLanguages = [
   _Language('Esperanto', 'eo'),
 ];
 
-_Language _langByLabel(String label) =>
-    _kLanguages.firstWhere((l) => l.label == label,
-        orElse: () => _kLanguages.first);
+_Language _langByLabel(String label) => _kLanguages
+    .firstWhere((l) => l.label == label, orElse: () => _kLanguages.first);
 
 class TranslateBody extends StatefulWidget {
   const TranslateBody({super.key});
@@ -233,7 +232,8 @@ class _TranslateBodyState extends State<TranslateBody> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Speech-to-text not supported for $_sourceLang on this device.'),
+            content: Text(
+                'Speech-to-text not supported for $_sourceLang on this device.'),
           ),
         );
       }
@@ -257,8 +257,7 @@ class _TranslateBodyState extends State<TranslateBody> {
             offset: _inputController.text.length,
           );
         });
-        if (result.finalResult &&
-            result.recognizedWords.trim().isNotEmpty) {
+        if (result.finalResult && result.recognizedWords.trim().isNotEmpty) {
           _onTranslate();
         }
       },
@@ -407,93 +406,93 @@ class _TranslateBodyState extends State<TranslateBody> {
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 📌 Title
-              Text(
-                'Translate',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: context.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 📌 Language Selector Row
-              _LanguageSelectorRow(
-                sourceLang: _sourceLang,
-                targetLang: _targetLang,
-                onSourceChanged: (val) => setState(() => _sourceLang = val),
-                onTargetChanged: (val) => setState(() => _targetLang = val),
-                onSwap: _swapLanguages,
-              ),
-              const SizedBox(height: 12),
-
-              // 📌 Input Box
-              _InputBox(
-                controller: _inputController,
-                isRecording: _isRecording,
-                onMicTap: _toggleListen,
-                sourceLang: _sourceLang,
-              ),
-              const SizedBox(height: 16),
-
-              // 📌 Translate Button
-              Center(
-                child: SizedBox(
-                  width: 200,
-                  height: 35,
-                  child: ElevatedButton(
-                    onPressed: _onTranslate,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFCE5DE5),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: _isTranslating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Translate',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 📌 Title
+                Text(
+                  'Translate',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimary,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // 📌 Output Box
-              _OutputBox(
-                translatedText: _hasTranslation ? _translatedText : '',
-                isRTL: _langByLabel(_targetLang).rtl,
-                isBookmarked: _isBookmarked,
-                isSpeaking: _isSpeaking,
-                onBookmark: _toggleBookmark,
-                onCopy: _copyToClipboard,
-                onSpeak: _toggleSpeak,
-              ),
-            ],
+                // 📌 Language Selector Row
+                _LanguageSelectorRow(
+                  sourceLang: _sourceLang,
+                  targetLang: _targetLang,
+                  onSourceChanged: (val) => setState(() => _sourceLang = val),
+                  onTargetChanged: (val) => setState(() => _targetLang = val),
+                  onSwap: _swapLanguages,
+                ),
+                const SizedBox(height: 12),
+
+                // 📌 Input Box
+                _InputBox(
+                  controller: _inputController,
+                  isRecording: _isRecording,
+                  onMicTap: _toggleListen,
+                  sourceLang: _sourceLang,
+                ),
+                const SizedBox(height: 16),
+
+                // 📌 Translate Button
+                Center(
+                  child: SizedBox(
+                    width: 200,
+                    height: 35,
+                    child: ElevatedButton(
+                      onPressed: _onTranslate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCE5DE5),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: _isTranslating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Translate',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 📌 Output Box
+                _OutputBox(
+                  translatedText: _hasTranslation ? _translatedText : '',
+                  isRTL: _langByLabel(_targetLang).rtl,
+                  isBookmarked: _isBookmarked,
+                  isSpeaking: _isSpeaking,
+                  onBookmark: _toggleBookmark,
+                  onCopy: _copyToClipboard,
+                  onSpeak: _toggleSpeak,
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // 📌 SECTION: Language Selector Row
@@ -535,8 +534,7 @@ class _LanguageSelectorRow extends StatelessWidget {
               width: 18,
               height: 18,
               fit: BoxFit.contain,
-              colorFilter:
-                  const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
             ),
           ),
         ),
@@ -635,7 +633,7 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: context.borderColor,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -909,7 +907,7 @@ class _OutputBox extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 110),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -942,8 +940,8 @@ class _OutputBox extends StatelessWidget {
                           'assets/icons/Bookmark.svg',
                           width: 20,
                           height: 20,
-                          colorFilter: const ColorFilter.mode(
-                              Colors.black, BlendMode.srcIn),
+                          colorFilter: ColorFilter.mode(
+                              context.textPrimary, BlendMode.srcIn),
                         ),
                 ),
               ),
@@ -956,7 +954,7 @@ class _OutputBox extends StatelessWidget {
                   width: 20,
                   height: 20,
                   colorFilter:
-                      const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                      ColorFilter.mode(context.textPrimary, BlendMode.srcIn),
                 ),
               ),
             ],
@@ -970,10 +968,10 @@ class _OutputBox extends StatelessWidget {
                 child: Text(
                   translatedText,
                   textAlign: isRTL ? TextAlign.right : TextAlign.left,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w500,
-                    color: Colors.black87,
+                    color: context.textPrimary,
                     height: 1.6,
                   ),
                 ),
@@ -1001,8 +999,8 @@ class _OutputBox extends StatelessWidget {
                         height: 20,
                         colorFilter: ColorFilter.mode(
                           translatedText.isNotEmpty
-                              ? Colors.black
-                              : Colors.grey,
+                              ? context.textPrimary
+                              : context.textMuted,
                           BlendMode.srcIn,
                         ),
                       ),

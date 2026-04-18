@@ -156,6 +156,10 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    // Disable Firestore network BEFORE revoking the auth token. This stops all
+    // active stream subscriptions cleanly instead of letting them receive
+    // permission-denied errors when the token is invalidated.
+    await FirebaseFirestore.instance.disableNetwork();
     await _googleSignIn.signOut();
     await _auth.signOut();
   }

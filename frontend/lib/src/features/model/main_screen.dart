@@ -50,21 +50,24 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   // 📌 SECTION: Resolve background color per tab
-  Color get _backgroundColor {
+  Color _backgroundColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (_selectedIndex) {
-      case 1: // Events   ✅ Added
+      case 1: // Events
       case 3: // Messages
       case 4: // Profile
-        return Colors.white;
+        return Theme.of(context).scaffoldBackgroundColor;
       default:
-        return const Color(0xFFE8EAF0);
+        return isDark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : const Color(0xFFE8EAF0);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: _backgroundColor(context),
       extendBody: true,
       body: Stack(
         children: [
@@ -84,7 +87,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 16,
+            bottom: 16 + MediaQuery.of(context).padding.bottom,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(

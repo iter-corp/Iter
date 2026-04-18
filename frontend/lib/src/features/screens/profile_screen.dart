@@ -39,7 +39,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: context.borderColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -53,18 +53,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                 ),
-                const Divider(height: 1),
                 Expanded(
                   child: uids.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'No users yet',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         )
                       : ListView.separated(
                           itemCount: uids.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, __) => const SizedBox.shrink(),
                           itemBuilder: (context, index) {
                             final uid = uids[index];
                             final userAsync = ref
@@ -77,15 +76,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               stream: userAsync,
                               builder: (context, snapshot) {
                                 final data = snapshot.data;
-                                final avatarUrl =
-                                    data?['avatarUrl'] as String?;
+                                final avatarUrl = data?['avatarUrl'] as String?;
                                 return ListTile(
                                   onTap: () {
                                     Navigator.pop(context);
                                     openUserProfile(context, uid: uid);
                                   },
                                   leading: CircleAvatar(
-                                    backgroundColor: Colors.grey.shade200,
+                                    backgroundColor: context.inputFill,
                                     backgroundImage: avatarUrl != null
                                         ? NetworkImage(avatarUrl)
                                         : null,
@@ -98,7 +96,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                   subtitle: Text(
                                     (data?['handle'] as String?) ?? '',
-                                    style: const TextStyle(color: Colors.grey),
+                                    style:
+                                        TextStyle(color: context.textSecondary),
                                   ),
                                 );
                               },
@@ -172,7 +171,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   selectedTab: selectedTab,
                   onTap: (i) => setState(() => selectedTab = i),
                 ),
-                const Divider(height: 1),
                 if (currentUid != null)
                   _tabContent(currentUid)
                 else
@@ -221,8 +219,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     onChanged: (_) =>
                         ref.read(themeModeProvider.notifier).toggle(),
                   ),
-                  onTap: () =>
-                      ref.read(themeModeProvider.notifier).toggle(),
+                  onTap: () => ref.read(themeModeProvider.notifier).toggle(),
                 );
               },
             ),
@@ -245,6 +242,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               title: const Text('Log out', style: TextStyle(color: Colors.red)),
               onTap: () async {
                 await ref.read(authServiceProvider).signOut();
+                ref.invalidate(adminConfigProvider);
+                ref.invalidate(adminPostsProvider);
+                ref.invalidate(adminEventsProvider);
+                ref.invalidate(blacklistProvider);
                 if (context.mounted) {
                   context.go('/login');
                 }
@@ -309,9 +310,9 @@ class UserPostsGrid extends ConsumerWidget {
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
                               Container(color: context.borderColor),
-                          errorWidget: (_, __, ___) => const Icon(
+                          errorWidget: (_, __, ___) => Icon(
                             Icons.broken_image,
-                            color: Colors.grey,
+                            color: context.textSecondary,
                           ),
                         )
                       : Padding(
@@ -395,9 +396,9 @@ class UserRepostsGrid extends ConsumerWidget {
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
                               Container(color: context.borderColor),
-                          errorWidget: (_, __, ___) => const Icon(
+                          errorWidget: (_, __, ___) => Icon(
                             Icons.broken_image,
-                            color: Colors.grey,
+                            color: context.textSecondary,
                           ),
                         )
                       : Padding(
@@ -481,9 +482,9 @@ class UserSavedGrid extends ConsumerWidget {
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
                               Container(color: context.borderColor),
-                          errorWidget: (_, __, ___) => const Icon(
+                          errorWidget: (_, __, ___) => Icon(
                             Icons.broken_image,
-                            color: Colors.grey,
+                            color: context.textSecondary,
                           ),
                         )
                       : Padding(
@@ -528,8 +529,10 @@ class _EmptyTab extends StatelessWidget {
           Icon(icon, size: 48, color: context.textMuted),
           const SizedBox(height: 12),
           Text(title,
-              style:
-                  TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textPrimary)),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: context.textPrimary)),
           const SizedBox(height: 4),
           Text(subtitle,
               textAlign: TextAlign.center,

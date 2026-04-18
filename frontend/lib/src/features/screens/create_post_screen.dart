@@ -100,8 +100,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             children: [
               // HEADER
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                 child: Row(
                   children: [
                     IconButton(
@@ -134,13 +133,13 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                         children: [
                           CircleAvatar(
                             radius: 20,
-                            backgroundColor: Colors.grey.shade200,
+                            backgroundColor: context.inputFill,
                             backgroundImage: avatarUrl != null
                                 ? NetworkImage(avatarUrl)
                                 : null,
                             child: avatarUrl == null
-                                ? const Icon(Icons.person,
-                                    size: 22, color: Colors.grey)
+                                ? Icon(Icons.person,
+                                    size: 22, color: context.textMuted)
                                 : null,
                           ),
                           const SizedBox(width: 10),
@@ -158,8 +157,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                                 const SizedBox(height: 2),
                                 _PrivacyChip(
                                   isPrivate: _isPrivate,
-                                  onTap: () => setState(
-                                      () => _isPrivate = !_isPrivate),
+                                  onTap: () =>
+                                      setState(() => _isPrivate = !_isPrivate),
                                 ),
                               ],
                             ),
@@ -171,21 +170,18 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       // CAPTION CARD
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: context.cardBg,
                           borderRadius: BorderRadius.circular(18),
-                          border:
-                              Border.all(color: const Color(0xFFEDEDF2)),
+                          border: Border.all(color: context.borderColor),
                         ),
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                         child: TextField(
                           controller: _captionCtrl,
                           maxLines: 6,
                           minLines: 3,
                           style: const TextStyle(fontSize: 15),
                           decoration: const InputDecoration(
-                            hintText:
-                                "What's happening? Share your moment…",
+                            hintText: "What's happening? Share your moment…",
                             hintStyle: TextStyle(
                               color: Color(0xFFB1B1B6),
                               fontSize: 15,
@@ -204,8 +200,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                           files: _pickedImages,
                           onRemove: _removeImage,
                         ),
-                      if (_pickedImages.isNotEmpty)
-                        const SizedBox(height: 16),
+                      if (_pickedImages.isNotEmpty) const SizedBox(height: 16),
 
                       // ACTION TILES
                       _ActionTile(
@@ -231,7 +226,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E1F22),
+                      color: context.surfaceSoft,
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Row(
@@ -269,16 +264,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white : Colors.transparent,
+          color: isActive ? context.cardBg : Colors.transparent,
           borderRadius: BorderRadius.circular(25),
         ),
         child: Text(
           text,
           style: TextStyle(
-            color: isActive ? Colors.black : Colors.grey,
+            color: isActive ? context.textPrimary : context.textSecondary,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
@@ -298,8 +292,7 @@ class _PostButton extends StatelessWidget {
     return GestureDetector(
       onTap: loading ? null : onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFD044E8), Color(0xFF7E3BE8)],
@@ -344,12 +337,9 @@ class _PrivacyChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
-          color: isPrivate
-              ? const Color(0xFFFFF1F8)
-              : const Color(0xFFEEF1FF),
+          color: isPrivate ? context.purpleSoft : context.purpleSoft,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isPrivate
@@ -363,9 +353,8 @@ class _PrivacyChip extends StatelessWidget {
             Icon(
               isPrivate ? Icons.lock_outline : Icons.public,
               size: 12,
-              color: isPrivate
-                  ? const Color(0xFFD044E8)
-                  : const Color(0xFF7E3BE8),
+              color:
+                  isPrivate ? const Color(0xFFD044E8) : const Color(0xFF7E3BE8),
             ),
             const SizedBox(width: 4),
             Text(
@@ -398,8 +387,7 @@ class _ImageGrid extends StatelessWidget {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         mainAxisSpacing: 6,
         crossAxisSpacing: 6,
@@ -420,13 +408,12 @@ class _ImageGrid extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onRemove(i),
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Colors.black54,
                   shape: BoxShape.circle,
                 ),
                 padding: const EdgeInsets.all(3),
-                child: const Icon(Icons.close,
-                    size: 14, color: Colors.white),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
               ),
             ),
           ),
@@ -455,8 +442,7 @@ class _ActionTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: context.borderColor),
@@ -469,8 +455,7 @@ class _ActionTile extends StatelessWidget {
                   color: context.purpleSoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon,
-                    size: 20, color: const Color(0xFF7E3BE8)),
+                child: Icon(icon, size: 20, color: const Color(0xFF7E3BE8)),
               ),
               const SizedBox(width: 12),
               Text(
@@ -481,8 +466,7 @@ class _ActionTile extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.chevron_right,
-                  color: Color(0xFFB1B1B6)),
+              const Icon(Icons.chevron_right, color: Color(0xFFB1B1B6)),
             ],
           ),
         ),

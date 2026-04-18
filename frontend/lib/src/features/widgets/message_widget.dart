@@ -75,12 +75,12 @@ class MessageTile extends StatelessWidget {
       onTap: onTap,
       leading: CircleAvatar(
         radius: 26,
-        backgroundColor: Colors.grey.shade200,
+        backgroundColor: context.inputFill,
         backgroundImage: message.otherAvatarUrl.isNotEmpty
             ? NetworkImage(message.otherAvatarUrl)
             : null,
         child: message.otherAvatarUrl.isEmpty
-            ? const Icon(Icons.person, color: Colors.white)
+            ? Icon(Icons.person, color: context.textMuted)
             : null,
       ),
       title: Text(
@@ -89,7 +89,7 @@ class MessageTile extends StatelessWidget {
       ),
       subtitle: Text(
         message.lastMessage,
-        style: const TextStyle(color: Colors.grey, fontSize: 12),
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -104,7 +104,8 @@ class MessageTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-          const Icon(Icons.camera_alt_outlined, size: 20, color: Colors.grey),
+          Icon(Icons.camera_alt_outlined,
+              size: 20, color: context.textSecondary),
         ],
       ),
     );

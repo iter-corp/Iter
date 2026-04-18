@@ -75,7 +75,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // 📌 SECTION: Back Arrow
               Padding(
                 padding: const EdgeInsets.only(left: 14, top: 10, bottom: 6),
@@ -106,7 +105,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         errorBuilder: (_, __, ___) => Container(
                           width: 44,
                           height: 44,
-                          color: const Color(0xFFD0D0D0),
+                          color: context.borderColor,
                         ),
                       ),
                     ),
@@ -126,9 +125,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         const SizedBox(height: 2),
                         Text(
                           widget.subtitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF999999),
+                            color: context.textSecondary,
                           ),
                         ),
                       ],
@@ -146,25 +145,27 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 child: Stack(
                   children: [
                     // 🔹 PageView — full bleed
-                 Padding(
-                   padding: const EdgeInsets.all(4),
-                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20), // 🔹 change value as needed
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: widget.imageUrls.length,
-                      onPageChanged: (i) => setState(() => _currentImage = i),
-                      itemBuilder: (_, i) => Image.network(
-                        widget.imageUrls[i],
-                        width: double.infinity,
-                        height: 210,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            Container(color: const Color(0xFFD0D0D0)),
+                    Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                            20), // 🔹 change value as needed
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: widget.imageUrls.length,
+                          onPageChanged: (i) =>
+                              setState(() => _currentImage = i),
+                          itemBuilder: (_, i) => Image.network(
+                            widget.imageUrls[i],
+                            width: double.infinity,
+                            height: 210,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: context.borderColor),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                 ),
                     // 🔹 Left arrow — vertically centered
                     Positioned(
                       left: 12,
@@ -270,7 +271,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               // 📌 SECTION: Email row
               _ContactRow(
                 icon: Icons.mail,
-                iconColor: Colors.black,
+                iconColor: context.textPrimary,
                 label: widget.email,
               ),
 
@@ -368,7 +369,7 @@ class _RegistrationButton extends ConsumerWidget {
       switch (reg.status) {
         case RegistrationStatus.pending:
           label = 'Request pending';
-          color = Colors.grey.shade500;
+          color = context.textSecondary;
           onTap = null;
           break;
         case RegistrationStatus.approved:

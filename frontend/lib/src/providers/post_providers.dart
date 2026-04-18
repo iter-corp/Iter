@@ -1,14 +1,30 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/model/post_model.dart';
+import '../services/follow_service.dart';
 import '../services/post_service.dart';
 import 'auth_providers.dart';
+import 'follow_providers.dart';
 
 final postServiceProvider = Provider<PostService>((_) => PostService());
 
-final feedProvider = StreamProvider<List<Post>>(
-  (ref) => ref.watch(postServiceProvider).streamFeed(),
-);
+final feedProvider = StreamProvider<List<Post>>((ref) {
+  final currentUid = ref.watch(authStateProvider).value?.uid;
+  if (currentUid == null) return const Stream.empty();
+
+  final followService = ref.watch(followServiceProvider);
+
+  // Combine raw posts with the current user's following list so that
+  // followers-only posts are hidden from users who don't follow the author.
+  return ref.watch(postServiceProvider).streamFeed().asyncExpand((posts) {
+    return followService.getFollowing(currentUid).map((following) {
+      final allowed = {...following, currentUid};
+      return posts
+          .where((p) => !p.isPrivate || allowed.contains(p.authorUid))
+          .toList();
+    });
+  });
+});
 
 final userPostsProvider = StreamProvider.family<List<Post>, String>(
   (ref, uid) => ref.watch(postServiceProvider).streamUserPosts(uid),

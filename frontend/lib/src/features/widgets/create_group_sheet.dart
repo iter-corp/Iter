@@ -103,7 +103,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -114,8 +114,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'New group',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -138,13 +137,14 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Add members (from people you follow)',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style:
+                        TextStyle(fontSize: 12, color: context.textSecondary),
                   ),
                 ),
               ),
@@ -156,10 +156,10 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   error: (e, _) => Center(child: Text('Error: $e')),
                   data: (uids) {
                     if (uids.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Text(
                           'You aren\'t following anyone yet.',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: context.textSecondary),
                         ),
                       );
                     }
@@ -211,8 +211,8 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                           : Text(
                               'Create'
                               '${_selected.isEmpty ? '' : ' (${_selected.length})'}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
                             ),
                     ),
                   ),
@@ -240,10 +240,8 @@ class _UserRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
       builder: (context, snap) {
         final d = snap.data?.data() ?? {};
         final username = (d['username'] as String?) ?? uid;
@@ -254,12 +252,11 @@ class _UserRow extends ConsumerWidget {
           controlAffinity: ListTileControlAffinity.trailing,
           secondary: CircleAvatar(
             radius: 20,
-            backgroundColor: Colors.grey.shade200,
-            backgroundImage: avatar.isNotEmpty
-                ? CachedNetworkImageProvider(avatar)
-                : null,
+            backgroundColor: context.inputFill,
+            backgroundImage:
+                avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
             child: avatar.isEmpty
-                ? const Icon(Icons.person, color: Colors.grey)
+                ? Icon(Icons.person, color: context.textSecondary)
                 : null,
           ),
           title: Text(username,

@@ -76,8 +76,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
           chatId: conv.chatId,
           otherUid: conv.otherUid,
           otherName: conv.isGroup ? conv.groupName : conv.otherUsername,
-          otherAvatar:
-              conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl,
+          otherAvatar: conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl,
         ),
       ),
     );
@@ -109,10 +108,12 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
     final requestsAsync = ref.watch(requestsProvider);
     final eventChatsAsync = ref.watch(myEventChatsProvider);
 
-    final oneToOne = (acceptedInboxAsync.value ?? []).where(_matches).toList();
+    final oneToOne =
+        (acceptedInboxAsync.valueOrNull ?? []).where(_matches).toList();
     final eventRows =
-        (eventChatsAsync.value ?? []).where(_matchesEvent).toList();
-    final requestConvs = (requestsAsync.value ?? []).where(_matches).toList();
+        (eventChatsAsync.valueOrNull ?? []).where(_matchesEvent).toList();
+    final requestConvs =
+        (requestsAsync.valueOrNull ?? []).where(_matches).toList();
 
     // Merge + sort by lastTime (newest first).
     final merged = <InboxRow>[
@@ -161,8 +162,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                     onTap: () => showCreateGroupSheet(context),
                     borderRadius: BorderRadius.circular(12),
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 10),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       child: Icon(
                         Icons.group_add_outlined,
                         color: Colors.white,
@@ -261,9 +262,8 @@ class _ConvTile extends StatelessWidget {
           ? CircleAvatar(
               radius: 26,
               backgroundColor: const Color(0xFF7E3BE8),
-              backgroundImage: displayAvatar.isNotEmpty
-                  ? NetworkImage(displayAvatar)
-                  : null,
+              backgroundImage:
+                  displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
               child: displayAvatar.isEmpty
                   ? const Icon(Icons.groups, color: Colors.white)
                   : null,
@@ -271,9 +271,8 @@ class _ConvTile extends StatelessWidget {
           : CircleAvatar(
               radius: 26,
               backgroundColor: context.inputFill,
-              backgroundImage: displayAvatar.isNotEmpty
-                  ? NetworkImage(displayAvatar)
-                  : null,
+              backgroundImage:
+                  displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
               child: displayAvatar.isEmpty
                   ? Icon(Icons.person, color: context.textSecondary)
                   : null,
@@ -283,8 +282,10 @@ class _ConvTile extends StatelessWidget {
           Flexible(
             child: Text(
               displayName,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 14),
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: context.textPrimary),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -293,7 +294,7 @@ class _ConvTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFEADDF7),
+                color: context.purpleSoft,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Text(
@@ -328,7 +329,8 @@ class _ConvTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-          Icon(Icons.camera_alt_outlined, size: 20, color: context.textSecondary),
+          Icon(Icons.camera_alt_outlined,
+              size: 20, color: context.textSecondary),
         ],
       ),
     );
@@ -360,9 +362,10 @@ class _EventConvTile extends StatelessWidget {
           Flexible(
             child: Text(
               chat.eventTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
+                color: context.textPrimary,
               ),
               overflow: TextOverflow.ellipsis,
             ),
