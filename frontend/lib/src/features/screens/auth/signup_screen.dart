@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../providers/auth_providers.dart';
+import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -43,6 +44,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           );
       if (!mounted) return;
       context.push('/otp?email=${Uri.encodeComponent(_emailCtrl.text.trim())}');
+    } on AccountDeletedException catch (e) {
+      setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Signup failed');
     } finally {

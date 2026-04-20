@@ -117,6 +117,23 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       }
     });
 
+    // If the user's Firestore profile transitions from present → missing
+    // while they're signed in — e.g. an admin deletes them on another device
+    // — sign them out so they can't keep using a ghost session. We require a
+    // prior non-null value so the transient null that precedes the user-doc
+    // write during a fresh sign-up doesn't log the user out immediately.
+    // The cross-session admin-delete case is already handled by the blacklist
+    // check inside authStateProvider.
+    ref.listen<AsyncValue<Map<String, dynamic>?>>(currentUserDocProvider,
+        (prev, next) {
+      final authed = ref.read(authStateProvider).value != null;
+      final wasPresent = prev?.value != null;
+      final nowMissing = next.hasValue && next.value == null;
+      if (authed && wasPresent && nowMissing) {
+        unawaited(ref.read(authServiceProvider).signOut());
+      }
+    });
+
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(

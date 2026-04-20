@@ -56,12 +56,21 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Block re-registration for emails that were previously deleted. Checked
+    // BEFORE creating the Firebase Auth account so a blacklisted address
+    // never gets a fresh user record.
+    if (await isEmailBlacklisted(email.trim())) {
+      throw const AccountDeletedException();
+    }
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
     final user = cred.user;
     if (user != null) {
+      // Defensive second check in case the blacklist was written between
+      // the pre-flight read and account creation.
+      await _enforceBlacklist(user);
       await _db.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'email': user.email,

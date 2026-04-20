@@ -60,6 +60,12 @@ dependencies:
   shared_preferences: ^2.3.2
   package_info_plus: ^8.0.0
 
+dependency_overrides:
+  # record 5.1.2 transitively pulls record_linux 0.7.2, which is incompatible
+  # with record_platform_interface 1.5.0 (missing startStream, changed
+  # hasPermission signature). Pinning to 1.x fixes the compile error on iOS.
+  record_linux: ^1.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

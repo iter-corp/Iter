@@ -47,8 +47,11 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // While user doc is still loading (first emission hasn't happened yet),
       // keep showing the splash instead of bouncing them to /home with no
-      // knowledge of onboarding state.
-      if (userDocAsync.isLoading) {
+      // knowledge of onboarding state. A transient null during a fresh
+      // sign-up (auth user exists, users/{uid} doc write still in flight)
+      // also falls through to /splash so we don't boot them out mid-flow.
+      if (userDocAsync.isLoading ||
+          (userDocAsync.hasValue && userDoc == null)) {
         return loc == '/splash' ? null : '/splash';
       }
 
