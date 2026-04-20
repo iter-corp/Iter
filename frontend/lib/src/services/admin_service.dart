@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminConfig {
   final bool storiesEnabled;
@@ -170,13 +171,9 @@ class AdminService {
       await story.reference.delete();
     }
 
-    final comments = await _db
-        .collectionGroup('comments')
-        .where('authorUid', isEqualTo: uid)
-        .get();
-    for (final c in comments.docs) {
-      await c.reference.delete();
-    }
+    // Comments authored by the deleted user are intentionally kept on other
+    // people's posts so the conversation history stays intact. The comment
+    // tile renders "deleted user" when the author doc no longer exists.
 
     final chats = await _db
         .collection('chats')
@@ -236,6 +233,26 @@ class AdminService {
   /// (followers on others, likes on others' posts) since collection-group
   /// writes aren't permitted for non-admin callers.
   Future<void> selfDeleteCurrentUser(String uid) async {
+    // Capture the email FIRST so we can blacklist it even if some downstream
+    // step fails. This is what stops the user from signing back in (via
+    // Google, Apple, or a recreated email/password account).
+    final userRef = _db.collection('users').doc(uid);
+    final userSnap = await userRef.get();
+    final email = (userSnap.data()?['email'] as String?) ?? '';
+    if (email.isNotEmpty) {
+      try {
+        await _db.collection('blacklist').doc(email).set({
+          'email': email,
+          'uid': uid,
+          'deletedAt': FieldValue.serverTimestamp(),
+          'selfDeleted': true,
+        });
+      } catch (_) {
+        // Best-effort — if rules reject the write the auth-account delete
+        // below is the only remaining gate.
+      }
+    }
+
     final posts = await _db
         .collection('posts')
         .where('authorUid', isEqualTo: uid)
@@ -252,7 +269,9 @@ class AdminService {
       await story.reference.delete();
     }
 
-    final userRef = _db.collection('users').doc(uid);
+    // Comments by this user are intentionally preserved; the comment tile
+    // displays "deleted user" once the author doc is gone.
+
     await _deleteSubcollection(userRef, 'followers');
     await _deleteSubcollection(userRef, 'following');
     await _deleteSubcollection(userRef, 'reposts');
@@ -333,11 +352,32 @@ class AdminService {
       'imageUrls': imageUrls,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Auto-create the matching event group chat so the admin sees it in
+    // their inbox immediately, before any registrations are approved.
+    final adminUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (adminUid.isNotEmpty) {
+      await _db.collection('eventChats').doc(ref.id).set({
+        'eventId': ref.id,
+        'eventTitle': title,
+        'adminUid': adminUid,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
     return ref.id;
   }
 
-  Future<void> updateEvent(String id, Map<String, dynamic> data) =>
-      _db.collection('events').doc(id).update(data);
+  Future<void> updateEvent(String id, Map<String, dynamic> data) async {
+    await _db.collection('events').doc(id).update(data);
+    // Keep the chat doc's title mirrored when the admin renames the event.
+    if (data.containsKey('title')) {
+      await _db
+          .collection('eventChats')
+          .doc(id)
+          .set({'eventTitle': data['title']}, SetOptions(merge: true));
+    }
+  }
 
   Future<void> deleteEvent(String id) =>
       _db.collection('events').doc(id).delete();

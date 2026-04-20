@@ -7,6 +7,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+/// Thrown when sign-in succeeded against Firebase Auth but the email has
+/// been blacklisted (the account was previously deleted by an admin or by
+/// the user themselves). Caught by the login UI to show a friendly message.
+class AccountDeletedException implements Exception {
+  const AccountDeletedException();
+  @override
+  String toString() => 'This account has been deleted and can no longer sign in.';
+}
+
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -14,6 +23,34 @@ class AuthService {
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  /// Returns true when [email] has a tombstone in `blacklist/{email}`.
+  /// Empty emails are treated as not blacklisted so anonymous-style accounts
+  /// don't get permanently locked out.
+  Future<bool> isEmailBlacklisted(String email) async {
+    if (email.isEmpty) return false;
+    try {
+      final snap = await _db.collection('blacklist').doc(email).get();
+      return snap.exists;
+    } catch (_) {
+      // If the read fails (e.g. transient network issue) we let the user
+      // through — a stale blacklist hit will be caught on the next call.
+      return false;
+    }
+  }
+
+  /// If the just-signed-in [user] has a blacklisted email, immediately sign
+  /// them back out and throw [AccountDeletedException] so the UI can react.
+  Future<void> _enforceBlacklist(User user) async {
+    final email = user.email ?? '';
+    if (await isEmailBlacklisted(email)) {
+      await _auth.signOut();
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+      throw const AccountDeletedException();
+    }
+  }
 
   Future<User?> signUp({
     required String email,
@@ -54,7 +91,9 @@ class AuthService {
       email: email.trim(),
       password: password,
     );
-    return cred.user;
+    final user = cred.user;
+    if (user != null) await _enforceBlacklist(user);
+    return user;
   }
 
   Future<User?> signInWithGoogle() async {
@@ -70,6 +109,7 @@ class AuthService {
     final cred = await _auth.signInWithCredential(credential);
     final user = cred.user;
     if (user == null) return null;
+    await _enforceBlacklist(user);
 
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
     if (isNew) {
@@ -114,6 +154,7 @@ class AuthService {
     final cred = await _auth.signInWithCredential(oauthCredential);
     final user = cred.user;
     if (user == null) return null;
+    await _enforceBlacklist(user);
 
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
     if (isNew) {

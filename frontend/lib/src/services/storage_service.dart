@@ -34,6 +34,11 @@ class StorageService {
     return _uploadViaEdge(bucket: 'posts', file: file, kind: 'chat', subPath: chatId);
   }
 
+  Future<String> uploadChatAudio(File file, String chatId) {
+    return _uploadViaEdge(
+        bucket: 'posts', file: file, kind: 'audio', subPath: chatId);
+  }
+
   Future<String> uploadStoryImage(File file) {
     return _uploadViaEdge(bucket: 'posts', file: file, kind: 'story');
   }
@@ -117,6 +122,15 @@ class StorageService {
         return 'image/gif';
       case 'heic':
         return 'image/heic';
+      case 'm4a':
+      case 'aac':
+        return 'audio/m4a';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'ogg':
+        return 'audio/ogg';
       default:
         return 'application/octet-stream';
     }

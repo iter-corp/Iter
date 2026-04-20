@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_providers.dart';
+import '../../providers/event_chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
+import 'event_chat_screen.dart';
 import 'post_detail_screen.dart';
 import 'user_screen.dart';
 
@@ -210,6 +212,26 @@ class _NotificationItem extends ConsumerWidget {
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
+          case 'event_approved':
+            title = 'Your event registration was approved';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'event_rejected':
+            title = 'Your event registration was rejected';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'event_invited':
+            title = '$username added you to an event group';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'event_removed':
+            title = 'You were removed from an event group';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
           default:
             title = username;
             subtitle = _timeAgo(notif.createdAt);
@@ -220,6 +242,14 @@ class _NotificationItem extends ConsumerWidget {
         if ((notif.type == 'like' || notif.type == 'comment') &&
             notif.targetId != null) {
           trailingWidget = _PostThumbnail(postId: notif.targetId!);
+        }
+
+        // Inline accept/reject buttons for event invitations.
+        if (notif.type == 'event_invited' && notif.targetId != null) {
+          trailingWidget = _InviteActions(
+            eventId: notif.targetId!,
+            onDone: onMarkRead,
+          );
         }
 
         return Dismissible(
@@ -281,7 +311,41 @@ class _NotificationItem extends ConsumerWidget {
           _openChatFromNotification(context, notif);
         }
         break;
+      case 'event_approved':
+      case 'event_invited':
+        if (notif.targetId != null) {
+          _openEventChatFromNotification(context, notif);
+        }
+        break;
+      case 'event_rejected':
+      case 'event_removed':
+        // Nothing to navigate to — the user is no longer in the group.
+        break;
     }
+  }
+
+  /// Resolves the event chat metadata and navigates into it.
+  Future<void> _openEventChatFromNotification(
+    BuildContext context,
+    AppNotification notif,
+  ) async {
+    final db = FirebaseFirestore.instance;
+    final snap = await db.collection('eventChats').doc(notif.targetId!).get();
+    final d = snap.data() ?? {};
+    final title = (d['eventTitle'] as String?) ?? 'Event';
+    final adminUid = (d['adminUid'] as String?) ?? '';
+
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventChatScreen(
+          eventId: notif.targetId!,
+          eventTitle: title,
+          adminUid: adminUid,
+        ),
+      ),
+    );
   }
 
   /// Resolves the chat metadata + actor info, then navigates to ChatScreen.
@@ -319,6 +383,97 @@ class _NotificationItem extends ConsumerWidget {
     if (d.inHours < 24) return '${d.inHours}h';
     if (d.inDays < 7) return '${d.inDays}d';
     return '${(d.inDays / 7).floor()}w';
+  }
+}
+
+// ─────────────────────────────────────────────
+// Invite actions — Accept (stay in the group) / Reject (leave the group).
+// Shown inline on `event_invited` notifications.
+// ─────────────────────────────────────────────
+
+class _InviteActions extends ConsumerStatefulWidget {
+  final String eventId;
+  final VoidCallback? onDone;
+
+  const _InviteActions({required this.eventId, this.onDone});
+
+  @override
+  ConsumerState<_InviteActions> createState() => _InviteActionsState();
+}
+
+class _InviteActionsState extends ConsumerState<_InviteActions> {
+  bool _busy = false;
+
+  Future<void> _accept() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      widget.onDone?.call();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _reject() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(eventChatServiceProvider).leaveGroup(widget.eventId);
+      widget.onDone?.call();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: _busy ? null : _reject,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE04E5C)),
+            ),
+            child: const Text(
+              'Reject',
+              style: TextStyle(
+                  color: Color(0xFFE04E5C),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        InkWell(
+          onTap: _busy ? null : _accept,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFFB44FFF),
+            ),
+            child: const Text(
+              'Accept',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

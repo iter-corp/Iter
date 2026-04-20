@@ -117,6 +117,24 @@ class EventRegistrationService {
           }));
   }
 
+  /// Pending registrations for a single event — shown in the group settings
+  /// screen so the admin can approve/reject people who signed up for THIS
+  /// event without leaving the chat.
+  Stream<List<EventRegistration>> streamPendingForEvent(String eventId) {
+    return _col
+        .where('eventId', isEqualTo: eventId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((s) => s.docs.map(EventRegistration.fromDoc).toList()
+          ..sort((a, b) {
+            final ac = a.createdAt;
+            final bc = b.createdAt;
+            if (ac == null) return 1;
+            if (bc == null) return -1;
+            return bc.compareTo(ac);
+          }));
+  }
+
   /// Stream a single user's registration for a specific event (nullable).
   Stream<EventRegistration?> streamMine(String eventId) {
     final uid = _auth.currentUser?.uid;

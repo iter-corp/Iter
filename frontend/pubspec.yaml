@@ -48,6 +48,9 @@ dependencies:
   speech_to_text: ^7.0.0
   gal: ^2.3.1
   flutter_tts: ^4.2.5
+  record: ^5.1.2
+  audioplayers: ^6.1.0
+  path_provider: ^2.1.4
 
   # Location (GPS + reverse-geocode for onboarding "Nearby")
   geolocator: ^13.0.1

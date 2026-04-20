@@ -350,15 +350,26 @@ class _CommentTile extends ConsumerWidget {
         currentUid == comment.authorUid || currentUid == post.authorUid;
 
     // Pull the author's current avatar/username from their user doc so
-    // profile changes are reflected on old comments. Fall back to the
-    // snapshot stored in the comment while the stream is loading.
-    final liveUser = ref.watch(userByUidProvider(comment.authorUid)).value;
-    final avatar =
-        (liveUser?['avatarUrl'] as String?) ?? comment.authorAvatar;
-    final username =
-        (liveUser?['username'] as String?) ?? comment.authorUsername;
+    // profile changes are reflected on old comments. When the doc has
+    // loaded but is null the account was deleted — render "deleted user"
+    // and disable navigation to the (now non-existent) profile.
+    final liveAsync = ref.watch(userByUidProvider(comment.authorUid));
+    final liveUser = liveAsync.value;
+    final isDeleted = liveAsync.hasValue && liveUser == null;
+
+    final avatar = isDeleted
+        ? null
+        : ((liveUser?['avatarUrl'] as String?) ?? comment.authorAvatar);
+    final username = isDeleted
+        ? 'deleted user'
+        : ((liveUser?['username'] as String?) ?? comment.authorUsername);
     final hasAvatar = avatar != null && avatar.isNotEmpty;
     final avatarRadius = comment.isReply ? 14.0 : 16.0;
+
+    void openProfile() {
+      if (isDeleted) return;
+      openUserProfile(context, uid: comment.authorUid);
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -366,7 +377,7 @@ class _CommentTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () => openUserProfile(context, uid: comment.authorUid),
+            onTap: openProfile,
             child: CircleAvatar(
               radius: avatarRadius,
               backgroundImage:
@@ -384,12 +395,18 @@ class _CommentTile extends ConsumerWidget {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: () =>
-                          openUserProfile(context, uid: comment.authorUid),
+                      onTap: openProfile,
                       child: Text(
                         username,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          fontStyle:
+                              isDeleted ? FontStyle.italic : FontStyle.normal,
+                          color: isDeleted
+                              ? context.textSecondary
+                              : context.textPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

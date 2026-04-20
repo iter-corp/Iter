@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
@@ -44,6 +47,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Timer? _typingTimer;
   bool _sendingImage = false;
 
+  // Reply state — the message currently being replied to (null when none).
+  ChatMessage? _replyTarget;
+
+  // Voice recording state.
+  final AudioRecorder _recorder = AudioRecorder();
+  bool _isRecording = false;
+  DateTime? _recordStartedAt;
+  bool _uploadingVoice = false;
+
   String? get _currentUid => ref.read(authStateProvider).value?.uid;
 
   @override
@@ -62,6 +74,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _typingTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
+    _recorder.dispose();
     super.dispose();
   }
 
@@ -88,11 +101,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _typingTimer?.cancel();
     ref.read(typingServiceProvider).setTyping(widget.chatId, uid, false);
     _controller.clear();
+    final reply = _replyTarget;
+    setState(() => _replyTarget = null);
     await ref.read(chatServiceProvider).sendMessage(
           chatId: widget.chatId,
           senderUid: uid,
           receiverUid: widget.otherUid,
           text: text,
+          replyToId: reply?.id,
+          replyToText: reply == null ? null : _previewOf(reply),
+          replyToSenderUid: reply?.senderUid,
         );
   }
 
@@ -113,12 +131,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       final url = await StorageService()
           .uploadChatImage(File(picked.path), widget.chatId);
+      final reply = _replyTarget;
+      setState(() => _replyTarget = null);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
             senderUid: uid,
             receiverUid: widget.otherUid,
             text: '',
             imageUrl: url,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
           );
     } catch (e) {
       if (mounted) {
@@ -128,6 +151,92 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     } finally {
       if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
+  Future<void> _toggleVoiceRecording() async {
+    if (_uploadingVoice) return;
+    final uid = _currentUid;
+    if (uid == null) return;
+
+    if (_isRecording) {
+      // Stop + upload + send.
+      final path = await _recorder.stop();
+      final startedAt = _recordStartedAt;
+      setState(() {
+        _isRecording = false;
+        _recordStartedAt = null;
+      });
+      if (path == null) return;
+
+      setState(() => _uploadingVoice = true);
+      try {
+        final file = File(path);
+        final durationMs = startedAt == null
+            ? null
+            : DateTime.now().difference(startedAt).inMilliseconds;
+        final url = await StorageService()
+            .uploadChatAudio(file, widget.chatId);
+        final reply = _replyTarget;
+        setState(() => _replyTarget = null);
+        await ref.read(chatServiceProvider).sendMessage(
+              chatId: widget.chatId,
+              senderUid: uid,
+              receiverUid: widget.otherUid,
+              text: '',
+              voiceUrl: url,
+              voiceDurationMs: durationMs,
+              replyToId: reply?.id,
+              replyToText: reply == null ? null : _previewOf(reply),
+              replyToSenderUid: reply?.senderUid,
+            );
+        // Best-effort cleanup of the temp file.
+        try {
+          await file.delete();
+        } catch (_) {}
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Voice upload failed: $e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _uploadingVoice = false);
+      }
+    } else {
+      if (!await _recorder.hasPermission()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission denied')),
+          );
+        }
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+      setState(() {
+        _isRecording = true;
+        _recordStartedAt = DateTime.now();
+      });
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    if (!_isRecording) return;
+    final path = await _recorder.stop();
+    setState(() {
+      _isRecording = false;
+      _recordStartedAt = null;
+    });
+    if (path != null) {
+      try {
+        await File(path).delete();
+      } catch (_) {}
     }
   }
 
@@ -143,6 +252,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _openOtherProfile() {
     openUserProfile(context, uid: widget.otherUid);
+  }
+
+  void _startReply(ChatMessage msg) {
+    setState(() => _replyTarget = msg);
+  }
+
+  String _previewOf(ChatMessage m) {
+    if (m.voiceUrl != null && m.voiceUrl!.isNotEmpty) return 'Voice message';
+    if (m.imageUrl != null && m.imageUrl!.isNotEmpty) return 'Photo';
+    if (m.sharedPostId != null && m.sharedPostId!.isNotEmpty) {
+      return 'Shared post';
+    }
+    return m.text;
   }
 
   @override
@@ -257,14 +379,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.videocam_outlined, size: 24),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.call_outlined, size: 22),
-                  ),
                 ],
               ),
             ),
@@ -298,6 +412,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         otherUid: widget.otherUid,
                         otherAvatar: widget.otherAvatar,
                         isGroup: isGroup,
+                        onReply: () => _startReply(msg),
                       );
                     },
                   );
@@ -311,50 +426,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 canCreate: true,
               ),
 
+            // REPLY PREVIEW (above input)
+            if (_replyTarget != null)
+              _ReplyComposingBar(
+                target: _replyTarget!,
+                previewText: _previewOf(_replyTarget!),
+                onCancel: () => setState(() => _replyTarget = null),
+              ),
+
             // INPUT
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _sendingImage ? null : _pickAndSendImage,
-                    icon: _sendingImage
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Color(0xFFB05ECC)),
-                          )
-                        : Icon(Icons.camera_alt_outlined,
-                            color: context.textSecondary),
-                  ),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: context.inputFill,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        onChanged: _onTextChanged,
-                        decoration: InputDecoration(
-                          hintText: 'Message...',
-                          hintStyle:
-                              TextStyle(color: context.textMuted, fontSize: 14),
-                          border: InputBorder.none,
+              child: _isRecording
+                  ? _RecordingBar(
+                      startedAt: _recordStartedAt,
+                      onCancel: _cancelRecording,
+                      onStop: _toggleVoiceRecording,
+                    )
+                  : Row(
+                      children: [
+                        IconButton(
+                          onPressed: _sendingImage ? null : _pickAndSendImage,
+                          icon: _sendingImage
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Color(0xFFB05ECC)),
+                                )
+                              : Icon(Icons.camera_alt_outlined,
+                                  color: context.textSecondary),
                         ),
-                        onSubmitted: (_) => _sendMessage(),
-                      ),
+                        Expanded(
+                          child: Container(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: context.inputFill,
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: TextField(
+                              controller: _controller,
+                              onChanged: _onTextChanged,
+                              decoration: InputDecoration(
+                                hintText: 'Message...',
+                                hintStyle: TextStyle(
+                                    color: context.textMuted, fontSize: 14),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        if (_controller.text.trim().isEmpty && !_uploadingVoice)
+                          IconButton(
+                            onPressed: _toggleVoiceRecording,
+                            icon: const Icon(Icons.mic_none,
+                                color: Color(0xFFB05ECC)),
+                          )
+                        else if (_uploadingVoice)
+                          const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Color(0xFFB05ECC)),
+                            ),
+                          )
+                        else
+                          IconButton(
+                            onPressed: _sendMessage,
+                            icon: const Icon(Icons.send,
+                                color: Color(0xFFB05ECC)),
+                          ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _sendMessage,
-                    icon: const Icon(Icons.send, color: Color(0xFFB05ECC)),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -363,6 +511,142 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
+// ─────────────────────────────────────────────
+// Reply preview bar — shown above the input while composing a reply.
+// ─────────────────────────────────────────────
+
+class _ReplyComposingBar extends StatelessWidget {
+  final ChatMessage target;
+  final String previewText;
+  final VoidCallback onCancel;
+
+  const _ReplyComposingBar({
+    required this.target,
+    required this.previewText,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.purpleSoft,
+        border: Border(
+          left: BorderSide(
+            color: const Color(0xFFB05ECC).withValues(alpha: 0.8),
+            width: 3,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.reply, size: 16, color: Color(0xFFB05ECC)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              previewText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: context.textPrimary, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: onCancel,
+            icon: Icon(Icons.close, size: 18, color: context.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Recording bar — replaces the input row while the user is recording.
+// ─────────────────────────────────────────────
+
+class _RecordingBar extends StatefulWidget {
+  final DateTime? startedAt;
+  final VoidCallback onCancel;
+  final VoidCallback onStop;
+
+  const _RecordingBar({
+    required this.startedAt,
+    required this.onCancel,
+    required this.onStop,
+  });
+
+  @override
+  State<_RecordingBar> createState() => _RecordingBarState();
+}
+
+class _RecordingBarState extends State<_RecordingBar> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _elapsed() {
+    if (widget.startedAt == null) return '0:00';
+    final d = DateTime.now().difference(widget.startedAt!);
+    final mm = d.inMinutes.toString().padLeft(1, '0');
+    final ss = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$mm:$ss';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: widget.onCancel,
+          icon: const Icon(Icons.delete_outline, color: Colors.red),
+        ),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.inputFill,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.fiber_manual_record,
+                    color: Colors.red, size: 14),
+                const SizedBox(width: 8),
+                Text('Recording… ${_elapsed()}',
+                    style:
+                        TextStyle(color: context.textPrimary, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: widget.onStop,
+          icon: const Icon(Icons.send, color: Color(0xFFB05ECC)),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Message bubble
+// ─────────────────────────────────────────────
+
 class _MessageBubble extends ConsumerWidget {
   final String chatId;
   final ChatMessage msg;
@@ -370,6 +654,7 @@ class _MessageBubble extends ConsumerWidget {
   final String otherUid;
   final String otherAvatar;
   final bool isGroup;
+  final VoidCallback onReply;
 
   const _MessageBubble({
     required this.chatId,
@@ -377,6 +662,7 @@ class _MessageBubble extends ConsumerWidget {
     required this.isMe,
     required this.otherUid,
     required this.otherAvatar,
+    required this.onReply,
     this.isGroup = false,
   });
 
@@ -396,6 +682,9 @@ class _MessageBubble extends ConsumerWidget {
     final senderName =
         isGroup ? ((senderLive?['username'] as String?) ?? 'Member') : '';
     final senderUidForTap = isGroup ? msg.senderUid : otherUid;
+
+    final hasReply = msg.replyToId != null && msg.replyToId!.isNotEmpty;
+    final hasVoice = msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -435,66 +724,74 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                 ),
               GestureDetector(
-                onLongPress: () => showReactionsSheet(
-                  context,
-                  ref: ref,
-                  parentPath: 'chats/$chatId/messages',
-                  messageId: msg.id,
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFFB05ECC) : context.inputFill,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
+                onLongPress: () => _showBubbleMenu(context, ref),
+                child: Dismissible(
+                  key: ValueKey('dismiss-${msg.id}'),
+                  direction: isMe
+                      ? DismissDirection.endToStart
+                      : DismissDirection.startToEnd,
+                  confirmDismiss: (_) async {
+                    onReply();
+                    return false; // never actually dismiss — just trigger reply
+                  },
+                  background: _replySwipeBg(context, alignLeft: true),
+                  secondaryBackground:
+                      _replySwipeBg(context, alignLeft: false),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 260),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isMe ? const Color(0xFFB05ECC) : context.inputFill,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: Radius.circular(isMe ? 16 : 4),
+                          bottomRight: Radius.circular(isMe ? 4 : 16),
+                        ),
                       ),
-                    ),
-                    child: (msg.sharedPostId != null &&
-                            msg.sharedPostId!.isNotEmpty)
-                        ? _SharedPostPreview(
-                            postId: msg.sharedPostId!,
-                            isMe: isMe,
-                          )
-                        : (msg.imageUrl != null && msg.imageUrl!.isNotEmpty)
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: CachedNetworkImage(
-                                      imageUrl: msg.imageUrl!,
-                                      width: 240,
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, __) => const SizedBox(
-                                        height: 180,
-                                        child: Center(
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2),
-                                        ),
-                                      ),
-                                    ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasReply)
+                            _RepliedQuote(
+                              isMe: isMe,
+                              senderUid: msg.replyToSenderUid ?? '',
+                              text: msg.replyToText ?? '',
+                            ),
+                          if (hasVoice)
+                            _VoiceMessageBubble(
+                              url: msg.voiceUrl!,
+                              durationMs: msg.voiceDurationMs,
+                              isMe: isMe,
+                            )
+                          else if (msg.sharedPostId != null &&
+                              msg.sharedPostId!.isNotEmpty)
+                            _SharedPostPreview(
+                              postId: msg.sharedPostId!,
+                              isMe: isMe,
+                            )
+                          else if (msg.imageUrl != null &&
+                              msg.imageUrl!.isNotEmpty) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: CachedNetworkImage(
+                                imageUrl: msg.imageUrl!,
+                                width: 240,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => const SizedBox(
+                                  height: 180,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   ),
-                                  if (msg.text.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      msg.text,
-                                      style: TextStyle(
-                                        color: isMe
-                                            ? Colors.white
-                                            : context.textPrimary,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              )
-                            : Text(
+                                ),
+                              ),
+                            ),
+                            if (msg.text.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
                                 msg.text,
                                 style: TextStyle(
                                   color:
@@ -502,6 +799,19 @@ class _MessageBubble extends ConsumerWidget {
                                   fontSize: 14,
                                 ),
                               ),
+                            ],
+                          ] else
+                            Text(
+                              msg.text,
+                              style: TextStyle(
+                                color:
+                                    isMe ? Colors.white : context.textPrimary,
+                                fontSize: 14,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -541,6 +851,242 @@ class _MessageBubble extends ConsumerWidget {
                 ],
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _replySwipeBg(BuildContext context, {required bool alignLeft}) {
+    return Align(
+      alignment: alignLeft ? Alignment.centerLeft : Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Icon(Icons.reply, color: context.textSecondary, size: 20),
+      ),
+    );
+  }
+
+  void _showBubbleMenu(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.reply),
+              title: const Text('Reply'),
+              onTap: () {
+                Navigator.pop(sheet);
+                onReply();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_reaction_outlined),
+              title: const Text('Add reaction'),
+              onTap: () {
+                Navigator.pop(sheet);
+                showReactionsSheet(
+                  context,
+                  ref: ref,
+                  parentPath: 'chats/$chatId/messages',
+                  messageId: msg.id,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Replied-to quote — thin colored bar + preview text shown atop a bubble
+// whose sender is replying to another message.
+// ─────────────────────────────────────────────
+
+class _RepliedQuote extends ConsumerWidget {
+  final bool isMe;
+  final String senderUid;
+  final String text;
+
+  const _RepliedQuote({
+    required this.isMe,
+    required this.senderUid,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final who = ref.watch(userByUidProvider(senderUid)).value;
+    final name = (who?['username'] as String?) ?? 'Someone';
+    final bg = isMe
+        ? Colors.white.withValues(alpha: 0.18)
+        : Colors.black.withValues(alpha: 0.05);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(
+            color: isMe ? Colors.white : const Color(0xFFB05ECC),
+            width: 3,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: isMe ? Colors.white : const Color(0xFFB05ECC),
+            ),
+          ),
+          Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color:
+                  isMe ? Colors.white.withValues(alpha: 0.85) : context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Voice message bubble — play/pause + duration.
+// ─────────────────────────────────────────────
+
+class _VoiceMessageBubble extends StatefulWidget {
+  final String url;
+  final int? durationMs;
+  final bool isMe;
+
+  const _VoiceMessageBubble({
+    required this.url,
+    required this.durationMs,
+    required this.isMe,
+  });
+
+  @override
+  State<_VoiceMessageBubble> createState() => _VoiceMessageBubbleState();
+}
+
+class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _playing = false;
+  Duration _position = Duration.zero;
+  Duration? _duration;
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<void>? _completeSub;
+  StreamSubscription<Duration>? _durSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _duration = widget.durationMs == null
+        ? null
+        : Duration(milliseconds: widget.durationMs!);
+    _posSub = _player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _completeSub = _player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _playing = false;
+          _position = Duration.zero;
+        });
+      }
+    });
+    _durSub = _player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _completeSub?.cancel();
+    _durSub?.cancel();
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playing) {
+      await _player.pause();
+      setState(() => _playing = false);
+    } else {
+      await _player.play(UrlSource(widget.url));
+      setState(() => _playing = true);
+    }
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.toString();
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = _duration ?? Duration.zero;
+    final progress = total.inMilliseconds == 0
+        ? 0.0
+        : (_position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
+    final fg = widget.isMe ? Colors.white : const Color(0xFFB05ECC);
+    final trackBg = widget.isMe
+        ? Colors.white.withValues(alpha: 0.35)
+        : const Color(0xFFB05ECC).withValues(alpha: 0.25);
+    return SizedBox(
+      width: 220,
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _toggle,
+            child: Icon(
+              _playing
+                  ? Icons.pause_circle_filled
+                  : Icons.play_circle_fill,
+              color: fg,
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: trackBg,
+                    valueColor: AlwaysStoppedAnimation(fg),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _playing
+                      ? _fmt(_position)
+                      : (_duration == null ? '0:00' : _fmt(_duration!)),
+                  style: TextStyle(color: fg, fontSize: 11),
+                ),
+              ],
+            ),
           ),
         ],
       ),

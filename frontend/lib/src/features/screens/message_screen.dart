@@ -316,23 +316,16 @@ class _ConvTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (conv.unreadCount > 0)
-            Container(
+      trailing: conv.unreadCount > 0
+          ? Container(
               width: 10,
               height: 10,
-              margin: const EdgeInsets.only(right: 8),
               decoration: const BoxDecoration(
                 color: Color(0xFFB05ECC),
                 shape: BoxShape.circle,
               ),
-            ),
-          Icon(Icons.camera_alt_outlined,
-              size: 20, color: context.textSecondary),
-        ],
-      ),
+            )
+          : null,
     );
   }
 }

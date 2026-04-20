@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'notification_service.dart';
 
 class EventChatMessage {
   final String id;
@@ -50,6 +53,7 @@ class EventChatSummary {
 class EventChatService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationService _notifications = NotificationService();
 
   DocumentReference<Map<String, dynamic>> _chatDoc(String eventId) =>
       _db.collection('eventChats').doc(eventId);
@@ -102,38 +106,65 @@ class EventChatService {
         .map((s) => s.docs.map(EventChatMessage.fromDoc).toList());
   }
 
-  /// Stream every event chat doc the user is a member of. Combines two
-  /// queries: (a) chats where the user is admin, (b) chats that contain
-  /// a member doc for this user. The function collects them into one list.
+  /// Stream every event chat doc the user is a member of, plus every chat
+  /// where the user is the admin (even if they haven't added themselves as
+  /// a member). Combines:
+  ///   (a) chats referenced via the user's `members` docs (collectionGroup),
+  ///   (b) chats where `adminUid == uid` (admin's own chats, shown as soon
+  ///       as an event is created — before any members join).
   Stream<List<EventChatSummary>> streamMyEventChats(String uid) {
-    // We piggyback on the `collectionGroup` of members to find every event the
-    // user belongs to, then fetch each parent chat doc.
-    return _db
+    final memberEventsStream = _db
         .collectionGroup('members')
         .where('uid', isEqualTo: uid)
-        .snapshots()
-        .asyncMap((memberSnap) async {
-      // Collect parent event ids from member docs.
+        .snapshots();
+    final adminEventsStream = _db
+        .collection('eventChats')
+        .where('adminUid', isEqualTo: uid)
+        .snapshots();
+
+    // Combine both streams. We re-emit whenever either side changes.
+    return _combineLatest2(memberEventsStream, adminEventsStream)
+        .asyncMap((pair) async {
+      final memberSnap = pair.$1;
+      final adminSnap = pair.$2;
+
       final eventIds = <String>{};
       final lastSeenByEvent = <String, DateTime?>{};
+
+      // From membership docs.
       for (final m in memberSnap.docs) {
         final parent = m.reference.parent.parent;
         if (parent == null) continue;
-        // Ensure the grandparent is 'eventChats'.
         if (parent.parent.id != 'eventChats') continue;
         eventIds.add(parent.id);
         lastSeenByEvent[parent.id] =
             (m.data()['lastSeenAt'] as Timestamp?)?.toDate();
       }
 
+      // Pre-seed admin-owned chat summaries (they're already fresh in
+      // adminSnap so we don't need to re-fetch them below).
+      final adminSummaries = <String, EventChatSummary>{};
+      for (final doc in adminSnap.docs) {
+        eventIds.add(doc.id);
+        final d = doc.data();
+        final lastTime = (d['lastTime'] as Timestamp?)?.toDate();
+        adminSummaries[doc.id] = EventChatSummary(
+          eventId: doc.id,
+          eventTitle: (d['eventTitle'] as String?) ?? 'Event',
+          adminUid: (d['adminUid'] as String?) ?? '',
+          lastMessage: (d['lastMessage'] as String?) ?? '',
+          lastTime: lastTime,
+          unreadCount: 0, // admin is always caught up on their own chat
+        );
+      }
+
       if (eventIds.isEmpty) return <EventChatSummary>[];
 
-      // Fetch each chat doc in parallel.
-      final docs = await Future.wait(
-        eventIds.map((id) => _chatDoc(id).get()),
-      );
+      // Fetch any chat docs we haven't already got.
+      final missing = eventIds.where((id) => !adminSummaries.containsKey(id));
+      final docs = await Future.wait(missing.map((id) => _chatDoc(id).get()));
 
-      final result = <EventChatSummary>[];
+      final result = <EventChatSummary>[...adminSummaries.values];
       for (final doc in docs) {
         if (!doc.exists) continue;
         final d = doc.data() ?? {};
@@ -165,6 +196,35 @@ class EventChatService {
     });
   }
 
+  /// Minimal combine-latest for two streams — emits `(a, b)` tuples whenever
+  /// either upstream emits, once both have produced at least one value.
+  Stream<(A, B)> _combineLatest2<A, B>(Stream<A> a, Stream<B> b) async* {
+    A? lastA;
+    B? lastB;
+    var hasA = false;
+    var hasB = false;
+    final controller = StreamController<(A, B)>();
+
+    final subA = a.listen((v) {
+      lastA = v;
+      hasA = true;
+      if (hasB) controller.add((lastA as A, lastB as B));
+    }, onError: controller.addError);
+    final subB = b.listen((v) {
+      lastB = v;
+      hasB = true;
+      if (hasA) controller.add((lastA as A, lastB as B));
+    }, onError: controller.addError);
+
+    try {
+      yield* controller.stream;
+    } finally {
+      await subA.cancel();
+      await subB.cancel();
+      await controller.close();
+    }
+  }
+
   /// Mark the user as having seen the chat up to now.
   Future<void> markSeen(String eventId) async {
     final user = _auth.currentUser;
@@ -186,5 +246,73 @@ class EventChatService {
     return _membersCol(eventId).snapshots().map(
           (s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList(),
         );
+  }
+
+  /// Admin-only: add a user directly to the event chat (skipping the
+  /// registration flow) and notify them so they can choose to stay or leave.
+  Future<void> addMember({
+    required String eventId,
+    required String uid,
+  }) async {
+    final admin = _auth.currentUser;
+    if (admin == null) throw Exception('Not signed in');
+
+    final userSnap = await _db.collection('users').doc(uid).get();
+    final name = (userSnap.data()?['username'] as String?) ?? '';
+
+    await _membersCol(eventId).doc(uid).set({
+      'uid': uid,
+      'name': name,
+      'joinedAt': FieldValue.serverTimestamp(),
+      'addedByAdmin': true,
+    }, SetOptions(merge: true));
+
+    try {
+      await _notifications.createNotification(
+        targetUid: uid,
+        type: 'event_invited',
+        actorUid: admin.uid,
+        targetId: eventId,
+      );
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Remove a member. Admin can remove anyone; a user can remove themselves
+  /// (i.e. "leave the group"). Mirrors the Firestore rule:
+  ///   allow delete: if isSelf(uid) || isAdmin();
+  Future<void> removeMember({
+    required String eventId,
+    required String uid,
+    bool notifyRemovedUser = true,
+  }) async {
+    final current = _auth.currentUser;
+    if (current == null) throw Exception('Not signed in');
+
+    await _membersCol(eventId).doc(uid).delete();
+
+    // If the admin kicked someone, tell them.
+    if (notifyRemovedUser && current.uid != uid) {
+      try {
+        await _notifications.createNotification(
+          targetUid: uid,
+          type: 'event_removed',
+          actorUid: current.uid,
+          targetId: eventId,
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Convenience wrapper — the current user leaves the group.
+  Future<void> leaveGroup(String eventId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    await removeMember(
+      eventId: eventId,
+      uid: user.uid,
+      notifyRemovedUser: false,
+    );
   }
 }

@@ -10,6 +10,7 @@ import '../../providers/event_chat_providers.dart';
 import '../../services/event_chat_service.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
+import 'event_group_settings_screen.dart';
 
 class EventChatScreen extends ConsumerStatefulWidget {
   final String eventId;
@@ -72,6 +73,19 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
     openUserProfile(context, uid: widget.adminUid);
   }
 
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventGroupSettingsScreen(
+          eventId: widget.eventId,
+          eventTitle: widget.eventTitle,
+          adminUid: widget.adminUid,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUid = _currentUid;
@@ -99,49 +113,59 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back, size: 22),
                   ),
-                  const CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Color(0xFFB05ECC),
-                    child: Icon(Icons.groups, color: Colors.white),
+                  GestureDetector(
+                    onTap: _openSettings,
+                    child: const CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Color(0xFFB05ECC),
+                      child: Icon(Icons.groups, color: Colors.white),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.eventTitle,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                    child: GestureDetector(
+                      onTap: _openSettings,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.eventTitle,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        GestureDetector(
-                          onTap: _openAdminProfile,
-                          child: Row(
-                            children: [
-                              if (adminAvatar.isNotEmpty)
-                                CircleAvatar(
-                                  radius: 7,
-                                  backgroundImage:
-                                      CachedNetworkImageProvider(adminAvatar),
+                          GestureDetector(
+                            onTap: _openAdminProfile,
+                            child: Row(
+                              children: [
+                                if (adminAvatar.isNotEmpty)
+                                  CircleAvatar(
+                                    radius: 7,
+                                    backgroundImage:
+                                        CachedNetworkImageProvider(adminAvatar),
+                                  ),
+                                if (adminAvatar.isNotEmpty)
+                                  const SizedBox(width: 4),
+                                Text(
+                                  'Admin: $adminName',
+                                  style: const TextStyle(
+                                    color: Color(0xFFB05ECC),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              if (adminAvatar.isNotEmpty)
-                                const SizedBox(width: 4),
-                              Text(
-                                'Admin: $adminName',
-                                style: const TextStyle(
-                                  color: Color(0xFFB05ECC),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ),
+                  IconButton(
+                    onPressed: _openSettings,
+                    icon: const Icon(Icons.more_vert, size: 22),
                   ),
                 ],
               ),

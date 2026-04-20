@@ -9,7 +9,8 @@ final authServiceProvider = Provider<AuthService>((_) => AuthService());
 final userServiceProvider = Provider<UserService>((_) => UserService());
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  return ref.watch(authServiceProvider).authStateChanges.asyncMap((user) async {
+  final authService = ref.watch(authServiceProvider);
+  return authService.authStateChanges.asyncMap((user) async {
     if (user != null) {
       try {
         // Confirm the token is in the Firebase Auth cache.
@@ -20,6 +21,16 @@ final authStateProvider = StreamProvider<User?>((ref) {
         await FirebaseFirestore.instance.enableNetwork();
       } catch (_) {
         // Non-fatal — Firestore will retry on its own.
+      }
+
+      // Catch the case where the account was deleted (by an admin or by
+      // the user themselves on another device) while the session was alive.
+      // The blacklist tombstone is checked on every emission so the user
+      // is signed out as soon as the app re-attaches to the auth stream.
+      final email = user.email ?? '';
+      if (email.isNotEmpty && await authService.isEmailBlacklisted(email)) {
+        await authService.signOut();
+        return null;
       }
     }
     return user;

@@ -10,6 +10,11 @@ class ChatMessage {
   final String text;
   final String? imageUrl;
   final String? sharedPostId;
+  final String? voiceUrl;
+  final int? voiceDurationMs;
+  final String? replyToId;
+  final String? replyToText;
+  final String? replyToSenderUid;
   final DateTime? createdAt;
   final List<String> seenBy;
 
@@ -19,6 +24,11 @@ class ChatMessage {
     required this.text,
     this.imageUrl,
     this.sharedPostId,
+    this.voiceUrl,
+    this.voiceDurationMs,
+    this.replyToId,
+    this.replyToText,
+    this.replyToSenderUid,
     this.createdAt,
     required this.seenBy,
   });
@@ -31,6 +41,11 @@ class ChatMessage {
       text: (d['text'] as String?) ?? '',
       imageUrl: d['imageUrl'] as String?,
       sharedPostId: d['sharedPostId'] as String?,
+      voiceUrl: d['voiceUrl'] as String?,
+      voiceDurationMs: (d['voiceDurationMs'] as num?)?.toInt(),
+      replyToId: d['replyToId'] as String?,
+      replyToText: d['replyToText'] as String?,
+      replyToSenderUid: d['replyToSenderUid'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       seenBy: List<String>.from(d['seenBy'] as List? ?? []),
     );
@@ -186,15 +201,24 @@ class ChatService {
     required String text,
     String? imageUrl,
     String? sharedPostId,
+    String? voiceUrl,
+    int? voiceDurationMs,
+    String? replyToId,
+    String? replyToText,
+    String? replyToSenderUid,
   }) async {
     final trimmedText = text.trim();
     final normalizedImageUrl = imageUrl?.trim();
     final normalizedSharedPostId = sharedPostId?.trim();
+    final normalizedVoiceUrl = voiceUrl?.trim();
     final hasSharedPost =
         normalizedSharedPostId != null && normalizedSharedPostId.isNotEmpty;
+    final hasVoice =
+        normalizedVoiceUrl != null && normalizedVoiceUrl.isNotEmpty;
     if (trimmedText.isEmpty &&
         (normalizedImageUrl == null || normalizedImageUrl.isEmpty) &&
-        !hasSharedPost) {
+        !hasSharedPost &&
+        !hasVoice) {
       return;
     }
 
@@ -217,9 +241,11 @@ class ChatService {
         ? trimmedText
         : hasSharedPost
             ? 'Shared a post'
-            : (normalizedImageUrl?.isNotEmpty ?? false)
-                ? 'Sent a photo'
-                : '';
+            : hasVoice
+                ? 'Voice message'
+                : (normalizedImageUrl?.isNotEmpty ?? false)
+                    ? 'Sent a photo'
+                    : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,
@@ -227,6 +253,14 @@ class ChatService {
       'text': trimmedText,
       'imageUrl': normalizedImageUrl,
       if (hasSharedPost) 'sharedPostId': normalizedSharedPostId,
+      if (hasVoice) 'voiceUrl': normalizedVoiceUrl,
+      if (hasVoice && voiceDurationMs != null)
+        'voiceDurationMs': voiceDurationMs,
+      if (replyToId != null && replyToId.isNotEmpty) 'replyToId': replyToId,
+      if (replyToText != null && replyToText.isNotEmpty)
+        'replyToText': replyToText,
+      if (replyToSenderUid != null && replyToSenderUid.isNotEmpty)
+        'replyToSenderUid': replyToSenderUid,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
     });

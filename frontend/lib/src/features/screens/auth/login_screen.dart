@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../providers/auth_providers.dart';
+import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -27,6 +28,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   final bool _isIOS = Platform.isIOS;
 
+  /// Maps a [FirebaseAuthException] code to a short human-readable message.
+  /// Firebase's default messages leak technical detail ("There is no user
+  /// record corresponding to this identifier..."). This collapses every
+  /// "wrong credentials" variant into one clear line so the user knows
+  /// exactly what to fix.
+  String _friendlyError(FirebaseAuthException e, {String fallback = 'Login failed'}) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'That email address looks invalid.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Incorrect email or password.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again in a few minutes.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      default:
+        return fallback;
+    }
+  }
+
   Future<void> _signInWithApple() async {
     setState(() {
       _appleLoading = true;
@@ -34,10 +60,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await ref.read(authServiceProvider).signInWithApple();
+    } on AccountDeletedException catch (e) {
+      setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Apple sign-in failed');
-    } catch (e) {
-      setState(() => _error = 'Apple sign-in failed: $e');
+      setState(() =>
+          _error = _friendlyError(e, fallback: 'Apple sign-in failed.'));
+    } catch (_) {
+      setState(() => _error = 'Apple sign-in failed.');
     } finally {
       if (mounted) setState(() => _appleLoading = false);
     }
@@ -50,10 +79,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
+    } on AccountDeletedException catch (e) {
+      setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Google sign-in failed');
-    } catch (e) {
-      setState(() => _error = 'Google sign-in failed: $e');
+      setState(() =>
+          _error = _friendlyError(e, fallback: 'Google sign-in failed.'));
+    } catch (_) {
+      setState(() => _error = 'Google sign-in failed.');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -77,8 +109,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             email: _usernameCtrl.text,
             password: _passCtrl.text,
           );
+    } on AccountDeletedException catch (e) {
+      setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Login failed');
+      setState(() => _error = _friendlyError(e));
+    } catch (_) {
+      setState(() => _error = 'Login failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -97,22 +133,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 30),
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: context.purpleSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.send_rounded,
-                    color: Color(0xFFCE5DE5),
-                    size: 30,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assets/img/app_icon.png',
+                    width: 84,
+                    height: 84,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Sign In',
+                  'Login',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -121,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Please enter the code we just sent\nto email',
+                  'Welcome back. Enter your details to continue.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -196,7 +228,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text(
-                            'Sign In',
+                            'Login',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -224,7 +256,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 _buildSocialButton(
                   label: _googleLoading
                       ? 'Signing in...'
-                      : 'Sign In with Google',
+                      : 'Continue with Google',
                   icon: _googleLoading
                       ? const SizedBox(
                           width: 20,
@@ -239,7 +271,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   _buildSocialButton(
                     label: _appleLoading
                         ? 'Signing in...'
-                        : 'Sign In with Apple',
+                        : 'Continue with Apple',
                     icon: _appleLoading
                         ? const SizedBox(
                             width: 20,
