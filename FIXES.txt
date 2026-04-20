@@ -1,0 +1,76 @@
+COIL — Session Fixes
+=====================
+
+1. Camera icon in chats list
+   File: frontend/lib/src/features/widgets/message_widget.dart (lines 94-103)
+   Removed Icons.camera_alt_outlined from the MessageTile trailing row.
+   Now only the unread dot (or nothing) renders.
+
+2. Admin-deleted user could still log in
+   File: frontend/lib/main.dart (lines 120-134)
+   Added a currentUserDocProvider listener in MyApp. When the user's
+   Firestore doc transitions present -> missing (admin deletes them on
+   another device), it triggers signOut(). Not fired on transient nulls,
+   so new sign-ups aren't kicked out mid-flow.
+
+3. Self-deleted user could re-register with the same email
+   File: frontend/lib/src/services/auth_service.dart (lines 55-78)
+   signUp() now runs isEmailBlacklisted() before
+   createUserWithEmailAndPassword and throws AccountDeletedException
+   if hit. Added a second _enforceBlacklist(user) defensive check
+   immediately after the auth account is created.
+
+4. Signup screen now surfaces the deletion error
+   File: frontend/lib/src/features/screens/auth/signup_screen.dart
+   (line 8 import, line 47 catch)
+   Imported AuthService and added an on AccountDeletedException catch
+   so the red error banner shows "This account has been deleted..."
+   instead of a silent failure.
+
+5. Router handling of transient null user doc
+   File: frontend/lib/src/router/app_router.dart (lines 51-57)
+   Kept showing /splash while userDocAsync.hasValue && userDoc == null,
+   so the brief window during Google sign-up (before the Firestore
+   user doc write lands) doesn't flicker the user back to /login.
+
+6. Google sign-in broken by reactive signOut
+   File: frontend/lib/main.dart (lines 120-134, same edit as #2)
+   The first version of the listener fired on any null emission,
+   which bounced new Google sign-ins straight back to Login.
+   Now only fires on a true transition from previously-present to null.
+
+7. Build-blocking transitive dep conflict
+   File: frontend/pubspec.yaml (lines 63-68)
+   record 5.1.2 was transitively pinning record_linux 0.7.2, which
+   is incompatible with record_platform_interface 1.5.0 (missing
+   startStream, changed hasPermission signature). Added
+   dependency_overrides: record_linux: ^1.1.0 so iOS debug builds
+   compile again.
+
+
+Verified already working — no edits needed
+-------------------------------------------
+- Admin event creation auto-creates an event group chat
+  (admin_service.dart createEvent) visible in the admin's inbox
+  (event_chat_service.dart streamMyEventChats also returns admin-owned chats).
+- Pending-registration approve/reject with notifications
+  (event_approved, event_rejected in event_registration_service.dart).
+- Group members UI (event_group_settings_screen.dart):
+    * All members see the member list.
+    * Regular members can leave the group.
+    * Admin can kick members (event_removed notification).
+    * Admin can add members via followed list (event_invited notification).
+    * Invite notification has inline Accept / Reject buttons
+      (notification_screen.dart _InviteActions).
+- Voice message record / send / playback in chat_screen.dart
+  (uses the `record` and `audioplayers` packages — no Firebase Blaze
+   required; audio goes through Firebase Storage which works on Spark).
+- Reply-to-message (WhatsApp/Telegram style):
+    * Swipe a bubble in either direction to reply.
+    * Long-press -> "Reply" in the bottom sheet.
+    * Composing bar above input shows the quoted preview.
+    * Outgoing bubbles render the _RepliedQuote block.
+- Comments are preserved after user deletion and rendered as
+  "deleted user" (comment_screen.dart, via userByUidProvider).
+- No video or voice call buttons exist in either chat header —
+  nothing to remove.
