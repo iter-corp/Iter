@@ -303,12 +303,36 @@ class ChatService {
     await batch.commit();
   }
 
-  /// Resets the unread counter for [uid] in [chatId].
+  /// Resets the unread counter for [uid] in [chatId] AND marks the most
+  /// recent messages as seen by [uid] so the sender sees a "Seen" indicator.
+  ///
+  /// We only touch the last 50 messages — older messages are assumed seen
+  /// once they've scrolled out of view. seenBy is appended via
+  /// [FieldValue.arrayUnion] so concurrent readers don't clobber each other.
   Future<void> markSeen({
     required String chatId,
     required String uid,
   }) async {
     await _chatDoc(chatId).update({'unread.$uid': 0});
+
+    final recent = await _messagesCol(chatId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .get();
+    if (recent.docs.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final doc in recent.docs) {
+      final data = doc.data();
+      final seenBy = List<String>.from(data['seenBy'] as List? ?? const []);
+      if (seenBy.contains(uid)) continue;
+      // Don't mark our own messages as seen-by-us — pointless write.
+      if (data['senderUid'] == uid) continue;
+      batch.update(doc.reference, {
+        'seenBy': FieldValue.arrayUnion([uid]),
+      });
+    }
+    await batch.commit();
   }
 
   /// Real-time stream of messages, oldest first.

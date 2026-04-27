@@ -73,7 +73,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // User-selected dictation locale. null = device default. Long-press the
   // dictation button to change.
   String? _dictationLocaleId;
-  String _dictationLocaleLabel = 'Auto';
 
   // Auto-translate incoming messages. Persisted per-chat in SharedPreferences
   // so each chat can have its own preference. _autoTranslateTarget is the
@@ -507,13 +506,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     }
 
-    // Use the user-picked locale (long-press the mic to change), or fall
-    // back to the device system locale if the user has not chosen one.
-    String? localeId = _dictationLocaleId;
-    if (localeId == null) {
-      final systemLocale = await _stt.systemLocale();
-      localeId = systemLocale?.localeId;
-    }
+    // Use the user-picked locale (long-press the mic to change). When the
+    // user hasn't chosen one we pass null so the engine falls back to its
+    // own default — calling _stt.systemLocale() hangs silently on some
+    // Android builds and prevents listen() from ever starting.
+    final String? localeId = _dictationLocaleId;
 
     _dictationBaseText = _controller.text;
     setState(() => _isDictating = true);
@@ -609,7 +606,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (selected == null || !mounted) return;
     setState(() {
       _dictationLocaleId = selected.id;
-      _dictationLocaleLabel = selected.label;
     });
   }
 
@@ -971,45 +967,53 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               : Icon(Icons.camera_alt_outlined,
                                   color: context.textSecondary),
                         ),
-                        // Tap-to-dictate: turns speech into text in the
-                        // input field. Different from the hold-to-record
-                        // mic on the right which sends a voice message.
-                        // Long-press to change dictation language.
-                        GestureDetector(
-                          onLongPress: _pickDictationLocale,
-                          child: IconButton(
-                            tooltip: _isDictating
-                                ? 'Stop dictation (long-press to change language)'
-                                : 'Speak to type — $_dictationLocaleLabel '
-                                    '(long-press to change language)',
-                            onPressed: _toggleDictation,
-                            icon: Icon(
-                              _isDictating
-                                  ? Icons.keyboard_voice
-                                  : Icons.keyboard_voice_outlined,
-                              color: _isDictating
-                                  ? const Color(0xFFB05ECC)
-                                  : context.textSecondary,
-                            ),
-                          ),
-                        ),
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.only(left: 16, right: 4),
                             decoration: BoxDecoration(
                               color: context.inputFill,
                               borderRadius: BorderRadius.circular(24),
                             ),
-                            child: TextField(
-                              controller: _controller,
-                              onChanged: _onTextChanged,
-                              decoration: InputDecoration(
-                                hintText: 'Message...',
-                                hintStyle: TextStyle(
-                                    color: context.textMuted, fontSize: 14),
-                                border: InputBorder.none,
-                              ),
-                              onSubmitted: (_) => _sendMessage(),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _controller,
+                                    onChanged: _onTextChanged,
+                                    decoration: InputDecoration(
+                                      hintText: 'Message...',
+                                      hintStyle: TextStyle(
+                                          color: context.textMuted,
+                                          fontSize: 14),
+                                      border: InputBorder.none,
+                                    ),
+                                    onSubmitted: (_) => _sendMessage(),
+                                  ),
+                                ),
+                                // Tap-to-dictate sits INSIDE the input pill so
+                                // it reads as a text-input affordance. We use
+                                // a plain GestureDetector with opaque hit-test
+                                // because IconButton/InkWell inside a
+                                // BoxDecoration container was swallowing taps
+                                // (gesture arena conflict with Tooltip's
+                                // long-press recognizer).
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _toggleDictation,
+                                  onLongPress: _pickDictationLocale,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Icon(
+                                      _isDictating
+                                          ? Icons.keyboard_voice
+                                          : Icons.keyboard_voice_outlined,
+                                      color: _isDictating
+                                          ? const Color(0xFFB05ECC)
+                                          : context.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
