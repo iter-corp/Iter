@@ -519,26 +519,6 @@ class _CommentTranslateSheet extends StatefulWidget {
 }
 
 class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
-  // Same language list used by the chat auto-translate sheet — keeps a
-  // consistent set of options across the app.
-  static const _languages = <_LangOption>[
-    _LangOption('en', 'English'),
-    _LangOption('ckb', 'Kurdish (Sorani)'),
-    _LangOption('kmr', 'Kurdish (Kurmanji)'),
-    _LangOption('ar', 'Arabic'),
-    _LangOption('fa', 'Persian'),
-    _LangOption('tr', 'Turkish'),
-    _LangOption('es', 'Spanish'),
-    _LangOption('fr', 'French'),
-    _LangOption('de', 'German'),
-    _LangOption('it', 'Italian'),
-    _LangOption('ru', 'Russian'),
-    _LangOption('hi', 'Hindi'),
-    _LangOption('ur', 'Urdu'),
-    _LangOption('zh-Hans', 'Chinese'),
-    _LangOption('ja', 'Japanese'),
-  ];
-
   String _target = 'en';
   String? _translated;
   String? _error;
@@ -582,8 +562,8 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
   }
 
   String _labelOf(String code) =>
-      _languages.firstWhere((l) => l.code == code,
-          orElse: () => const _LangOption('?', '?')).label;
+      kTranslateLanguages.firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?')).label;
 
   @override
   Widget build(BuildContext context) {
@@ -611,10 +591,10 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
               height: 36,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _languages.length,
+                itemCount: kTranslateLanguages.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 6),
                 itemBuilder: (_, i) {
-                  final lang = _languages[i];
+                  final lang = kTranslateLanguages[i];
                   final selected = lang.code == _target;
                   return GestureDetector(
                     onTap: () => _selectLang(lang.code),
@@ -683,12 +663,4 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
       ),
     );
   }
-}
-
-/// Lightweight (code, label) pair used by the comment-translate sheet's
-/// language picker. Kept private to this file.
-class _LangOption {
-  final String code;
-  final String label;
-  const _LangOption(this.code, this.label);
 }

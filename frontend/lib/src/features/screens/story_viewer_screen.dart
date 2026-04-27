@@ -106,11 +106,25 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           _next();
         }
       });
+    _commentFocusNode.addListener(_onReplyFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) => _startCurrent());
+  }
+
+  /// Pauses the auto-advance progress when the user focuses the reply
+  /// input (typing a reply) and resumes when they unfocus, so the story
+  /// doesn't move on while they're mid-message.
+  void _onReplyFocusChange() {
+    if (!mounted) return;
+    if (_commentFocusNode.hasFocus) {
+      _progress.stop();
+    } else {
+      _progress.forward();
+    }
   }
 
   @override
   void dispose() {
+    _commentFocusNode.removeListener(_onReplyFocusChange);
     _progress.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
@@ -402,6 +416,11 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       ),
       child: Scaffold(
         backgroundColor: Colors.black,
+        // Don't shrink the story canvas when the keyboard opens — that would
+        // push the composer (positioned at bottom: 20) up toward the middle
+        // of the now-shrunk body. Keep the Stack full-screen and lift only
+        // the composer by viewInsets.bottom instead.
+        resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: GestureDetector(
             onTapUp: (details) {

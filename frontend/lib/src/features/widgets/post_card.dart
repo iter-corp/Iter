@@ -159,12 +159,39 @@ class _PostCardState extends ConsumerState<PostCard> {
                     ),
                     alignment: Alignment.center,
                     padding: const EdgeInsets.all(24),
-                    child: _ExpandableCaption(
-                      text: post.caption,
-                      collapsedMaxLines: 8,
-                      style: const TextStyle(color: Colors.white, fontSize: 18),
-                      toggleColor: Colors.white,
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ExpandableCaption(
+                          text: post.caption,
+                          collapsedMaxLines: 8,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 18),
+                          toggleColor: Colors.white,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: () => _translateCaption(context),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.translate,
+                                  size: 14, color: Colors.white70),
+                              SizedBox(width: 4),
+                              Text(
+                                'Translate',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
           ),
@@ -431,15 +458,17 @@ class _PostCardState extends ConsumerState<PostCard> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SingleChildScrollView(
-                  child: SelectableText(
-                    widget.post.caption,
-                    style: const TextStyle(fontSize: 14, height: 1.4),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      widget.post.caption,
+                      style: const TextStyle(fontSize: 14, height: 1.4),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextButton.icon(
-                  onPressed: () => _translateCaptionToEnglish(context),
+                  onPressed: () => _translateCaption(context),
                   icon: const Icon(Icons.translate, size: 18),
                   label: const Text('Translate'),
                 ),
@@ -451,89 +480,15 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
   }
 
-  Future<void> _translateCaptionToEnglish(BuildContext context) async {
+  Future<void> _translateCaption(BuildContext context) async {
     final raw = widget.post.caption.trim();
     if (raw.isEmpty) return;
-
-    showDialog<void>(
+    await showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _PostTranslateSheet(text: raw),
     );
-
-    try {
-      final translated = await const TranslateService().translateText(
-        text: raw,
-        sourceLang: 'auto',
-        targetLang: 'en',
-      );
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-      if (!mounted) return;
-
-      await showModalBottomSheet<void>(
-        context: context,
-        builder: (sheet) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'English translation',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Text(translated, style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    TextButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: translated));
-                        Navigator.pop(sheet);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Translation copied')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.copy, size: 18),
-                      label: const Text('Copy'),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => Navigator.pop(sheet),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-      if (!mounted) return;
-      final message = TranslateService.userFriendlyErrorMessage(e);
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Translation unavailable'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
   }
 
   void _openShareSheet(BuildContext context, WidgetRef ref) {
@@ -932,6 +887,166 @@ class _ExpandableCaptionState extends State<_ExpandableCaption> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Bottom sheet for translating a post caption. Mirrors the comment
+/// translate sheet — horizontal chip strip lets the user pick a target
+/// language, the result is re-fetched on each selection (cache makes
+/// repeats instant).
+class _PostTranslateSheet extends StatefulWidget {
+  final String text;
+  const _PostTranslateSheet({required this.text});
+
+  @override
+  State<_PostTranslateSheet> createState() => _PostTranslateSheetState();
+}
+
+class _PostTranslateSheetState extends State<_PostTranslateSheet> {
+  String _target = 'en';
+  String? _translated;
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _translate();
+  }
+
+  Future<void> _translate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: widget.text,
+        sourceLang: 'auto',
+        targetLang: _target,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = TranslateService.userFriendlyErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _selectLang(String code) {
+    if (code == _target) return;
+    setState(() => _target = code);
+    _translate();
+  }
+
+  String _labelOf(String code) =>
+      kTranslateLanguages.firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?')).label;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Translate to ${_labelOf(_target)}',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: kTranslateLanguages.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  final lang = kTranslateLanguages[i];
+                  final selected = lang.code == _target;
+                  return GestureDetector(
+                    onTap: () => _selectLang(lang.code),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFB05ECC)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        lang.label,
+                        style: TextStyle(
+                          color: selected ? Colors.white : null,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else
+              SelectableText(
+                _translated ?? '',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _translated == null || _loading
+                      ? null
+                      : () {
+                          Clipboard.setData(
+                              ClipboardData(text: _translated!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Translation copied'),
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('Copy'),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

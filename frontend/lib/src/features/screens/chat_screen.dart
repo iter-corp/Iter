@@ -58,7 +58,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isRecording = false;
   DateTime? _recordStartedAt;
   bool _uploadingVoice = false;
-  bool _isMicPressed = false;
 
   // Dictation (speech-to-text) state. Lets the user speak a message and
   // have it transcribed into the text field — they can edit before sending.
@@ -308,10 +307,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       debugPrint('Error checking group permissions: $e');
     }
 
-    setState(() => _isMicPressed = true);
-
     if (!await _recorder.hasPermission()) {
-      setState(() => _isMicPressed = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Microphone permission denied')),
@@ -335,7 +331,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _stopAndSendVoiceRecording() async {
     debugPrint('[chat-voice] stopAndSend invoked '
         '(isRecording=$_isRecording uploading=$_uploadingVoice)');
-    setState(() => _isMicPressed = false);
 
     if (!_isRecording || _uploadingVoice) {
       debugPrint('[chat-voice] aborting: not recording or already uploading');
@@ -460,7 +455,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _cancelRecording() async {
-    setState(() => _isMicPressed = false);
     if (!_isRecording) return;
     final path = await _recorder.stop();
     setState(() {
@@ -671,27 +665,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         labelText: 'Translate into',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'en', child: Text('English')),
-                        DropdownMenuItem(
-                            value: 'ckb', child: Text('Kurdish (Sorani)')),
-                        DropdownMenuItem(
-                            value: 'kmr', child: Text('Kurdish (Kurmanji)')),
-                        DropdownMenuItem(value: 'ar', child: Text('Arabic')),
-                        DropdownMenuItem(value: 'fa', child: Text('Persian')),
-                        DropdownMenuItem(value: 'tr', child: Text('Turkish')),
-                        DropdownMenuItem(value: 'es', child: Text('Spanish')),
-                        DropdownMenuItem(value: 'fr', child: Text('French')),
-                        DropdownMenuItem(value: 'de', child: Text('German')),
-                        DropdownMenuItem(value: 'it', child: Text('Italian')),
-                        DropdownMenuItem(value: 'ru', child: Text('Russian')),
-                        DropdownMenuItem(value: 'hi', child: Text('Hindi')),
-                        DropdownMenuItem(value: 'ur', child: Text('Urdu')),
-                        DropdownMenuItem(
-                            value: 'zh-Hans',
-                            child: Text('Chinese (Simplified)')),
-                        DropdownMenuItem(
-                            value: 'ja', child: Text('Japanese')),
+                      items: [
+                        for (final lang in kTranslateLanguages)
+                          DropdownMenuItem(
+                            value: lang.code,
+                            child: Text(lang.label),
+                          ),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
@@ -1018,28 +997,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                         const SizedBox(width: 4),
                         if (_controller.text.trim().isEmpty && !_uploadingVoice)
-                          // Hold-to-record microphone button with visual feedback
+                          // Tap-to-record voice message. First tap starts
+                          // recording (the input row swaps to _RecordingBar
+                          // which has its own stop / cancel buttons).
                           GestureDetector(
-                            onLongPressStart: (_) => _startVoiceRecording(),
-                            onLongPressEnd: (_) => _stopAndSendVoiceRecording(),
-                            onLongPressCancel: () => _cancelRecording(),
-                            child: Transform.scale(
-                              scale: _isMicPressed ? 0.85 : 1.0,
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: _isMicPressed
-                                      ? const Color(0xFFB05ECC).withValues(alpha: 0.2)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: Icon(
-                                  Icons.mic_none,
-                                  color: _isMicPressed
-                                      ? const Color(0xFFB05ECC)
-                                      : const Color(0xFFB05ECC),
-                                  size: 24,
-                                ),
+                            onTap: _startVoiceRecording,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: const Icon(
+                                Icons.mic_none,
+                                color: Color(0xFFB05ECC),
+                                size: 24,
                               ),
                             ),
                           )
@@ -1761,6 +1733,16 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     return '$m:$s';
   }
 
+  Future<void> _seekTo(double progress) async {
+    final total = _duration;
+    if (total == null || total.inMilliseconds == 0) return;
+    final target = Duration(
+      milliseconds: (total.inMilliseconds * progress.clamp(0.0, 1.0)).round(),
+    );
+    await _player.seek(target);
+    if (mounted) setState(() => _position = target);
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = _duration ?? Duration.zero;
@@ -1772,7 +1754,7 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
         ? Colors.white.withValues(alpha: 0.35)
         : const Color(0xFFB05ECC).withValues(alpha: 0.25);
     return SizedBox(
-      width: 220,
+      width: 240,
       child: Row(
         children: [
           GestureDetector(
@@ -1788,14 +1770,12 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 4,
-                    backgroundColor: trackBg,
-                    valueColor: AlwaysStoppedAnimation(fg),
-                  ),
+                _WaveformScrubber(
+                  url: widget.url,
+                  progress: progress,
+                  fg: fg,
+                  trackBg: trackBg,
+                  onSeek: _seekTo,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1811,6 +1791,122 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
       ),
     );
   }
+}
+
+/// WhatsApp-style waveform scrubber for voice messages. We don't decode the
+/// audio file (would need a heavy native dependency), so bar heights are a
+/// deterministic pseudo-random pattern derived from the URL — same URL
+/// always gets the same waveform, so it doesn't reshuffle on rebuild.
+/// Tapping or horizontal-dragging seeks playback.
+class _WaveformScrubber extends StatelessWidget {
+  final String url;
+  final double progress;
+  final Color fg;
+  final Color trackBg;
+  final ValueChanged<double> onSeek;
+
+  const _WaveformScrubber({
+    required this.url,
+    required this.progress,
+    required this.fg,
+    required this.trackBg,
+    required this.onSeek,
+  });
+
+  static List<double> _heightsFor(String url) {
+    const barCount = 38;
+    var seed = url.hashCode & 0x7fffffff;
+    final out = <double>[];
+    for (var i = 0; i < barCount; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      final v = (seed % 1000) / 1000.0;
+      out.add(0.25 + v * 0.75);
+    }
+    return out;
+  }
+
+  void _handleSeek(BuildContext context, Offset localPosition) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final width = box.size.width;
+    if (width <= 0) return;
+    onSeek((localPosition.dx / width).clamp(0.0, 1.0));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (innerContext) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (d) => _handleSeek(innerContext, d.localPosition),
+        onHorizontalDragUpdate: (d) =>
+            _handleSeek(innerContext, d.localPosition),
+        child: SizedBox(
+          height: 28,
+          child: CustomPaint(
+            painter: _WaveformPainter(
+              heights: _heightsFor(url),
+              progress: progress,
+              fg: fg,
+              trackBg: trackBg,
+            ),
+            size: Size.infinite,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WaveformPainter extends CustomPainter {
+  final List<double> heights;
+  final double progress;
+  final Color fg;
+  final Color trackBg;
+
+  _WaveformPainter({
+    required this.heights,
+    required this.progress,
+    required this.fg,
+    required this.trackBg,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (heights.isEmpty) return;
+    const barWidth = 2.5;
+    final gap =
+        (size.width - barWidth * heights.length) / (heights.length - 1);
+    final centerY = size.height / 2;
+    final progressX = size.width * progress;
+
+    final activePaint = Paint()
+      ..color = fg
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = barWidth;
+    final inactivePaint = Paint()
+      ..color = trackBg
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = barWidth;
+
+    for (var i = 0; i < heights.length; i++) {
+      final x = i * (barWidth + gap) + barWidth / 2;
+      final h = heights[i] * (size.height - 4);
+      final paint = x <= progressX ? activePaint : inactivePaint;
+      canvas.drawLine(
+        Offset(x, centerY - h / 2),
+        Offset(x, centerY + h / 2),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformPainter old) =>
+      old.progress != progress ||
+      old.fg != fg ||
+      old.trackBg != trackBg ||
+      old.heights != heights;
 }
 
 class _SharedPostPreview extends StatelessWidget {

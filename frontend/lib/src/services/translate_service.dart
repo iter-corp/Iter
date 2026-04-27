@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tag prefix used by every debug print emitted by [TranslateService].
 /// Search the device log with: `flutter logs | grep [translate]`
@@ -10,6 +13,103 @@ const String _kTranslateLogTag = '[translate]';
 void _tlog(String msg) {
   if (kDebugMode) debugPrint('$_kTranslateLogTag $msg');
 }
+
+/// Metadata for a translation target language.
+///
+/// [code] is the BCP-47 / Azure language code passed to
+/// [TranslateService.translateText]. [label] is the human-readable name
+/// shown in pickers. [stt] is the speech-to-text locale (`xx_YY` form) for
+/// the in-app live translator's mic input — `null` means the device default
+/// is used. [rtl] is true for right-to-left scripts.
+class TranslateLanguage {
+  final String code;
+  final String label;
+  final String? stt;
+  final bool rtl;
+  const TranslateLanguage(this.code, this.label, {this.stt, this.rtl = false});
+}
+
+/// Single source of truth for every language picker in the app: chat
+/// auto-translate dropdown, comment translate sheet, post-caption
+/// translate sheet, and the dedicated translate screen. Edit here once
+/// and every picker updates.
+const List<TranslateLanguage> kTranslateLanguages = [
+  TranslateLanguage('en', 'English (USA)', stt: 'en_US'),
+  TranslateLanguage('en', 'English (UK)', stt: 'en_GB'),
+  TranslateLanguage('ar', 'Arabic', stt: 'ar_SA', rtl: true),
+  TranslateLanguage('ckb', 'Kurdish (Sorani)', stt: 'ar_IQ', rtl: true),
+  TranslateLanguage('kmr', 'Kurdish (Kurmanji)', stt: 'tr_TR'),
+  TranslateLanguage('fa', 'Persian', stt: 'fa_IR', rtl: true),
+  TranslateLanguage('tr', 'Turkish', stt: 'tr_TR'),
+  TranslateLanguage('es', 'Spanish', stt: 'es_ES'),
+  TranslateLanguage('fr', 'French', stt: 'fr_FR'),
+  TranslateLanguage('de', 'German', stt: 'de_DE'),
+  TranslateLanguage('it', 'Italian', stt: 'it_IT'),
+  TranslateLanguage('pt-BR', 'Portuguese (Brazil)', stt: 'pt_BR'),
+  TranslateLanguage('pt-PT', 'Portuguese (Portugal)', stt: 'pt_PT'),
+  TranslateLanguage('ru', 'Russian', stt: 'ru_RU'),
+  TranslateLanguage('uk', 'Ukrainian', stt: 'uk_UA'),
+  TranslateLanguage('pl', 'Polish', stt: 'pl_PL'),
+  TranslateLanguage('nl', 'Dutch', stt: 'nl_NL'),
+  TranslateLanguage('sv', 'Swedish', stt: 'sv_SE'),
+  TranslateLanguage('no', 'Norwegian', stt: 'nb_NO'),
+  TranslateLanguage('da', 'Danish', stt: 'da_DK'),
+  TranslateLanguage('fi', 'Finnish', stt: 'fi_FI'),
+  TranslateLanguage('cs', 'Czech', stt: 'cs_CZ'),
+  TranslateLanguage('el', 'Greek', stt: 'el_GR'),
+  TranslateLanguage('he', 'Hebrew', stt: 'he_IL', rtl: true),
+  TranslateLanguage('ur', 'Urdu', stt: 'ur_PK', rtl: true),
+  TranslateLanguage('hi', 'Hindi', stt: 'hi_IN'),
+  TranslateLanguage('bn', 'Bengali', stt: 'bn_IN'),
+  TranslateLanguage('ta', 'Tamil', stt: 'ta_IN'),
+  TranslateLanguage('te', 'Telugu', stt: 'te_IN'),
+  TranslateLanguage('ms', 'Malay', stt: 'ms_MY'),
+  TranslateLanguage('id', 'Indonesian', stt: 'id_ID'),
+  TranslateLanguage('th', 'Thai', stt: 'th_TH'),
+  TranslateLanguage('vi', 'Vietnamese', stt: 'vi_VN'),
+  TranslateLanguage('ja', 'Japanese', stt: 'ja_JP'),
+  TranslateLanguage('ko', 'Korean', stt: 'ko_KR'),
+  TranslateLanguage('zh-CN', 'Chinese (Simplified)', stt: 'zh_CN'),
+  TranslateLanguage('zh-TW', 'Chinese (Traditional)', stt: 'zh_TW'),
+  TranslateLanguage('sw', 'Swahili', stt: 'sw_KE'),
+  TranslateLanguage('am', 'Amharic', stt: 'am_ET'),
+  TranslateLanguage('so', 'Somali'),
+  TranslateLanguage('ha', 'Hausa'),
+  TranslateLanguage('zu', 'Zulu', stt: 'zu_ZA'),
+  TranslateLanguage('af', 'Afrikaans', stt: 'af_ZA'),
+  TranslateLanguage('hu', 'Hungarian', stt: 'hu_HU'),
+  TranslateLanguage('ro', 'Romanian', stt: 'ro_RO'),
+  TranslateLanguage('bg', 'Bulgarian', stt: 'bg_BG'),
+  TranslateLanguage('sr', 'Serbian', stt: 'sr_RS'),
+  TranslateLanguage('hr', 'Croatian', stt: 'hr_HR'),
+  TranslateLanguage('sk', 'Slovak', stt: 'sk_SK'),
+  TranslateLanguage('sl', 'Slovenian', stt: 'sl_SI'),
+  TranslateLanguage('lt', 'Lithuanian', stt: 'lt_LT'),
+  TranslateLanguage('lv', 'Latvian', stt: 'lv_LV'),
+  TranslateLanguage('et', 'Estonian', stt: 'et_EE'),
+  TranslateLanguage('is', 'Icelandic', stt: 'is_IS'),
+  TranslateLanguage('ca', 'Catalan', stt: 'ca_ES'),
+  TranslateLanguage('eu', 'Basque', stt: 'eu_ES'),
+  TranslateLanguage('gl', 'Galician', stt: 'gl_ES'),
+  TranslateLanguage('cy', 'Welsh'),
+  TranslateLanguage('ga', 'Irish'),
+  TranslateLanguage('sq', 'Albanian'),
+  TranslateLanguage('hy', 'Armenian'),
+  TranslateLanguage('az', 'Azerbaijani'),
+  TranslateLanguage('ka', 'Georgian'),
+  TranslateLanguage('kk', 'Kazakh'),
+  TranslateLanguage('uz', 'Uzbek'),
+  TranslateLanguage('mn', 'Mongolian'),
+  TranslateLanguage('km', 'Khmer'),
+  TranslateLanguage('lo', 'Lao'),
+  TranslateLanguage('my', 'Burmese'),
+  TranslateLanguage('fil', 'Filipino', stt: 'fil_PH'),
+  TranslateLanguage('ne', 'Nepali'),
+  TranslateLanguage('si', 'Sinhala'),
+  TranslateLanguage('ps', 'Pashto', rtl: true),
+  TranslateLanguage('mt', 'Maltese'),
+  TranslateLanguage('eo', 'Esperanto'),
+];
 
 /// Client-side translation with provider routing.
 ///
@@ -23,6 +123,98 @@ class TranslateService {
 
   // Round-robin index — shared across all instances for the app lifetime.
   static int _providerIndex = 0;
+
+  // ──────────────────────────────────────────────
+  // On-device translation cache
+  // ──────────────────────────────────────────────
+  // Same translation request hits SharedPreferences first; only misses go to
+  // network providers. Single JSON blob keyed `<src>|<tgt>|<sha1(text)>`.
+  // Capped at [_kCacheMaxEntries] — on overflow we drop the whole cache
+  // (cheaper than per-entry LRU bookkeeping for the size we care about).
+  static const String _kCachePrefsKey = 'translate_cache_v1';
+  static const int _kCacheMaxEntries = 1000;
+  static Map<String, String>? _cache;
+  static Future<void>? _cacheLoadFuture;
+
+  static String _cacheKey({
+    required String sourceLang,
+    required String targetLang,
+    required String text,
+  }) {
+    final hash = sha1.convert(utf8.encode(text)).toString();
+    return '${sourceLang.toLowerCase()}|${targetLang.toLowerCase()}|$hash';
+  }
+
+  static Future<void> _ensureCacheLoaded() {
+    if (_cache != null) return Future.value();
+    return _cacheLoadFuture ??= () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString(_kCachePrefsKey);
+        if (raw == null || raw.isEmpty) {
+          _cache = <String, String>{};
+        } else {
+          final decoded = jsonDecode(raw);
+          _cache = decoded is Map
+              ? decoded.map((k, v) => MapEntry(k.toString(), v.toString()))
+              : <String, String>{};
+        }
+        _tlog('cache loaded entries=${_cache!.length}');
+      } catch (e) {
+        _tlog('cache load FAILED: $e — starting empty');
+        _cache = <String, String>{};
+      }
+    }();
+  }
+
+  static Future<String?> _cacheLookup({
+    required String sourceLang,
+    required String targetLang,
+    required String text,
+  }) async {
+    await _ensureCacheLoaded();
+    final hit = _cache![_cacheKey(
+      sourceLang: sourceLang,
+      targetLang: targetLang,
+      text: text,
+    )];
+    if (hit != null) _tlog('cache HIT len=${hit.length}');
+    return hit;
+  }
+
+  static Future<void> _cacheStore({
+    required String sourceLang,
+    required String targetLang,
+    required String text,
+    required String result,
+  }) async {
+    await _ensureCacheLoaded();
+    final cache = _cache!;
+    if (cache.length >= _kCacheMaxEntries) {
+      _tlog('cache full (${cache.length}) — clearing');
+      cache.clear();
+    }
+    cache[_cacheKey(
+      sourceLang: sourceLang,
+      targetLang: targetLang,
+      text: text,
+    )] = result;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kCachePrefsKey, jsonEncode(cache));
+    } catch (e) {
+      _tlog('cache persist FAILED: $e');
+    }
+  }
+
+  /// Clears all cached translations (memory + disk).
+  static Future<void> clearCache() async {
+    _cache = <String, String>{};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kCachePrefsKey);
+    } catch (_) {}
+  }
 
   static bool _isKurdish(String lang) {
     final l = lang.toLowerCase();
@@ -132,6 +324,18 @@ class TranslateService {
         'tgt="$targetLang" textLen=${normalized.length} '
         'sample="${normalized.substring(0, normalized.length > 40 ? 40 : normalized.length)}"');
 
+    // Cache lookup — keyed on the *effective* source so an "auto" call
+    // that resolves to ckb shares cache entries with a future explicit-ckb
+    // call. Hits return instantly without touching any network provider.
+    final cached = await _cacheLookup(
+      sourceLang: effectiveSourceLang,
+      targetLang: targetLang,
+      text: normalized,
+    );
+    if (cached != null) {
+      return cached;
+    }
+
     final allProviders = _buildProviderList(
       sourceLang: effectiveSourceLang,
       targetLang: targetLang,
@@ -172,6 +376,14 @@ class TranslateService {
             'resultLen=${result.length} '
             'sample="${result.substring(0, result.length > 40 ? 40 : result.length)}"');
         _providerIndex = (_providerIndex + 1) % allProviders.length;
+        // Persist for next time. Fire-and-forget — caller already has the
+        // result; cache write happens in the background.
+        unawaited(_cacheStore(
+          sourceLang: effectiveSourceLang,
+          targetLang: targetLang,
+          text: normalized,
+          result: result,
+        ));
         return result;
       } on Exception catch (e) {
         _tlog('FAIL via $provider: $e');
