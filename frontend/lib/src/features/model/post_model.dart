@@ -11,6 +11,13 @@ class Post {
   final int commentsCount;
   final bool isPrivate;
   final DateTime? createdAt;
+  final String? postPlaceName;
+  final String? postPlaceCity;
+  final double? postLat;
+  final double? postLng;
+  final bool postLocationExact;
+  final double? travelDistanceKm;
+  final String? travelDistanceLabel;
 
   Post({
     required this.id,
@@ -23,10 +30,19 @@ class Post {
     required this.commentsCount,
     required this.isPrivate,
     required this.createdAt,
+    this.postPlaceName,
+    this.postPlaceCity,
+    this.postLat,
+    this.postLng,
+    this.postLocationExact = false,
+    this.travelDistanceKm,
+    this.travelDistanceLabel,
   });
 
   factory Post.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
     final data = d.data() ?? {};
+    final postLocation = data['postLocation'];
+    final postLocationMap = postLocation is Map ? postLocation : null;
     return Post(
       id: d.id,
       authorUid: data['authorUid'] as String? ?? '',
@@ -38,6 +54,48 @@ class Post {
       commentsCount: (data['commentsCount'] as int?) ?? 0,
       isPrivate: (data['isPrivate'] as bool?) ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      postPlaceName: (data['postPlaceName'] as String?)?.trim(),
+      postPlaceCity: (data['postPlaceCity'] as String?)?.trim(),
+      postLat: (postLocationMap?['lat'] as num?)?.toDouble(),
+      postLng: (postLocationMap?['lng'] as num?)?.toDouble(),
+      postLocationExact: (data['postLocationExact'] as bool?) ?? false,
+    );
+  }
+
+  factory Post.fromTravelMap(Map<String, dynamic> data) {
+    final postLocation = data['postLocation'];
+    final postLocationMap = postLocation is Map ? postLocation : null;
+
+    DateTime? createdAt;
+    final createdRaw = data['createdAt'];
+    if (createdRaw is Timestamp) {
+      createdAt = createdRaw.toDate();
+    } else if (createdRaw is Map && createdRaw['_seconds'] is num) {
+      final seconds = (createdRaw['_seconds'] as num).toInt();
+      final nanos = (createdRaw['_nanoseconds'] as num?)?.toInt() ?? 0;
+      createdAt = DateTime.fromMillisecondsSinceEpoch(
+        seconds * 1000 + (nanos / 1000000).round(),
+      );
+    }
+
+    return Post(
+      id: data['postId'] as String? ?? '',
+      authorUid: data['authorUid'] as String? ?? '',
+      authorUsername: data['authorUsername'] as String? ?? 'unknown',
+      authorAvatar: data['authorAvatar'] as String?,
+      caption: data['caption'] as String? ?? '',
+      imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? const [],
+      likesCount: (data['likesCount'] as num?)?.toInt() ?? 0,
+      commentsCount: (data['commentsCount'] as num?)?.toInt() ?? 0,
+      isPrivate: (data['isPrivate'] as bool?) ?? false,
+      createdAt: createdAt,
+      postPlaceName: (data['postPlaceName'] as String?)?.trim(),
+      postPlaceCity: (data['postPlaceCity'] as String?)?.trim(),
+      postLat: (postLocationMap?['lat'] as num?)?.toDouble(),
+      postLng: (postLocationMap?['lng'] as num?)?.toDouble(),
+      postLocationExact: (data['postLocationExact'] as bool?) ?? false,
+      travelDistanceKm: (data['distanceKm'] as num?)?.toDouble(),
+      travelDistanceLabel: (data['distanceLabel'] as String?)?.trim(),
     );
   }
 }

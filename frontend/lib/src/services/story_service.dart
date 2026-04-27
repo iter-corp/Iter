@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../features/model/story_comment_model.dart';
+import 'notification_service.dart';
+
+
 class Story {
   final String id;
   final String authorUid;
@@ -9,6 +13,8 @@ class Story {
   final String imageUrl;
   final DateTime createdAt;
   final DateTime expiresAt;
+  final int likesCount;
+  final int commentsCount;
 
   const Story({
     required this.id,
@@ -18,6 +24,8 @@ class Story {
     required this.imageUrl,
     required this.createdAt,
     required this.expiresAt,
+    this.likesCount = 0,
+    this.commentsCount = 0,
   });
 
   factory Story.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -30,6 +38,8 @@ class Story {
       imageUrl: (d['imageUrl'] as String?) ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       expiresAt: (d['expiresAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      likesCount: (d['likesCount'] as int?) ?? 0,
+      commentsCount: (d['commentsCount'] as int?) ?? 0,
     );
   }
 }
@@ -61,6 +71,7 @@ class StoryViewer {
 class StoryService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationService _notifications = NotificationService();
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('stories');
@@ -147,4 +158,135 @@ class StoryService {
       return viewers;
     });
   }
-}
+
+  Future<void> toggleLike(String storyId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    final likeRef = _col.doc(storyId).collection('likes').doc(user.uid);
+    final storyRef = _col.doc(storyId);
+    bool didLike = false;
+    String? authorUid;
+
+    await _db.runTransaction((tx) async {
+      final storySnap = await tx.get(storyRef);
+      authorUid = storySnap.data()?['authorUid'] as String?;
+
+      final likeSnap = await tx.get(likeRef);
+      if (likeSnap.exists) {
+        didLike = false;
+        tx.delete(likeRef);
+        tx.update(storyRef, {'likesCount': FieldValue.increment(-1)});
+      } else {
+        didLike = true;
+        tx.set(likeRef, {'createdAt': FieldValue.serverTimestamp()});
+        tx.update(storyRef, {'likesCount': FieldValue.increment(1)});
+      }
+    });
+
+    // Notification for story like
+    if (authorUid != null && authorUid != user.uid) {
+      final notifId = 'story_like_${user.uid}_$storyId';
+      try {
+        if (didLike) {
+          await _notifications.upsertNotification(
+            targetUid: authorUid!,
+            docId: notifId,
+            type: 'story_like',
+            actorUid: user.uid,
+            targetId: storyId,
+          );
+        } else {
+          await _notifications.removeNotificationById(authorUid!, notifId);
+        }
+      } catch (_) {}
+    }
+  }
+
+  Stream<bool> streamIsLiked(String storyId, {String? uid}) {
+    final effectiveUid = uid ?? _auth.currentUser?.uid;
+    if (effectiveUid == null) return Stream.value(false);
+    return _col
+        .doc(storyId)
+        .collection('likes')
+        .doc(effectiveUid)
+        .snapshots()
+        .map((s) => s.exists);
+  }
+
+  Future<void> addComment({
+    required String storyId,
+    required String authorUid,
+    required String authorUsername,
+    String? authorAvatar,
+    required String text,
+    String? parentCommentId,
+    String? replyToUsername,
+  }) async {
+    final commentRef = _col.doc(storyId).collection('comments').doc();
+    final batch = _db.batch();
+    batch.set(commentRef, {
+      'authorUid': authorUid,
+      'authorUsername': authorUsername,
+      'authorAvatar': authorAvatar,
+      'text': text,
+      'createdAt': FieldValue.serverTimestamp(),
+      if (parentCommentId != null) 'parentCommentId': parentCommentId,
+      if (replyToUsername != null) 'replyToUsername': replyToUsername,
+    });
+    batch.update(_col.doc(storyId), {
+      'commentsCount': FieldValue.increment(1),
+    });
+    await batch.commit();
+
+    // Notification for story comment
+    if (parentCommentId != null) {
+      try {
+        final parentSnap =
+            await _col.doc(storyId).collection('comments').doc(parentCommentId).get();
+        final parentAuthorUid =
+            parentSnap.data()?['authorUid'] as String?;
+        if (parentAuthorUid != null && parentAuthorUid != authorUid) {
+          await _notifications.createNotification(
+            targetUid: parentAuthorUid,
+            type: 'story_reply',
+            actorUid: authorUid,
+            targetId: storyId,
+          );
+        }
+      } catch (_) {}
+    } else {
+      // Notification for story comment to story author
+      final storySnap = await _col.doc(storyId).get();
+      final storyAuthorUid = storySnap.data()?['authorUid'] as String?;
+      if (storyAuthorUid != null && storyAuthorUid != authorUid) {
+        await _notifications.createNotification(
+          targetUid: storyAuthorUid,
+          type: 'story_comment',
+          actorUid: authorUid,
+          targetId: storyId,
+        );
+      }
+    }
+  }
+
+  Stream<List<StoryComment>> streamComments(String storyId) {
+    return _col
+        .doc(storyId)
+        .collection('comments')
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((snap) => snap.docs.map(StoryComment.fromDoc).toList());
+  }
+
+  Future<void> deleteComment({
+    required String storyId,
+    required String commentId,
+  }) async {
+    final batch = _db.batch();
+    batch.delete(_col.doc(storyId).collection('comments').doc(commentId));
+    batch.update(_col.doc(storyId), {
+      'commentsCount': FieldValue.increment(-1),
+    });
+    await batch.commit();
+  }
+} 

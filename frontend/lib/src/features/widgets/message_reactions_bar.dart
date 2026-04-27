@@ -28,32 +28,42 @@ void showReactionsSheet(
               '$parentPath::$messageId',
             ));
             final mine = myAsync.value;
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: kReactionEmojis.map((e) {
-                final selected = mine == e;
-                return GestureDetector(
-                  onTap: () async {
-                    await sheetRef.read(reactionServiceProvider).toggle(
-                          parentPath: parentPath,
-                          messageId: messageId,
-                          emoji: e,
-                        );
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? context.purpleSoft
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
+            // The reaction picker can have many emojis; on narrow screens
+            // a fixed Row overflows. Use a horizontal ListView so the user
+            // can scroll to find any emoji and the layout never overflows.
+            return SizedBox(
+              height: 64,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: kReactionEmojis.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 4),
+                itemBuilder: (_, i) {
+                  final e = kReactionEmojis[i];
+                  final selected = mine == e;
+                  return GestureDetector(
+                    onTap: () async {
+                      await sheetRef.read(reactionServiceProvider).toggle(
+                            parentPath: parentPath,
+                            messageId: messageId,
+                            emoji: e,
+                          );
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? context.purpleSoft
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(e, style: const TextStyle(fontSize: 28)),
                     ),
-                    child: Text(e, style: const TextStyle(fontSize: 30)),
-                  ),
-                );
-              }).toList(),
+                  );
+                },
+              ),
             );
           },
         ),

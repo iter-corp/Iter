@@ -17,17 +17,17 @@ class AppTheme {
     brightness: Brightness.light,
     useMaterial3: true,
     fontFamily: null, // system default
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: AppColors.purple,
       secondary: AppColors.purpleBright,
       surface: Colors.white,
       error: AppColors.red,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      onSurface: const Color(0xFF0F0F10),
+      onSurface: Color(0xFF0F0F10),
       onError: Colors.white,
-      outline: const Color(0xFFEDEDF2),
-      surfaceContainerHighest: const Color(0xFFF0F0F0),
+      outline: Color(0xFFEDEDF2),
+      surfaceContainerHighest: Color(0xFFF0F0F0),
     ),
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: const AppBarTheme(
@@ -73,17 +73,17 @@ class AppTheme {
     brightness: Brightness.dark,
     useMaterial3: true,
     fontFamily: null,
-    colorScheme: ColorScheme.dark(
+    colorScheme: const ColorScheme.dark(
       primary: AppColors.purple,
       secondary: AppColors.purpleBright,
-      surface: const Color(0xFF1A1A1E),
+      surface: Color(0xFF1A1A1E),
       error: AppColors.red,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      onSurface: const Color(0xFFE8E8EE),
+      onSurface: Color(0xFFE8E8EE),
       onError: Colors.white,
-      outline: const Color(0xFF2E2E34),
-      surfaceContainerHighest: const Color(0xFF252528),
+      outline: Color(0xFF2E2E34),
+      surfaceContainerHighest: Color(0xFF252528),
     ),
     scaffoldBackgroundColor: const Color(0xFF111114),
     appBarTheme: const AppBarTheme(

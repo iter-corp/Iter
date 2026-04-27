@@ -82,6 +82,7 @@ class AuthService {
         'gender': null,
         'role': 'user',
         'suspended': false,
+        'isPrivate': false,
         'followersCount': 0,
         'followingCount': 0,
         'postsCount': 0,
@@ -133,6 +134,7 @@ class AuthService {
         'gender': null,
         'role': 'user',
         'suspended': false,
+        'isPrivate': false,
         'followersCount': 0,
         'followingCount': 0,
         'postsCount': 0,
@@ -187,6 +189,7 @@ class AuthService {
         'gender': null,
         'role': 'user',
         'suspended': false,
+        'isPrivate': false,
         'followersCount': 0,
         'followingCount': 0,
         'postsCount': 0,
@@ -210,7 +213,11 @@ class AuthService {
     // active stream subscriptions cleanly instead of letting them receive
     // permission-denied errors when the token is invalidated.
     await FirebaseFirestore.instance.disableNetwork();
-    await _googleSignIn.signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Ignore errors if Google sign in wasn't used or not initialized
+    }
     await _auth.signOut();
   }
 

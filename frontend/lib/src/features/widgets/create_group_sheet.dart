@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_providers.dart';
+import '../../providers/block_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../theme/app_theme.dart';
@@ -176,6 +177,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                             _selected.remove(uids[i]);
                           }
                         }),
+                        currentUid: me ?? '',
                       ),
                     );
                   },
@@ -230,15 +232,20 @@ class _UserRow extends ConsumerWidget {
   final String uid;
   final bool selected;
   final ValueChanged<bool> onToggle;
+  final String currentUid;
 
   const _UserRow({
     required this.uid,
     required this.selected,
     required this.onToggle,
+    required this.currentUid,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isBlockedAsync = ref.watch(isBlockedProvider(uid));
+    final isBlockedByAsync = ref.watch(isBlockedByProvider(uid));
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream:
           FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
@@ -246,6 +253,15 @@ class _UserRow extends ConsumerWidget {
         final d = snap.data?.data() ?? {};
         final username = (d['username'] as String?) ?? uid;
         final avatar = (d['avatarUrl'] as String?) ?? '';
+
+        final isBlocked = isBlockedAsync.value ?? false;
+        final isBlockedBy = isBlockedByAsync.value ?? false;
+
+        // Hide blocked users from the list
+        if (isBlocked || isBlockedBy) {
+          return const SizedBox.shrink();
+        }
+
         return CheckboxListTile(
           value: selected,
           onChanged: (v) => onToggle(v ?? false),

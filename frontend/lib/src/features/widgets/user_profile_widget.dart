@@ -11,6 +11,9 @@ class UserCoverAvatar extends StatelessWidget {
   final String? coverUrl;
   final bool isPrivate;
   final VoidCallback onBack;
+  final bool showMenu;
+  final VoidCallback? onBlockTap;
+  final bool isBlocked;
 
   const UserCoverAvatar({
     super.key,
@@ -18,6 +21,9 @@ class UserCoverAvatar extends StatelessWidget {
     required this.coverUrl,
     required this.isPrivate,
     required this.onBack,
+    this.showMenu = false,
+    this.onBlockTap,
+    this.isBlocked = false,
   });
 
   ImageProvider? get _avatarImage =>
@@ -42,6 +48,37 @@ class UserCoverAvatar extends StatelessWidget {
         ),
       ),
     );
+
+    final menuButton = showMenu
+        ? Positioned(
+            top: 40,
+            right: 12,
+            child: PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'block') {
+                  onBlockTap?.call();
+                }
+              },
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+              ),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'block',
+                  child: Text(
+                    isBlocked ? 'Unblock' : 'Block',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : const SizedBox.shrink();
 
     final avatar = CircleAvatar(
       radius: 40,
@@ -75,6 +112,7 @@ class UserCoverAvatar extends StatelessWidget {
               color: Colors.black.withValues(alpha: 0.2),
             ),
             backArrow,
+            menuButton,
             Positioned(
               bottom: 0,
               left: 0,
@@ -108,6 +146,7 @@ class UserCoverAvatar extends StatelessWidget {
                 : Container(color: context.inputFill),
           ),
           backArrow,
+          menuButton,
           Positioned(
             bottom: 0,
             left: 0,
@@ -133,11 +172,13 @@ class UserCoverAvatar extends StatelessWidget {
 class UserNameBio extends StatelessWidget {
   final String username;
   final String handle;
+  final bool isPrivate;
 
   const UserNameBio({
     super.key,
     required this.username,
     required this.handle,
+    this.isPrivate = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -145,9 +186,23 @@ class UserNameBio extends StatelessWidget {
       padding: const EdgeInsets.only(top: 52, bottom: 8),
       child: Column(
         children: [
-          Text(
-            username,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                username,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              if (isPrivate) ...[
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.lock,
+                  size: 18,
+                  color: context.textSecondary,
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 4),
           Text(
@@ -167,6 +222,7 @@ class UserStats extends StatelessWidget {
   final int posts;
   final VoidCallback? onFollowersTap;
   final VoidCallback? onFollowingTap;
+  final bool isPrivateAndNotFollowing;
 
   const UserStats({
     super.key,
@@ -175,6 +231,7 @@ class UserStats extends StatelessWidget {
     required this.posts,
     this.onFollowersTap,
     this.onFollowingTap,
+    this.isPrivateAndNotFollowing = false,
   });
 
   @override
@@ -184,11 +241,26 @@ class UserStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(context, _fmt(followers), "Followers", onFollowersTap),
+          _statItem(
+            context, 
+            isPrivateAndNotFollowing ? "—" : _fmt(followers), 
+            "Followers", 
+            isPrivateAndNotFollowing ? null : onFollowersTap
+          ),
           _divider(context),
-          _statItem(context, _fmt(following), "Following", onFollowingTap),
+          _statItem(
+            context, 
+            isPrivateAndNotFollowing ? "—" : _fmt(following), 
+            "Following", 
+            isPrivateAndNotFollowing ? null : onFollowingTap
+          ),
           _divider(context),
-          _statItem(context, _fmt(posts), "Posts", null),
+          _statItem(
+            context, 
+            isPrivateAndNotFollowing ? "—" : _fmt(posts), 
+            "Posts", 
+            null
+          ),
         ],
       ),
     );
@@ -227,6 +299,7 @@ class UserStats extends StatelessWidget {
 /// FOLLOW + MESSAGE BUTTONS
 class UserButtons extends StatelessWidget {
   final bool isFollowing;
+  final bool isRequested;
   final bool isPrivate;
   final VoidCallback onFollowTap;
   final VoidCallback? onMessageTap;
@@ -234,6 +307,7 @@ class UserButtons extends StatelessWidget {
   const UserButtons({
     super.key,
     required this.isFollowing,
+    this.isRequested = false,
     required this.isPrivate,
     required this.onFollowTap,
     this.onMessageTap,
@@ -241,6 +315,9 @@ class UserButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool active = isFollowing || isRequested;
+    final String text = isFollowing ? "Following" : (isRequested ? "Requested" : "Follow");
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -255,19 +332,19 @@ class UserButtons extends StatelessWidget {
                   duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
                     color:
-                        isFollowing ? context.cardBg : const Color(0xFFB05ECC),
+                        active ? context.cardBg : const Color(0xFFB05ECC),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isFollowing
+                      color: active
                           ? context.borderColor
                           : const Color(0xFFB05ECC),
                     ),
                   ),
                   child: Center(
                     child: Text(
-                      isFollowing ? "Following" : "Follow",
+                      text,
                       style: TextStyle(
-                        color: isFollowing ? context.textPrimary : Colors.white,
+                        color: active ? context.textPrimary : Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),

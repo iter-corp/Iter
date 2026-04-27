@@ -55,8 +55,15 @@ class StorageService {
     final idToken = await user.getIdToken();
     if (idToken == null) throw StorageException('Could not get Firebase ID token');
 
-    final ext = _extensionOf(file.path);
+    var ext = _extensionOf(file.path);
     final contentType = _contentTypeOf(ext);
+    // The Supabase edge function (issue-upload-url) rejects `m4a` with
+    // {"error":"bad ext"} even though the file is plain AAC audio inside an
+    // MP4 container. Re-label as `aac` for the upload-URL request — the
+    // bytes are still valid AAC so playback is unaffected.
+    if (kind == 'audio' && ext == 'm4a') {
+      ext = 'aac';
+    }
 
     final edgeUri = Uri.parse('$_supabaseUrl/functions/v1/issue-upload-url');
 

@@ -1,10 +1,37 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../features/model/post_model.dart';
-import '../services/follow_service.dart';
 import '../services/post_service.dart';
 import 'auth_providers.dart';
+import 'block_providers.dart';
 import 'follow_providers.dart';
+
+class TravelFeedQuery {
+  final String placeQuery;
+  final double? lat;
+  final double? lng;
+  final int limit;
+
+  const TravelFeedQuery({
+    this.placeQuery = '',
+    this.lat,
+    this.lng,
+    this.limit = 60,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    return other is TravelFeedQuery &&
+        other.placeQuery == placeQuery &&
+        other.lat == lat &&
+        other.lng == lng &&
+        other.limit == limit;
+  }
+
+  @override
+  int get hashCode => Object.hash(placeQuery, lat, lng, limit);
+}
 
 final postServiceProvider = Provider<PostService>((_) => PostService());
 
@@ -13,22 +40,36 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
   if (currentUid == null) return const Stream.empty();
 
   final followService = ref.watch(followServiceProvider);
+  final blockedStream = ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
 
-  // Combine raw posts with the current user's following list so that
-  // followers-only posts are hidden from users who don't follow the author.
-  return ref.watch(postServiceProvider).streamFeed().asyncExpand((posts) {
-    return followService.getFollowing(currentUid).map((following) {
+  return Rx.combineLatest3(
+    ref.watch(postServiceProvider).streamFeed().onErrorReturn(<Post>[]),
+    followService.getFollowing(currentUid).onErrorReturn(<String>[]),
+    blockedStream.onErrorReturn(<String>[]),
+    (List<Post> posts, List<String> following, List<String> blocked) {
       final allowed = {...following, currentUid};
+      final blockedSet = blocked.toSet();
       return posts
+          .where((p) => !blockedSet.contains(p.authorUid))
           .where((p) => !p.isPrivate || allowed.contains(p.authorUid))
           .toList();
-    });
-  });
+    },
+  );
 });
 
 final userPostsProvider = StreamProvider.family<List<Post>, String>(
   (ref, uid) => ref.watch(postServiceProvider).streamUserPosts(uid),
 );
+
+final travelFeedProvider =
+    FutureProvider.family<List<Post>, TravelFeedQuery>((ref, query) async {
+  return ref.watch(postServiceProvider).getTravelPosts(
+        placeQuery: query.placeQuery,
+        currentLat: query.lat,
+        currentLng: query.lng,
+        limit: query.limit,
+      );
+});
 
 final isLikedProvider = StreamProvider.family<bool, String>((ref, postId) {
   // Watch auth so the stream rebuilds after logout/re-login, preventing a

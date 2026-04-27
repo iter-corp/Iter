@@ -15,6 +15,12 @@ class ChatMessage {
   final String? replyToId;
   final String? replyToText;
   final String? replyToSenderUid;
+  /// When this message was sent in response to a story, [storyId] holds the
+  /// story doc id and [storyImageUrl] holds the story thumbnail. The chat
+  /// bubble renders a "Replied to story" header so the receiver can see
+  /// which story the reply/reaction is about.
+  final String? storyId;
+  final String? storyImageUrl;
   final DateTime? createdAt;
   final List<String> seenBy;
 
@@ -29,6 +35,8 @@ class ChatMessage {
     this.replyToId,
     this.replyToText,
     this.replyToSenderUid,
+    this.storyId,
+    this.storyImageUrl,
     this.createdAt,
     required this.seenBy,
   });
@@ -46,6 +54,8 @@ class ChatMessage {
       replyToId: d['replyToId'] as String?,
       replyToText: d['replyToText'] as String?,
       replyToSenderUid: d['replyToSenderUid'] as String?,
+      storyId: d['storyId'] as String?,
+      storyImageUrl: d['storyImageUrl'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       seenBy: List<String>.from(d['seenBy'] as List? ?? []),
     );
@@ -206,19 +216,26 @@ class ChatService {
     String? replyToId,
     String? replyToText,
     String? replyToSenderUid,
+    String? storyId,
+    String? storyImageUrl,
   }) async {
     final trimmedText = text.trim();
     final normalizedImageUrl = imageUrl?.trim();
     final normalizedSharedPostId = sharedPostId?.trim();
     final normalizedVoiceUrl = voiceUrl?.trim();
+    final normalizedStoryId = storyId?.trim();
+    final normalizedStoryImageUrl = storyImageUrl?.trim();
     final hasSharedPost =
         normalizedSharedPostId != null && normalizedSharedPostId.isNotEmpty;
     final hasVoice =
         normalizedVoiceUrl != null && normalizedVoiceUrl.isNotEmpty;
+    final hasStoryRef =
+        normalizedStoryId != null && normalizedStoryId.isNotEmpty;
     if (trimmedText.isEmpty &&
         (normalizedImageUrl == null || normalizedImageUrl.isEmpty) &&
         !hasSharedPost &&
-        !hasVoice) {
+        !hasVoice &&
+        !hasStoryRef) {
       return;
     }
 
@@ -261,6 +278,11 @@ class ChatService {
         'replyToText': replyToText,
       if (replyToSenderUid != null && replyToSenderUid.isNotEmpty)
         'replyToSenderUid': replyToSenderUid,
+      if (hasStoryRef) 'storyId': normalizedStoryId,
+      if (hasStoryRef &&
+          normalizedStoryImageUrl != null &&
+          normalizedStoryImageUrl.isNotEmpty)
+        'storyImageUrl': normalizedStoryImageUrl,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
     });
@@ -281,38 +303,12 @@ class ChatService {
     await batch.commit();
   }
 
-  /// Resets the unread counter for [uid] in [chatId] AND marks every
-  /// recent unseen message as seen by [uid] so the sender's double-check
-  /// indicator can flip from "delivered" to "seen". We scan only the last
-  /// 50 messages to bound cost — older history is left alone (a chat
-  /// that's been open this long is realistically already seen anyway).
+  /// Resets the unread counter for [uid] in [chatId].
   Future<void> markSeen({
     required String chatId,
     required String uid,
   }) async {
     await _chatDoc(chatId).update({'unread.$uid': 0});
-
-    final recent = await _messagesCol(chatId)
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .get();
-
-    final batch = _db.batch();
-    var pending = 0;
-    for (final doc in recent.docs) {
-      final data = doc.data();
-      final senderUid = data['senderUid'] as String? ?? '';
-      if (senderUid == uid) continue; // own message, already in seenBy
-      final seenBy = List<String>.from(data['seenBy'] as List? ?? []);
-      if (seenBy.contains(uid)) continue;
-      batch.update(doc.reference, {
-        'seenBy': FieldValue.arrayUnion([uid]),
-      });
-      pending++;
-    }
-    if (pending > 0) {
-      await batch.commit();
-    }
   }
 
   /// Real-time stream of messages, oldest first.

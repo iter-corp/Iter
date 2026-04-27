@@ -1,24 +1,7 @@
-import 'dart:async';
 import 'dart:convert';
-<<<<<<< Updated upstream
-
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
-
-/// Translation via Google Gemini.
-/// We ask Gemini to translate text, instructing it to return only the
-/// translated text with no explanation or prefix.
-class TranslateService {
-  const TranslateService();
-
-  static const _model = 'gemini-2.5-flash';
-  static const _host = 'generativelanguage.googleapis.com';
-=======
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tag prefix used by every debug print emitted by [TranslateService].
 /// Search the device log with: `flutter logs | grep [translate]`
@@ -27,104 +10,6 @@ const String _kTranslateLogTag = '[translate]';
 void _tlog(String msg) {
   if (kDebugMode) debugPrint('$_kTranslateLogTag $msg');
 }
-
-/// Metadata for a translation target language.
-///
-/// [code] is the BCP-47 / Azure language code passed to
-/// [TranslateService.translateText]. [label] is the human-readable name
-/// shown in pickers. [stt] is the speech-to-text locale (`xx_YY` form) for
-/// the in-app live translator's mic input — `null` means the device default
-/// is used and live transcription may be less accurate. [rtl] is true for
-/// right-to-left scripts so UI text alignment can flip.
-class TranslateLanguage {
-  final String code;
-  final String label;
-  final String? stt;
-  final bool rtl;
-  const TranslateLanguage(this.code, this.label, {this.stt, this.rtl = false});
-}
-
-/// Single source of truth for every language picker in the app: chat
-/// auto-translate dropdown, comment translate sheet, post-caption translate
-/// sheet, and the dedicated translate screen. Edit here once — every picker
-/// updates automatically.
-const List<TranslateLanguage> kTranslateLanguages = [
-  TranslateLanguage('en', 'English (USA)', stt: 'en_US'),
-  TranslateLanguage('en', 'English (UK)', stt: 'en_GB'),
-  TranslateLanguage('ar', 'Arabic', stt: 'ar_SA', rtl: true),
-  TranslateLanguage('ckb', 'Kurdish (Sorani)', stt: 'ar_IQ', rtl: true),
-  TranslateLanguage('kmr', 'Kurdish (Kurmanji)', stt: 'tr_TR'),
-  TranslateLanguage('fa', 'Persian', stt: 'fa_IR', rtl: true),
-  TranslateLanguage('tr', 'Turkish', stt: 'tr_TR'),
-  TranslateLanguage('es', 'Spanish', stt: 'es_ES'),
-  TranslateLanguage('fr', 'French', stt: 'fr_FR'),
-  TranslateLanguage('de', 'German', stt: 'de_DE'),
-  TranslateLanguage('it', 'Italian', stt: 'it_IT'),
-  TranslateLanguage('pt-BR', 'Portuguese (Brazil)', stt: 'pt_BR'),
-  TranslateLanguage('pt-PT', 'Portuguese (Portugal)', stt: 'pt_PT'),
-  TranslateLanguage('ru', 'Russian', stt: 'ru_RU'),
-  TranslateLanguage('uk', 'Ukrainian', stt: 'uk_UA'),
-  TranslateLanguage('pl', 'Polish', stt: 'pl_PL'),
-  TranslateLanguage('nl', 'Dutch', stt: 'nl_NL'),
-  TranslateLanguage('sv', 'Swedish', stt: 'sv_SE'),
-  TranslateLanguage('no', 'Norwegian', stt: 'nb_NO'),
-  TranslateLanguage('da', 'Danish', stt: 'da_DK'),
-  TranslateLanguage('fi', 'Finnish', stt: 'fi_FI'),
-  TranslateLanguage('cs', 'Czech', stt: 'cs_CZ'),
-  TranslateLanguage('el', 'Greek', stt: 'el_GR'),
-  TranslateLanguage('he', 'Hebrew', stt: 'he_IL', rtl: true),
-  TranslateLanguage('ur', 'Urdu', stt: 'ur_PK', rtl: true),
-  TranslateLanguage('hi', 'Hindi', stt: 'hi_IN'),
-  TranslateLanguage('bn', 'Bengali', stt: 'bn_IN'),
-  TranslateLanguage('ta', 'Tamil', stt: 'ta_IN'),
-  TranslateLanguage('te', 'Telugu', stt: 'te_IN'),
-  TranslateLanguage('ms', 'Malay', stt: 'ms_MY'),
-  TranslateLanguage('id', 'Indonesian', stt: 'id_ID'),
-  TranslateLanguage('th', 'Thai', stt: 'th_TH'),
-  TranslateLanguage('vi', 'Vietnamese', stt: 'vi_VN'),
-  TranslateLanguage('ja', 'Japanese', stt: 'ja_JP'),
-  TranslateLanguage('ko', 'Korean', stt: 'ko_KR'),
-  TranslateLanguage('zh-CN', 'Chinese (Simplified)', stt: 'zh_CN'),
-  TranslateLanguage('zh-TW', 'Chinese (Traditional)', stt: 'zh_TW'),
-  TranslateLanguage('sw', 'Swahili', stt: 'sw_KE'),
-  TranslateLanguage('am', 'Amharic', stt: 'am_ET'),
-  TranslateLanguage('so', 'Somali'),
-  TranslateLanguage('ha', 'Hausa'),
-  TranslateLanguage('zu', 'Zulu', stt: 'zu_ZA'),
-  TranslateLanguage('af', 'Afrikaans', stt: 'af_ZA'),
-  TranslateLanguage('hu', 'Hungarian', stt: 'hu_HU'),
-  TranslateLanguage('ro', 'Romanian', stt: 'ro_RO'),
-  TranslateLanguage('bg', 'Bulgarian', stt: 'bg_BG'),
-  TranslateLanguage('sr', 'Serbian', stt: 'sr_RS'),
-  TranslateLanguage('hr', 'Croatian', stt: 'hr_HR'),
-  TranslateLanguage('sk', 'Slovak', stt: 'sk_SK'),
-  TranslateLanguage('sl', 'Slovenian', stt: 'sl_SI'),
-  TranslateLanguage('lt', 'Lithuanian', stt: 'lt_LT'),
-  TranslateLanguage('lv', 'Latvian', stt: 'lv_LV'),
-  TranslateLanguage('et', 'Estonian', stt: 'et_EE'),
-  TranslateLanguage('is', 'Icelandic', stt: 'is_IS'),
-  TranslateLanguage('ca', 'Catalan', stt: 'ca_ES'),
-  TranslateLanguage('eu', 'Basque', stt: 'eu_ES'),
-  TranslateLanguage('gl', 'Galician', stt: 'gl_ES'),
-  TranslateLanguage('cy', 'Welsh'),
-  TranslateLanguage('ga', 'Irish'),
-  TranslateLanguage('sq', 'Albanian'),
-  TranslateLanguage('hy', 'Armenian'),
-  TranslateLanguage('az', 'Azerbaijani'),
-  TranslateLanguage('ka', 'Georgian'),
-  TranslateLanguage('kk', 'Kazakh'),
-  TranslateLanguage('uz', 'Uzbek'),
-  TranslateLanguage('mn', 'Mongolian'),
-  TranslateLanguage('km', 'Khmer'),
-  TranslateLanguage('lo', 'Lao'),
-  TranslateLanguage('my', 'Burmese'),
-  TranslateLanguage('fil', 'Filipino', stt: 'fil_PH'),
-  TranslateLanguage('ne', 'Nepali'),
-  TranslateLanguage('si', 'Sinhala'),
-  TranslateLanguage('ps', 'Pashto', rtl: true),
-  TranslateLanguage('mt', 'Maltese'),
-  TranslateLanguage('eo', 'Esperanto'),
-];
 
 /// Client-side translation with provider routing.
 ///
@@ -138,108 +23,6 @@ class TranslateService {
 
   // Round-robin index — shared across all instances for the app lifetime.
   static int _providerIndex = 0;
-
-  // ──────────────────────────────────────────────
-  // On-device translation cache
-  // ──────────────────────────────────────────────
-  // Stored as a single JSON map under [_kCachePrefsKey] in SharedPreferences.
-  // Key format: "<srcLang>|<tgtLang>|<sha1HexOfText>" → translated text.
-  // First lookup loads it once into the in-memory map; subsequent calls hit
-  // memory only. We re-write the whole blob on each store — fine for the
-  // expected size (capped at [_kCacheMaxEntries]) and avoids needing two
-  // round-trips per write. On overflow we drop the entire cache; tracking
-  // LRU per-entry would double every write for marginal benefit.
-  static const String _kCachePrefsKey = 'translate_cache_v1';
-  static const int _kCacheMaxEntries = 1000;
-  static Map<String, String>? _cache;
-  static Future<void>? _cacheLoadFuture;
-
-  static String _cacheKey({
-    required String sourceLang,
-    required String targetLang,
-    required String text,
-  }) {
-    final hash = sha1.convert(utf8.encode(text)).toString();
-    return '${sourceLang.toLowerCase()}|${targetLang.toLowerCase()}|$hash';
-  }
-
-  static Future<void> _ensureCacheLoaded() {
-    if (_cache != null) return Future.value();
-    return _cacheLoadFuture ??= () async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final raw = prefs.getString(_kCachePrefsKey);
-        if (raw == null || raw.isEmpty) {
-          _cache = <String, String>{};
-        } else {
-          final decoded = jsonDecode(raw);
-          if (decoded is Map) {
-            _cache = decoded.map(
-              (k, v) => MapEntry(k.toString(), v.toString()),
-            );
-          } else {
-            _cache = <String, String>{};
-          }
-        }
-        _tlog('cache loaded entries=${_cache!.length}');
-      } catch (e) {
-        _tlog('cache load FAILED: $e — starting empty');
-        _cache = <String, String>{};
-      }
-    }();
-  }
-
-  static Future<String?> _cacheLookup({
-    required String sourceLang,
-    required String targetLang,
-    required String text,
-  }) async {
-    await _ensureCacheLoaded();
-    final hit = _cache![_cacheKey(
-      sourceLang: sourceLang,
-      targetLang: targetLang,
-      text: text,
-    )];
-    if (hit != null) {
-      _tlog('cache HIT len=${hit.length}');
-    }
-    return hit;
-  }
-
-  static Future<void> _cacheStore({
-    required String sourceLang,
-    required String targetLang,
-    required String text,
-    required String result,
-  }) async {
-    await _ensureCacheLoaded();
-    final cache = _cache!;
-    if (cache.length >= _kCacheMaxEntries) {
-      _tlog('cache full (${cache.length}) — clearing');
-      cache.clear();
-    }
-    cache[_cacheKey(
-      sourceLang: sourceLang,
-      targetLang: targetLang,
-      text: text,
-    )] = result;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kCachePrefsKey, jsonEncode(cache));
-    } catch (e) {
-      _tlog('cache persist FAILED: $e');
-    }
-  }
-
-  /// Clears all cached translations (memory + disk). Useful for a settings
-  /// "Clear translation cache" action.
-  static Future<void> clearCache() async {
-    _cache = <String, String>{};
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_kCachePrefsKey);
-    } catch (_) {}
-  }
 
   static bool _isKurdish(String lang) {
     final l = lang.toLowerCase();
@@ -329,7 +112,6 @@ class TranslateService {
 
     return 'Translation failed. Please try again in a little while.';
   }
->>>>>>> Stashed changes
 
   Future<String> translateText({
     required String text,
@@ -341,11 +123,6 @@ class TranslateService {
       return normalized;
     }
 
-<<<<<<< Updated upstream
-    final key = dotenv.env['GEMINI_API_KEY'];
-    if (key == null || key.isEmpty) {
-      throw Exception('GEMINI_API_KEY missing from .env');
-=======
     final effectiveSourceLang = _effectiveSourceLang(
       sourceLang: sourceLang,
       text: normalized,
@@ -355,17 +132,6 @@ class TranslateService {
         'tgt="$targetLang" textLen=${normalized.length} '
         'sample="${normalized.substring(0, normalized.length > 40 ? 40 : normalized.length)}"');
 
-    // Cache lookup — keyed on the *effective* source so an "auto" call that
-    // resolves to ckb shares cache entries with a future explicit-ckb call.
-    final cached = await _cacheLookup(
-      sourceLang: effectiveSourceLang,
-      targetLang: targetLang,
-      text: normalized,
-    );
-    if (cached != null) {
-      return cached;
-    }
-
     final allProviders = _buildProviderList(
       sourceLang: effectiveSourceLang,
       targetLang: targetLang,
@@ -374,26 +140,12 @@ class TranslateService {
       _tlog('ERROR: no providers configured for src=$effectiveSourceLang '
           'tgt=$targetLang. Check .env keys.');
       throw Exception('No translation providers configured');
->>>>>>> Stashed changes
     }
 
-    final prompt =
-        'Translate the following text from "$sourceLang" to "$targetLang". '
-        'Return ONLY the translated text, with no quotes, no explanation, '
-        'no prefix, no markdown.\n\nText:\n$normalized';
+    final kurdishInvolved =
+        _isKurdish(effectiveSourceLang) || _isKurdish(targetLang);
+    _tlog('kurdishInvolved=$kurdishInvolved providers=$allProviders');
 
-<<<<<<< Updated upstream
-    final body = {
-      'contents': [
-        {
-          'parts': [
-            {'text': prompt}
-          ]
-        }
-      ],
-      'generationConfig': {
-        'temperature': 0.2,
-=======
     // For Kurdish-related translations, keep deterministic order so Gemini
     // is always attempted first (no rotation).
     final orderedProviders = kurdishInvolved
@@ -420,53 +172,373 @@ class TranslateService {
             'resultLen=${result.length} '
             'sample="${result.substring(0, result.length > 40 ? 40 : result.length)}"');
         _providerIndex = (_providerIndex + 1) % allProviders.length;
-        // Persist for next time. Fire-and-forget — the result is already
-        // returned to the caller; cache write happens in the background.
-        unawaited(_cacheStore(
-          sourceLang: effectiveSourceLang,
-          targetLang: targetLang,
-          text: normalized,
-          result: result,
-        ));
         return result;
       } on Exception catch (e) {
         _tlog('FAIL via $provider: $e');
         lastError = e;
         // Fall through to next provider.
->>>>>>> Stashed changes
       }
-    };
-
-    final isApiKey = key.startsWith('AIza');
-    final uri = Uri.https(
-      _host,
-      '/v1beta/models/$_model:generateContent',
-      isApiKey ? {'key': key} : null,
-    );
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (!isApiKey) 'Authorization': 'Bearer $key',
-    };
-
-    final resp = await http.post(uri, headers: headers, body: jsonEncode(body));
-    if (resp.statusCode != 200) {
-      throw Exception('Gemini ${resp.statusCode}: ${resp.body}');
     }
 
-    final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+    _tlog('ALL PROVIDERS FAILED. lastError=$lastError');
+    throw lastError ?? Exception('All providers failed');
+  }
+
+  // ──────────────────────────────────────────────
+  // Provider list builder
+  // ──────────────────────────────────────────────
+
+  List<_Provider> _buildProviderList({
+    required String sourceLang,
+    required String targetLang,
+  }) {
+    final kurdishTarget = _isKurdish(targetLang);
+    // For explicit Kurdish source (not auto-detect), treat as Kurdish too.
+    final kurdishSource = sourceLang != 'auto' && _isKurdish(sourceLang);
+    final involvesKurdish = kurdishTarget || kurdishSource;
+
+    final geminiKey = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
+    final langblyKey = dotenv.maybeGet('LANGBLY_API_KEY') ?? '';
+    final freeapiKey = dotenv.maybeGet('FREEAPITOOLS_API_KEY') ?? '';
+
+    final azureKey = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
+
+    if (involvesKurdish) {
+      // Kurdish: Azure (Microsoft) is the primary engine, but Sorani/Kurmanji
+      // can fail on Azure due to region/quota/language-support issues. Fall
+      // back to MyMemory (supports ckb/kmr) and Gemini so users still get
+      // a translation while we diagnose Azure.
+      final providers = <_Provider>[];
+      if (azureKey.isNotEmpty) {
+        providers.add(_Provider.azure);
+      }
+      providers.add(_Provider.mymemory);
+      if (geminiKey.isNotEmpty) {
+        providers.add(_Provider.gemini);
+      }
+      return providers;
+    }
+
+    // Non-Kurdish: Gemini first, then other AI fallbacks. Azure is added
+    // last as a workhorse because it's reliable and has a generous free
+    // tier — it kicks in if Gemini's model has rotated, MyMemory hits
+    // its 403 daily quota, and so on. Without Azure here, comment/post
+    // translate would silently fail for non-Kurdish text once the free
+    // providers were exhausted.
+    final providers = <_Provider>[];
+    if (geminiKey.isNotEmpty) {
+      providers.add(_Provider.gemini);
+    }
+    if (langblyKey.isNotEmpty) {
+      providers.add(_Provider.langbly);
+    }
+    providers.add(_Provider.mymemory);
+    if (freeapiKey.isNotEmpty) {
+      providers.add(_Provider.freeapitools);
+    }
+    if (azureKey.isNotEmpty) {
+      providers.add(_Provider.azure);
+    }
+    return providers;
+  }
+
+  // ──────────────────────────────────────────────
+  // Provider dispatch
+  // ──────────────────────────────────────────────
+
+  Future<String> _callProvider({
+    required _Provider provider,
+    required String text,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    switch (provider) {
+      case _Provider.azure:
+        return _callAzure(
+            text: text, sourceLang: sourceLang, targetLang: targetLang);
+      case _Provider.gemini:
+        return _callGemini(
+            text: text, sourceLang: sourceLang, targetLang: targetLang);
+      case _Provider.langbly:
+        return _callLangbly(
+            text: text, sourceLang: sourceLang, targetLang: targetLang);
+      case _Provider.mymemory:
+        return _callMyMemory(
+            text: text, sourceLang: sourceLang, targetLang: targetLang);
+      case _Provider.freeapitools:
+        return _callFreeAPITools(
+            text: text, sourceLang: sourceLang, targetLang: targetLang);
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Provider implementations
+  // ──────────────────────────────────────────────
+
+  /// Microsoft Azure Translator. Used exclusively for Kurdish.
+  /// Maps kmr → ku (Kurmanji/Northern Kurdish) so Azure accepts the code.
+  Future<String> _callAzure({
+    required String text,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    final apiKey = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
+    if (apiKey.isEmpty) {
+      throw Exception('Azure Translator key is missing');
+    }
+    final region =
+        dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ?? 'centralindia';
+    final endpoint = (dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
+            'https://api.cognitive.microsofttranslator.com/')
+        .replaceAll(RegExp(r'/$'), '');
+
+    // Azure language-code mapping. Azure Translator uses `ku` for Central
+    // Kurdish (Sorani). Kurmanji (Northern Kurdish, `kmr`) is NOT supported
+    // by Azure — the caller will fall back to MyMemory/Gemini for that.
+    String mapLang(String code) {
+      final l = code.toLowerCase();
+      if (l == 'ckb' || l.startsWith('ckb-')) return 'ku';
+      if (l == 'kmr' || l.startsWith('kmr-')) {
+        throw Exception(
+            'Azure does not support Kurmanji (kmr); falling back to next provider');
+      }
+      return code;
+    }
+
+    final mappedTarget = mapLang(targetLang);
+    final mappedSource = sourceLang == 'auto' ? null : mapLang(sourceLang);
+
+    final query = <String, String>{
+      'api-version': '3.0',
+      'to': mappedTarget,
+    };
+    if (mappedSource != null) {
+      query['from'] = mappedSource;
+    }
+
+    final uri =
+        Uri.parse('$endpoint/translate').replace(queryParameters: query);
+
+    _tlog('Azure REQUEST: '
+        'endpoint=$endpoint region=$region '
+        'from=${mappedSource ?? "(auto)"} to=$mappedTarget '
+        'keyPrefix=${apiKey.substring(0, apiKey.length > 6 ? 6 : apiKey.length)}... '
+        'uri=$uri');
+
+    final stopwatch = Stopwatch()..start();
+    final response = await http
+        .post(
+          uri,
+          headers: {
+            'Ocp-Apim-Subscription-Key': apiKey,
+            'Ocp-Apim-Subscription-Region': region,
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode([
+            {'Text': text}
+          ]),
+        )
+        .timeout(const Duration(seconds: 20));
+    stopwatch.stop();
+
+    _tlog('Azure RESPONSE: status=${response.statusCode} '
+        'elapsed=${stopwatch.elapsedMilliseconds}ms '
+        'bodyLen=${response.body.length} '
+        'body=${response.body.length > 500 ? "${response.body.substring(0, 500)}..." : response.body}');
+
+    if (response.statusCode == 429) {
+      throw Exception('Azure quota exceeded (429)');
+    }
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception(
+          'Azure unauthorized (${response.statusCode}) — check key/region. Body: ${response.body}');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Azure error ${response.statusCode}: ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body) as List;
+    final translated =
+        (decoded.first['translations'] as List?)?.first?['text'] as String?;
+    if (translated == null || translated.trim().isEmpty) {
+      _tlog('Azure returned empty translation. decoded=$decoded');
+      throw Exception('Azure returned empty translation');
+    }
+    return translated.trim();
+  }
+
+  Future<String> _callGemini({
+    required String text,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    final apiKey = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
+    if (apiKey.isEmpty) {
+      throw Exception('Gemini API key is missing');
+    }
+
+    final src = sourceLang == 'auto' ? 'detected source language' : sourceLang;
+    final prompt = '''You are a precise translation engine.
+Translate the following text from $src to $targetLang.
+Return only the translated text.
+Text:
+$text''';
+
+    final response = await http
+        .post(
+          Uri.parse(
+              'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': prompt}
+                ]
+              }
+            ],
+            'generationConfig': {
+              'temperature': 0,
+              'topP': 0.1,
+              'maxOutputTokens': 2048,
+            }
+          }),
+        )
+        .timeout(const Duration(seconds: 25));
+
+    if (response.statusCode == 429) {
+      throw Exception('Gemini quota exceeded (429)');
+    }
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Gemini unauthorized (${response.statusCode})');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Gemini error ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final candidates = decoded['candidates'] as List?;
-    if (candidates == null || candidates.isEmpty) {
-      throw Exception('No candidates in Gemini response');
+    final translated = candidates?.firstWhere((_) => true,
+        orElse: () => null)?['content']?['parts']?[0]?['text'] as String?;
+
+    if (translated == null || translated.trim().isEmpty) {
+      throw Exception('Gemini returned empty translation');
     }
-    final content = (candidates.first as Map)['content'] as Map?;
-    final parts = content?['parts'] as List?;
-    if (parts == null || parts.isEmpty) {
-      throw Exception('No parts in Gemini response');
+    return translated.trim();
+  }
+
+  Future<String> _callLangbly({
+    required String text,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    final apiKey = dotenv.maybeGet('LANGBLY_API_KEY') ?? '';
+    final response = await http
+        .post(
+          Uri.parse('https://api.langbly.com/language/translate/v2'),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey,
+          },
+          body: jsonEncode({
+            'q': text,
+            'source': sourceLang,
+            'target': targetLang,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode == 429) {
+      throw Exception('Langbly quota exceeded (429)');
     }
-    final out = (parts.first as Map)['text'] as String?;
-    if (out == null || out.trim().isEmpty) {
-      throw Exception('Empty Gemini response');
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Langbly unauthorized (${response.statusCode})');
     }
-    return out.trim();
+    if (response.statusCode != 200) {
+      throw Exception('Langbly error ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final translated = (decoded['data']?['translations'] as List?)
+        ?.first?['translatedText'] as String?;
+    if (translated == null || translated.trim().isEmpty) {
+      throw Exception('Langbly returned empty translation');
+    }
+    return translated.trim();
+  }
+
+  /// MyMemory — free tier, no API key required.
+  /// 1 000 words/day anonymous; supports ckb (Sorani) and kmr (Kurmanji).
+  Future<String> _callMyMemory({
+    required String text,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    // MyMemory uses "autodetect" for automatic source detection.
+    final src = sourceLang == 'auto' ? 'autodetect' : sourceLang;
+    final langPair = '$src|$targetLang';
+
+    final uri = Uri.parse(
+      'https://api.mymemory.translated.net/get',
+    ).replace(queryParameters: {'q': text, 'langpair': langPair});
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception('MyMemory error ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final status = decoded['responseStatus'];
+    // MyMemory returns 200 for success (as a number or string).
+    if (status != 200 && status != '200') {
+      throw Exception('MyMemory API error: $status');
+    }
+
+    final translated = decoded['responseData']?['translatedText'] as String?;
+    if (translated == null || translated.trim().isEmpty) {
+      throw Exception('MyMemory returned empty translation');
+    }
+    return translated.trim();
+  }
+
+  Future<String> _callFreeAPITools({
+    required String text,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    final apiKey = dotenv.maybeGet('FREEAPITOOLS_API_KEY') ?? '';
+    final response = await http
+        .post(
+          Uri.parse('https://freeapitools.dev/api/v1/translate'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'api_key': apiKey,
+            'text': text,
+            'source_language': sourceLang,
+            'target_language': targetLang,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode == 403) {
+      throw Exception('FreeAPITools forbidden (403)');
+    }
+    if (response.statusCode == 429) {
+      throw Exception('FreeAPITools quota exceeded (429)');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('FreeAPITools error ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final translated = decoded['translated_text'] as String? ??
+        decoded['translation'] as String?;
+    if (translated == null || translated.trim().isEmpty) {
+      throw Exception('FreeAPITools returned empty translation');
+    }
+    return translated.trim();
   }
 }
+
+enum _Provider { azure, gemini, langbly, mymemory, freeapitools }

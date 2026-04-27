@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart' as geo;
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../providers/auth_providers.dart';
@@ -20,14 +22,78 @@ class CreatePostScreen extends ConsumerStatefulWidget {
 
 class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _captionCtrl = TextEditingController();
+  final _placeNameCtrl = TextEditingController();
+  final _placeCityCtrl = TextEditingController();
   final List<File> _pickedImages = [];
   bool _isPrivate = false;
   bool _posting = false;
+  double? _placeLat;
+  double? _placeLng;
+  bool _placeFromCurrentLocation = false;
 
   @override
   void dispose() {
     _captionCtrl.dispose();
+    _placeNameCtrl.dispose();
+    _placeCityCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _useCurrentLocationForPlace() async {
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        throw 'Location services are off. Enable them in device settings.';
+      }
+
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        throw 'Location permission denied.';
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+
+      String city = _placeCityCtrl.text.trim();
+      String place = _placeNameCtrl.text.trim();
+      try {
+        final marks =
+            await geo.placemarkFromCoordinates(pos.latitude, pos.longitude);
+        if (marks.isNotEmpty) {
+          final p = marks.first;
+          city = (p.locality ?? p.subAdministrativeArea ?? city).trim();
+          final nameParts = <String>[
+            p.name ?? '',
+            p.street ?? '',
+          ].where((v) => v.trim().isNotEmpty).toList();
+          if (nameParts.isNotEmpty) {
+            place = nameParts.first.trim();
+          }
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() {
+        _placeLat = pos.latitude;
+        _placeLng = pos.longitude;
+        _placeFromCurrentLocation = true;
+        if (city.isNotEmpty) _placeCityCtrl.text = city;
+        if (place.isNotEmpty) {
+          _placeNameCtrl.text = place;
+        } else if (_placeNameCtrl.text.trim().isEmpty) {
+          _placeNameCtrl.text = 'Current location';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   Future<void> _pickImages() async {
@@ -54,6 +120,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _submit() async {
     final caption = _captionCtrl.text.trim();
+    final placeName = _placeNameCtrl.text.trim();
+    final placeCity = _placeCityCtrl.text.trim();
     if (caption.isEmpty && _pickedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add a caption or image')),
@@ -62,6 +130,23 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     }
     setState(() => _posting = true);
     try {
+      // If place name is entered but coordinates aren't set, geocode the place
+      double? finalLat = _placeLat;
+      double? finalLng = _placeLng;
+      if (placeName.isNotEmpty && (finalLat == null || finalLng == null)) {
+        try {
+          final query =
+              placeCity.isNotEmpty ? '$placeName, $placeCity' : placeName;
+          final locations = await geo.locationFromAddress(query);
+          if (locations.isNotEmpty) {
+            finalLat = locations.first.latitude;
+            finalLng = locations.first.longitude;
+          }
+        } catch (_) {
+          // Geocoding failed, continue without coordinates
+        }
+      }
+
       final storage = StorageService();
       final urls = <String>[];
       for (final file in _pickedImages) {
@@ -72,6 +157,13 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             caption: caption,
             imageUrls: urls,
             isPrivate: _isPrivate,
+            postPlaceName: placeName,
+            postPlaceCity: placeCity,
+            postLat: finalLat,
+            postLng: finalLng,
+            postLocationExact: _placeFromCurrentLocation &&
+                finalLat != null &&
+                finalLng != null,
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -170,8 +262,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       // CAPTION CARD
                       Container(
                         decoration: BoxDecoration(
-                          color: context.cardBg,
-                          borderRadius: BorderRadius.circular(18),
+                          color: context.inputFill,
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: context.borderColor),
                         ),
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -179,16 +271,74 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                           controller: _captionCtrl,
                           maxLines: 6,
                           minLines: 3,
-                          style: const TextStyle(fontSize: 15),
-                          decoration: const InputDecoration(
+                          style: TextStyle(
+                              fontSize: 15, color: context.textPrimary),
+                          decoration: InputDecoration(
                             hintText: "What's happening? Share your moment…",
                             hintStyle: TextStyle(
-                              color: Color(0xFFB1B1B6),
+                              color: context.textSecondary,
                               fontSize: 15,
                             ),
                             border: InputBorder.none,
                             isCollapsed: true,
+                            filled: false,
                           ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      Container(
+                        decoration: BoxDecoration(
+                          color: context.cardBg,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Place',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _PostFormField(
+                              controller: _placeNameCtrl,
+                              hintText: 'Place name (optional)',
+                              icon: Icons.place_outlined,
+                              onChanged: (_) {
+                                if (_placeFromCurrentLocation) {
+                                  setState(
+                                      () => _placeFromCurrentLocation = false);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _PostFormField(
+                              controller: _placeCityCtrl,
+                              hintText: 'City (optional)',
+                              icon: Icons.location_city_outlined,
+                              onChanged: (_) {
+                                if (_placeFromCurrentLocation) {
+                                  setState(
+                                      () => _placeFromCurrentLocation = false);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: _useCurrentLocationForPlace,
+                                icon: const Icon(Icons.my_location_rounded),
+                                label: const Text('Use current location'),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -377,6 +527,52 @@ class _PrivacyChip extends StatelessWidget {
   }
 }
 
+class _PostFormField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final IconData icon;
+  final ValueChanged<String>? onChanged;
+
+  const _PostFormField({
+    required this.controller,
+    required this.hintText,
+    required this.icon,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.inputFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.borderColor,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF7E3BE8)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                hintText: hintText,
+                hintStyle: TextStyle(color: context.textSecondary),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ImageGrid extends StatelessWidget {
   final List<File> files;
   final ValueChanged<int> onRemove;
@@ -408,7 +604,7 @@ class _ImageGrid extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onRemove(i),
               child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.black54,
                   shape: BoxShape.circle,
                 ),

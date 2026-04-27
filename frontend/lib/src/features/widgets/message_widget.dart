@@ -1,5 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/auth_providers.dart';
 import '../../services/chat_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -59,7 +62,7 @@ class MessageTabBar extends StatelessWidget {
 }
 
 /// MESSAGE TILE
-class MessageTile extends StatelessWidget {
+class MessageTile extends ConsumerWidget {
   final ChatConversation message;
   final VoidCallback onTap;
 
@@ -70,21 +73,24 @@ class MessageTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userData = ref.watch(userByUidProvider(message.otherUid)).value;
+    final avatarUrl = userData?['avatarUrl'] as String?;
+    final username = userData?['username'] as String? ?? message.otherUsername;
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
         radius: 26,
         backgroundColor: context.inputFill,
-        backgroundImage: message.otherAvatarUrl.isNotEmpty
-            ? NetworkImage(message.otherAvatarUrl)
+        backgroundImage: avatarUrl != null
+            ? CachedNetworkImageProvider(avatarUrl)
             : null,
-        child: message.otherAvatarUrl.isEmpty
+        child: avatarUrl == null
             ? Icon(Icons.person, color: context.textMuted)
             : null,
       ),
       title: Text(
-        message.otherUsername,
+        username,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       subtitle: Text(

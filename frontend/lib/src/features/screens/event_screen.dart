@@ -83,6 +83,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
   String? _selectedGender;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  int _selectedTab = 0;
 
   @override
   void initState() {
@@ -429,9 +430,18 @@ class _PartnersView extends ConsumerWidget {
     String currentUid,
     Map<String, dynamic>? currentUser,
   ) {
+    final myBlocked = List<String>.from(currentUser?['blockedUsers'] ?? []);
     final q = query.toLowerCase();
     final filtered = users.where((u) {
       if (u['__id'] == currentUid) return false;
+
+      // Filter out users I've blocked
+      if (myBlocked.contains(u['__id'])) return false;
+
+      // Filter out users who have blocked me
+      final theirBlocked = List<String>.from(u['blockedUsers'] ?? []);
+      if (theirBlocked.contains(currentUid)) return false;
+
       if (q.isEmpty) return true;
       final name = (u['username'] as String? ?? '').toLowerCase();
       final handle = (u['handle'] as String? ?? '').toLowerCase();

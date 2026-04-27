@@ -5,13 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // ─────────────────────────────────────────────
 
 /// Notification types written by Cloud Functions or client-side logic.
-/// type values: 'follow', 'like', 'comment'
+/// type values: 'follow', 'like', 'comment', 'story_like', 'story_comment', 'story_reply'
 class AppNotification {
   final String id;
   final String type;
   final String actorUid;
   final String? targetId; // postId for like / comment notifications
   final bool read;
+  final String? status; // 'accepted', 'rejected', etc.
   final DateTime? createdAt;
 
   const AppNotification({
@@ -20,6 +21,7 @@ class AppNotification {
     required this.actorUid,
     this.targetId,
     required this.read,
+    this.status,
     this.createdAt,
   });
 
@@ -33,6 +35,7 @@ class AppNotification {
       actorUid: (d['actorUid'] as String?) ?? '',
       targetId: d['targetId'] as String?,
       read: (d['read'] as bool?) ?? false,
+      status: d['status'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -64,6 +67,13 @@ class NotificationService {
   /// Mark a single notification as read.
   Future<void> markRead(String uid, String notifId) =>
       _items(uid).doc(notifId).update({'read': true});
+
+  /// Update the status of a notification (e.g. 'accepted', 'rejected')
+  Future<void> updateNotificationStatus(String uid, String notifId, String status) =>
+      _items(uid).doc(notifId).update({
+        'status': status,
+        'read': true, // Auto-mark as read when taking action
+      });
 
   /// Mark every unread notification as read in a single batch.
   Future<void> markAllRead(String uid) async {

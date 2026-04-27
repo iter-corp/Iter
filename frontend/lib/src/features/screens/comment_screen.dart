@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -9,6 +10,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/comment_providers.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
+import '../../services/translate_service.dart';
 import '../model/post_model.dart';
 
 class _ReplyTarget {
@@ -149,7 +151,8 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${commentsAsync.value?.length ?? widget.post.commentsCount}',
-                    style: TextStyle(color: context.textSecondary, fontSize: 14),
+                    style:
+                        TextStyle(color: context.textSecondary, fontSize: 14),
                   ),
                 ],
               ),
@@ -170,8 +173,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                     );
                   }
 
-                  final tops =
-                      comments.where((c) => !c.isReply).toList();
+                  final tops = comments.where((c) => !c.isReply).toList();
                   final repliesByParent = <String, List<Comment>>{};
                   for (final c in comments) {
                     if (c.parentCommentId != null) {
@@ -343,6 +345,17 @@ class _CommentTile extends ConsumerWidget {
     required this.onReply,
   });
 
+  Future<void> _translateCommentToEnglish(BuildContext context) async {
+    final raw = comment.text.trim();
+    if (raw.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheet) => _CommentTranslateSheet(text: raw),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider).value?.uid;
@@ -382,9 +395,7 @@ class _CommentTile extends ConsumerWidget {
               radius: avatarRadius,
               backgroundImage:
                   hasAvatar ? CachedNetworkImageProvider(avatar) : null,
-              child: hasAvatar
-                  ? null
-                  : Icon(Icons.person, size: avatarRadius),
+              child: hasAvatar ? null : Icon(Icons.person, size: avatarRadius),
             ),
           ),
           const SizedBox(width: 10),
@@ -435,20 +446,43 @@ class _CommentTile extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                GestureDetector(
-                  onTap: onReply,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Text(
-                      'Reply',
-                      style: TextStyle(
-                        color: context.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: onReply,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          'Reply',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    if (comment.text.trim().isNotEmpty) ...[
+                      const SizedBox(width: 14),
+                      GestureDetector(
+                        onTap: () => _translateCommentToEnglish(context),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            'Translate',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -462,7 +496,8 @@ class _CommentTile extends ConsumerWidget {
               },
               child: Padding(
                 padding: const EdgeInsets.only(left: 8),
-                child: Icon(Icons.close, size: 16, color: context.textSecondary),
+                child:
+                    Icon(Icons.close, size: 16, color: context.textSecondary),
               ),
             ),
         ],
@@ -470,8 +505,6 @@ class _CommentTile extends ConsumerWidget {
     );
   }
 }
-<<<<<<< Updated upstream
-=======
 
 /// Bottom sheet that translates a comment and lets the user pick which
 /// language to translate INTO. The translation re-runs whenever the user
@@ -486,6 +519,26 @@ class _CommentTranslateSheet extends StatefulWidget {
 }
 
 class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
+  // Same language list used by the chat auto-translate sheet — keeps a
+  // consistent set of options across the app.
+  static const _languages = <_LangOption>[
+    _LangOption('en', 'English'),
+    _LangOption('ckb', 'Kurdish (Sorani)'),
+    _LangOption('kmr', 'Kurdish (Kurmanji)'),
+    _LangOption('ar', 'Arabic'),
+    _LangOption('fa', 'Persian'),
+    _LangOption('tr', 'Turkish'),
+    _LangOption('es', 'Spanish'),
+    _LangOption('fr', 'French'),
+    _LangOption('de', 'German'),
+    _LangOption('it', 'Italian'),
+    _LangOption('ru', 'Russian'),
+    _LangOption('hi', 'Hindi'),
+    _LangOption('ur', 'Urdu'),
+    _LangOption('zh-Hans', 'Chinese'),
+    _LangOption('ja', 'Japanese'),
+  ];
+
   String _target = 'en';
   String? _translated;
   String? _error;
@@ -529,8 +582,8 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
   }
 
   String _labelOf(String code) =>
-      kTranslateLanguages.firstWhere((l) => l.code == code,
-          orElse: () => const TranslateLanguage('?', '?')).label;
+      _languages.firstWhere((l) => l.code == code,
+          orElse: () => const _LangOption('?', '?')).label;
 
   @override
   Widget build(BuildContext context) {
@@ -558,10 +611,10 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
               height: 36,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: kTranslateLanguages.length,
+                itemCount: _languages.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 6),
                 itemBuilder: (_, i) {
-                  final lang = kTranslateLanguages[i];
+                  final lang = _languages[i];
                   final selected = lang.code == _target;
                   return GestureDetector(
                     onTap: () => _selectLang(lang.code),
@@ -631,4 +684,11 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
     );
   }
 }
->>>>>>> Stashed changes
+
+/// Lightweight (code, label) pair used by the comment-translate sheet's
+/// language picker. Kept private to this file.
+class _LangOption {
+  final String code;
+  final String label;
+  const _LangOption(this.code, this.label);
+}

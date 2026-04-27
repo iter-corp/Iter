@@ -6,11 +6,14 @@ service cloud.firestore {
     }
 
     function isSelf(uid) {
-<<<<<<< Updated upstream
-      return signedIn() && request.auth.uid == uid;
-=======
       return request.auth != null && request.auth.uid == uid;
->>>>>>> Stashed changes
+    }
+
+    function canSeeContent(uid) {
+      let user = get(/databases/$(database)/documents/users/$(uid)).data;
+      return !user.isPrivate || isSelf(uid) || 
+             (exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)) && 
+              get(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)).data.status == 'active');
     }
 
     function isAdmin() {
@@ -49,16 +52,24 @@ service cloud.firestore {
       allow delete: if isSelf(uid) || isAdmin();
 
       match /followers/{followerUid} {
-        allow read: if signedIn();
-        allow create: if isSelf(followerUid);
-        allow delete: if isSelf(followerUid) || isAdmin();
-        allow update: if false;
+        allow read: if signedIn() && (isSelf(uid) ||
+          (exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)).data.status == 'active'));
+        allow create: if isSelf(followerUid) || isSelf(uid);
+        allow delete: if isSelf(followerUid) || isSelf(uid) || isAdmin();
+        allow update: if isSelf(uid);
       }
 
       match /following/{followingUid} {
+        allow read: if signedIn() && isSelf(uid);
+        allow create: if isSelf(uid) || isSelf(followingUid);
+        allow delete: if isSelf(uid) || isSelf(followingUid) || isAdmin();
+        allow update: if isSelf(uid) || isSelf(followingUid);
+      }
+
+      match /blockedUsers/{blockedUid} {
         allow read: if signedIn();
-        allow create: if isSelf(uid);
-        allow delete: if isSelf(uid) || isAdmin();
+        allow create, delete: if isSelf(uid) || isAdmin();
         allow update: if false;
       }
 
@@ -107,15 +118,7 @@ service cloud.firestore {
     }
 
     match /posts/{postId} {
-<<<<<<< Updated upstream
-=======
-      // Any signed-in user can read posts. Privacy/blocking is enforced on
-      // the client (the feed filters posts whose author is private and not
-      // followed). The previous `canSeeContent` rule called get() on the
-      // author's user doc, which made list queries fail entirely because
-      // Firestore can't filter list results by rule — it can only reject
-      // the whole query.
-      allow read: if signedIn();
+      allow read: if signedIn() && canSeeContent(resource.data.authorUid);
       allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
       allow update: if signedIn() && (
         resource.data.authorUid == request.auth.uid ||
@@ -127,13 +130,13 @@ service cloud.firestore {
       );
 
       match /likes/{uid} {
-        allow read: if signedIn();
+        allow read: if signedIn() && canSeeContent(get(/databases/$(database)/documents/posts/$(postId)).data.authorUid);
         allow create: if isSelf(uid);
         allow delete: if isSelf(uid) || isAdmin();
       }
 
       match /comments/{commentId} {
-        allow read: if signedIn();
+        allow read: if signedIn() && canSeeContent(get(/databases/$(database)/documents/posts/$(postId)).data.authorUid);
         allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
         allow delete: if signedIn() && (
           resource.data.authorUid == request.auth.uid || isAdmin()
@@ -142,7 +145,7 @@ service cloud.firestore {
       }
 
       match /reposts/{uid} {
-        allow read: if signedIn();
+        allow read: if signedIn() && canSeeContent(get(/databases/$(database)/documents/posts/$(postId)).data.authorUid);
         allow create: if isSelf(uid);
         allow delete: if isSelf(uid) || isAdmin();
         allow update: if false;
@@ -150,7 +153,6 @@ service cloud.firestore {
     }
 
     match /stories/{storyId} {
->>>>>>> Stashed changes
       allow read: if true;
       allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
       allow update: if signedIn() && (
@@ -176,21 +178,6 @@ service cloud.firestore {
         );
         allow update: if false;
       }
-
-      match /reposts/{uid} {
-        allow read: if true;
-        allow create: if isSelf(uid);
-        allow delete: if isSelf(uid) || isAdmin();
-        allow update: if false;
-      }
-    }
-
-    match /stories/{storyId} {
-      allow read: if true;
-      allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update, delete: if signedIn() && (
-        resource.data.authorUid == request.auth.uid || isAdmin()
-      );
 
       match /viewers/{viewerUid} {
         allow read: if signedIn() && (
@@ -340,11 +327,7 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isChatParticipant(chatId) || isAdmin();
         allow create: if isChatParticipant(chatId) && request.resource.data.senderUid == request.auth.uid;
-        // Chat participants may update ONLY the `seenBy` field — needed so
-        // the recipient can mark messages as seen and the sender's double-
-        // check indicator flips. Any other diff is rejected.
-        allow update: if isChatParticipant(chatId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy']);
+        allow update: if false;
         allow delete: if isAdmin();
 
         match /reactions/{reactorUid} {

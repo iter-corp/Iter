@@ -158,10 +158,10 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
       );
     }
     if (_remoteUid == null) {
-      return Center(
+      return const Center(
         child: Text(
           'Waiting for host video…',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: Colors.white70),
         ),
       );
     }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/block_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
@@ -31,7 +32,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   bool _followBusy = false;
   bool _messageBusy = false;
 
-  Future<void> _toggleFollow(bool currentlyFollowing) async {
+  Future<void> _toggleFollow(bool currentlyFollowing, bool currentlyRequested, bool isPrivate) async {
     final currentUser = ref.read(authStateProvider).value ??
         ref.read(authServiceProvider).currentUser;
     if (currentUser == null || _followBusy) return;
@@ -39,7 +40,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     setState(() => _followBusy = true);
     try {
       final service = ref.read(followServiceProvider);
-      if (currentlyFollowing) {
+      if (currentlyFollowing || currentlyRequested) {
         await service.unfollow(
           currentUid: currentUser.uid,
           targetUid: widget.uid,
@@ -48,6 +49,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         await service.follow(
           currentUid: currentUser.uid,
           targetUid: widget.uid,
+          isPrivate: isPrivate,
         );
       }
     } catch (e) {
@@ -187,8 +189,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ref.watch(authServiceProvider).currentUser;
     final isOwnProfile = currentUser?.uid == widget.uid;
     final isFollowingAsync = ref.watch(isFollowingProvider(widget.uid));
+    final isRequestedAsync = ref.watch(hasRequestedFollowProvider(widget.uid));
     final followersAsync = ref.watch(followersProvider(widget.uid));
     final followingAsync = ref.watch(followingProvider(widget.uid));
+    
+    final isBlockedAsync = ref.watch(isBlockedProvider(widget.uid));
+    final isBlockedByAsync = ref.watch(isBlockedByProvider(widget.uid));
 
     return Scaffold(
       backgroundColor: context.cardBg,
@@ -203,8 +209,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           final handle = (user['handle'] as String?) ?? '';
           final avatarUrl = user['avatarUrl'] as String?;
           final coverUrl = user['coverUrl'] as String?;
-          const isPrivate = false;
+          final isPrivate = (user['isPrivate'] as bool?) ?? false;
           final isFollowing = isFollowingAsync.value ?? false;
+          final isRequested = isRequestedAsync.value ?? false;
           final followers = followersAsync.valueOrNull?.length ??
               (user['followersCount'] as int?) ??
               0;
@@ -212,6 +219,14 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               (user['followingCount'] as int?) ??
               0;
           final posts = (user['postsCount'] as int?) ?? 0;
+
+          final isBlocked = isBlockedAsync.value ?? false;
+          final isBlockedBy = isBlockedByAsync.value ?? false;
+
+          // If current user is blocked by target user, or blocked target user
+          final hideContent = isBlocked || isBlockedBy;
+          // If private and not following and not own profile
+          final enforcePrivacy = isPrivate && !isFollowing && !isOwnProfile;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 24),
@@ -222,39 +237,99 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   coverUrl: coverUrl,
                   isPrivate: isPrivate,
                   onBack: () => Navigator.pop(context),
+                  showMenu: !isOwnProfile,
+                  onBlockTap: () async {
+                    if (currentUser == null) return;
+                    try {
+                      if (isBlocked) {
+                        await ref.read(blockServiceProvider).unblockUser(
+                              currentUid: currentUser.uid,
+                              targetUid: widget.uid,
+                            );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('User unblocked')),
+                          );
+                        }
+                      } else {
+                        await ref.read(blockServiceProvider).blockUser(
+                              currentUid: currentUser.uid,
+                              targetUid: widget.uid,
+                            );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('User blocked')),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Failed to block/unblock: $e\nDid you deploy the Firestore rules?',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  isBlocked: isBlocked,
                 ),
-                UserNameBio(username: username, handle: handle),
-                UserStats(
-                  followers: followers,
-                  following: following,
-                  posts: posts,
-                  onFollowersTap: () => _showUserListSheet(
-                    title: 'Followers',
-                    uids: followersAsync.value ?? const [],
+                UserNameBio(username: username, handle: handle, isPrivate: isPrivate),
+                if (!hideContent) ...[
+                  UserStats(
+                    followers: followers,
+                    following: following,
+                    posts: posts,
+                    onFollowersTap: () => _showUserListSheet(
+                      title: 'Followers',
+                      uids: followersAsync.value ?? const [],
+                    ),
+                    onFollowingTap: () => _showUserListSheet(
+                      title: 'Following',
+                      uids: followingAsync.value ?? const [],
+                    ),
+                    isPrivateAndNotFollowing: enforcePrivacy,
                   ),
-                  onFollowingTap: () => _showUserListSheet(
-                    title: 'Following',
-                    uids: followingAsync.value ?? const [],
+                  if (!isOwnProfile && !isBlockedBy)
+                    UserButtons(
+                      isFollowing: isFollowing,
+                      isRequested: isRequested,
+                      isPrivate: isPrivate,
+                      onFollowTap: _followBusy
+                          ? () {}
+                          : () => _toggleFollow(isFollowing, isRequested, isPrivate),
+                      onMessageTap: _messageBusy
+                          ? null
+                          : () => _openMessage(username, avatarUrl ?? ''),
+                    ),
+                  if (enforcePrivacy)
+                    const UserPrivateMessage()
+                  else ...[
+                    UserTabBar(
+                      selectedTab: selectedTab,
+                      onTap: (i) => setState(() => selectedTab = i),
+                    ),
+                    if (selectedTab == 0)
+                      _UserPostsGrid(uid: widget.uid)
+                    else
+                      _UserRepostsGrid(uid: widget.uid),
+                  ]
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        isBlockedBy
+                            ? 'User not found'
+                            : 'You have blocked this user',
+                        style: TextStyle(
+                            fontSize: 16, color: context.textSecondary),
+                      ),
+                    ),
                   ),
-                ),
-                if (!isOwnProfile)
-                  UserButtons(
-                    isFollowing: isFollowing,
-                    isPrivate: isPrivate,
-                    onFollowTap:
-                        _followBusy ? () {} : () => _toggleFollow(isFollowing),
-                    onMessageTap: _messageBusy
-                        ? null
-                        : () => _openMessage(username, avatarUrl ?? ''),
-                  ),
-                UserTabBar(
-                  selectedTab: selectedTab,
-                  onTap: (i) => setState(() => selectedTab = i),
-                ),
-                if (selectedTab == 0)
-                  _UserPostsGrid(uid: widget.uid)
-                else
-                  _UserRepostsGrid(uid: widget.uid),
+                ],
               ],
             ),
           );

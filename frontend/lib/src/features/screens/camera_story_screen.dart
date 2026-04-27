@@ -34,6 +34,7 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _setupCamera();
   }
 
@@ -41,6 +42,7 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
 
@@ -318,8 +320,8 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
         return FittedBox(
           fit: BoxFit.cover,
           child: SizedBox(
-            width: c.value.previewSize?.height ?? 1,
-            height: c.value.previewSize?.width ?? 1,
+            width: c.value.previewSize?.width ?? 1,
+            height: c.value.previewSize?.height ?? 1,
             child: CameraPreview(c),
           ),
         );

@@ -84,8 +84,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       setState(() =>
           _error = _friendlyError(e, fallback: 'Google sign-in failed.'));
-    } catch (_) {
-      setState(() => _error = 'Google sign-in failed.');
+    } catch (e) {
+      debugPrint('[google-signin] error: $e');
+      setState(() => _error = 'Google sign-in failed: $e');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }

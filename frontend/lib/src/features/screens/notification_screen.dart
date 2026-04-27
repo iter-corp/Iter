@@ -183,6 +183,7 @@ class _NotificationItem extends ConsumerWidget {
               onFollow = () => ref.read(followServiceProvider).follow(
                     currentUid: currentUser.uid,
                     targetUid: notif.actorUid,
+                    isPrivate: false,
                   );
 
               final isFollowingAsync =
@@ -194,6 +195,39 @@ class _NotificationItem extends ConsumerWidget {
                 isFollowing: isFollowing,
                 onTap: isFollowing ? null : onFollow,
               );
+            }
+            break;
+          case 'follow_request':
+            title = '$username requested to follow you';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            if (currentUser != null) {
+              final followRequestsAsync = ref.watch(followRequestsProvider(currentUser.uid));
+              final followersAsync = ref.watch(followersProvider(currentUser.uid));
+              
+              final followRequests = followRequestsAsync.valueOrNull;
+              final followers = followersAsync.valueOrNull;
+
+              if (followRequests == null || followers == null) {
+                 trailingWidget = const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
+              } else {
+                final isPending = followRequests.contains(notif.actorUid);
+                final isFollower = followers.contains(notif.actorUid);
+                
+                // Show action buttons only if request is still pending
+                if (isPending && !isFollower) {
+                  trailingWidget = _FollowRequestActions(
+                    requesterUid: notif.actorUid,
+                    currentUid: currentUser.uid,
+                  );
+                } else {
+                  // Request was already processed (accepted or rejected)
+                  trailingWidget = Text(
+                    isFollower ? 'Accepted' : 'Rejected',
+                    style: TextStyle(color: context.textSecondary, fontSize: 12),
+                  );
+                }
+              }
             }
             break;
           case 'like':
@@ -229,6 +263,11 @@ class _NotificationItem extends ConsumerWidget {
             break;
           case 'event_removed':
             title = 'You were removed from an event group';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'follow_accept':
+            title = '$username accepted your follow request';
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
@@ -459,6 +498,140 @@ class _InviteActionsState extends ConsumerState<_InviteActions> {
           child: Container(
             padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFFB44FFF),
+            ),
+            child: const Text(
+              'Accept',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Follow Request actions
+// ─────────────────────────────────────────────
+
+class _FollowRequestActions extends ConsumerStatefulWidget {
+  final String requesterUid;
+  final String currentUid;
+
+  const _FollowRequestActions({
+    required this.requesterUid,
+    required this.currentUid,
+  });
+
+  @override
+  ConsumerState<_FollowRequestActions> createState() =>
+      _FollowRequestActionsState();
+}
+
+class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
+  bool _busy = false;
+  bool _success = false;
+
+  Future<void> _accept() async {
+    if (_busy || _success) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(followServiceProvider).acceptFollowRequest(
+            currentUid: widget.currentUid,
+            requesterUid: widget.requesterUid,
+          );
+
+      // Delete the follow request notification using the deterministic ID that matches the backend
+      // The backend creates notifications with ID format: follow_request_${followerUid}
+      final deterministicNotificationId = 'follow_request_${widget.requesterUid}';
+      await ref.read(notificationServiceProvider).deleteNotification(
+        widget.currentUid,
+        deterministicNotificationId,
+      );
+
+      if (mounted) setState(() => _success = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _reject() async {
+    if (_busy || _success) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(followServiceProvider).rejectFollowRequest(
+            currentUid: widget.currentUid,
+            requesterUid: widget.requesterUid,
+          );
+
+      // Delete the follow request notification using the deterministic ID that matches the backend
+      // The backend creates notifications with ID format: follow_request_${followerUid}
+      final deterministicNotificationId = 'follow_request_${widget.requesterUid}';
+      await ref.read(notificationServiceProvider).deleteNotification(
+        widget.currentUid,
+        deterministicNotificationId,
+      );
+
+      if (mounted) setState(() => _success = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_success) {
+      return Text('Processed',
+          style: TextStyle(color: context.textSecondary, fontSize: 12));
+    }
+    if (_busy) {
+      return const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: _busy ? null : _reject,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE04E5C)),
+            ),
+            child: const Text(
+              'Reject',
+              style: TextStyle(
+                  color: Color(0xFFE04E5C),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        InkWell(
+          onTap: _busy ? null : _accept,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               color: const Color(0xFFB44FFF),

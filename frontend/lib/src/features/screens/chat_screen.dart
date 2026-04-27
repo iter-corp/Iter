@@ -10,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
@@ -18,10 +20,10 @@ import '../../providers/chat_providers.dart';
 import '../../providers/event_chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/storage_service.dart';
+import '../../services/translate_service.dart';
 import '../model/post_model.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
-import 'chat_media_screen.dart';
 import 'post_detail_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -56,8 +58,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isRecording = false;
   DateTime? _recordStartedAt;
   bool _uploadingVoice = false;
-<<<<<<< Updated upstream
-=======
+  bool _isMicPressed = false;
 
   // Dictation (speech-to-text) state. Lets the user speak a message and
   // have it transcribed into the text field — they can edit before sending.
@@ -72,6 +73,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // User-selected dictation locale. null = device default. Long-press the
   // dictation button to change.
   String? _dictationLocaleId;
+  String _dictationLocaleLabel = 'Auto';
 
   // Auto-translate incoming messages. Persisted per-chat in SharedPreferences
   // so each chat can have its own preference. _autoTranslateTarget is the
@@ -79,13 +81,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // INTO. The settings sheet is opened from the translate icon in the header.
   bool _autoTranslate = false;
   String _autoTranslateTarget = 'en';
->>>>>>> Stashed changes
 
   String? get _currentUid => ref.read(authStateProvider).value?.uid;
+
+  String get _prefsAutoKey => 'chat_autotranslate_${widget.chatId}';
+  String get _prefsLangKey => 'chat_autotranslate_lang_${widget.chatId}';
+
+  Future<void> _loadAutoTranslatePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _autoTranslate = prefs.getBool(_prefsAutoKey) ?? false;
+      _autoTranslateTarget = prefs.getString(_prefsLangKey) ?? 'en';
+    });
+  }
+
+  Future<void> _saveAutoTranslatePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsAutoKey, _autoTranslate);
+    await prefs.setString(_prefsLangKey, _autoTranslateTarget);
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadAutoTranslatePrefs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final uid = _currentUid;
       if (uid == null) return;
@@ -100,6 +120,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     _recorder.dispose();
+    if (_isDictating) {
+      _stt.stop();
+    }
     super.dispose();
   }
 
@@ -128,21 +151,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.clear();
     final reply = _replyTarget;
     setState(() => _replyTarget = null);
-    await ref.read(chatServiceProvider).sendMessage(
-          chatId: widget.chatId,
-          senderUid: uid,
-          receiverUid: widget.otherUid,
-          text: text,
-          replyToId: reply?.id,
-          replyToText: reply == null ? null : _previewOf(reply),
-          replyToSenderUid: reply?.senderUid,
+    
+    try {
+      // Check group permissions if this is a group chat
+      final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
+      if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
+        // Check if messaging is restricted
+        final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
+        final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
+        final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
+        final isAdmin = admins.contains(uid);
+        
+        if (restrictMessaging && !isAdmin) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Messaging is restricted in this group')),
+            );
+          }
+          return;
+        }
+        
+        if (adminOnly && !isAdmin) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Only admins can message in this group')),
+            );
+          }
+          return;
+        }
+      }
+      
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: text,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send message: $e')),
         );
+      }
+    }
   }
 
   Future<void> _pickAndSendImage() async {
     if (_sendingImage) return;
     final uid = _currentUid;
     if (uid == null) return;
+
+    // Check group permissions first
+    try {
+      final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
+      if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
+        final mediaShare = chatDoc['mediaShare'] as bool? ?? true;
+        final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
+        final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
+        final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
+        final isAdmin = admins.contains(uid);
+        
+        if (!mediaShare) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Media sharing is disabled in this group')),
+            );
+          }
+          return;
+        }
+        
+        if ((restrictMessaging || adminOnly) && !isAdmin) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('You cannot send media in this group')),
+            );
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking group permissions: $e');
+    }
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -179,24 +271,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _toggleVoiceRecording() async {
-    if (_uploadingVoice) return;
+  Future<void> _startVoiceRecording() async {
+    if (_uploadingVoice || _isRecording) return;
     final uid = _currentUid;
     if (uid == null) return;
 
-    if (_isRecording) {
-      // Stop + upload + send.
-      final path = await _recorder.stop();
-      final startedAt = _recordStartedAt;
-      setState(() {
-        _isRecording = false;
-        _recordStartedAt = null;
-      });
-      if (path == null) return;
+    // Check group permissions first
+    try {
+      final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
+      if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
+        final mediaShare = chatDoc['mediaShare'] as bool? ?? true;
+        final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
+        final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
+        final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
+        final isAdmin = admins.contains(uid);
 
-<<<<<<< Updated upstream
-      setState(() => _uploadingVoice = true);
-=======
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -219,7 +308,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       debugPrint('Error checking group permissions: $e');
     }
 
+    setState(() => _isMicPressed = true);
+
     if (!await _recorder.hasPermission()) {
+      setState(() => _isMicPressed = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Microphone permission denied')),
@@ -243,6 +335,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _stopAndSendVoiceRecording() async {
     debugPrint('[chat-voice] stopAndSend invoked '
         '(isRecording=$_isRecording uploading=$_uploadingVoice)');
+    setState(() => _isMicPressed = false);
 
     if (!_isRecording || _uploadingVoice) {
       debugPrint('[chat-voice] aborting: not recording or already uploading');
@@ -291,64 +384,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           const SnackBar(content: Text('Voice recording is empty')),
         );
       }
->>>>>>> Stashed changes
       try {
-        final file = File(path);
-        final durationMs = startedAt == null
-            ? null
-            : DateTime.now().difference(startedAt).inMilliseconds;
-        final url = await StorageService()
-            .uploadChatAudio(file, widget.chatId);
-        final reply = _replyTarget;
-        setState(() => _replyTarget = null);
-        await ref.read(chatServiceProvider).sendMessage(
-              chatId: widget.chatId,
-              senderUid: uid,
-              receiverUid: widget.otherUid,
-              text: '',
-              voiceUrl: url,
-              voiceDurationMs: durationMs,
-              replyToId: reply?.id,
-              replyToText: reply == null ? null : _previewOf(reply),
-              replyToSenderUid: reply?.senderUid,
-            );
-        // Best-effort cleanup of the temp file.
+        await file.delete();
+      } catch (_) {}
+      return;
+    }
+
+    setState(() => _uploadingVoice = true);
+    try {
+      final durationMs = startedAt == null
+          ? null
+          : DateTime.now().difference(startedAt).inMilliseconds;
+      debugPrint('[chat-voice] computed durationMs=$durationMs');
+
+      // Validate duration - minimum 300ms
+      if (durationMs != null && durationMs < 300) {
+        debugPrint('[chat-voice] too short, aborting');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Voice message too short (min 300ms)')),
+          );
+        }
         try {
           await file.delete();
         } catch (_) {}
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Voice upload failed: $e')),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _uploadingVoice = false);
+        return;
       }
-    } else {
-      if (!await _recorder.hasPermission()) {
+
+      debugPrint('[chat-voice] starting upload to storage…');
+      final url = await StorageService()
+          .uploadChatAudio(file, widget.chatId);
+      debugPrint('[chat-voice] upload returned url=$url');
+
+      if (url.isEmpty) {
+        debugPrint('[chat-voice] upload returned EMPTY url');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Microphone permission denied')),
+            const SnackBar(content: Text('Failed to upload voice message - empty URL')),
           );
         }
         return;
       }
-      final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await _recorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc),
-        path: path,
-      );
-      setState(() {
-        _isRecording = true;
-        _recordStartedAt = DateTime.now();
-      });
+
+      final reply = _replyTarget;
+      setState(() => _replyTarget = null);
+      debugPrint('[chat-voice] writing chat message…');
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: '',
+            voiceUrl: url,
+            voiceDurationMs: durationMs,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
+          );
+      debugPrint('[chat-voice] sendMessage OK');
+    } catch (e, st) {
+      debugPrint('[chat-voice] FAILED: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Voice upload failed: $e')),
+        );
+      }
+    } finally {
+      // Best-effort cleanup of the temp file.
+      try {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {}
+      if (mounted) setState(() => _uploadingVoice = false);
     }
   }
 
   Future<void> _cancelRecording() async {
+    setState(() => _isMicPressed = false);
     if (!_isRecording) return;
     final path = await _recorder.stop();
     setState(() {
@@ -362,46 +474,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-<<<<<<< Updated upstream
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-=======
   /// Tap-to-dictate: speech-to-text into the message field. The user can
   /// then edit and send. Tap again to stop. Distinct from the hold-to-send
   /// voice-message button (which uploads an audio recording).
   Future<void> _toggleDictation() async {
-    debugPrint('[chat-stt] toggle tap — currentlyDictating=$_isDictating '
-        'initialized=$_sttInitialized');
     if (_isDictating) {
-      debugPrint('[chat-stt] stopping current session');
       await _stt.stop();
       if (mounted) setState(() => _isDictating = false);
       return;
     }
 
     if (!_sttInitialized) {
-      debugPrint('[chat-stt] initializing…');
       _sttInitialized = await _stt.initialize(
         onStatus: (status) {
-          debugPrint('[chat-stt] status=$status');
           if (status == 'done' || status == 'notListening') {
             if (mounted) setState(() => _isDictating = false);
           }
         },
         onError: (err) {
-          debugPrint('[chat-stt] ERROR msg=${err.errorMsg} '
-              'permanent=${err.permanent}');
+          debugPrint('[chat-stt] error: ${err.errorMsg}');
           if (!mounted) return;
           setState(() => _isDictating = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Dictation error: ${err.errorMsg}'),
-              duration: const Duration(seconds: 3),
-            ),
+            SnackBar(content: Text('Dictation error: ${err.errorMsg}')),
           );
         },
       );
-      debugPrint('[chat-stt] initialize returned $_sttInitialized');
       if (!_sttInitialized) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -414,58 +512,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     }
 
-    // Sanity check the engine is actually available right now.
-    final available = _stt.isAvailable;
-    debugPrint('[chat-stt] isAvailable=$available isListening=${_stt.isListening}');
-
-    // We deliberately do NOT call _stt.systemLocale() here. On some Android
-    // builds that call hangs forever and the function silently exits, which
-    // is why dictation appeared to do nothing. If the user has explicitly
-    // picked a locale via long-press, use it; otherwise pass null and let
-    // the speech engine pick the device default itself.
-    final localeId = _dictationLocaleId;
-    debugPrint('[chat-stt] using locale=${localeId ?? "(engine default)"}');
+    // Use the user-picked locale (long-press the mic to change), or fall
+    // back to the device system locale if the user has not chosen one.
+    String? localeId = _dictationLocaleId;
+    if (localeId == null) {
+      final systemLocale = await _stt.systemLocale();
+      localeId = systemLocale?.localeId;
+    }
 
     _dictationBaseText = _controller.text;
     setState(() => _isDictating = true);
 
-    try {
-      await _stt.listen(
-        localeId: localeId,
-        listenOptions: stt.SpeechListenOptions(
-          partialResults: true,
-          cancelOnError: false,
-          listenMode: stt.ListenMode.dictation,
-        ),
-        listenFor: const Duration(seconds: 60),
-        pauseFor: const Duration(seconds: 4),
-        onResult: (result) {
-          debugPrint('[chat-stt] result words="${result.recognizedWords}" '
-              'final=${result.finalResult}');
-          if (!mounted) return;
-          final spoken = result.recognizedWords;
-          final separator =
-              _dictationBaseText.isEmpty || _dictationBaseText.endsWith(' ')
-                  ? ''
-                  : ' ';
-          final next = '$_dictationBaseText$separator$spoken';
-          _controller.value = TextEditingValue(
-            text: next,
-            selection: TextSelection.collapsed(offset: next.length),
-          );
-          _onTextChanged(next);
-        },
-      );
-      debugPrint('[chat-stt] listen() call returned, isListening=${_stt.isListening}');
-    } catch (e, st) {
-      debugPrint('[chat-stt] listen FAILED: $e\n$st');
-      if (mounted) {
-        setState(() => _isDictating = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start dictation: $e')),
+    await _stt.listen(
+      localeId: localeId,
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      ),
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 4),
+      onResult: (result) {
+        if (!mounted) return;
+        final spoken = result.recognizedWords;
+        final separator =
+            _dictationBaseText.isEmpty || _dictationBaseText.endsWith(' ')
+                ? ''
+                : ' ';
+        final next = '$_dictationBaseText$separator$spoken';
+        _controller.value = TextEditingValue(
+          text: next,
+          selection: TextSelection.collapsed(offset: next.length),
         );
-      }
-    }
+        // Keep the typing-indicator behavior in sync with the new text.
+        _onTextChanged(next);
+      },
+    );
   }
 
   /// Long-press handler on the dictation mic — lets the user pick which
@@ -532,6 +614,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (selected == null || !mounted) return;
     setState(() {
       _dictationLocaleId = selected.id;
+      _dictationLocaleLabel = selected.label;
     });
   }
 
@@ -588,12 +671,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         labelText: 'Translate into',
                         border: OutlineInputBorder(),
                       ),
-                      items: [
-                        for (final lang in kTranslateLanguages)
-                          DropdownMenuItem(
-                            value: lang.code,
-                            child: Text(lang.label),
-                          ),
+                      items: const [
+                        DropdownMenuItem(value: 'en', child: Text('English')),
+                        DropdownMenuItem(
+                            value: 'ckb', child: Text('Kurdish (Sorani)')),
+                        DropdownMenuItem(
+                            value: 'kmr', child: Text('Kurdish (Kurmanji)')),
+                        DropdownMenuItem(value: 'ar', child: Text('Arabic')),
+                        DropdownMenuItem(value: 'fa', child: Text('Persian')),
+                        DropdownMenuItem(value: 'tr', child: Text('Turkish')),
+                        DropdownMenuItem(value: 'es', child: Text('Spanish')),
+                        DropdownMenuItem(value: 'fr', child: Text('French')),
+                        DropdownMenuItem(value: 'de', child: Text('German')),
+                        DropdownMenuItem(value: 'it', child: Text('Italian')),
+                        DropdownMenuItem(value: 'ru', child: Text('Russian')),
+                        DropdownMenuItem(value: 'hi', child: Text('Hindi')),
+                        DropdownMenuItem(value: 'ur', child: Text('Urdu')),
+                        DropdownMenuItem(
+                            value: 'zh-Hans',
+                            child: Text('Chinese (Simplified)')),
+                        DropdownMenuItem(
+                            value: 'ja', child: Text('Japanese')),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
@@ -630,12 +728,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     final target = _scrollController.position.maxScrollExtent;
     if (animated && _initialScrollDone) {
->>>>>>> Stashed changes
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        target,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+    } else {
+      _scrollController.jumpTo(target);
+    }
+
+    // The first time messages arrive, image/voice bubbles can still be
+    // sizing themselves on the next frame, which grows maxScrollExtent
+    // after our first jump. Retry a couple of frames so we end up truly
+    // at the latest message even when the bubble heights settle late.
+    if (!_initialScrollDone) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final newTarget = _scrollController.position.maxScrollExtent;
+        if ((newTarget - _scrollController.offset).abs() > 1) {
+          _scrollController.jumpTo(newTarget);
+        }
+        _initialScrollDone = true;
+      });
     }
   }
 
@@ -768,8 +882,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                   ),
-<<<<<<< Updated upstream
-=======
                   IconButton(
                     tooltip: _autoTranslate
                         ? 'Auto-translate ON ($_autoTranslateTarget)'
@@ -782,24 +894,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           : context.textSecondary,
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Shared media',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatMediaScreen(
-                            chatId: widget.chatId,
-                            chatTitle: isGroup ? groupName : widget.otherName,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: Icon(
-                      Icons.info_outline,
-                      color: context.textSecondary,
-                    ),
-                  ),
->>>>>>> Stashed changes
                 ],
               ),
             ),
@@ -813,23 +907,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (msgs) {
                   final currentUid = _currentUid ?? '';
-                  // Re-mark seen whenever the latest message is one we
-                  // haven't acked yet — covers the case where the user is
-                  // already in the chat when the other person sends. Cheap
-                  // because markSeen short-circuits the batch write when
-                  // there's nothing new to update.
-                  if (currentUid.isNotEmpty && msgs.isNotEmpty) {
-                    final last = msgs.last;
-                    if (last.senderUid != currentUid &&
-                        !last.seenBy.contains(currentUid)) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        ref.read(chatServiceProvider).markSeen(
-                              chatId: widget.chatId,
-                              uid: currentUid,
-                            );
-                      });
-                    }
-                  }
                   if (msgs.isEmpty) {
                     return Center(
                       child: Text('Say hello!',
@@ -851,6 +928,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         otherAvatar: widget.otherAvatar,
                         isGroup: isGroup,
                         onReply: () => _startReply(msg),
+                        autoTranslate: _autoTranslate,
+                        autoTranslateTarget: _autoTranslateTarget,
                       );
                     },
                   );
@@ -879,7 +958,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ? _RecordingBar(
                       startedAt: _recordStartedAt,
                       onCancel: _cancelRecording,
-                      onStop: _toggleVoiceRecording,
+                      onStop: _stopAndSendVoiceRecording,
                     )
                   : Row(
                       children: [
@@ -895,92 +974,74 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               : Icon(Icons.camera_alt_outlined,
                                   color: context.textSecondary),
                         ),
+                        // Tap-to-dictate: turns speech into text in the
+                        // input field. Different from the hold-to-record
+                        // mic on the right which sends a voice message.
+                        // Long-press to change dictation language.
+                        GestureDetector(
+                          onLongPress: _pickDictationLocale,
+                          child: IconButton(
+                            tooltip: _isDictating
+                                ? 'Stop dictation (long-press to change language)'
+                                : 'Speak to type — $_dictationLocaleLabel '
+                                    '(long-press to change language)',
+                            onPressed: _toggleDictation,
+                            icon: Icon(
+                              _isDictating
+                                  ? Icons.keyboard_voice
+                                  : Icons.keyboard_voice_outlined,
+                              color: _isDictating
+                                  ? const Color(0xFFB05ECC)
+                                  : context.textSecondary,
+                            ),
+                          ),
+                        ),
                         Expanded(
                           child: Container(
-<<<<<<< Updated upstream
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-=======
-                            padding: const EdgeInsets.only(left: 16, right: 4),
->>>>>>> Stashed changes
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
                               color: context.inputFill,
                               borderRadius: BorderRadius.circular(24),
                             ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _controller,
-                                    onChanged: _onTextChanged,
-                                    decoration: InputDecoration(
-                                      hintText: 'Message...',
-                                      hintStyle: TextStyle(
-                                          color: context.textMuted, fontSize: 14),
-                                      border: InputBorder.none,
-                                    ),
-                                    onSubmitted: (_) => _sendMessage(),
-                                  ),
-                                ),
-                                // Tap-to-dictate (speech → text in input).
-                                // Long-press to change dictation language.
-                                // Plain GestureDetector — Tooltip's internal
-                                // long-press recognizer was competing in the
-                                // arena and can swallow the tap.
-                                GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: () {
-                                    debugPrint('[chat-stt] dict button tapped');
-                                    _toggleDictation();
-                                  },
-                                  onLongPress: _pickDictationLocale,
-                                  child: Container(
-                                    width: 44,
-                                    height: 44,
-                                    alignment: Alignment.center,
-                                    child: Icon(
-                                      _isDictating
-                                          ? Icons.keyboard_voice
-                                          : Icons.keyboard_voice_outlined,
-                                      color: _isDictating
-                                          ? const Color(0xFFB05ECC)
-                                          : context.textSecondary,
-                                      size: 22,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            child: TextField(
+                              controller: _controller,
+                              onChanged: _onTextChanged,
+                              decoration: InputDecoration(
+                                hintText: 'Message...',
+                                hintStyle: TextStyle(
+                                    color: context.textMuted, fontSize: 14),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
                             ),
                           ),
                         ),
                         const SizedBox(width: 4),
                         if (_controller.text.trim().isEmpty && !_uploadingVoice)
-<<<<<<< Updated upstream
-                          IconButton(
-                            onPressed: _toggleVoiceRecording,
-                            icon: const Icon(Icons.mic_none,
-                                color: Color(0xFFB05ECC)),
-=======
-                          // Tap-to-record voice message. First tap starts
-                          // recording (the input row swaps to _RecordingBar
-                          // which has its own stop/cancel buttons). Earlier
-                          // this was a hold-to-record gesture but users
-                          // expect a single tap to immediately start.
+                          // Hold-to-record microphone button with visual feedback
                           GestureDetector(
-                            onTap: _startVoiceRecording,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: const Icon(
-                                Icons.mic_none,
-                                color: Color(0xFFB05ECC),
-                                size: 24,
+                            onLongPressStart: (_) => _startVoiceRecording(),
+                            onLongPressEnd: (_) => _stopAndSendVoiceRecording(),
+                            onLongPressCancel: () => _cancelRecording(),
+                            child: Transform.scale(
+                              scale: _isMicPressed ? 0.85 : 1.0,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _isMicPressed
+                                      ? const Color(0xFFB05ECC).withValues(alpha: 0.2)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: Icon(
+                                  Icons.mic_none,
+                                  color: _isMicPressed
+                                      ? const Color(0xFFB05ECC)
+                                      : const Color(0xFFB05ECC),
+                                  size: 24,
+                                ),
                               ),
                             ),
->>>>>>> Stashed changes
                           )
                         else if (_uploadingVoice)
                           const Padding(
@@ -1125,8 +1186,7 @@ class _RecordingBarState extends State<_RecordingBar> {
                     color: Colors.red, size: 14),
                 const SizedBox(width: 8),
                 Text('Recording… ${_elapsed()}',
-                    style:
-                        TextStyle(color: context.textPrimary, fontSize: 13)),
+                    style: TextStyle(color: context.textPrimary, fontSize: 13)),
               ],
             ),
           ),
@@ -1144,7 +1204,7 @@ class _RecordingBarState extends State<_RecordingBar> {
 // Message bubble
 // ─────────────────────────────────────────────
 
-class _MessageBubble extends ConsumerWidget {
+class _MessageBubble extends ConsumerStatefulWidget {
   final String chatId;
   final ChatMessage msg;
   final bool isMe;
@@ -1152,6 +1212,8 @@ class _MessageBubble extends ConsumerWidget {
   final String otherAvatar;
   final bool isGroup;
   final VoidCallback onReply;
+  final bool autoTranslate;
+  final String autoTranslateTarget;
 
   const _MessageBubble({
     required this.chatId,
@@ -1161,15 +1223,176 @@ class _MessageBubble extends ConsumerWidget {
     required this.otherAvatar,
     required this.onReply,
     this.isGroup = false,
+    this.autoTranslate = false,
+    this.autoTranslateTarget = 'en',
   });
+
+  @override
+  ConsumerState<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends ConsumerState<_MessageBubble> {
+  // Translated body for this message, computed lazily once auto-translate
+  // is on. Null until the request completes (or fails).
+  String? _translated;
+  // Cache key the translation was generated for: "<targetLang>|<originalText>".
+  // Lets us re-translate when the user changes target language without
+  // re-translating on every parent rebuild.
+  String? _translatedFor;
+  bool _translating = false;
+  // Per-bubble toggle: when true, show the original even if auto-translate
+  // is on. Tap "Show original" / "Show translation" to flip.
+  bool _showOriginal = false;
+  // Last error from the translation service, surfaced inline so the user
+  // knows it failed for this message rather than getting silent fallback.
+  String? _translateError;
+
+  // Convenience accessors so the build method reads cleanly.
+  ChatMessage get msg => widget.msg;
+  bool get isMe => widget.isMe;
+  String get otherUid => widget.otherUid;
+  String get otherAvatar => widget.otherAvatar;
+  bool get isGroup => widget.isGroup;
+  VoidCallback get onReply => widget.onReply;
+
+  /// True when the message should be displayed translated. Self-messages and
+  /// empty-text messages are never translated, only the partner's prose.
+  bool get _shouldTranslate =>
+      widget.autoTranslate &&
+      !isMe &&
+      msg.text.trim().isNotEmpty &&
+      !_showOriginal;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _maybeTranslate();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MessageBubble old) {
+    super.didUpdateWidget(old);
+    if (old.autoTranslate != widget.autoTranslate ||
+        old.autoTranslateTarget != widget.autoTranslateTarget ||
+        old.msg.text != widget.msg.text) {
+      _maybeTranslate();
+    }
+  }
+
+  Future<void> _maybeTranslate() async {
+    if (!_shouldTranslate) return;
+    final cacheKey = '${widget.autoTranslateTarget}|${msg.text}';
+    if (_translatedFor == cacheKey) return; // already done
+    if (_translating) return;
+    setState(() {
+      _translating = true;
+      _translateError = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: msg.text,
+        sourceLang: 'auto',
+        targetLang: widget.autoTranslateTarget,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _translatedFor = cacheKey;
+        _translating = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _translating = false;
+        _translateError = e.toString();
+      });
+    }
+  }
 
   String _fmt(DateTime? dt) {
     if (dt == null) return '';
     return DateFormat('h:mm a').format(dt);
   }
 
+  /// Builds the text to render for the message body, plus an optional
+  /// trailing "Show original" / "Show translation" / loading indicator.
+  Widget _buildBody({required Color textColor}) {
+    final originalStyle = TextStyle(color: textColor, fontSize: 14);
+    if (!widget.autoTranslate || isMe || msg.text.trim().isEmpty) {
+      return Text(msg.text, style: originalStyle);
+    }
+
+    final body = _showOriginal
+        ? msg.text
+        : (_translated ?? msg.text); // until translation arrives, show original
+
+    final hintColor = isMe
+        ? Colors.white.withValues(alpha: 0.85)
+        : const Color(0xFFB05ECC);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(body, style: originalStyle),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_translating)
+              SizedBox(
+                width: 10,
+                height: 10,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.4,
+                  valueColor: AlwaysStoppedAnimation<Color>(hintColor),
+                ),
+              )
+            else
+              Icon(Icons.translate, size: 12, color: hintColor),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                if (_translating) return;
+                if (_translateError != null) {
+                  // Allow a retry by clearing cache marker.
+                  setState(() {
+                    _translateError = null;
+                    _translatedFor = null;
+                  });
+                  _maybeTranslate();
+                  return;
+                }
+                if (_translated == null) {
+                  _maybeTranslate();
+                  return;
+                }
+                setState(() => _showOriginal = !_showOriginal);
+              },
+              child: Text(
+                _translateError != null
+                    ? 'Translation failed — tap to retry'
+                    : _translating
+                        ? 'Translating…'
+                        : _showOriginal
+                            ? 'Show translation'
+                            : 'Show original',
+                style: TextStyle(
+                  color: hintColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // In groups we look up each sender's live profile dynamically. In 1:1
     // chats we reuse the cached otherAvatar passed into the screen.
     final senderLive =
@@ -1232,15 +1455,15 @@ class _MessageBubble extends ConsumerWidget {
                     return false; // never actually dismiss — just trigger reply
                   },
                   background: _replySwipeBg(context, alignLeft: true),
-                  secondaryBackground:
-                      _replySwipeBg(context, alignLeft: false),
+                  secondaryBackground: _replySwipeBg(context, alignLeft: false),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 260),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: isMe ? const Color(0xFFB05ECC) : context.inputFill,
+                        color:
+                            isMe ? const Color(0xFFB05ECC) : context.inputFill,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(16),
                           topRight: const Radius.circular(16),
@@ -1256,6 +1479,11 @@ class _MessageBubble extends ConsumerWidget {
                               isMe: isMe,
                               senderUid: msg.replyToSenderUid ?? '',
                               text: msg.replyToText ?? '',
+                            ),
+                          if (msg.storyId != null && msg.storyId!.isNotEmpty)
+                            _StoryReplyBanner(
+                              isMe: isMe,
+                              storyImageUrl: msg.storyImageUrl,
                             ),
                           if (hasVoice)
                             _VoiceMessageBubble(
@@ -1288,23 +1516,16 @@ class _MessageBubble extends ConsumerWidget {
                             ),
                             if (msg.text.isNotEmpty) ...[
                               const SizedBox(height: 6),
-                              Text(
-                                msg.text,
-                                style: TextStyle(
-                                  color:
-                                      isMe ? Colors.white : context.textPrimary,
-                                  fontSize: 14,
-                                ),
+                              _buildBody(
+                                textColor: isMe
+                                    ? Colors.white
+                                    : context.textPrimary,
                               ),
                             ],
                           ] else
-                            Text(
-                              msg.text,
-                              style: TextStyle(
-                                color:
-                                    isMe ? Colors.white : context.textPrimary,
-                                fontSize: 14,
-                              ),
+                            _buildBody(
+                              textColor:
+                                  isMe ? Colors.white : context.textPrimary,
                             ),
                         ],
                       ),
@@ -1313,7 +1534,7 @@ class _MessageBubble extends ConsumerWidget {
                 ),
               ),
               MessageReactionsRow(
-                parentPath: 'chats/$chatId/messages',
+                parentPath: 'chats/${widget.chatId}/messages',
                 messageId: msg.id,
               ),
               if (msg.sharedPostId != null &&
@@ -1333,16 +1554,18 @@ class _MessageBubble extends ConsumerWidget {
               ],
               const SizedBox(height: 2),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     _fmt(msg.createdAt),
                     style: TextStyle(color: context.textMuted, fontSize: 11),
                   ),
-                  if (isMe && msg.seenBy.length > 1) ...[
+                  if (isMe) ...[
                     const SizedBox(width: 4),
-                    Text(
-                      'Seen',
-                      style: TextStyle(color: context.textMuted, fontSize: 11),
+                    _MessageStatusIcon(
+                      pending: msg.createdAt == null,
+                      seen: msg.seenBy.length > 1,
+                      mutedColor: context.textMuted,
                     ),
                   ],
                 ],
@@ -1387,7 +1610,7 @@ class _MessageBubble extends ConsumerWidget {
                 showReactionsSheet(
                   context,
                   ref: ref,
-                  parentPath: 'chats/$chatId/messages',
+                  parentPath: 'chats/${widget.chatId}/messages',
                   messageId: msg.id,
                 );
               },
@@ -1452,8 +1675,9 @@ class _RepliedQuote extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
-              color:
-                  isMe ? Colors.white.withValues(alpha: 0.85) : context.textSecondary,
+              color: isMe
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : context.textSecondary,
             ),
           ),
         ],
@@ -1537,16 +1761,6 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     return '$m:$s';
   }
 
-  Future<void> _seekTo(double progress) async {
-    final total = _duration;
-    if (total == null || total.inMilliseconds == 0) return;
-    final target = Duration(
-      milliseconds: (total.inMilliseconds * progress.clamp(0.0, 1.0)).round(),
-    );
-    await _player.seek(target);
-    if (mounted) setState(() => _position = target);
-  }
-
   @override
   Widget build(BuildContext context) {
     final total = _duration ?? Duration.zero;
@@ -1558,15 +1772,13 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
         ? Colors.white.withValues(alpha: 0.35)
         : const Color(0xFFB05ECC).withValues(alpha: 0.25);
     return SizedBox(
-      width: 240,
+      width: 220,
       child: Row(
         children: [
           GestureDetector(
             onTap: _toggle,
             child: Icon(
-              _playing
-                  ? Icons.pause_circle_filled
-                  : Icons.play_circle_fill,
+              _playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
               color: fg,
               size: 32,
             ),
@@ -1576,12 +1788,14 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _WaveformScrubber(
-                  url: widget.url,
-                  progress: progress,
-                  fg: fg,
-                  trackBg: trackBg,
-                  onSeek: _seekTo,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: trackBg,
+                    valueColor: AlwaysStoppedAnimation(fg),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1597,122 +1811,6 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
       ),
     );
   }
-}
-
-/// WhatsApp-style waveform scrubber for voice messages. We don't decode the
-/// audio file (would need a heavy native dependency), so bar heights are a
-/// deterministic pseudo-random pattern derived from the URL — same URL always
-/// gets the same waveform, so it doesn't reshuffle on rebuild and feels
-/// "real". Tapping or dragging horizontally seeks playback.
-class _WaveformScrubber extends StatelessWidget {
-  final String url;
-  final double progress;
-  final Color fg;
-  final Color trackBg;
-  final ValueChanged<double> onSeek;
-
-  const _WaveformScrubber({
-    required this.url,
-    required this.progress,
-    required this.fg,
-    required this.trackBg,
-    required this.onSeek,
-  });
-
-  static List<double> _heightsFor(String url) {
-    const barCount = 38;
-    // Stable hash → pseudo-random heights in [0.25, 1.0]
-    var seed = url.hashCode & 0x7fffffff;
-    final out = <double>[];
-    for (var i = 0; i < barCount; i++) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      final v = (seed % 1000) / 1000.0;
-      out.add(0.25 + v * 0.75);
-    }
-    return out;
-  }
-
-  void _handleSeek(BuildContext context, Offset localPosition) {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final width = box.size.width;
-    if (width <= 0) return;
-    onSeek((localPosition.dx / width).clamp(0.0, 1.0));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Builder(
-      builder: (innerContext) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (d) => _handleSeek(innerContext, d.localPosition),
-        onHorizontalDragUpdate: (d) =>
-            _handleSeek(innerContext, d.localPosition),
-        child: SizedBox(
-          height: 28,
-          child: CustomPaint(
-            painter: _WaveformPainter(
-              heights: _heightsFor(url),
-              progress: progress,
-              fg: fg,
-              trackBg: trackBg,
-            ),
-            size: Size.infinite,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WaveformPainter extends CustomPainter {
-  final List<double> heights;
-  final double progress;
-  final Color fg;
-  final Color trackBg;
-
-  _WaveformPainter({
-    required this.heights,
-    required this.progress,
-    required this.fg,
-    required this.trackBg,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (heights.isEmpty) return;
-    const barWidth = 2.5;
-    final gap = (size.width - barWidth * heights.length) / (heights.length - 1);
-    final centerY = size.height / 2;
-    final progressX = size.width * progress;
-
-    final activePaint = Paint()
-      ..color = fg
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = barWidth;
-    final inactivePaint = Paint()
-      ..color = trackBg
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = barWidth;
-
-    for (var i = 0; i < heights.length; i++) {
-      final x = i * (barWidth + gap) + barWidth / 2;
-      final h = heights[i] * (size.height - 4);
-      final paint = x <= progressX ? activePaint : inactivePaint;
-      canvas.drawLine(
-        Offset(x, centerY - h / 2),
-        Offset(x, centerY + h / 2),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WaveformPainter old) =>
-      old.progress != progress ||
-      old.fg != fg ||
-      old.trackBg != trackBg ||
-      old.heights != heights;
 }
 
 class _SharedPostPreview extends StatelessWidget {
@@ -1862,6 +1960,116 @@ class _SharedEventLabel extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Carries the user's dictation-language pick out of the bottom sheet.
+/// `id` is null for "Auto (device default)".
+class _DictationLocaleChoice {
+  final String? id;
+  final String label;
+  const _DictationLocaleChoice({required this.id, required this.label});
+}
+
+/// Small WhatsApp-style status icon for own messages:
+///   • clock      — pending write (no server timestamp yet)
+///   • single ✓   — sent / delivered (written to Firestore)
+///   • double ✓✓  — seen (recipient has the message in their seenBy list)
+/// The seen state shows in the brand purple to draw the eye.
+class _MessageStatusIcon extends StatelessWidget {
+  final bool pending;
+  final bool seen;
+  final Color mutedColor;
+  const _MessageStatusIcon({
+    required this.pending,
+    required this.seen,
+    required this.mutedColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (pending) {
+      return Icon(Icons.access_time, size: 12, color: mutedColor);
+    }
+    if (seen) {
+      return const Icon(Icons.done_all, size: 14, color: Color(0xFFB05ECC));
+    }
+    return Icon(Icons.done_all, size: 14, color: mutedColor);
+  }
+}
+
+/// Header rendered at the top of a message bubble when the message was sent
+/// in response to a story. Shows a thin "Replied to story" line and, when
+/// the original story image URL is available, a tiny rounded thumbnail so
+/// the recipient knows exactly which story prompted the reply/reaction.
+class _StoryReplyBanner extends StatelessWidget {
+  final bool isMe;
+  final String? storyImageUrl;
+  const _StoryReplyBanner({
+    required this.isMe,
+    this.storyImageUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isMe
+        ? Colors.white.withValues(alpha: 0.85)
+        : const Color(0xFFB05ECC);
+    final bg = isMe
+        ? Colors.white.withValues(alpha: 0.15)
+        : Colors.black.withValues(alpha: 0.05);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border(
+          left: BorderSide(color: fg, width: 3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (storyImageUrl != null && storyImageUrl!.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: CachedNetworkImage(
+                imageUrl: storyImageUrl!,
+                width: 28,
+                height: 36,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  width: 28,
+                  height: 36,
+                  color: Colors.black12,
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  width: 28,
+                  height: 36,
+                  color: Colors.black26,
+                  child:
+                      Icon(Icons.broken_image, size: 14, color: fg),
+                ),
+              ),
+            )
+          else
+            Icon(Icons.auto_stories, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Replied to story',
+              style: TextStyle(
+                color: fg,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

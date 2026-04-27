@@ -81,7 +81,9 @@ class _StoriesListState extends ConsumerState<StoriesList> {
           final allGroups = <List<Story>>[];
           final hasOwnStory = byAuthor.containsKey(currentUid);
           if (hasOwnStory) allGroups.add(byAuthor[currentUid]!);
-          for (final entry in otherAuthors) allGroups.add(entry.value);
+          for (final entry in otherAuthors) {
+            allGroups.add(entry.value);
+          }
 
           return ListView(
             scrollDirection: Axis.horizontal,
@@ -209,7 +211,7 @@ class _MyStoryBubble extends StatelessWidget {
   }
 }
 
-class _StoryBubble extends StatelessWidget {
+class _StoryBubble extends ConsumerWidget {
   final List<Story> stories;
   final bool seen;
   final List<List<Story>> allGroups;
@@ -226,8 +228,11 @@ class _StoryBubble extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final first = stories.first;
+    final userData = ref.watch(userByUidProvider(first.authorUid)).value;
+    final avatarUrl = userData?['avatarUrl'] as String?;
+    final username = userData?['username'] as String? ?? first.authorUsername;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Column(
@@ -248,10 +253,10 @@ class _StoryBubble extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 30,
                   backgroundColor: context.inputFill,
-                  backgroundImage: first.authorAvatar != null
-                      ? CachedNetworkImageProvider(first.authorAvatar!)
+                  backgroundImage: avatarUrl != null
+                      ? CachedNetworkImageProvider(avatarUrl)
                       : null,
-                  child: first.authorAvatar == null
+                  child: avatarUrl == null
                       ? Icon(Icons.person, color: context.textMuted)
                       : null,
                 ),
@@ -264,7 +269,7 @@ class _StoryBubble extends StatelessWidget {
             child: GestureDetector(
               onTap: () => openUserProfile(context, uid: first.authorUid),
               child: Text(
-                first.authorUsername,
+                username,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,

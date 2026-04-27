@@ -1,7 +1,10 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +23,20 @@ import 'src/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    if (details.exceptionAsString().contains('EncodingError: The source image cannot be decoded') ||
+        details.library == 'image resource service') {
+      return;
+    }
+    if (originalOnError != null) {
+      originalOnError(details);
+    } else {
+      FlutterError.presentError(details);
+    }
+  };
+
   debugPrint('[boot] WidgetsFlutterBinding ready');
   await _configureSystemUi();
 
@@ -39,6 +56,26 @@ Future<void> main() async {
     debugPrint('[boot] Firebase init non-fatal: $e');
   }
   debugPrint('[boot] Firebase.apps=${Firebase.apps.length}');
+
+  // Connect to emulators only when explicitly enabled. On a real device,
+  // 'localhost' resolves to the phone itself, so leaving this on caused
+  // every callable/Firestore call to hang. Set USE_FIREBASE_EMULATOR=true
+  // in .env to re-enable, and set FIREBASE_EMULATOR_HOST to your PC's LAN
+  // IP (e.g. 192.168.1.42) when testing on a physical device.
+  final useEmulator =
+      (dotenv.maybeGet('USE_FIREBASE_EMULATOR') ?? '').toLowerCase() == 'true';
+  if (kDebugMode && useEmulator) {
+    final host = dotenv.maybeGet('FIREBASE_EMULATOR_HOST') ?? 'localhost';
+    try {
+      await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+      FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+      FirebaseStorage.instance.useStorageEmulator(host, 9199);
+      FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+      debugPrint('[boot] Connected to Firebase emulators @ $host');
+    } catch (e) {
+      debugPrint('[boot] Emulator connection failed: $e');
+    }
+  }
 
   // Sanity-check that auth stream produces a first event.
   FirebaseAuth.instance.authStateChanges().first.timeout(
