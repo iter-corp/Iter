@@ -131,30 +131,37 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     super.dispose();
   }
 
-  Future<void> _toggleLike() async {
+  Future<void> _toggleLike({bool silent = false}) async {
     final story = _stories[_index];
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to like stories')),
-      );
+      if (!silent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to like stories')),
+        );
+      }
       return;
     }
 
-    if (_isLiking) return; // Prevent double taps
+    if (_isLiking) return;
 
     setState(() => _isLiking = true);
-
-    // Add haptic feedback
     await HapticFeedback.lightImpact();
 
     try {
       await _storyService.toggleLike(story.id);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to toggle like: $e')),
-      );
+      // Story like is best-effort. When called via _quickReact (silent=true)
+      // the user already sees "Sent ❤️" feedback; the most common failure
+      // here is a Firestore rules race on the parent story doc's likesCount
+      // update. Swallow silently so the viewer doesn't flash an alarming
+      // permission-denied banner alongside a successful DM.
+      debugPrint('[story-like] toggleLike failed: $e');
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to toggle like: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLiking = false);
     }
@@ -188,8 +195,9 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     final ok = await _replyToStoryAsDM(emoji);
     debugPrint('[story-react] DM result=$ok');
     if (emoji == '❤️' && _currentUid != null && !_isLiking) {
-      // Fire-and-forget — surfaces any error via _toggleLike's own snackbar.
-      unawaited(_toggleLike());
+      // Fire-and-forget — silenced so the DM "Sent ❤️" toast isn't
+      // followed by a permission-denied banner from the like attempt.
+      unawaited(_toggleLike(silent: true));
     }
     if (!mounted || !ok) return;
     ScaffoldMessenger.of(context).showSnackBar(

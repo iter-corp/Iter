@@ -24,6 +24,7 @@ import '../../services/translate_service.dart';
 import '../model/post_model.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
+import 'chat_media_screen.dart';
 import 'post_detail_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -871,6 +872,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       color: _autoTranslate
                           ? const Color(0xFFB05ECC)
                           : context.textSecondary,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Shared media',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatMediaScreen(
+                            chatId: widget.chatId,
+                            chatTitle: isGroup ? groupName : widget.otherName,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.info_outline,
+                      color: context.textSecondary,
                     ),
                   ),
                 ],

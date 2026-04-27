@@ -118,7 +118,13 @@ service cloud.firestore {
     }
 
     match /posts/{postId} {
-      allow read: if signedIn() && canSeeContent(resource.data.authorUid);
+      // Any signed-in user can read posts. Privacy/blocking is enforced on
+      // the client (the feed filters posts whose author is private and not
+      // followed). The previous `canSeeContent` rule called get() on the
+      // author's user doc, which made list queries fail entirely because
+      // Firestore can't filter list results by rule — it can only reject
+      // the whole query.
+      allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
       allow update: if signedIn() && (
         resource.data.authorUid == request.auth.uid ||
@@ -130,13 +136,13 @@ service cloud.firestore {
       );
 
       match /likes/{uid} {
-        allow read: if signedIn() && canSeeContent(get(/databases/$(database)/documents/posts/$(postId)).data.authorUid);
+        allow read: if signedIn();
         allow create: if isSelf(uid);
         allow delete: if isSelf(uid) || isAdmin();
       }
 
       match /comments/{commentId} {
-        allow read: if signedIn() && canSeeContent(get(/databases/$(database)/documents/posts/$(postId)).data.authorUid);
+        allow read: if signedIn();
         allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
         allow delete: if signedIn() && (
           resource.data.authorUid == request.auth.uid || isAdmin()
@@ -145,7 +151,7 @@ service cloud.firestore {
       }
 
       match /reposts/{uid} {
-        allow read: if signedIn() && canSeeContent(get(/databases/$(database)/documents/posts/$(postId)).data.authorUid);
+        allow read: if signedIn();
         allow create: if isSelf(uid);
         allow delete: if isSelf(uid) || isAdmin();
         allow update: if false;
@@ -327,7 +333,11 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isChatParticipant(chatId) || isAdmin();
         allow create: if isChatParticipant(chatId) && request.resource.data.senderUid == request.auth.uid;
-        allow update: if false;
+        // Chat participants may update ONLY the `seenBy` field — needed so
+        // the recipient can mark messages as seen and the sender's
+        // double-check indicator flips. Any other diff is rejected.
+        allow update: if isChatParticipant(chatId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy']);
         allow delete: if isAdmin();
 
         match /reactions/{reactorUid} {

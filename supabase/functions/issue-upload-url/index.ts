@@ -2,7 +2,7 @@
 // Verifies a Firebase ID token and returns a signed Supabase Storage upload URL
 // scoped to the user's own folder inside the requested bucket.
 //
-// Request body: { bucket: 'avatars' | 'posts', kind: 'avatar'|'post'|'chat', ext: string, subPath?: string }
+// Request body: { bucket: 'avatars' | 'posts', kind: 'avatar'|'cover'|'post'|'story'|'chat'|'audio', ext: string, subPath?: string }
 // Response:     { uploadUrl, token, path, publicUrl }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -13,7 +13,9 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const ALLOWED_BUCKETS = new Set(["avatars", "posts"]);
-const ALLOWED_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic"]);
+const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic"]);
+const AUDIO_EXTS = new Set(["m4a", "aac", "mp3", "wav", "ogg"]);
+const ALLOWED_EXTS = new Set([...IMAGE_EXTS, ...AUDIO_EXTS]);
 
 const JWKS = createRemoteJWKSet(
   new URL(
@@ -94,6 +96,16 @@ Deno.serve(async (req) => {
       return json(400, { error: "bad subPath" });
     }
     path = `${uid}/chats/${subPath}/${ts}_${rand}.${ext}`;
+  } else if (kind === "audio" && subPath) {
+    // Voice messages live alongside chat media but in a /voices/ folder
+    // so they're easy to enumerate separately.
+    if (!/^[A-Za-z0-9_]+$/.test(subPath)) {
+      return json(400, { error: "bad subPath" });
+    }
+    if (!AUDIO_EXTS.has(ext)) {
+      return json(400, { error: "audio kind requires audio ext" });
+    }
+    path = `${uid}/chats/${subPath}/voices/${ts}_${rand}.${ext}`;
   } else {
     return json(400, { error: "bad kind" });
   }
