@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../services/story_service.dart';
+import '../../theme/app_theme.dart';
 
 const Duration _kStoryDuration = Duration(seconds: 5);
 
@@ -88,15 +89,159 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           _next();
         }
       });
+    _commentFocusNode.addListener(_onReplyFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) => _startCurrent());
+  }
+
+  void _onReplyFocusChange() {
+    if (!mounted) return;
+    if (_commentFocusNode.hasFocus) {
+      _progress.stop();
+    } else {
+      _progress.forward();
+    }
   }
 
   @override
   void dispose() {
+    _commentFocusNode.removeListener(_onReplyFocusChange);
     _progress.dispose();
     super.dispose();
   }
 
+<<<<<<< Updated upstream
+=======
+  Future<void> _toggleLike({bool silent = false}) async {
+    final story = _stories[_index];
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!silent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to like stories')),
+        );
+      }
+      return;
+    }
+
+    if (_isLiking) return;
+
+    setState(() => _isLiking = true);
+    await HapticFeedback.lightImpact();
+
+    try {
+      await _storyService.toggleLike(story.id);
+    } catch (e) {
+      debugPrint('[story-like] toggleLike failed: $e');
+      // Story like is best-effort — when invoked alongside a quick-reaction
+      // DM the user has already gotten feedback ("Sent ❤️"), and the most
+      // common failure here is a Firestore rules race on the parent
+      // story doc's likesCount update. Swallow silently in that case so
+      // the viewer doesn't flash an alarming permission-denied banner.
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to toggle like: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLiking = false);
+    }
+  }
+
+  Future<void> _addComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _sendingComment = true);
+    final ok = await _replyToStoryAsDM(text);
+    if (!mounted) return;
+    setState(() => _sendingComment = false);
+    if (ok) {
+      _commentController.clear();
+      _commentFocusNode.unfocus();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reply sent')),
+      );
+    }
+  }
+
+  /// Sends a quick emoji reaction to the story author as a DM. Same flow as
+  /// [_replyToStoryAsDM] but with an emoji as the text. The receiving chat
+  /// renders a "Replied to your story" header above the bubble so the
+  /// recipient knows which story the reaction is about. Tapping ❤️ also
+  /// toggles the story-level like so the engagement counter updates.
+  Future<void> _quickReact(String emoji) async {
+    HapticFeedback.lightImpact();
+    debugPrint('[story-react] tapped emoji=$emoji story=${_stories[_index].id}');
+    final ok = await _replyToStoryAsDM(emoji);
+    debugPrint('[story-react] DM result=$ok');
+    if (emoji == '❤️' && _currentUid != null && !_isLiking) {
+      // Fire-and-forget — surfaces any error via _toggleLike's own snackbar.
+      unawaited(_toggleLike(silent: true));
+    }
+    if (!mounted || !ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sent $emoji'),
+        duration: const Duration(milliseconds: 900),
+      ),
+    );
+  }
+
+  /// Opens (or finds) the 1:1 chat with the current story's author and
+  /// sends [text] there with a reference back to the story (storyId +
+  /// thumbnail). Returns true on success. Used by both the reply input
+  /// and the quick-reactions row. The story author can't reply to their
+  /// own story — we no-op in that case so we never DM ourselves.
+  Future<bool> _replyToStoryAsDM(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      debugPrint('[story-reply] empty text, skipping');
+      return false;
+    }
+    final story = _stories[_index];
+    final me = _currentUid;
+    debugPrint('[story-reply] me=$me author=${story.authorUid} '
+        'storyId=${story.id} text="${trimmed.length > 30 ? "${trimmed.substring(0, 30)}…" : trimmed}"');
+    if (me == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to reply to stories')),
+      );
+      return false;
+    }
+    if (story.authorUid == me) {
+      debugPrint('[story-reply] author == me, no DM');
+      return false;
+    }
+
+    try {
+      final chatService = ref.read(chatServiceProvider);
+      debugPrint('[story-reply] openChat…');
+      final chatId = await chatService.openChat(
+        currentUid: me,
+        otherUid: story.authorUid,
+      );
+      debugPrint('[story-reply] openChat OK chatId=$chatId, sending…');
+      await chatService.sendMessage(
+        chatId: chatId,
+        senderUid: me,
+        receiverUid: story.authorUid,
+        text: trimmed,
+        storyId: story.id,
+        storyImageUrl: story.imageUrl,
+      );
+      debugPrint('[story-reply] sendMessage OK');
+      return true;
+    } catch (e, st) {
+      debugPrint('[story-reply] FAILED: $e\n$st');
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send reply: $e')),
+      );
+      return false;
+    }
+  }
+
+>>>>>>> Stashed changes
   Future<void> _startCurrent() async {
     final story = _stories[_index];
     _progress.stop();
@@ -256,6 +401,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       ),
       child: Scaffold(
         backgroundColor: Colors.black,
+<<<<<<< Updated upstream
         body: GestureDetector(
           onTapUp: (details) {
             if (details.globalPosition.dx < width / 3) {
@@ -264,6 +410,22 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               _next();
             }
           },
+=======
+        // Don't shrink the story canvas when the keyboard opens — that
+        // makes the composer (positioned at `bottom: 20`) jump up into
+        // the middle of the now-shrunk body. We keep the Stack full-screen
+        // and instead lift only the composer by viewInsets.bottom.
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: GestureDetector(
+            onTapUp: (details) {
+              if (details.globalPosition.dx < width / 3) {
+                _prev();
+              } else {
+                _next();
+              }
+            },
+>>>>>>> Stashed changes
           onLongPressStart: (_) => _progress.stop(),
           onLongPressEnd: (_) => _progress.forward(),
           onVerticalDragEnd: (details) {
@@ -395,6 +557,40 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                     ],
                   ),
                 ),
+<<<<<<< Updated upstream
+=======
+                // The old floating heart-like + comment-count column used to
+                // sit at bottom+100 and overlapped the new reactions strip,
+                // hiding all reactions except the heart. We merged the
+                // story-level like into the reactions row (tap ❤️ both
+                // toggles the story like AND DMs the author), so this
+                // floating column is no longer needed.
+                // Comment input
+                Positioned(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  left: 16,
+                  right: 16,
+                  // Absorb taps in this region so the parent's onTapUp
+                  // (which advances to the next story / pops the viewer)
+                  // doesn't fire when the user taps the send button or
+                  // anywhere else in the composer.
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {},
+                    child: _currentUid == null
+                        ? _StorySignInBanner()
+                        : isOwnStory
+                            ? const SizedBox.shrink()
+                            : _StoryReplyComposer(
+                                controller: _commentController,
+                                focusNode: _commentFocusNode,
+                                sending: _sendingComment,
+                                onSend: _addComment,
+                                onReact: _quickReact,
+                              ),
+                  ),
+                ),
+>>>>>>> Stashed changes
                 if (isOwnStory)
                   Positioned(
                     bottom: 20,
@@ -498,9 +694,9 @@ class _ViewersSheet extends StatelessWidget {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -509,7 +705,7 @@ class _ViewersSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -522,17 +718,18 @@ class _ViewersSheet extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.remove_red_eye_outlined,
                           size: 20,
-                          color: Colors.black87,
+                          color: context.textPrimary,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           '$count ${count == 1 ? 'view' : 'views'}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
+                            color: context.textPrimary,
                           ),
                         ),
                       ],
@@ -552,12 +749,12 @@ class _ViewersSheet extends StatelessWidget {
                     }
                     final viewers = snapshot.data ?? const [];
                     if (viewers.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
                           child: Text(
                             'No views yet',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         ),
                       );
@@ -575,15 +772,24 @@ class _ViewersSheet extends StatelessWidget {
                           },
                           leading: CircleAvatar(
                             radius: 20,
+<<<<<<< Updated upstream
                             backgroundColor: Colors.grey.shade200,
                             backgroundImage: v.avatarUrl != null
                                 ? CachedNetworkImageProvider(v.avatarUrl!)
                                 : null,
                             child: v.avatarUrl == null
                                 ? const Icon(
+=======
+                            backgroundColor: context.surfaceSoft,
+                            backgroundImage: avatarUrl != null
+                                ? CachedNetworkImageProvider(avatarUrl)
+                                : null,
+                            child: avatarUrl == null
+                                ? Icon(
+>>>>>>> Stashed changes
                                     Icons.person,
                                     size: 18,
-                                    color: Colors.grey,
+                                    color: context.textMuted,
                                   )
                                 : null,
                           ),
@@ -593,8 +799,8 @@ class _ViewersSheet extends StatelessWidget {
                           ),
                           trailing: Text(
                             _ago(v.viewedAt),
-                            style: const TextStyle(
-                              color: Colors.grey,
+                            style: TextStyle(
+                              color: context.textSecondary,
                               fontSize: 12,
                             ),
                           ),

@@ -13,100 +13,12 @@ import '../../theme/app_theme.dart';
 import '../widgets/feature_disabled_view.dart';
 import 'saved_translations_screen.dart';
 
-// 📌 SECTION: Supported Languages
-//
-// Gemini handles virtually any language. We keep a broad list here, with the
-// ISO-639 code Gemini should receive, plus an optional BCP-47 locale for
-// on-device speech-to-text. Languages without a `stt` locale fall back to the
-// device default; live transcription may be less accurate for those.
-class _Language {
-  final String label;
-  final String code;
-  final String? stt;
-  final bool rtl;
-  const _Language(this.label, this.code, {this.stt, this.rtl = false});
-}
+// 📌 Languages: see [kTranslateLanguages] in translate_service.dart for the
+// canonical list shared with chat / comment / post translate pickers. The
+// translate-screen-specific helpers below just look up entries by label.
 
-const List<_Language> _kLanguages = [
-  _Language('English (USA)', 'en', stt: 'en_US'),
-  _Language('English (UK)', 'en', stt: 'en_GB'),
-  _Language('Arabic', 'ar', stt: 'ar_SA', rtl: true),
-  _Language('Kurdish (Sorani)', 'ckb', stt: 'ar_IQ', rtl: true),
-  _Language('Kurdish (Kurmanji)', 'kmr', stt: 'tr_TR'),
-  _Language('Persian', 'fa', stt: 'fa_IR', rtl: true),
-  _Language('Turkish', 'tr', stt: 'tr_TR'),
-  _Language('Spanish', 'es', stt: 'es_ES'),
-  _Language('French', 'fr', stt: 'fr_FR'),
-  _Language('German', 'de', stt: 'de_DE'),
-  _Language('Italian', 'it', stt: 'it_IT'),
-  _Language('Portuguese (Brazil)', 'pt-BR', stt: 'pt_BR'),
-  _Language('Portuguese (Portugal)', 'pt-PT', stt: 'pt_PT'),
-  _Language('Russian', 'ru', stt: 'ru_RU'),
-  _Language('Ukrainian', 'uk', stt: 'uk_UA'),
-  _Language('Polish', 'pl', stt: 'pl_PL'),
-  _Language('Dutch', 'nl', stt: 'nl_NL'),
-  _Language('Swedish', 'sv', stt: 'sv_SE'),
-  _Language('Norwegian', 'no', stt: 'nb_NO'),
-  _Language('Danish', 'da', stt: 'da_DK'),
-  _Language('Finnish', 'fi', stt: 'fi_FI'),
-  _Language('Czech', 'cs', stt: 'cs_CZ'),
-  _Language('Greek', 'el', stt: 'el_GR'),
-  _Language('Hebrew', 'he', stt: 'he_IL', rtl: true),
-  _Language('Urdu', 'ur', stt: 'ur_PK', rtl: true),
-  _Language('Hindi', 'hi', stt: 'hi_IN'),
-  _Language('Bengali', 'bn', stt: 'bn_IN'),
-  _Language('Tamil', 'ta', stt: 'ta_IN'),
-  _Language('Telugu', 'te', stt: 'te_IN'),
-  _Language('Malay', 'ms', stt: 'ms_MY'),
-  _Language('Indonesian', 'id', stt: 'id_ID'),
-  _Language('Thai', 'th', stt: 'th_TH'),
-  _Language('Vietnamese', 'vi', stt: 'vi_VN'),
-  _Language('Japanese', 'ja', stt: 'ja_JP'),
-  _Language('Korean', 'ko', stt: 'ko_KR'),
-  _Language('Chinese (Simplified)', 'zh-CN', stt: 'zh_CN'),
-  _Language('Chinese (Traditional)', 'zh-TW', stt: 'zh_TW'),
-  _Language('Swahili', 'sw', stt: 'sw_KE'),
-  _Language('Amharic', 'am', stt: 'am_ET'),
-  _Language('Somali', 'so'),
-  _Language('Hausa', 'ha'),
-  _Language('Zulu', 'zu', stt: 'zu_ZA'),
-  _Language('Afrikaans', 'af', stt: 'af_ZA'),
-  _Language('Hungarian', 'hu', stt: 'hu_HU'),
-  _Language('Romanian', 'ro', stt: 'ro_RO'),
-  _Language('Bulgarian', 'bg', stt: 'bg_BG'),
-  _Language('Serbian', 'sr', stt: 'sr_RS'),
-  _Language('Croatian', 'hr', stt: 'hr_HR'),
-  _Language('Slovak', 'sk', stt: 'sk_SK'),
-  _Language('Slovenian', 'sl', stt: 'sl_SI'),
-  _Language('Lithuanian', 'lt', stt: 'lt_LT'),
-  _Language('Latvian', 'lv', stt: 'lv_LV'),
-  _Language('Estonian', 'et', stt: 'et_EE'),
-  _Language('Icelandic', 'is', stt: 'is_IS'),
-  _Language('Catalan', 'ca', stt: 'ca_ES'),
-  _Language('Basque', 'eu', stt: 'eu_ES'),
-  _Language('Galician', 'gl', stt: 'gl_ES'),
-  _Language('Welsh', 'cy'),
-  _Language('Irish', 'ga'),
-  _Language('Albanian', 'sq'),
-  _Language('Armenian', 'hy'),
-  _Language('Azerbaijani', 'az'),
-  _Language('Georgian', 'ka'),
-  _Language('Kazakh', 'kk'),
-  _Language('Uzbek', 'uz'),
-  _Language('Mongolian', 'mn'),
-  _Language('Khmer', 'km'),
-  _Language('Lao', 'lo'),
-  _Language('Burmese', 'my'),
-  _Language('Filipino', 'fil', stt: 'fil_PH'),
-  _Language('Nepali', 'ne'),
-  _Language('Sinhala', 'si'),
-  _Language('Pashto', 'ps', rtl: true),
-  _Language('Maltese', 'mt'),
-  _Language('Esperanto', 'eo'),
-];
-
-_Language _langByLabel(String label) => _kLanguages
-    .firstWhere((l) => l.label == label, orElse: () => _kLanguages.first);
+TranslateLanguage _langByLabel(String label) => kTranslateLanguages
+    .firstWhere((l) => l.label == label, orElse: () => kTranslateLanguages.first);
 
 class TranslateBody extends ConsumerStatefulWidget {
   const TranslateBody({super.key});
@@ -357,10 +269,10 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
     );
     if (result == null || !mounted) return;
     setState(() {
-      if (_kLanguages.any((l) => l.label == result.sourceLangLabel)) {
+      if (kTranslateLanguages.any((l) => l.label == result.sourceLangLabel)) {
         _sourceLang = result.sourceLangLabel;
       }
-      if (_kLanguages.any((l) => l.label == result.targetLangLabel)) {
+      if (kTranslateLanguages.any((l) => l.label == result.targetLangLabel)) {
         _targetLang = result.targetLangLabel;
       }
       _inputController.text = result.sourceText;
@@ -657,8 +569,8 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
   Widget build(BuildContext context) {
     final q = _query.trim().toLowerCase();
     final filtered = q.isEmpty
-        ? _kLanguages
-        : _kLanguages
+        ? kTranslateLanguages
+        : kTranslateLanguages
             .where((l) =>
                 l.label.toLowerCase().contains(q) ||
                 l.code.toLowerCase().contains(q))

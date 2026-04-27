@@ -281,12 +281,38 @@ class ChatService {
     await batch.commit();
   }
 
-  /// Resets the unread counter for [uid] in [chatId].
+  /// Resets the unread counter for [uid] in [chatId] AND marks every
+  /// recent unseen message as seen by [uid] so the sender's double-check
+  /// indicator can flip from "delivered" to "seen". We scan only the last
+  /// 50 messages to bound cost — older history is left alone (a chat
+  /// that's been open this long is realistically already seen anyway).
   Future<void> markSeen({
     required String chatId,
     required String uid,
   }) async {
     await _chatDoc(chatId).update({'unread.$uid': 0});
+
+    final recent = await _messagesCol(chatId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .get();
+
+    final batch = _db.batch();
+    var pending = 0;
+    for (final doc in recent.docs) {
+      final data = doc.data();
+      final senderUid = data['senderUid'] as String? ?? '';
+      if (senderUid == uid) continue; // own message, already in seenBy
+      final seenBy = List<String>.from(data['seenBy'] as List? ?? []);
+      if (seenBy.contains(uid)) continue;
+      batch.update(doc.reference, {
+        'seenBy': FieldValue.arrayUnion([uid]),
+      });
+      pending++;
+    }
+    if (pending > 0) {
+      await batch.commit();
+    }
   }
 
   /// Real-time stream of messages, oldest first.

@@ -21,6 +21,7 @@ import '../../services/storage_service.dart';
 import '../model/post_model.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
+import 'chat_media_screen.dart';
 import 'post_detail_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -55,6 +56,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isRecording = false;
   DateTime? _recordStartedAt;
   bool _uploadingVoice = false;
+<<<<<<< Updated upstream
+=======
+
+  // Dictation (speech-to-text) state. Lets the user speak a message and
+  // have it transcribed into the text field — they can edit before sending.
+  // The platform's SpeechRecognizer uses the device default locale, which
+  // is the closest thing to language auto-detection it supports natively.
+  final stt.SpeechToText _stt = stt.SpeechToText();
+  bool _sttInitialized = false;
+  bool _isDictating = false;
+  // The text that was already in the field when dictation started, so we
+  // append onto it instead of overwriting whatever the user had typed.
+  String _dictationBaseText = '';
+  // User-selected dictation locale. null = device default. Long-press the
+  // dictation button to change.
+  String? _dictationLocaleId;
+
+  // Auto-translate incoming messages. Persisted per-chat in SharedPreferences
+  // so each chat can have its own preference. _autoTranslateTarget is the
+  // language code (e.g., 'en', 'ckb') the partner's messages get translated
+  // INTO. The settings sheet is opened from the translate icon in the header.
+  bool _autoTranslate = false;
+  String _autoTranslateTarget = 'en';
+>>>>>>> Stashed changes
 
   String? get _currentUid => ref.read(authStateProvider).value?.uid;
 
@@ -169,7 +194,104 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       });
       if (path == null) return;
 
+<<<<<<< Updated upstream
       setState(() => _uploadingVoice = true);
+=======
+        if (!mediaShare) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Media sharing is disabled in this group')),
+            );
+          }
+          return;
+        }
+        
+        if ((restrictMessaging || adminOnly) && !isAdmin) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('You cannot send voice messages in this group')),
+            );
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking group permissions: $e');
+    }
+
+    if (!await _recorder.hasPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission denied')),
+        );
+      }
+      return;
+    }
+    final dir = await getTemporaryDirectory();
+    final path =
+        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _recorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc),
+      path: path,
+    );
+    setState(() {
+      _isRecording = true;
+      _recordStartedAt = DateTime.now();
+    });
+  }
+
+  Future<void> _stopAndSendVoiceRecording() async {
+    debugPrint('[chat-voice] stopAndSend invoked '
+        '(isRecording=$_isRecording uploading=$_uploadingVoice)');
+
+    if (!_isRecording || _uploadingVoice) {
+      debugPrint('[chat-voice] aborting: not recording or already uploading');
+      return;
+    }
+    final uid = _currentUid;
+    if (uid == null) {
+      debugPrint('[chat-voice] aborting: no uid');
+      return;
+    }
+
+    // Stop recording.
+    final path = await _recorder.stop();
+    final startedAt = _recordStartedAt;
+    setState(() {
+      _isRecording = false;
+      _recordStartedAt = null;
+    });
+    debugPrint('[chat-voice] recorder.stop() returned path=$path');
+    if (path == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to record voice message')),
+        );
+      }
+      return;
+    }
+
+    final file = File(path);
+    // Validate file exists and has content
+    if (!await file.exists()) {
+      debugPrint('[chat-voice] file does not exist: $path');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Recording file not found')),
+        );
+      }
+      return;
+    }
+
+    final fileSize = await file.length();
+    debugPrint('[chat-voice] file size = $fileSize bytes');
+    if (fileSize == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Voice recording is empty')),
+        );
+      }
+>>>>>>> Stashed changes
       try {
         final file = File(path);
         final durationMs = startedAt == null
@@ -240,8 +362,275 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+<<<<<<< Updated upstream
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
+=======
+  /// Tap-to-dictate: speech-to-text into the message field. The user can
+  /// then edit and send. Tap again to stop. Distinct from the hold-to-send
+  /// voice-message button (which uploads an audio recording).
+  Future<void> _toggleDictation() async {
+    debugPrint('[chat-stt] toggle tap — currentlyDictating=$_isDictating '
+        'initialized=$_sttInitialized');
+    if (_isDictating) {
+      debugPrint('[chat-stt] stopping current session');
+      await _stt.stop();
+      if (mounted) setState(() => _isDictating = false);
+      return;
+    }
+
+    if (!_sttInitialized) {
+      debugPrint('[chat-stt] initializing…');
+      _sttInitialized = await _stt.initialize(
+        onStatus: (status) {
+          debugPrint('[chat-stt] status=$status');
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) setState(() => _isDictating = false);
+          }
+        },
+        onError: (err) {
+          debugPrint('[chat-stt] ERROR msg=${err.errorMsg} '
+              'permanent=${err.permanent}');
+          if (!mounted) return;
+          setState(() => _isDictating = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Dictation error: ${err.errorMsg}'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        },
+      );
+      debugPrint('[chat-stt] initialize returned $_sttInitialized');
+      if (!_sttInitialized) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone unavailable. Check permission.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Sanity check the engine is actually available right now.
+    final available = _stt.isAvailable;
+    debugPrint('[chat-stt] isAvailable=$available isListening=${_stt.isListening}');
+
+    // We deliberately do NOT call _stt.systemLocale() here. On some Android
+    // builds that call hangs forever and the function silently exits, which
+    // is why dictation appeared to do nothing. If the user has explicitly
+    // picked a locale via long-press, use it; otherwise pass null and let
+    // the speech engine pick the device default itself.
+    final localeId = _dictationLocaleId;
+    debugPrint('[chat-stt] using locale=${localeId ?? "(engine default)"}');
+
+    _dictationBaseText = _controller.text;
+    setState(() => _isDictating = true);
+
+    try {
+      await _stt.listen(
+        localeId: localeId,
+        listenOptions: stt.SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: false,
+          listenMode: stt.ListenMode.dictation,
+        ),
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 4),
+        onResult: (result) {
+          debugPrint('[chat-stt] result words="${result.recognizedWords}" '
+              'final=${result.finalResult}');
+          if (!mounted) return;
+          final spoken = result.recognizedWords;
+          final separator =
+              _dictationBaseText.isEmpty || _dictationBaseText.endsWith(' ')
+                  ? ''
+                  : ' ';
+          final next = '$_dictationBaseText$separator$spoken';
+          _controller.value = TextEditingValue(
+            text: next,
+            selection: TextSelection.collapsed(offset: next.length),
+          );
+          _onTextChanged(next);
+        },
+      );
+      debugPrint('[chat-stt] listen() call returned, isListening=${_stt.isListening}');
+    } catch (e, st) {
+      debugPrint('[chat-stt] listen FAILED: $e\n$st');
+      if (mounted) {
+        setState(() => _isDictating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start dictation: $e')),
+        );
+      }
+    }
+  }
+
+  /// Long-press handler on the dictation mic — lets the user pick which
+  /// language to dictate in for this chat. Includes an "Auto (device default)"
+  /// option that resets back to the system locale.
+  Future<void> _pickDictationLocale() async {
+    if (!_sttInitialized) {
+      _sttInitialized = await _stt.initialize();
+      if (!_sttInitialized) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone unavailable. Check permission.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    final installed = await _stt.locales();
+    if (!mounted) return;
+
+    final selected = await showModalBottomSheet<_DictationLocaleChoice>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('Auto (device default)'),
+                trailing: _dictationLocaleId == null
+                    ? const Icon(Icons.check, color: Color(0xFFB05ECC))
+                    : null,
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  const _DictationLocaleChoice(id: null, label: 'Auto'),
+                ),
+              ),
+              const Divider(height: 1),
+              ...installed.map((loc) => ListTile(
+                    title: Text(loc.name),
+                    subtitle: Text(loc.localeId),
+                    trailing: _dictationLocaleId == loc.localeId
+                        ? const Icon(Icons.check, color: Color(0xFFB05ECC))
+                        : null,
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      _DictationLocaleChoice(
+                        id: loc.localeId,
+                        label: loc.name,
+                      ),
+                    ),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() {
+      _dictationLocaleId = selected.id;
+    });
+  }
+
+  /// Bottom-sheet shown from the translate icon in the chat header. Lets
+  /// the user toggle auto-translate of incoming messages and pick which
+  /// language to translate them into. Settings are persisted per-chat.
+  Future<void> _openTranslationSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Translation',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Automatically translate the other person\'s messages '
+                      'into your preferred language. You can still tap any '
+                      'message to see the original.',
+                      style: TextStyle(
+                          color: Theme.of(sheetContext)
+                              .textTheme
+                              .bodySmall
+                              ?.color,
+                          fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Auto-translate incoming messages'),
+                      value: _autoTranslate,
+                      onChanged: (v) {
+                        setSheetState(() {});
+                        setState(() => _autoTranslate = v);
+                        _saveAutoTranslatePrefs();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: _autoTranslateTarget,
+                      decoration: const InputDecoration(
+                        labelText: 'Translate into',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        for (final lang in kTranslateLanguages)
+                          DropdownMenuItem(
+                            value: lang.code,
+                            child: Text(lang.label),
+                          ),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setSheetState(() {});
+                        setState(() => _autoTranslateTarget = v);
+                        _saveAutoTranslatePrefs();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Whether we've successfully landed at the bottom for the first batch of
+  // messages. Until this is true, "scroll to bottom" jumps (no animation)
+  // and retries on subsequent frames so layout settling can't leave us
+  // parked above the latest message.
+  bool _initialScrollDone = false;
+
+  void _scrollToBottom({bool animated = true}) {
+    if (!_scrollController.hasClients) {
+      // ListView hasn't been built yet. Try again next frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _scrollToBottom(animated: animated);
+      });
+      return;
+    }
+    final target = _scrollController.position.maxScrollExtent;
+    if (animated && _initialScrollDone) {
+>>>>>>> Stashed changes
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
@@ -379,6 +768,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                   ),
+<<<<<<< Updated upstream
+=======
+                  IconButton(
+                    tooltip: _autoTranslate
+                        ? 'Auto-translate ON ($_autoTranslateTarget)'
+                        : 'Translation settings',
+                    onPressed: _openTranslationSettings,
+                    icon: Icon(
+                      _autoTranslate ? Icons.translate : Icons.translate_outlined,
+                      color: _autoTranslate
+                          ? const Color(0xFFB05ECC)
+                          : context.textSecondary,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Shared media',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatMediaScreen(
+                            chatId: widget.chatId,
+                            chatTitle: isGroup ? groupName : widget.otherName,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.info_outline,
+                      color: context.textSecondary,
+                    ),
+                  ),
+>>>>>>> Stashed changes
                 ],
               ),
             ),
@@ -392,6 +813,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (msgs) {
                   final currentUid = _currentUid ?? '';
+                  // Re-mark seen whenever the latest message is one we
+                  // haven't acked yet — covers the case where the user is
+                  // already in the chat when the other person sends. Cheap
+                  // because markSeen short-circuits the batch write when
+                  // there's nothing new to update.
+                  if (currentUid.isNotEmpty && msgs.isNotEmpty) {
+                    final last = msgs.last;
+                    if (last.senderUid != currentUid &&
+                        !last.seenBy.contains(currentUid)) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        ref.read(chatServiceProvider).markSeen(
+                              chatId: widget.chatId,
+                              uid: currentUid,
+                            );
+                      });
+                    }
+                  }
                   if (msgs.isEmpty) {
                     return Center(
                       child: Text('Say hello!',
@@ -459,31 +897,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                         Expanded(
                           child: Container(
+<<<<<<< Updated upstream
                             padding:
                                 const EdgeInsets.symmetric(horizontal: 16),
+=======
+                            padding: const EdgeInsets.only(left: 16, right: 4),
+>>>>>>> Stashed changes
                             decoration: BoxDecoration(
                               color: context.inputFill,
                               borderRadius: BorderRadius.circular(24),
                             ),
-                            child: TextField(
-                              controller: _controller,
-                              onChanged: _onTextChanged,
-                              decoration: InputDecoration(
-                                hintText: 'Message...',
-                                hintStyle: TextStyle(
-                                    color: context.textMuted, fontSize: 14),
-                                border: InputBorder.none,
-                              ),
-                              onSubmitted: (_) => _sendMessage(),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _controller,
+                                    onChanged: _onTextChanged,
+                                    decoration: InputDecoration(
+                                      hintText: 'Message...',
+                                      hintStyle: TextStyle(
+                                          color: context.textMuted, fontSize: 14),
+                                      border: InputBorder.none,
+                                    ),
+                                    onSubmitted: (_) => _sendMessage(),
+                                  ),
+                                ),
+                                // Tap-to-dictate (speech → text in input).
+                                // Long-press to change dictation language.
+                                // Plain GestureDetector — Tooltip's internal
+                                // long-press recognizer was competing in the
+                                // arena and can swallow the tap.
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    debugPrint('[chat-stt] dict button tapped');
+                                    _toggleDictation();
+                                  },
+                                  onLongPress: _pickDictationLocale,
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      _isDictating
+                                          ? Icons.keyboard_voice
+                                          : Icons.keyboard_voice_outlined,
+                                      color: _isDictating
+                                          ? const Color(0xFFB05ECC)
+                                          : context.textSecondary,
+                                      size: 22,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                         const SizedBox(width: 4),
                         if (_controller.text.trim().isEmpty && !_uploadingVoice)
+<<<<<<< Updated upstream
                           IconButton(
                             onPressed: _toggleVoiceRecording,
                             icon: const Icon(Icons.mic_none,
                                 color: Color(0xFFB05ECC)),
+=======
+                          // Tap-to-record voice message. First tap starts
+                          // recording (the input row swaps to _RecordingBar
+                          // which has its own stop/cancel buttons). Earlier
+                          // this was a hold-to-record gesture but users
+                          // expect a single tap to immediately start.
+                          GestureDetector(
+                            onTap: _startVoiceRecording,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: const Icon(
+                                Icons.mic_none,
+                                color: Color(0xFFB05ECC),
+                                size: 24,
+                              ),
+                            ),
+>>>>>>> Stashed changes
                           )
                         else if (_uploadingVoice)
                           const Padding(
@@ -1040,6 +1537,16 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     return '$m:$s';
   }
 
+  Future<void> _seekTo(double progress) async {
+    final total = _duration;
+    if (total == null || total.inMilliseconds == 0) return;
+    final target = Duration(
+      milliseconds: (total.inMilliseconds * progress.clamp(0.0, 1.0)).round(),
+    );
+    await _player.seek(target);
+    if (mounted) setState(() => _position = target);
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = _duration ?? Duration.zero;
@@ -1051,7 +1558,7 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
         ? Colors.white.withValues(alpha: 0.35)
         : const Color(0xFFB05ECC).withValues(alpha: 0.25);
     return SizedBox(
-      width: 220,
+      width: 240,
       child: Row(
         children: [
           GestureDetector(
@@ -1069,14 +1576,12 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 4,
-                    backgroundColor: trackBg,
-                    valueColor: AlwaysStoppedAnimation(fg),
-                  ),
+                _WaveformScrubber(
+                  url: widget.url,
+                  progress: progress,
+                  fg: fg,
+                  trackBg: trackBg,
+                  onSeek: _seekTo,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1092,6 +1597,122 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
       ),
     );
   }
+}
+
+/// WhatsApp-style waveform scrubber for voice messages. We don't decode the
+/// audio file (would need a heavy native dependency), so bar heights are a
+/// deterministic pseudo-random pattern derived from the URL — same URL always
+/// gets the same waveform, so it doesn't reshuffle on rebuild and feels
+/// "real". Tapping or dragging horizontally seeks playback.
+class _WaveformScrubber extends StatelessWidget {
+  final String url;
+  final double progress;
+  final Color fg;
+  final Color trackBg;
+  final ValueChanged<double> onSeek;
+
+  const _WaveformScrubber({
+    required this.url,
+    required this.progress,
+    required this.fg,
+    required this.trackBg,
+    required this.onSeek,
+  });
+
+  static List<double> _heightsFor(String url) {
+    const barCount = 38;
+    // Stable hash → pseudo-random heights in [0.25, 1.0]
+    var seed = url.hashCode & 0x7fffffff;
+    final out = <double>[];
+    for (var i = 0; i < barCount; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      final v = (seed % 1000) / 1000.0;
+      out.add(0.25 + v * 0.75);
+    }
+    return out;
+  }
+
+  void _handleSeek(BuildContext context, Offset localPosition) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final width = box.size.width;
+    if (width <= 0) return;
+    onSeek((localPosition.dx / width).clamp(0.0, 1.0));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (innerContext) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (d) => _handleSeek(innerContext, d.localPosition),
+        onHorizontalDragUpdate: (d) =>
+            _handleSeek(innerContext, d.localPosition),
+        child: SizedBox(
+          height: 28,
+          child: CustomPaint(
+            painter: _WaveformPainter(
+              heights: _heightsFor(url),
+              progress: progress,
+              fg: fg,
+              trackBg: trackBg,
+            ),
+            size: Size.infinite,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WaveformPainter extends CustomPainter {
+  final List<double> heights;
+  final double progress;
+  final Color fg;
+  final Color trackBg;
+
+  _WaveformPainter({
+    required this.heights,
+    required this.progress,
+    required this.fg,
+    required this.trackBg,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (heights.isEmpty) return;
+    const barWidth = 2.5;
+    final gap = (size.width - barWidth * heights.length) / (heights.length - 1);
+    final centerY = size.height / 2;
+    final progressX = size.width * progress;
+
+    final activePaint = Paint()
+      ..color = fg
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = barWidth;
+    final inactivePaint = Paint()
+      ..color = trackBg
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = barWidth;
+
+    for (var i = 0; i < heights.length; i++) {
+      final x = i * (barWidth + gap) + barWidth / 2;
+      final h = heights[i] * (size.height - 4);
+      final paint = x <= progressX ? activePaint : inactivePaint;
+      canvas.drawLine(
+        Offset(x, centerY - h / 2),
+        Offset(x, centerY + h / 2),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformPainter old) =>
+      old.progress != progress ||
+      old.fg != fg ||
+      old.trackBg != trackBg ||
+      old.heights != heights;
 }
 
 class _SharedPostPreview extends StatelessWidget {
