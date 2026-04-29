@@ -162,6 +162,9 @@ class PostService {
         bLat: lat,
         bLng: lng,
       );
+      // Distance for every travel post that has place coords. The
+      // previous gate only surfaced km on exact-located posts which
+      // hid most cards in the feed.
       out.add(
         Post(
           id: base.id,
@@ -179,8 +182,8 @@ class PostService {
           postLat: lat,
           postLng: lng,
           postLocationExact: isExact,
-          travelDistanceKm: isExact ? km : null,
-          travelDistanceLabel: isExact ? _distanceLabel(km) : '',
+          travelDistanceKm: km,
+          travelDistanceLabel: _distanceLabel(km),
         ),
       );
 

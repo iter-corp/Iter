@@ -379,6 +379,17 @@ class AdminService {
     }
   }
 
-  Future<void> deleteEvent(String id) =>
-      _db.collection('events').doc(id).delete();
+  /// Delete an event and, optionally, its linked group chat. The chat
+  /// doc lives at `eventChats/{eventId}`; deleting it stops it from
+  /// surfacing in members' inboxes. We delete the doc itself; pending
+  /// messages cleanup is left to a backend trigger / TTL since
+  /// recursive subcollection deletes aren't supported client-side.
+  Future<void> deleteEvent(String id, {bool deleteChat = false}) async {
+    final batch = _db.batch();
+    batch.delete(_db.collection('events').doc(id));
+    if (deleteChat) {
+      batch.delete(_db.collection('eventChats').doc(id));
+    }
+    await batch.commit();
+  }
 }

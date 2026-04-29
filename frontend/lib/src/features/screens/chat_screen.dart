@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,7 +12,10 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:video_player/video_player.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
@@ -19,6 +23,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/block_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/event_chat_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../providers/reaction_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/reaction_service.dart';
@@ -30,6 +35,10 @@ import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
+
+/// Choices surfaced by [_MessageBubbleState._showAttachMenu]. Kept at
+/// top-level so it can be returned from the modal sheet.
+enum _AttachKind { image, video, file }
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String chatId;
@@ -63,6 +72,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isRecording = false;
   DateTime? _recordStartedAt;
   bool _uploadingVoice = false;
+  // Live transcript captured by the on-device speech recognizer while
+  // the voice message is being recorded. Saved alongside the audio
+  // URL so the receiver can read or translate the message without
+  // waiting for a server-side transcription job.
+  final stt.SpeechToText _voiceStt = stt.SpeechToText();
+  bool _voiceSttInitialized = false;
+  String _voiceTranscript = '';
 
   // Dictation (speech-to-text) state. Lets the user speak a message and
   // have it transcribed into the text field — they can edit before sending.
@@ -202,12 +218,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _pickAndSendImage() async {
-    if (_sendingImage) return;
+  /// Returns true if the current user can send media in this chat.
+  /// Centralizes the group restrictMessaging / adminOnly / mediaShare
+  /// checks so image / video / file flows all share the same gate.
+  bool _checkCanSendMedia() {
     final uid = _currentUid;
-    if (uid == null) return;
-
-    // Check group permissions first
+    if (uid == null) return false;
     try {
       final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
       if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
@@ -216,28 +232,106 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
         final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
         final isAdmin = admins.contains(uid);
-        
+
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Media sharing is disabled in this group')),
+              const SnackBar(
+                  content:
+                      Text('Media sharing is disabled in this group')),
             );
           }
-          return;
+          return false;
         }
-        
         if ((restrictMessaging || adminOnly) && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('You cannot send media in this group')),
+              const SnackBar(
+                  content: Text('You cannot send media in this group')),
             );
           }
-          return;
+          return false;
         }
       }
     } catch (e) {
       debugPrint('Error checking group permissions: $e');
     }
+    return true;
+  }
+
+  /// Bottom sheet listing the supported attachment types. Replaces the
+  /// old "tap camera = open gallery" flow so users can also send videos
+  /// and arbitrary files.
+  Future<void> _showAttachMenu() async {
+    if (_sendingImage) return;
+    if (!_checkCanSendMedia()) return;
+    final choice = await showModalBottomSheet<_AttachKind>(
+      context: context,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              leading: const Icon(Icons.image_outlined,
+                  color: Color(0xFFB05ECC)),
+              title: const Text('Photo'),
+              onTap: () => Navigator.pop(sheet, _AttachKind.image),
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam_outlined,
+                  color: Color(0xFFB05ECC)),
+              title: const Text('Video'),
+              onTap: () => Navigator.pop(sheet, _AttachKind.video),
+            ),
+            ListTile(
+              leading: const Icon(Icons.insert_drive_file_outlined,
+                  color: Color(0xFFB05ECC)),
+              title: const Text('File'),
+              subtitle: const Text(
+                'PDF, document, archive, …',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () => Navigator.pop(sheet, _AttachKind.file),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    switch (choice) {
+      case _AttachKind.image:
+        await _pickAndSendImage();
+        break;
+      case _AttachKind.video:
+        await _pickAndSendVideo();
+        break;
+      case _AttachKind.file:
+        await _pickAndSendFile();
+        break;
+      case null:
+        return;
+    }
+  }
+
+  Future<void> _pickAndSendImage() async {
+    if (_sendingImage) return;
+    final uid = _currentUid;
+    if (uid == null || !_checkCanSendMedia()) return;
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -271,6 +365,111 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     } finally {
       if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
+  Future<void> _pickAndSendVideo() async {
+    if (_sendingImage) return;
+    final uid = _currentUid;
+    if (uid == null || !_checkCanSendMedia()) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 5),
+    );
+    if (picked == null) return;
+
+    setState(() => _sendingImage = true);
+    try {
+      final url = await StorageService()
+          .uploadChatVideo(File(picked.path), widget.chatId);
+      final reply = _replyTarget;
+      setState(() => _replyTarget = null);
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: '',
+            videoUrl: url,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Video upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
+  Future<void> _pickAndSendFile() async {
+    if (_sendingImage) return;
+    final uid = _currentUid;
+    if (uid == null || !_checkCanSendMedia()) return;
+
+    final result = await FilePicker.platform.pickFiles(withData: false);
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.first;
+    final path = picked.path;
+    if (path == null) return;
+
+    setState(() => _sendingImage = true);
+    try {
+      final file = File(path);
+      final url =
+          await StorageService().uploadChatFile(file, widget.chatId);
+      final reply = _replyTarget;
+      setState(() => _replyTarget = null);
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: '',
+            fileUrl: url,
+            fileName: picked.name,
+            fileMimeType: _mimeFromName(picked.name),
+            fileSizeBytes: picked.size,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('File upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
+  static String? _mimeFromName(String name) {
+    final dot = name.lastIndexOf('.');
+    if (dot < 0) return null;
+    final ext = name.substring(dot + 1).toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'txt':
+        return 'text/plain';
+      case 'zip':
+        return 'application/zip';
+      default:
+        return 'application/octet-stream';
     }
   }
 
@@ -326,10 +525,58 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       const RecordConfig(encoder: AudioEncoder.aacLc),
       path: path,
     );
+    // Best-effort live transcription. Both the recorder and the
+    // speech recognizer want the mic, so on platforms where the
+    // recognizer can't piggyback we just fall through with an empty
+    // transcript — the audio still uploads fine.
+    _voiceTranscript = '';
+    unawaited(_startVoiceTranscription());
     setState(() {
       _isRecording = true;
       _recordStartedAt = DateTime.now();
     });
+  }
+
+  Future<void> _startVoiceTranscription() async {
+    try {
+      if (!_voiceSttInitialized) {
+        _voiceSttInitialized = await _voiceStt.initialize(
+          onError: (e) =>
+              debugPrint('[chat-voice-stt] init error: ${e.errorMsg}'),
+        );
+      }
+      if (!_voiceSttInitialized) return;
+      // Match the user's preferred language so the recognizer picks
+      // the right model. Fallback locale = device default.
+      final lang = ref.read(preferredLanguageProvider);
+      final localeId = _localeIdForLang(lang);
+      await _voiceStt.listen(
+        localeId: localeId,
+        listenOptions: stt.SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: false,
+          listenMode: stt.ListenMode.dictation,
+        ),
+        listenFor: const Duration(minutes: 5),
+        pauseFor: const Duration(seconds: 6),
+        onResult: (result) {
+          _voiceTranscript = result.recognizedWords;
+        },
+      );
+    } catch (e) {
+      debugPrint('[chat-voice-stt] start failed: $e');
+    }
+  }
+
+  /// Map a BCP-47 translate code to a speech-to-text locale id. The
+  /// translate list uses short codes ("en"); the recognizer needs the
+  /// full locale ("en_US"). Falls back to null (device default) for
+  /// codes we don't have a mapping for.
+  String? _localeIdForLang(String code) {
+    for (final l in kTranslateLanguages) {
+      if (l.code == code && l.stt != null) return l.stt;
+    }
+    return null;
   }
 
   Future<void> _stopAndSendVoiceRecording() async {
@@ -346,8 +593,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
-    // Stop recording.
+    // Stop recording + the live transcript recognizer.
     final path = await _recorder.stop();
+    try {
+      if (_voiceStt.isListening) await _voiceStt.stop();
+    } catch (_) {}
+    final transcript = _voiceTranscript.trim();
     final startedAt = _recordStartedAt;
     setState(() {
       _isRecording = false;
@@ -435,6 +686,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             text: '',
             voiceUrl: url,
             voiceDurationMs: durationMs,
+            voiceTranscript: transcript.isEmpty ? null : transcript,
             replyToId: reply?.id,
             replyToText: reply == null ? null : _previewOf(reply),
             replyToSenderUid: reply?.senderUid,
@@ -461,6 +713,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _cancelRecording() async {
     if (!_isRecording) return;
     final path = await _recorder.stop();
+    try {
+      if (_voiceStt.isListening) await _voiceStt.stop();
+    } catch (_) {}
+    _voiceTranscript = '';
     setState(() {
       _isRecording = false;
       _recordStartedAt = null;
@@ -1033,7 +1289,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   : Row(
                       children: [
                         IconButton(
-                          onPressed: _sendingImage ? null : _pickAndSendImage,
+                          tooltip: 'Attach',
+                          onPressed: _sendingImage ? null : _showAttachMenu,
                           icon: _sendingImage
                               ? const SizedBox(
                                   width: 20,
@@ -1041,7 +1298,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2, color: Color(0xFFB05ECC)),
                                 )
-                              : Icon(Icons.camera_alt_outlined,
+                              : Icon(Icons.attach_file,
                                   color: context.textSecondary),
                         ),
                         Expanded(
@@ -1095,41 +1352,79 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        if (_controller.text.trim().isEmpty && !_uploadingVoice)
-                          // Tap-to-record voice message. First tap starts
-                          // recording (the input row swaps to _RecordingBar
-                          // which has its own stop / cancel buttons).
-                          GestureDetector(
-                            onTap: _startVoiceRecording,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(24),
+                        // Voice ↔ Send morph. We watch the input controller
+                        // so the button swaps the moment the user starts /
+                        // stops typing instead of waiting for the next
+                        // unrelated rebuild. AnimatedSwitcher gives a soft
+                        // scale+rotate crossfade, and the wrapping circle
+                        // also fills with purple when "send" appears so the
+                        // change reads as a single fluid morph.
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _controller,
+                          builder: (context, value, _) {
+                            final hasText = value.text.trim().isNotEmpty;
+                            if (_uploadingVoice) {
+                              return const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFFB05ECC)),
+                                ),
+                              );
+                            }
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: hasText
+                                  ? _sendMessage
+                                  : _startVoiceRecording,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOutCubic,
+                                width: 44,
+                                height: 44,
+                                margin: const EdgeInsets.all(4),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: hasText
+                                      ? const Color(0xFFB05ECC)
+                                      : Colors.transparent,
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration:
+                                      const Duration(milliseconds: 220),
+                                  switchInCurve: Curves.easeOutBack,
+                                  switchOutCurve: Curves.easeIn,
+                                  transitionBuilder: (child, animation) {
+                                    return ScaleTransition(
+                                      scale: animation,
+                                      child: RotationTransition(
+                                        turns: Tween<double>(
+                                                begin: 0.75, end: 1.0)
+                                            .animate(animation),
+                                        child: FadeTransition(
+                                          opacity: animation,
+                                          child: child,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Icon(
+                                    hasText ? Icons.send : Icons.mic_none,
+                                    key: ValueKey(hasText),
+                                    color: hasText
+                                        ? Colors.white
+                                        : const Color(0xFFB05ECC),
+                                    size: 22,
+                                  ),
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.mic_none,
-                                color: Color(0xFFB05ECC),
-                                size: 24,
-                              ),
-                            ),
-                          )
-                        else if (_uploadingVoice)
-                          const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Color(0xFFB05ECC)),
-                            ),
-                          )
-                        else
-                          IconButton(
-                            onPressed: _sendMessage,
-                            icon: const Icon(Icons.send,
-                                color: Color(0xFFB05ECC)),
-                          ),
+                            );
+                          },
+                        ),
                       ],
                     ),
             ),
@@ -1562,7 +1857,35 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                               durationMs: msg.voiceDurationMs,
                               isMe: isMe,
                             )
-                          else if (msg.sharedPostId != null &&
+                          else if (msg.videoUrl != null &&
+                              msg.videoUrl!.isNotEmpty) ...[
+                            _VideoMessageBubble(url: msg.videoUrl!),
+                            if (msg.text.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              _buildBody(
+                                textColor: isMe
+                                    ? Colors.white
+                                    : context.textPrimary,
+                              ),
+                            ],
+                          ] else if (msg.fileUrl != null &&
+                              msg.fileUrl!.isNotEmpty) ...[
+                            _FileMessageBubble(
+                              url: msg.fileUrl!,
+                              fileName: msg.fileName ?? 'Attachment',
+                              mimeType: msg.fileMimeType,
+                              sizeBytes: msg.fileSizeBytes,
+                              isMe: isMe,
+                            ),
+                            if (msg.text.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              _buildBody(
+                                textColor: isMe
+                                    ? Colors.white
+                                    : context.textPrimary,
+                              ),
+                            ],
+                          ] else if (msg.sharedPostId != null &&
                               msg.sharedPostId!.isNotEmpty)
                             _SharedPostPreview(
                               postId: msg.sharedPostId!,
@@ -1730,6 +2053,241 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                 Navigator.pop(sheet);
                 onReply();
               },
+            ),
+            // Translate to the user's preferred language. Falls back to
+            // English when the user hasn't set one yet (handled by the
+            // preferredLanguageProvider default).
+            if (msg.text.trim().isNotEmpty)
+              Consumer(
+                builder: (context, sheetRef, _) {
+                  final target = sheetRef.watch(preferredLanguageProvider);
+                  return ListTile(
+                    leading: const Icon(Icons.translate),
+                    title: Text('Translate to ${target.toUpperCase()}'),
+                    subtitle: Text(
+                      'Change in Settings → Preferred language',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      _showTranslationSheet(
+                        context,
+                        text: msg.text,
+                        target: target,
+                      );
+                    },
+                  );
+                },
+              ),
+            // Voice message options. Transcript is captured on the
+            // sender's device when the recording starts; if it's
+            // missing (mic contention, language unsupported, etc.) we
+            // still offer the entry but flag it as unavailable.
+            if (msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty) ...[
+              ListTile(
+                leading: const Icon(Icons.subtitles_outlined),
+                title: const Text('Show transcript'),
+                subtitle:
+                    (msg.voiceTranscript ?? '').trim().isEmpty
+                        ? const Text(
+                            'Transcript unavailable for this message',
+                            style: TextStyle(fontSize: 11),
+                          )
+                        : null,
+                enabled: (msg.voiceTranscript ?? '').trim().isNotEmpty,
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _showVoiceTranscriptSheet(
+                    context,
+                    transcript: msg.voiceTranscript ?? '',
+                  );
+                },
+              ),
+              if ((msg.voiceTranscript ?? '').trim().isNotEmpty)
+                Consumer(
+                  builder: (context, sheetRef, _) {
+                    final target = sheetRef.watch(preferredLanguageProvider);
+                    return ListTile(
+                      leading: const Icon(Icons.translate),
+                      title: Text(
+                          'Translate voice to ${target.toUpperCase()}'),
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        _showTranslationSheet(
+                          context,
+                          text: msg.voiceTranscript!,
+                          target: target,
+                        );
+                      },
+                    );
+                  },
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTranslationSheet(
+    BuildContext context, {
+    required String text,
+    required String target,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _MessageTranslationSheet(text: text, target: target),
+    );
+  }
+
+  Future<void> _showVoiceTranscriptSheet(
+    BuildContext context, {
+    required String transcript,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.subtitles_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Voice transcript',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                transcript,
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom-sheet that translates a message into the user's preferred
+/// language. Read-only — for changing the language the user goes to
+/// Settings → Preferred language.
+class _MessageTranslationSheet extends StatefulWidget {
+  final String text;
+  final String target;
+  const _MessageTranslationSheet({
+    required this.text,
+    required this.target,
+  });
+
+  @override
+  State<_MessageTranslationSheet> createState() =>
+      _MessageTranslationSheetState();
+}
+
+class _MessageTranslationSheetState extends State<_MessageTranslationSheet> {
+  String? _translated;
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _translate();
+  }
+
+  Future<void> _translate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: widget.text,
+        sourceLang: 'auto',
+        targetLang: widget.target,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = TranslateService.userFriendlyErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Translation (${widget.target.toUpperCase()})',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else
+              SelectableText(
+                _translated ?? '',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
             ),
           ],
         ),
@@ -2310,6 +2868,332 @@ class _StoryReplyBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Video message bubble — inline thumbnail + tap-to-play sheet.
+// ─────────────────────────────────────────────
+
+class _VideoMessageBubble extends StatefulWidget {
+  final String url;
+  const _VideoMessageBubble({required this.url});
+
+  @override
+  State<_VideoMessageBubble> createState() => _VideoMessageBubbleState();
+}
+
+class _VideoMessageBubbleState extends State<_VideoMessageBubble> {
+  VideoPlayerController? _ctrl;
+  bool _initFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
+  }
+
+  Future<void> _initController() async {
+    try {
+      final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      await c.initialize();
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
+      setState(() => _ctrl = c);
+    } catch (e) {
+      debugPrint('[chat-video] init failed: $e');
+      if (mounted) setState(() => _initFailed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = _ctrl;
+    return GestureDetector(
+      onTap: () => _openFullScreen(context),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 240,
+          height: 180,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (ctrl != null && ctrl.value.isInitialized)
+                FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: ctrl.value.size.width,
+                    height: ctrl.value.size.height,
+                    child: VideoPlayer(ctrl),
+                  ),
+                )
+              else
+                Container(color: Colors.black.withValues(alpha: 0.55)),
+              if (_initFailed)
+                const Center(
+                  child: Icon(Icons.broken_image,
+                      color: Colors.white70, size: 36),
+                )
+              else
+                const Center(
+                  child: Icon(
+                    Icons.play_circle_fill,
+                    color: Colors.white,
+                    size: 56,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openFullScreen(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _VideoFullscreenScreen(url: widget.url),
+      ),
+    );
+  }
+}
+
+class _VideoFullscreenScreen extends StatefulWidget {
+  final String url;
+  const _VideoFullscreenScreen({required this.url});
+
+  @override
+  State<_VideoFullscreenScreen> createState() =>
+      _VideoFullscreenScreenState();
+}
+
+class _VideoFullscreenScreenState extends State<_VideoFullscreenScreen> {
+  VideoPlayerController? _ctrl;
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    await c.initialize();
+    if (!mounted) {
+      await c.dispose();
+      return;
+    }
+    setState(() => _ctrl = c);
+    await c.play();
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _ctrl;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: GestureDetector(
+        onTap: () => setState(() => _showControls = !_showControls),
+        child: Center(
+          child: c == null || !c.value.isInitialized
+              ? const CircularProgressIndicator(color: Colors.white)
+              : Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: c.value.aspectRatio,
+                      child: VideoPlayer(c),
+                    ),
+                    if (_showControls)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        child: Center(
+                          child: IconButton(
+                            iconSize: 64,
+                            color: Colors.white,
+                            icon: Icon(c.value.isPlaying
+                                ? Icons.pause_circle_filled
+                                : Icons.play_circle_filled),
+                            onPressed: () {
+                              setState(() {
+                                c.value.isPlaying ? c.pause() : c.play();
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    if (_showControls)
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        bottom: 24,
+                        child: VideoProgressIndicator(
+                          c,
+                          allowScrubbing: true,
+                          colors: const VideoProgressColors(
+                            playedColor: Color(0xFFB05ECC),
+                            bufferedColor: Colors.white24,
+                            backgroundColor: Colors.white12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// File attachment bubble — name + size, tap to download & open.
+// ─────────────────────────────────────────────
+
+class _FileMessageBubble extends StatefulWidget {
+  final String url;
+  final String fileName;
+  final String? mimeType;
+  final int? sizeBytes;
+  final bool isMe;
+
+  const _FileMessageBubble({
+    required this.url,
+    required this.fileName,
+    this.mimeType,
+    this.sizeBytes,
+    required this.isMe,
+  });
+
+  @override
+  State<_FileMessageBubble> createState() => _FileMessageBubbleState();
+}
+
+class _FileMessageBubbleState extends State<_FileMessageBubble> {
+  bool _opening = false;
+
+  Future<void> _open() async {
+    if (_opening) return;
+    setState(() => _opening = true);
+    try {
+      final dir = await getTemporaryDirectory();
+      final safeName = widget.fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final path = '${dir.path}/$safeName';
+      final file = File(path);
+      if (!await file.exists()) {
+        final res = await http.get(Uri.parse(widget.url));
+        if (res.statusCode != 200) {
+          throw Exception('HTTP ${res.statusCode}');
+        }
+        await file.writeAsBytes(res.bodyBytes);
+      }
+      final result = await OpenFilex.open(path, type: widget.mimeType);
+      if (result.type != ResultType.done) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Open failed: ${result.message}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Open failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  String _formatSize(int? bytes) {
+    if (bytes == null || bytes <= 0) return '';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.isMe ? Colors.white : context.textPrimary;
+    final fgMuted =
+        widget.isMe ? Colors.white.withValues(alpha: 0.8) : context.textSecondary;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: GestureDetector(
+        onTap: _open,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: widget.isMe
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : context.purpleSoft,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: _opening
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Icon(
+                      Icons.insert_drive_file_outlined,
+                      color: widget.isMe ? Colors.white : AppColors.purple,
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_formatSize(widget.sizeBytes).isNotEmpty)
+                    Text(
+                      _formatSize(widget.sizeBytes),
+                      style: TextStyle(color: fgMuted, fontSize: 11),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

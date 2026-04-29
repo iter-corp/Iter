@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
+import 'profile_settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -224,6 +225,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()),
+    );
+  }
+
+  // ignore: unused_element
+  void _legacyShowSettings(BuildContext context) {
     final isAdmin = ref.read(isAdminProvider);
     showModalBottomSheet(
       context: context,

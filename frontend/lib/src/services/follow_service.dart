@@ -15,6 +15,12 @@ class FollowService {
   CollectionReference<Map<String, dynamic>> _followingCol(String uid) =>
       _userDoc(uid).collection('following');
 
+  /// Deterministic notification doc id for a follow event between two
+  /// users. Guarantees a single notification doc per (actor, target)
+  /// pair so we don't pile up duplicates when the user follows /
+  /// unfollows / refollows.
+  String _followNotifId(String actorUid) => 'follow_$actorUid';
+
   Future<void> follow({
     required String currentUid,
     required String targetUid,
@@ -24,7 +30,7 @@ class FollowService {
 
     final now = FieldValue.serverTimestamp();
     final status = isPrivate ? 'pending' : 'active';
-    
+
     final followingRef = _followingCol(currentUid).doc(targetUid);
     final followerRef = _followersCol(targetUid).doc(currentUid);
 
@@ -35,8 +41,13 @@ class FollowService {
 
     if (!isPrivate) {
       try {
-        await _notifications.createNotification(
+        // upsert by deterministic id so a follow → unfollow → follow
+        // cycle doesn't pile up notification rows. The unfollow path
+        // below also removes this id, so the badge clears when the
+        // relationship goes away.
+        await _notifications.upsertNotification(
           targetUid: targetUid,
+          docId: _followNotifId(currentUid),
           type: 'follow',
           actorUid: currentUid,
         );
@@ -60,6 +71,18 @@ class FollowService {
     batch.delete(followingRef);
     batch.delete(followerRef);
     await batch.commit();
+
+    // Clear the matching follow notification on the target's side so
+    // the receiver doesn't see a stale entry pointing at a follow that
+    // no longer exists. Best-effort — security rules might forbid us
+    // from touching the target's notifications subcollection on some
+    // configs, in which case the entry stays put until next visit.
+    try {
+      await _notifications.removeNotificationById(
+        targetUid,
+        _followNotifId(currentUid),
+      );
+    } catch (_) {}
   }
 
   Future<void> acceptFollowRequest({

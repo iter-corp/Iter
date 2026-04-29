@@ -9,9 +9,18 @@ class ChatMessage {
   final String senderUid;
   final String text;
   final String? imageUrl;
+  final String? videoUrl;
+  final String? fileUrl;
+  final String? fileName;
+  final String? fileMimeType;
+  final int? fileSizeBytes;
   final String? sharedPostId;
   final String? voiceUrl;
   final int? voiceDurationMs;
+  /// Live transcript captured on the sender's device while recording
+  /// the voice message. Lets the receiver read or translate the audio
+  /// without round-tripping through a backend transcription job.
+  final String? voiceTranscript;
   final String? replyToId;
   final String? replyToText;
   final String? replyToSenderUid;
@@ -29,9 +38,15 @@ class ChatMessage {
     required this.senderUid,
     required this.text,
     this.imageUrl,
+    this.videoUrl,
+    this.fileUrl,
+    this.fileName,
+    this.fileMimeType,
+    this.fileSizeBytes,
     this.sharedPostId,
     this.voiceUrl,
     this.voiceDurationMs,
+    this.voiceTranscript,
     this.replyToId,
     this.replyToText,
     this.replyToSenderUid,
@@ -48,9 +63,15 @@ class ChatMessage {
       senderUid: (d['senderUid'] as String?) ?? '',
       text: (d['text'] as String?) ?? '',
       imageUrl: d['imageUrl'] as String?,
+      videoUrl: d['videoUrl'] as String?,
+      fileUrl: d['fileUrl'] as String?,
+      fileName: d['fileName'] as String?,
+      fileMimeType: d['fileMimeType'] as String?,
+      fileSizeBytes: (d['fileSizeBytes'] as num?)?.toInt(),
       sharedPostId: d['sharedPostId'] as String?,
       voiceUrl: d['voiceUrl'] as String?,
       voiceDurationMs: (d['voiceDurationMs'] as num?)?.toInt(),
+      voiceTranscript: d['voiceTranscript'] as String?,
       replyToId: d['replyToId'] as String?,
       replyToText: d['replyToText'] as String?,
       replyToSenderUid: d['replyToSenderUid'] as String?,
@@ -236,9 +257,15 @@ class ChatService {
     required String receiverUid,
     required String text,
     String? imageUrl,
+    String? videoUrl,
+    String? fileUrl,
+    String? fileName,
+    String? fileMimeType,
+    int? fileSizeBytes,
     String? sharedPostId,
     String? voiceUrl,
     int? voiceDurationMs,
+    String? voiceTranscript,
     String? replyToId,
     String? replyToText,
     String? replyToSenderUid,
@@ -247,10 +274,20 @@ class ChatService {
   }) async {
     final trimmedText = text.trim();
     final normalizedImageUrl = imageUrl?.trim();
+    final normalizedVideoUrl = videoUrl?.trim();
+    final normalizedFileUrl = fileUrl?.trim();
+    final normalizedFileName = fileName?.trim();
     final normalizedSharedPostId = sharedPostId?.trim();
     final normalizedVoiceUrl = voiceUrl?.trim();
+    final normalizedVoiceTranscript = voiceTranscript?.trim();
     final normalizedStoryId = storyId?.trim();
     final normalizedStoryImageUrl = storyImageUrl?.trim();
+    final hasImage =
+        normalizedImageUrl != null && normalizedImageUrl.isNotEmpty;
+    final hasVideo =
+        normalizedVideoUrl != null && normalizedVideoUrl.isNotEmpty;
+    final hasFile =
+        normalizedFileUrl != null && normalizedFileUrl.isNotEmpty;
     final hasSharedPost =
         normalizedSharedPostId != null && normalizedSharedPostId.isNotEmpty;
     final hasVoice =
@@ -258,7 +295,9 @@ class ChatService {
     final hasStoryRef =
         normalizedStoryId != null && normalizedStoryId.isNotEmpty;
     if (trimmedText.isEmpty &&
-        (normalizedImageUrl == null || normalizedImageUrl.isEmpty) &&
+        !hasImage &&
+        !hasVideo &&
+        !hasFile &&
         !hasSharedPost &&
         !hasVoice &&
         !hasStoryRef) {
@@ -286,19 +325,36 @@ class ChatService {
             ? 'Shared a post'
             : hasVoice
                 ? 'Voice message'
-                : (normalizedImageUrl?.isNotEmpty ?? false)
-                    ? 'Sent a photo'
-                    : '';
+                : hasVideo
+                    ? 'Sent a video'
+                    : hasFile
+                        ? 'Sent a file'
+                        : hasImage
+                            ? 'Sent a photo'
+                            : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,
       if (!isGroup) 'receiverUid': receiverUid,
       'text': trimmedText,
       'imageUrl': normalizedImageUrl,
+      if (hasVideo) 'videoUrl': normalizedVideoUrl,
+      if (hasFile) 'fileUrl': normalizedFileUrl,
+      if (hasFile &&
+          normalizedFileName != null &&
+          normalizedFileName.isNotEmpty)
+        'fileName': normalizedFileName,
+      if (hasFile && fileMimeType != null && fileMimeType.isNotEmpty)
+        'fileMimeType': fileMimeType,
+      if (hasFile && fileSizeBytes != null) 'fileSizeBytes': fileSizeBytes,
       if (hasSharedPost) 'sharedPostId': normalizedSharedPostId,
       if (hasVoice) 'voiceUrl': normalizedVoiceUrl,
       if (hasVoice && voiceDurationMs != null)
         'voiceDurationMs': voiceDurationMs,
+      if (hasVoice &&
+          normalizedVoiceTranscript != null &&
+          normalizedVoiceTranscript.isNotEmpty)
+        'voiceTranscript': normalizedVoiceTranscript,
       if (replyToId != null && replyToId.isNotEmpty) 'replyToId': replyToId,
       if (replyToText != null && replyToText.isNotEmpty)
         'replyToText': replyToText,

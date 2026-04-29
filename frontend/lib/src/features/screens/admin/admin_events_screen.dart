@@ -93,30 +93,97 @@ class AdminEventsScreen extends ConsumerWidget {
 
   Future<void> _confirmDelete(
       BuildContext context, WidgetRef ref, String id) async {
-    final ok = await showDialog<bool>(
+    final result = await showDialog<_DeleteEventChoice>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete event?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red))),
-        ],
-      ),
+      builder: (_) => const _DeleteEventDialog(),
     );
-    if (ok == true) {
-      try {
-        await ref.read(adminServiceProvider).deleteEvent(id);
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Failed: $e')));
-        }
+    if (result == null || !result.confirmed) return;
+    try {
+      await ref.read(adminServiceProvider).deleteEvent(
+            id,
+            deleteChat: result.alsoDeleteChat,
+          );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     }
+  }
+}
+
+/// Outcome of [_DeleteEventDialog].
+class _DeleteEventChoice {
+  final bool confirmed;
+  final bool alsoDeleteChat;
+  const _DeleteEventChoice({
+    required this.confirmed,
+    required this.alsoDeleteChat,
+  });
+}
+
+class _DeleteEventDialog extends StatefulWidget {
+  const _DeleteEventDialog();
+
+  @override
+  State<_DeleteEventDialog> createState() => _DeleteEventDialogState();
+}
+
+class _DeleteEventDialogState extends State<_DeleteEventDialog> {
+  bool _alsoDeleteChat = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Delete event?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'This permanently removes the event for everyone.',
+          ),
+          const SizedBox(height: 8),
+          CheckboxListTile(
+            value: _alsoDeleteChat,
+            onChanged: (v) =>
+                setState(() => _alsoDeleteChat = v ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Also delete the event group chat'),
+            subtitle: const Text(
+              'Members lose access to its messages and media.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(
+            context,
+            const _DeleteEventChoice(
+              confirmed: false,
+              alsoDeleteChat: false,
+            ),
+          ),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _DeleteEventChoice(
+              confirmed: true,
+              alsoDeleteChat: _alsoDeleteChat,
+            ),
+          ),
+          child: const Text(
+            'Delete',
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      ],
+    );
   }
 }
 
