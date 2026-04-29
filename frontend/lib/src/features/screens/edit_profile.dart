@@ -19,7 +19,18 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
-  final _genderController = TextEditingController();
+  // Gender is no longer free-text — picked from a fixed list. Stored as
+  // null when the user selects "Prefer not to say" so we don't put a
+  // synthetic value into Firestore.
+  String? _gender;
+
+  static const List<String> _genderOptions = [
+    'Female',
+    'Male',
+    'Non-binary',
+    'Other',
+    'Prefer not to say',
+  ];
 
   bool _initialized = false;
   bool _saving = false;
@@ -32,7 +43,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void dispose() {
     _usernameController.dispose();
     _bioController.dispose();
-    _genderController.dispose();
     super.dispose();
   }
 
@@ -40,7 +50,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (_initialized) return;
     _usernameController.text = (user['username'] as String?) ?? '';
     _bioController.text = (user['bio'] as String?) ?? '';
-    _genderController.text = (user['gender'] as String?) ?? '';
+    final raw = (user['gender'] as String?)?.trim() ?? '';
+    if (raw.isEmpty) {
+      _gender = null;
+    } else {
+      // Match case-insensitively against the canonical option set.
+      final match = _genderOptions.firstWhere(
+        (g) => g.toLowerCase() == raw.toLowerCase(),
+        orElse: () => 'Other',
+      );
+      _gender = match;
+    }
     _avatarUrl = user['avatarUrl'] as String?;
     _coverUrl = user['coverUrl'] as String?;
     _initialized = true;
@@ -103,13 +123,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username can\'t be empty')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       final uid = ref.read(authServiceProvider).currentUser!.uid;
+      // "Prefer not to say" / null both write an empty string so the
+      // field exists in Firestore but doesn't surface anywhere.
+      final genderToSave =
+          (_gender == null || _gender == 'Prefer not to say') ? '' : _gender!;
       await ref.read(userServiceProvider).updateUser(uid, {
-        'username': _usernameController.text.trim(),
+        'username': username,
         'bio': _bioController.text.trim(),
-        'gender': _genderController.text.trim(),
+        'gender': genderToSave,
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -139,90 +171,54 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             _hydrate(user);
             return Column(
               children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back, size: 22),
-                      ),
-                      const Text(
-                        "Edit profile",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
+                _Header(
+                  saving: _saving,
+                  onBack: () => Navigator.pop(context),
+                  onSave: _save,
                 ),
                 Expanded(
                   child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 32),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // COVER + AVATAR composite
                         _buildCoverAndAvatar(),
                         const SizedBox(height: 56),
-                        GestureDetector(
+                        _CenterEditLink(
+                          label: 'Change profile photo',
                           onTap: _pickAndUploadAvatar,
-                          child: const Text(
-                            "Edit picture",
-                            style: TextStyle(
-                              color: Color(0xFFB05ECC),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
                         ),
                         const SizedBox(height: 4),
-                        GestureDetector(
+                        _CenterEditLink(
+                          label: 'Change cover image',
                           onTap: _pickAndUploadCover,
-                          child: const Text(
-                            "Edit cover",
-                            style: TextStyle(
-                              color: Color(0xFFB05ECC),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildField("Username", _usernameController),
-                        _buildField("Bio", _bioController, maxLines: 3),
-                        _buildField("Gender", _genderController),
-                        const SizedBox(height: 32),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: _saving ? null : _save,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFB05ECC),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-                              child: _saving
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                          color: Colors.white, strokeWidth: 2),
-                                    )
-                                  : const Text(
-                                      "Save",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                            ),
-                          ),
                         ),
                         const SizedBox(height: 24),
+                        const _SectionLabel(text: 'About you'),
+                        _LabeledInput(
+                          label: 'Username',
+                          icon: Icons.alternate_email,
+                          controller: _usernameController,
+                          hint: 'username',
+                          maxLength: 24,
+                        ),
+                        _LabeledInput(
+                          label: 'Bio',
+                          icon: Icons.short_text,
+                          controller: _bioController,
+                          hint: 'Tell people a little about you',
+                          maxLines: 4,
+                          maxLength: 160,
+                        ),
+                        _LabeledDropdown(
+                          label: 'Gender',
+                          icon: Icons.person_outline,
+                          value: _gender,
+                          options: _genderOptions,
+                          onChanged: (v) => setState(() => _gender = v),
+                          hint: 'Select gender',
+                        ),
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
@@ -241,7 +237,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Cover
           GestureDetector(
             onTap: _pickAndUploadCover,
             child: Container(
@@ -258,6 +253,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               child: Stack(
                 children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.18),
+                        ],
+                      ),
+                    ),
+                  ),
                   if (_uploadingCover)
                     const Center(
                       child: CircularProgressIndicator(
@@ -272,7 +279,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         color: Colors.black.withValues(alpha: 0.45),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt_outlined,
+                      child: const Icon(Icons.photo_camera_outlined,
                           color: Colors.white, size: 16),
                     ),
                   ),
@@ -280,7 +287,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
             ),
           ),
-          // Avatar
           Positioned(
             bottom: 0,
             left: 0,
@@ -289,10 +295,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               child: GestureDetector(
                 onTap: _pickAndUploadAvatar,
                 child: Container(
-                  padding: const EdgeInsets.all(3),
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: context.cardBg,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Stack(
                     alignment: Alignment.center,
@@ -313,6 +326,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           color: Color(0xFFB05ECC),
                           strokeWidth: 2.5,
                         ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFB05ECC),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: context.cardBg, width: 2),
+                          ),
+                          child: const Icon(Icons.edit,
+                              color: Colors.white, size: 14),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -323,27 +352,278 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
     );
   }
+}
 
-  Widget _buildField(String hint, TextEditingController controller,
-      {int maxLines = 1}) {
+class _Header extends StatelessWidget {
+  final bool saving;
+  final VoidCallback onBack;
+  final VoidCallback onSave;
+
+  const _Header({
+    required this.saving,
+    required this.onBack,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back, size: 22),
+          ),
+          const Expanded(
+            child: Text(
+              'Edit profile',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+          ),
+          TextButton(
+            onPressed: saving ? null : onSave,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFB05ECC),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Color(0xFFB05ECC),
+                    ),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class _CenterEditLink extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _CenterEditLink({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFB05ECC),
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: context.textSecondary,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+class _LabeledInput extends StatelessWidget {
+  final String label;
+  final String hint;
+  final IconData icon;
+  final TextEditingController controller;
+  final int maxLines;
+  final int? maxLength;
+
+  const _LabeledInput({
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.controller,
+    this.maxLines = 1,
+    this.maxLength,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
       child: Container(
         decoration: BoxDecoration(
           color: context.cardBg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: context.borderColor.withValues(alpha: 0.6), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: TextField(
-          controller: controller,
-          maxLines: maxLines,
-          style: TextStyle(fontSize: 14, color: context.textPrimary),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: context.textMuted, fontSize: 14),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: InputBorder.none,
-          ),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon,
+                    size: 16, color: const Color(0xFFB05ECC)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            TextField(
+              controller: controller,
+              maxLines: maxLines,
+              maxLength: maxLength,
+              style: TextStyle(
+                fontSize: 15,
+                color: context.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle:
+                    TextStyle(color: context.textMuted, fontSize: 14),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 6),
+                border: InputBorder.none,
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LabeledDropdown extends StatelessWidget {
+  final String label;
+  final String hint;
+  final IconData icon;
+  final String? value;
+  final List<String> options;
+  final ValueChanged<String?> onChanged;
+
+  const _LabeledDropdown({
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: context.borderColor.withValues(alpha: 0.6), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: const Color(0xFFB05ECC)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: value,
+              isExpanded: true,
+              icon: Icon(Icons.keyboard_arrow_down_rounded,
+                  color: context.textSecondary),
+              style: TextStyle(
+                fontSize: 15,
+                color: context.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle:
+                    TextStyle(color: context.textMuted, fontSize: 14),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 8),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+              items: [
+                for (final opt in options)
+                  DropdownMenuItem(
+                    value: opt,
+                    child: Text(opt),
+                  ),
+              ],
+              onChanged: onChanged,
+            ),
+          ],
         ),
       ),
     );

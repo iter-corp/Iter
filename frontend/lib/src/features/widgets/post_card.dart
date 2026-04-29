@@ -14,6 +14,7 @@ import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
 import '../screens/user_screen.dart';
+import 'location_map.dart';
 
 class PostCard extends ConsumerStatefulWidget {
   final Post post;
@@ -273,22 +274,55 @@ class _PostCardState extends ConsumerState<PostCard> {
                         if (widget.travelMode &&
                             travelPlace != null &&
                             travelPlace.isNotEmpty)
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 11,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                travelPlace,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 11,
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              final lat = post.postLat;
+                              final lng = post.postLng;
+                              if (lat == null || lng == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => LocationMapScreen(
+                                    lat: lat,
+                                    lng: lng,
+                                    label: travelPlace,
+                                    subtitle: post.postPlaceCity,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 11,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  travelPlace,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 11,
+                                    decoration: post.postLat != null &&
+                                            post.postLng != null
+                                        ? TextDecoration.underline
+                                        : null,
+                                    decorationColor:
+                                        Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                if (post.postLat != null &&
+                                    post.postLng != null) ...[
+                                  const SizedBox(width: 3),
+                                  const Icon(
+                                    Icons.map_outlined,
+                                    size: 11,
+                                    color: Colors.white,
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                       ],
                     ),

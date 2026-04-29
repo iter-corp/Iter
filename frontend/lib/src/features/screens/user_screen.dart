@@ -8,6 +8,7 @@ import '../../providers/block_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/profile_visitor_providers.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/user_profile_widget.dart';
@@ -31,6 +32,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   int selectedTab = 0;
   bool _followBusy = false;
   bool _messageBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Log a profile visit on the next frame so the owner can see who's
+    // looked at their profile (and how recently). Best-effort — the
+    // service swallows rule failures so this never blocks render.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(profileVisitorServiceProvider).recordVisit(widget.uid);
+    });
+  }
 
   Future<void> _toggleFollow(bool currentlyFollowing, bool currentlyRequested, bool isPrivate) async {
     final currentUser = ref.read(authStateProvider).value ??

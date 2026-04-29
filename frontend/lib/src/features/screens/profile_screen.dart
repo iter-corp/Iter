@@ -193,33 +193,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       2 => UserSavedGrid(uid: uid),
       _ => UserPostsGrid(uid: uid),
     };
-    // Smooth crossfade + subtle slide when switching tabs. The
-    // ValueKey on each child forces AnimatedSwitcher to treat tabs as
-    // distinct widgets so it can run the transition between them.
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 320),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) {
-        final offset = Tween<Offset>(
-          begin: const Offset(0.04, 0.0),
-          end: Offset.zero,
-        ).animate(animation);
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(position: offset, child: child),
-        );
+    // Horizontal swipe to switch tabs (left = next, right = prev).
+    // Threshold uses primaryVelocity so a quick flick reliably moves
+    // tabs while a vertical scroll never accidentally triggers it.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragEnd: (details) {
+        final v = details.primaryVelocity ?? 0;
+        if (v < -250 && selectedTab < 2) {
+          setState(() => selectedTab = selectedTab + 1);
+        } else if (v > 250 && selectedTab > 0) {
+          setState(() => selectedTab = selectedTab - 1);
+        }
       },
-      layoutBuilder: (current, previous) => Stack(
-        alignment: Alignment.topCenter,
-        children: [
-          ...previous,
-          if (current != null) current,
-        ],
-      ),
-      child: KeyedSubtree(
-        key: ValueKey(selectedTab),
-        child: child,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 320),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final offset = Tween<Offset>(
+            begin: const Offset(0.04, 0.0),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          );
+        },
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            ...previous,
+            if (current != null) current,
+          ],
+        ),
+        child: KeyedSubtree(
+          key: ValueKey(selectedTab),
+          child: child,
+        ),
       ),
     );
   }

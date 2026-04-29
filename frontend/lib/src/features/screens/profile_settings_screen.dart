@@ -6,9 +6,11 @@ import 'package:go_router/go_router.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/preferred_language_provider.dart';
+import '../../providers/profile_visitor_providers.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
+import 'profile_visitors_screen.dart';
 
 /// Full-screen profile settings page. Replaces the older bottom-sheet
 /// settings menu with a dedicated route so we can group preferences
@@ -25,6 +27,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
     final preferredLang = ref.watch(preferredLanguageProvider);
+    final visitorCount =
+        ref.watch(myProfileVisitorCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
       backgroundColor: context.cardBg,
@@ -58,6 +62,46 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     .read(userServiceProvider)
                     .updateUser(uid, {'isPrivate': val});
               },
+            ),
+          ),
+          ListTile(
+            leading:
+                const Icon(Icons.visibility_outlined, color: AppColors.purple),
+            title: const Text('Profile visitors'),
+            subtitle: Text(
+              visitorCount == 0
+                  ? 'See who has opened your profile'
+                  : '$visitorCount ${visitorCount == 1 ? 'person has' : 'people have'} viewed your profile',
+              style: TextStyle(fontSize: 12, color: context.textSecondary),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (visitorCount > 0)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: context.purpleSoft,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$visitorCount',
+                      style: const TextStyle(
+                        color: Color(0xFFB05ECC),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                Icon(Icons.chevron_right, color: context.textSecondary),
+              ],
+            ),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ProfileVisitorsScreen(),
+              ),
             ),
           ),
 

@@ -374,8 +374,11 @@ class UserButtons extends StatelessWidget {
             ),
           ),
 
-          /// MESSAGE BUTTON — only for public
-          if (!isPrivate) ...[
+          /// MESSAGE BUTTON — shown for public profiles, AND for
+          /// private profiles once the follow has been accepted (so
+          /// mutual followers can DM each other even when the target
+          /// is private).
+          if (!isPrivate || isFollowing) ...[
             const SizedBox(width: 10),
             Expanded(
               child: SizedBox(

@@ -80,15 +80,37 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   bool _sendingComment = false;
   final FocusNode _commentFocusNode = FocusNode();
 
-  List<Story> get _stories => _allGroups[_groupIndex];
+  List<Story> get _stories =>
+      (_groupIndex >= 0 && _groupIndex < _allGroups.length)
+          ? _allGroups[_groupIndex]
+          : const <Story>[];
+
+  /// Returns the story currently being shown, or null if the indexes are
+  /// out of bounds (e.g. after the last story in the last group is
+  /// deleted while the viewer is open). Callers must handle null and
+  /// pop or skip — never assume the index is valid.
+  Story? get _currentStory {
+    final group = _stories;
+    if (group.isEmpty) return null;
+    if (_index < 0 || _index >= group.length) return null;
+    return group[_index];
+  }
 
   String? get _currentUid => FirebaseAuth.instance.currentUser?.uid;
 
   @override
   void initState() {
     super.initState();
-    _groupIndex = widget.initialGroupIndex;
-    _allGroups = widget.allGroups.map((g) => List<Story>.of(g)).toList();
+    // Filter out empty groups defensively — one malformed group used to
+    // throw RangeError("No element") from _stories[_index].
+    _allGroups = widget.allGroups
+        .map((g) => List<Story>.of(g))
+        .where((g) => g.isNotEmpty)
+        .toList();
+    _groupIndex = widget.initialGroupIndex.clamp(
+      0,
+      _allGroups.isEmpty ? 0 : _allGroups.length - 1,
+    );
     _progress = AnimationController(
       vsync: this,
       duration: _kStoryDuration,
@@ -98,7 +120,14 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         }
       });
     _commentFocusNode.addListener(_onReplyFocusChange);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startCurrent());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_allGroups.isEmpty) {
+        Navigator.of(context).maybePop();
+        return;
+      }
+      _startCurrent();
+    });
   }
 
   /// Pauses the auto-advance progress when the user focuses the reply
@@ -123,7 +152,8 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   }
 
   Future<void> _toggleLike({bool silent = false}) async {
-    final story = _stories[_index];
+    final story = _currentStory;
+    if (story == null) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!silent) {
@@ -186,7 +216,8 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       debugPrint('[story-reply] empty text, skipping');
       return false;
     }
-    final story = _stories[_index];
+    final story = _currentStory;
+    if (story == null) return false;
     final me = _currentUid;
     debugPrint('[story-reply] me=$me author=${story.authorUid} '
         'storyId=${story.id} text="${trimmed.length > 30 ? "${trimmed.substring(0, 30)}…" : trimmed}"');
@@ -230,7 +261,13 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   }
 
   Future<void> _startCurrent() async {
-    final story = _stories[_index];
+    final story = _currentStory;
+    if (story == null) {
+      // Nothing to play — close the viewer rather than spinning
+      // forever on an invalid index.
+      if (mounted) Navigator.of(context).maybePop();
+      return;
+    }
     _progress.stop();
     _progress.value = 0;
     _loadingForStoryId = story.id;
@@ -330,7 +367,8 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   }
 
   Future<void> _deleteCurrentStory() async {
-    final story = _stories[_index];
+    final story = _currentStory;
+    if (story == null) return;
     _progress.stop();
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -360,13 +398,25 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       if (!mounted) return;
 
       setState(() {
-        _allGroups[_groupIndex].removeAt(_index);
-        if (_stories.isNotEmpty && _index >= _stories.length) {
-          _index = _stories.length - 1;
+        if (_groupIndex < _allGroups.length) {
+          if (_index >= 0 && _index < _allGroups[_groupIndex].length) {
+            _allGroups[_groupIndex].removeAt(_index);
+          }
+          // Drop the group entirely if it has no stories left so we
+          // don't end up landing on an out-of-bounds index next.
+          if (_allGroups[_groupIndex].isEmpty) {
+            _allGroups.removeAt(_groupIndex);
+            if (_groupIndex >= _allGroups.length) {
+              _groupIndex = _allGroups.length - 1;
+            }
+            _index = 0;
+          } else if (_index >= _allGroups[_groupIndex].length) {
+            _index = _allGroups[_groupIndex].length - 1;
+          }
         }
       });
 
-      if (_stories.isEmpty) {
+      if (_allGroups.isEmpty || _stories.isEmpty) {
         Navigator.pop(context);
         return;
       }
@@ -391,7 +441,20 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final story = _stories[_index];
+    final story = _currentStory;
+    if (story == null) {
+      // Fallback UI shown while we wait for initState's post-frame
+      // callback to pop, or in the rare race where the viewer rebuilds
+      // after the last story was deleted. Keeps the Scaffold valid so
+      // Navigator.pop() can finish without painting against a torn
+      // widget tree.
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
     final isOwnStory = story.authorUid == _currentUid;
     final width = MediaQuery.of(context).size.width;
     final userData = ref.watch(userByUidProvider(story.authorUid)).value;

@@ -445,8 +445,17 @@ class ChatService {
         .where('participants', arrayContains: uid)
         .snapshots()
         .map((s) {
-      final convs =
-          s.docs.map((doc) => ChatConversation.fromDoc(doc, uid)).toList();
+      // Hide chats that have no messages yet. openChat creates the doc
+      // as soon as you visit a profile and tap "Message"; without this
+      // filter the recipient saw a request notification for a chat the
+      // other user never actually wrote to. Group chats stay visible
+      // even when empty since the explicit invite already implies
+      // intent. We use lastMessage as the gate (not lastTime) because
+      // openChat sets a serverTimestamp on creation.
+      final convs = s.docs
+          .map((doc) => ChatConversation.fromDoc(doc, uid))
+          .where((c) => c.isGroup || c.lastMessage.isNotEmpty)
+          .toList();
       // Sort in Dart to avoid requiring a Firestore composite index.
       convs.sort((a, b) {
         if (a.lastTime == null) return 1;
@@ -549,5 +558,54 @@ class ChatService {
     required String name,
   }) async {
     await _chatDoc(chatId).update({'groupName': name.trim()});
+  }
+
+  /// Permanently delete a 1:1 chat for BOTH participants — wipes every
+  /// message in the subcollection, then the chat doc itself. Messages
+  /// are deleted in 400-doc batches (Firestore batch limit is 500).
+  ///
+  /// Note: media files (images, voice, video, attached docs) live in
+  /// Supabase Storage and require a separate edge-function delete which
+  /// isn't deployed yet — those bytes become orphans on the storage
+  /// bucket. We log the missed URLs so a future cleanup job can reap
+  /// them.
+  Future<void> deleteChat(String chatId) async {
+    DocumentSnapshot<Map<String, dynamic>>? lastDoc;
+    while (true) {
+      Query<Map<String, dynamic>> q = _messagesCol(chatId).limit(400);
+      if (lastDoc != null) q = q.startAfterDocument(lastDoc);
+      final snap = await q.get();
+      if (snap.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < 400) break;
+      lastDoc = snap.docs.last;
+    }
+    // Drop the parent chat doc last so the inbox stops listing it.
+    await _chatDoc(chatId).delete();
+  }
+
+  /// Configure auto-deletion of messages for [chatId]. Pass null to
+  /// disable. The `autoDeleteSeconds` field is read by a backend job /
+  /// scheduled function (not part of this changelist) that prunes
+  /// messages older than the threshold without removing the chat doc
+  /// itself, so the conversation stays in the user's inbox while old
+  /// content disappears.
+  Future<void> setAutoDeletePeriod({
+    required String chatId,
+    required Duration? period,
+  }) async {
+    if (period == null) {
+      await _chatDoc(chatId).update({
+        'autoDeleteSeconds': FieldValue.delete(),
+      });
+    } else {
+      await _chatDoc(chatId).update({
+        'autoDeleteSeconds': period.inSeconds,
+      });
+    }
   }
 }

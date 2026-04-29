@@ -26,12 +26,6 @@ const List<String> _kPartnerFilters = [
   'Gender',
 ];
 
-const List<String> _kGenderOptions = [
-  'Male',
-  'Female',
-  'Non-binary',
-  'Other',
-];
 
 double? _distanceKm(dynamic a, dynamic b) {
   if (a is! Map || b is! Map) return null;
@@ -80,7 +74,6 @@ class _EventBodyState extends ConsumerState<EventBody> {
   _MainTab _mainTab = _MainTab.partners;
   int _partnerFilter = 0;
   String? _selectedCity;
-  String? _selectedGender;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   int _selectedTab = 0;
@@ -126,15 +119,6 @@ class _EventBodyState extends ConsumerState<EventBody> {
       );
       if (chosen == null) return; // dismissed
       setState(() => _selectedCity = chosen.isEmpty ? null : chosen);
-    } else if (i == 3) {
-      setState(() => _partnerFilter = 3);
-      final chosen = await _pickFromSheet(
-        title: 'Filter by gender',
-        options: _kGenderOptions,
-        selected: _selectedGender,
-      );
-      if (chosen == null) return;
-      setState(() => _selectedGender = chosen.isEmpty ? null : chosen);
     } else {
       setState(() => _partnerFilter = i);
     }
@@ -205,7 +189,6 @@ class _EventBodyState extends ConsumerState<EventBody> {
                         query: _query,
                         filterIndex: _partnerFilter,
                         selectedCity: _selectedCity,
-                        selectedGender: _selectedGender,
                         onFilterTap: _onPartnerFilterTap,
                       )
                     : _EventsView(
@@ -413,7 +396,6 @@ class _PartnersView extends ConsumerWidget {
   final String query;
   final int filterIndex;
   final String? selectedCity;
-  final String? selectedGender;
   final ValueChanged<int> onFilterTap;
 
   const _PartnersView({
@@ -421,7 +403,6 @@ class _PartnersView extends ConsumerWidget {
     required this.query,
     required this.filterIndex,
     required this.selectedCity,
-    required this.selectedGender,
     required this.onFilterTap,
   });
 
@@ -476,18 +457,6 @@ class _PartnersView extends ConsumerWidget {
             .where((u) =>
                 (u['city'] as String? ?? '').toLowerCase().trim() == pick)
             .toList();
-      case 3: // Gender
-        final pick = selectedGender;
-        if (pick == null || pick.isEmpty) {
-          return filtered
-              .where((u) => (u['gender'] as String? ?? '').isNotEmpty)
-              .toList();
-        }
-        return filtered
-            .where((u) =>
-                (u['gender'] as String? ?? '').toLowerCase() ==
-                pick.toLowerCase())
-            .toList();
       default:
         return filtered;
     }
@@ -499,8 +468,6 @@ class _PartnersView extends ConsumerWidget {
         return Icons.near_me_outlined;
       case 2:
         return Icons.location_city_outlined;
-      case 3:
-        return Icons.person_outline_rounded;
       default:
         return Icons.search_off_rounded;
     }
@@ -512,8 +479,6 @@ class _PartnersView extends ConsumerWidget {
         return 'No one nearby yet — invite someone around you.';
       case 2:
         return 'No one from your city has joined yet.';
-      case 3:
-        return 'Users who set their gender will appear here.';
       default:
         return 'Be the first to say hi — invite someone.';
     }
@@ -529,7 +494,6 @@ class _PartnersView extends ConsumerWidget {
       'All',
       'Nearby',
       selectedCity ?? 'City',
-      selectedGender ?? 'Gender',
     ];
 
     return Column(
@@ -537,7 +501,7 @@ class _PartnersView extends ConsumerWidget {
         _FilterChipRow(
           active: filterIndex,
           labels: chipLabels,
-          dropdownIndices: const {2, 3},
+          dropdownIndices: const {2},
           onTap: onFilterTap,
         ),
         const SizedBox(height: 4),

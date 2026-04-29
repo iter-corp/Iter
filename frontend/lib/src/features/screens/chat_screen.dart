@@ -63,6 +63,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
   bool _sendingImage = false;
+  /// Per-message GlobalKeys so [_scrollToMessage] can jump back to the
+  /// original of a reply. Stale entries are cleared on rebuild because
+  /// we only insert keys for messages currently rendered.
+  final Map<String, GlobalKey> _messageKeys = {};
+  /// id of the message currently flashing as the result of a reply
+  /// quote tap. The bubble paints a brief highlight tween while this
+  /// is set so the user can see *which* message we landed on.
+  String? _flashedMessageId;
 
   // Reply state — the message currently being replied to (null when none).
   ChatMessage? _replyTarget;
@@ -965,6 +973,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // parked above the latest message.
   bool _initialScrollDone = false;
 
+  /// Scroll the chat list to the message identified by [messageId] and
+  /// flash it briefly so the user can spot the original of a reply.
+  /// Falls back gracefully when the message has scrolled out of the
+  /// rendered window (we just toast and stay put).
+  void _scrollToMessage(String messageId) {
+    final key = _messageKeys[messageId];
+    final ctx = key?.currentContext;
+    if (ctx == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Original message is no longer in view'),
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
+      return;
+    }
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: 0.3,
+    );
+    setState(() => _flashedMessageId = messageId);
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      if (_flashedMessageId == messageId) {
+        setState(() => _flashedMessageId = null);
+      }
+    });
+  }
+
   void _scrollToBottom({bool animated = true}) {
     if (!_scrollController.hasClients) {
       // ListView hasn't been built yet. Try again next frame.
@@ -1191,6 +1230,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       color: context.textSecondary,
                     ),
                   ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Chat options',
+                    icon: Icon(Icons.more_vert,
+                        color: context.textSecondary),
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'auto-delete':
+                          _showAutoDeletePicker(
+                            currentSeconds:
+                                (chatDoc['autoDeleteSeconds'] as num?)
+                                    ?.toInt(),
+                          );
+                          break;
+                        case 'delete':
+                          _confirmDeleteChat(isGroup: isGroup);
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'auto-delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.timer_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Text('Auto-delete messages'),
+                          ],
+                        ),
+                      ),
+                      if (!isGroup)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline,
+                                  size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Delete chat',
+                                  style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1217,16 +1300,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     itemCount: msgs.length,
                     itemBuilder: (context, i) {
                       final msg = msgs[i];
-                      return _MessageBubble(
-                        chatId: widget.chatId,
-                        msg: msg,
-                        isMe: msg.senderUid == currentUid,
-                        otherUid: widget.otherUid,
-                        otherAvatar: widget.otherAvatar,
-                        isGroup: isGroup,
-                        onReply: () => _startReply(msg),
-                        autoTranslate: _autoTranslate,
-                        autoTranslateTarget: _autoTranslateTarget,
+                      final key = _messageKeys.putIfAbsent(
+                          msg.id, () => GlobalKey());
+                      return KeyedSubtree(
+                        key: key,
+                        child: _MessageBubble(
+                          chatId: widget.chatId,
+                          msg: msg,
+                          isMe: msg.senderUid == currentUid,
+                          otherUid: widget.otherUid,
+                          otherAvatar: widget.otherAvatar,
+                          isGroup: isGroup,
+                          onReply: () => _startReply(msg),
+                          onReplyQuoteTap: _scrollToMessage,
+                          flashing: _flashedMessageId == msg.id,
+                          autoTranslate: _autoTranslate,
+                          autoTranslateTarget: _autoTranslateTarget,
+                        ),
                       );
                     },
                   );
@@ -1433,6 +1523,143 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+
+  /// Bottom sheet that lets the user pick an auto-delete period for
+  /// this chat. Choosing a duration writes `autoDeleteSeconds` on the
+  /// chat doc; "Off" clears the field. The chat doc itself is never
+  /// deleted by this setting — only its messages are pruned by a
+  /// scheduled job on the backend.
+  Future<void> _showAutoDeletePicker({required int? currentSeconds}) async {
+    const options = <_AutoDeleteOption>[
+      _AutoDeleteOption('Off', null),
+      _AutoDeleteOption('1 day', Duration(days: 1)),
+      _AutoDeleteOption('1 week', Duration(days: 7)),
+      _AutoDeleteOption('1 month', Duration(days: 30)),
+    ];
+    final picked = await showModalBottomSheet<_AutoDeleteOption>(
+      context: context,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Auto-delete messages',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Messages older than the chosen period are removed. '
+                  'The chat itself stays in your inbox.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+            for (final opt in options)
+              ListTile(
+                leading: Icon(
+                  opt.duration == null
+                      ? Icons.timer_off_outlined
+                      : Icons.timer_outlined,
+                  color: const Color(0xFFB05ECC),
+                ),
+                title: Text(opt.label),
+                trailing: (opt.duration?.inSeconds == currentSeconds ||
+                        (opt.duration == null && currentSeconds == null))
+                    ? const Icon(Icons.check, color: Color(0xFFB05ECC))
+                    : null,
+                onTap: () => Navigator.pop(sheet, opt),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    try {
+      await ref.read(chatServiceProvider).setAutoDeletePeriod(
+            chatId: widget.chatId,
+            period: picked.duration,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            picked.duration == null
+                ? 'Auto-delete turned off'
+                : 'Auto-delete: messages older than ${picked.label}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
+
+  Future<void> _confirmDeleteChat({required bool isGroup}) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete chat?'),
+        content: const Text(
+          'This permanently removes every message in this chat for both '
+          'people. Photos and voice notes already uploaded won\'t be '
+          'recoverable from the chat. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(chatServiceProvider).deleteChat(widget.chatId);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+    }
+  }
+}
+
+class _AutoDeleteOption {
+  final String label;
+  final Duration? duration;
+  const _AutoDeleteOption(this.label, this.duration);
 }
 
 // ─────────────────────────────────────────────
@@ -1580,6 +1807,14 @@ class _MessageBubble extends ConsumerStatefulWidget {
   final VoidCallback onReply;
   final bool autoTranslate;
   final String autoTranslateTarget;
+  /// Tapping the "replied to" quote inside a bubble should scroll the
+  /// chat back to the original message. The parent owns the scroll
+  /// controller + per-message keys, so we accept the callback here.
+  final void Function(String replyToId)? onReplyQuoteTap;
+  /// True while the parent has just scrolled to this bubble in
+  /// response to a reply-quote tap. The bubble paints a brief
+  /// highlight tween so the user can spot which one we landed on.
+  final bool flashing;
 
   const _MessageBubble({
     required this.chatId,
@@ -1591,6 +1826,8 @@ class _MessageBubble extends ConsumerStatefulWidget {
     this.isGroup = false,
     this.autoTranslate = false,
     this.autoTranslateTarget = 'en',
+    this.onReplyQuoteTap,
+    this.flashing = false,
   });
 
   @override
@@ -1824,18 +2061,33 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                   secondaryBackground: _replySwipeBg(context, alignLeft: false),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 260),
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOut,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color:
-                            isMe ? const Color(0xFFB05ECC) : context.inputFill,
+                        color: widget.flashing
+                            ? const Color(0xFFB05ECC).withValues(alpha: 0.85)
+                            : (isMe
+                                ? const Color(0xFFB05ECC)
+                                : context.inputFill),
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(16),
                           topRight: const Radius.circular(16),
                           bottomLeft: Radius.circular(isMe ? 16 : 4),
                           bottomRight: Radius.circular(isMe ? 4 : 16),
                         ),
+                        boxShadow: widget.flashing
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFFB05ECC)
+                                      .withValues(alpha: 0.5),
+                                  blurRadius: 14,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1845,6 +2097,10 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                               isMe: isMe,
                               senderUid: msg.replyToSenderUid ?? '',
                               text: msg.replyToText ?? '',
+                              onTap: widget.onReplyQuoteTap == null
+                                  ? null
+                                  : () => widget.onReplyQuoteTap!(
+                                      msg.replyToId!),
                             ),
                           if (msg.storyId != null && msg.storyId!.isNotEmpty)
                             _StoryReplyBanner(
@@ -2305,11 +2561,15 @@ class _RepliedQuote extends ConsumerWidget {
   final bool isMe;
   final String senderUid;
   final String text;
+  /// Tapping the quote scrolls the chat to the original message.
+  /// Wired up by [_MessageBubble] when [onReplyQuoteTap] is provided.
+  final VoidCallback? onTap;
 
   const _RepliedQuote({
     required this.isMe,
     required this.senderUid,
     required this.text,
+    this.onTap,
   });
 
   @override
@@ -2319,7 +2579,7 @@ class _RepliedQuote extends ConsumerWidget {
     final bg = isMe
         ? Colors.white.withValues(alpha: 0.18)
         : Colors.black.withValues(alpha: 0.05);
-    return Container(
+    final body = Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
@@ -2356,6 +2616,12 @@ class _RepliedQuote extends ConsumerWidget {
           ),
         ],
       ),
+    );
+    if (onTap == null) return body;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: body,
     );
   }
 }

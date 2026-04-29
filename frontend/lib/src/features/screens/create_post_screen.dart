@@ -10,6 +10,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/location_map.dart';
 import 'camera_story_screen.dart';
 import 'live_screen.dart';
 
@@ -93,6 +94,44 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  /// Geocode whatever the user typed in the place / city fields and
+  /// drop a pin on the map. Lets users post a location they're not
+  /// currently standing in (e.g. a place they want to recommend).
+  Future<void> _locateTypedPlaceOnMap() async {
+    final name = _placeNameCtrl.text.trim();
+    final city = _placeCityCtrl.text.trim();
+    final query = [name, city].where((s) => s.isNotEmpty).join(', ');
+    if (query.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Type a place name or city first'),
+        ),
+      );
+      return;
+    }
+    try {
+      final results = await geo.locationFromAddress(query);
+      if (results.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No coordinates found for "$query"')),
+        );
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _placeLat = results.first.latitude;
+        _placeLng = results.first.longitude;
+        _placeFromCurrentLocation = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lookup failed: $e')),
+      );
     }
   }
 
@@ -330,14 +369,35 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                               },
                             ),
                             const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: _useCurrentLocationForPlace,
-                                icon: const Icon(Icons.my_location_rounded),
-                                label: const Text('Use current location'),
-                              ),
+                            Row(
+                              children: [
+                                TextButton.icon(
+                                  onPressed: _useCurrentLocationForPlace,
+                                  icon:
+                                      const Icon(Icons.my_location_rounded),
+                                  label: const Text('Use current location'),
+                                ),
+                                const SizedBox(width: 8),
+                                TextButton.icon(
+                                  onPressed: _locateTypedPlaceOnMap,
+                                  icon: const Icon(Icons.map_outlined),
+                                  label: const Text('Locate on map'),
+                                ),
+                              ],
                             ),
+                            if (_placeLat != null && _placeLng != null) ...[
+                              const SizedBox(height: 10),
+                              MapPreview(
+                                lat: _placeLat!,
+                                lng: _placeLng!,
+                                label: _placeNameCtrl.text.trim().isEmpty
+                                    ? null
+                                    : _placeNameCtrl.text.trim(),
+                                subtitle: _placeCityCtrl.text.trim().isEmpty
+                                    ? null
+                                    : _placeCityCtrl.text.trim(),
+                              ),
+                            ],
                           ],
                         ),
                       ),
