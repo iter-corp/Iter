@@ -196,7 +196,9 @@ class ProfileButtons extends StatelessWidget {
   }
 }
 
-/// TABS
+/// TABS — animated pill underline + colour fade. The selected tab
+/// glides under the icons rather than snapping, giving the profile a
+/// more "modern" feel when switching between Posts / Reposts / Saved.
 class ProfileTabBar extends StatelessWidget {
   final int selectedTab;
   final Function(int) onTap;
@@ -209,37 +211,71 @@ class ProfileTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _tab(Icons.grid_on, 0, context),
-        _tab(Icons.repeat, 1, context),
-        _tab(Icons.bookmark_border, 2, context),
-      ],
-    );
-  }
-
-  Widget _tab(IconData icon, int index, BuildContext context) {
-    final bool isActive = selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onTap(index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            border: Border(
-              bottom: BorderSide(
-                color: isActive ? context.textPrimary : Colors.transparent,
-                width: 2,
+    const icons = [Icons.grid_on, Icons.repeat, Icons.bookmark_border];
+    return SizedBox(
+      height: 48,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = constraints.maxWidth / icons.length;
+          return Stack(
+            children: [
+              // Animated underline that slides between tabs.
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                left: tabWidth * selectedTab,
+                bottom: 0,
+                width: tabWidth,
+                height: 2,
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: context.textPrimary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          child: Icon(
-            icon,
-            color: isActive ? context.textPrimary : context.textSecondary,
-            size: 22,
-          ),
-        ),
+              Row(
+                children: List.generate(icons.length, (index) {
+                  final isActive = selectedTab == index;
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onTap(index),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        alignment: Alignment.center,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(end: isActive ? 1.0 : 0.0),
+                          duration: const Duration(milliseconds: 220),
+                          builder: (context, t, _) {
+                            return Transform.scale(
+                              scale: 1 + 0.08 * t,
+                              child: Icon(
+                                icons[index],
+                                color: Color.lerp(
+                                  context.textSecondary,
+                                  context.textPrimary,
+                                  t,
+                                ),
+                                size: 22,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

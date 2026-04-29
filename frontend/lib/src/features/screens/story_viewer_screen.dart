@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -10,13 +8,6 @@ import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/story_service.dart';
-
-/// Quick-reaction emojis shown above the story reply input. Tapping any of
-/// these sends a private DM to the story author with the emoji + a story
-/// reference (so the chat bubble shows which story it was about).
-const List<String> _kStoryQuickReactions = [
-  '❤️', '🔥', '😂', '😮', '👏', '😢', '🙌',
-];
 
 const Duration _kStoryDuration = Duration(seconds: 5);
 
@@ -184,30 +175,6 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     }
   }
 
-  /// Sends a quick emoji reaction to the story author as a DM. Same flow as
-  /// [_replyToStoryAsDM] but with an emoji as the text. The receiving chat
-  /// renders a "Replied to your story" header above the bubble so the
-  /// recipient knows which story the reaction is about. Tapping ❤️ also
-  /// toggles the story-level like so the engagement counter updates.
-  Future<void> _quickReact(String emoji) async {
-    HapticFeedback.lightImpact();
-    debugPrint('[story-react] tapped emoji=$emoji story=${_stories[_index].id}');
-    final ok = await _replyToStoryAsDM(emoji);
-    debugPrint('[story-react] DM result=$ok');
-    if (emoji == '❤️' && _currentUid != null && !_isLiking) {
-      // Fire-and-forget — silenced so the DM "Sent ❤️" toast isn't
-      // followed by a permission-denied banner from the like attempt.
-      unawaited(_toggleLike(silent: true));
-    }
-    if (!mounted || !ok) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Sent $emoji'),
-        duration: const Duration(milliseconds: 900),
-      ),
-    );
-  }
-
   /// Opens (or finds) the 1:1 chat with the current story's author and
   /// sends [text] there with a reference back to the story (storyId +
   /// thumbnail). Returns true on success. Used by both the reply input
@@ -341,6 +308,20 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ViewersSheet(
+        storyId: storyId,
+        service: _storyService,
+      ),
+    );
+    if (mounted) _progress.forward();
+  }
+
+  Future<void> _showLikersSheet(String storyId) async {
+    _progress.stop();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LikersSheet(
         storyId: storyId,
         service: _storyService,
       ),
@@ -585,8 +566,10 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                               controller: _commentController,
                               focusNode: _commentFocusNode,
                               sending: _sendingComment,
+                              storyId: story.id,
+                              service: _storyService,
                               onSend: _addComment,
-                              onReact: _quickReact,
+                              onHeartTap: () => _toggleLike(),
                             ),
                 ),
                 if (isOwnStory)
@@ -594,10 +577,20 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                     bottom: MediaQuery.of(context).viewInsets.bottom + 140, // Moved higher to avoid overlap with comment input
                     left: 16,
                     right: 16,
-                    child: _ViewsPill(
-                      storyId: story.id,
-                      service: _storyService,
-                      onTap: () => _showViewersSheet(story.id),
+                    child: Row(
+                      children: [
+                        _ViewsPill(
+                          storyId: story.id,
+                          service: _storyService,
+                          onTap: () => _showViewersSheet(story.id),
+                        ),
+                        const SizedBox(width: 8),
+                        _LikesPill(
+                          storyId: story.id,
+                          service: _storyService,
+                          onTap: () => _showLikersSheet(story.id),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -663,6 +656,205 @@ class _ViewsPill extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Likes counter shown next to [_ViewsPill] for the story owner. Tapping
+/// opens [_LikersSheet] with the list of users who liked the story.
+class _LikesPill extends StatelessWidget {
+  final String storyId;
+  final StoryService service;
+  final VoidCallback onTap;
+  const _LikesPill({
+    required this.storyId,
+    required this.service,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: service.streamLikesCount(storyId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.favorite,
+                  color: Color(0xFFFF3B5C),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$count ${count == 1 ? 'like' : 'likes'}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LikersSheet extends ConsumerWidget {
+  final String storyId;
+  final StoryService service;
+  const _LikersSheet({required this.storyId, required this.service});
+
+  String _ago(DateTime? dt) {
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    return '${diff.inDays}d';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 12),
+              StreamBuilder<int>(
+                stream: service.streamLikesCount(storyId),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.favorite,
+                          size: 20,
+                          color: Color(0xFFFF3B5C),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$count ${count == 1 ? 'like' : 'likes'}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              Expanded(
+                child: StreamBuilder<List<StoryViewer>>(
+                  stream: service.streamLikers(storyId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final likers = snapshot.data ?? const [];
+                    if (likers.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'No likes yet',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      controller: scrollController,
+                      itemCount: likers.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final v = likers[i];
+                        final userData =
+                            ref.watch(userByUidProvider(v.uid)).value;
+                        final avatarUrl = userData?['avatarUrl'] as String?;
+                        final username =
+                            userData?['username'] as String? ?? v.username;
+                        return ListTile(
+                          onTap: () {
+                            Navigator.pop(context);
+                            openUserProfile(context, uid: v.uid);
+                          },
+                          leading: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.grey.shade200,
+                            backgroundImage: avatarUrl != null
+                                ? CachedNetworkImageProvider(avatarUrl)
+                                : null,
+                            child: avatarUrl == null
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 18,
+                                    color: Colors.grey,
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            username.isEmpty ? v.uid : username,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          trailing: Text(
+                            _ago(v.viewedAt),
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -811,131 +1003,130 @@ class _ViewersSheet extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────
-// Story reply composer (input + quick-reactions)
+// Story reply composer (input + heart like)
 // ─────────────────────────────────────────────
 
-/// Modern reply UI for the story viewer. Two stacked rows:
-///   1. Quick-reactions strip — one-tap emojis that DM the story author
-///   2. Pill-shaped text input + send button
-/// Designed to read clearly over photo backgrounds (translucent dark fill,
-/// soft purple accents, white text). Hidden when the viewer is looking at
-/// their own story.
+/// Reply UI for the story viewer. A single pill-shaped input with a
+/// heart on the LEFT (Instagram-style: taps toggle the story-level like
+/// without sending anything to the chat) and a send button on the RIGHT
+/// for private replies. Hidden when the viewer is looking at their own
+/// story.
 class _StoryReplyComposer extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool sending;
+  final String storyId;
+  final StoryService service;
   final Future<void> Function() onSend;
-  final Future<void> Function(String emoji) onReact;
+  final Future<void> Function() onHeartTap;
 
   const _StoryReplyComposer({
     required this.controller,
     required this.focusNode,
     required this.sending,
+    required this.storyId,
+    required this.service,
     required this.onSend,
-    required this.onReact,
+    required this.onHeartTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Quick-reactions row — every emoji always visible, evenly spread
-        // across the full input width. We use a Row with Expanded children
-        // (not a horizontal ListView) so reactions can never collapse to
-        // zero width or get hidden behind a sibling Positioned widget.
-        Row(
-          children: [
-            for (final emoji in _kStoryQuickReactions)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => onReact(emoji),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    height: 44,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Text(emoji, style: const TextStyle(fontSize: 22)),
+    // Stadium / pill shape — radius is half the row height so the ends
+    // are fully circular regardless of how tall the input grows. Using
+    // a fixed large radius (e.g. 28) looked square once the heart icon
+    // pushed the row to ~52px tall.
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: ShapeDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: 0.22),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Heart on the left — toggles the story-level like only. Does
+          // NOT DM the author; that was the old reactions behavior the
+          // user removed.
+          StreamBuilder<bool>(
+            stream: service.streamIsLiked(storyId),
+            builder: (context, snapshot) {
+              final liked = snapshot.data ?? false;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  onHeartTap();
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    liked ? Icons.favorite : Icons.favorite_border,
+                    color: liked ? const Color(0xFFFF3B5C) : Colors.white,
+                    size: 24,
                   ),
                 ),
+              );
+            },
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Input pill.
-        Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.22),
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSend(),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'Reply privately…',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              ),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onSend(),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Reply privately…',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.65),
-                      fontSize: 14,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: sending ? null : () => onSend(),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: sending
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : const Color(0xFFB05ECC),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: sending ? null : () => onSend(),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: sending
-                        ? Colors.white.withValues(alpha: 0.15)
-                        : const Color(0xFFB05ECC),
-                    shape: BoxShape.circle,
-                  ),
-                  child: sending
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.send, color: Colors.white, size: 18),
-                ),
-              ),
-            ],
+              child: sending
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.send, color: Colors.white, size: 18),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -946,10 +1137,11 @@ class _StorySignInBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
+      decoration: ShapeDecoration(
         color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+        shape: StadiumBorder(
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
+        ),
       ),
       child: const Center(
         child: Text(

@@ -33,12 +33,15 @@ class _CreateGroupSheet extends ConsumerStatefulWidget {
 
 class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
   final _nameCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
+  String _query = '';
   final Set<String> _selected = <String>{};
   bool _busy = false;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -140,6 +143,26 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: 'Search people you follow…',
+                    prefixIcon: Icon(Icons.search, color: context.textMuted),
+                    filled: true,
+                    fillColor: context.inputFill,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -170,6 +193,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                       itemBuilder: (_, i) => _UserRow(
                         uid: uids[i],
                         selected: _selected.contains(uids[i]),
+                        query: _query,
                         onToggle: (v) => setState(() {
                           if (v) {
                             _selected.add(uids[i]);
@@ -231,12 +255,14 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
 class _UserRow extends ConsumerWidget {
   final String uid;
   final bool selected;
+  final String query;
   final ValueChanged<bool> onToggle;
   final String currentUid;
 
   const _UserRow({
     required this.uid,
     required this.selected,
+    required this.query,
     required this.onToggle,
     required this.currentUid,
   });
@@ -252,6 +278,7 @@ class _UserRow extends ConsumerWidget {
       builder: (context, snap) {
         final d = snap.data?.data() ?? {};
         final username = (d['username'] as String?) ?? uid;
+        final fullName = (d['fullName'] as String?) ?? '';
         final avatar = (d['avatarUrl'] as String?) ?? '';
 
         final isBlocked = isBlockedAsync.value ?? false;
@@ -259,6 +286,13 @@ class _UserRow extends ConsumerWidget {
 
         // Hide blocked users from the list
         if (isBlocked || isBlockedBy) {
+          return const SizedBox.shrink();
+        }
+
+        final q = query.trim().toLowerCase();
+        if (q.isNotEmpty &&
+            !username.toLowerCase().contains(q) &&
+            !fullName.toLowerCase().contains(q)) {
           return const SizedBox.shrink();
         }
 

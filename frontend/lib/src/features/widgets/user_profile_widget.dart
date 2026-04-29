@@ -172,12 +172,14 @@ class UserCoverAvatar extends StatelessWidget {
 class UserNameBio extends StatelessWidget {
   final String username;
   final String handle;
+  final String bio;
   final bool isPrivate;
 
   const UserNameBio({
     super.key,
     required this.username,
     required this.handle,
+    this.bio = '',
     this.isPrivate = false,
   });
   @override
@@ -204,11 +206,28 @@ class UserNameBio extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            handle,
-            style: TextStyle(fontSize: 13, color: context.textSecondary),
-          ),
+          if (handle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              handle,
+              style: TextStyle(fontSize: 13, color: context.textSecondary),
+            ),
+          ],
+          if (bio.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                bio,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: context.textPrimary,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

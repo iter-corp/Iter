@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
+import '../../providers/follow_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/event_chat_providers.dart';
 import '../../services/chat_service.dart';
@@ -77,6 +79,35 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
           otherUid: conv.otherUid,
           otherName: conv.isGroup ? conv.groupName : conv.otherUsername,
           otherAvatar: conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl,
+        ),
+      ),
+    );
+  }
+
+  /// Open (or create) a 1:1 chat with [otherUid]. Used when the search
+  /// matches a followed user the current user hasn't messaged yet — we
+  /// build the chat doc on the fly so they can start typing immediately.
+  Future<void> _openChatWithUser({
+    required String otherUid,
+    required String otherName,
+    required String otherAvatar,
+  }) async {
+    final currentUid = ref.read(authStateProvider).value?.uid;
+    if (currentUid == null) return;
+    final chatService = ref.read(chatServiceProvider);
+    final chatId = await chatService.openChat(
+      currentUid: currentUid,
+      otherUid: otherUid,
+    );
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          chatId: chatId,
+          otherUid: otherUid,
+          otherName: otherName,
+          otherAvatar: otherAvatar,
         ),
       ),
     );
@@ -193,33 +224,23 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                         const Center(child: CircularProgressIndicator()),
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (_) {
-                      if (merged.isEmpty) {
-                        return Center(
-                          child: Text(
-                            'No messages yet',
-                            style: TextStyle(color: context.textSecondary),
-                          ),
-                        );
-                      }
-                      return ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 100),
-                        itemCount: merged.length,
-                        itemBuilder: (_, i) {
-                          final row = merged[i];
-                          if (row is OneToOneRow) {
-                            return _ConvTile(
-                              conv: row.conv,
-                              onTap: () => _openChat(row.conv),
-                            );
-                          }
-                          if (row is EventRow) {
-                            return _EventConvTile(
-                              chat: row.chat,
-                              onTap: () => _openEventChat(row.chat),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
+                      // When the search box has a query, also surface
+                      // followed users the user hasn't messaged yet so
+                      // they can start a new chat directly from results.
+                      final query = _query.trim();
+                      final hasQuery = query.isNotEmpty;
+                      final existingUids = {
+                        for (final r in merged)
+                          if (r is OneToOneRow) r.conv.otherUid,
+                      };
+                      return _SearchableConvList(
+                        merged: merged,
+                        query: query,
+                        hasQuery: hasQuery,
+                        existingUids: existingUids,
+                        onOpenConv: _openChat,
+                        onOpenEvent: _openEventChat,
+                        onStartChat: _openChatWithUser,
                       );
                     },
                   )
@@ -237,6 +258,222 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Searchable conversation list
+// ─────────────────────────────────────────────
+
+/// Renders the inbox plus, when a search query is active, a "People you
+/// follow" section with followed users the current user hasn't messaged
+/// yet. Tapping such a user opens (or creates) a new chat with them.
+class _SearchableConvList extends ConsumerWidget {
+  final List<InboxRow> merged;
+  final String query;
+  final bool hasQuery;
+  final Set<String> existingUids;
+  final void Function(ChatConversation) onOpenConv;
+  final void Function(EventChatSummary) onOpenEvent;
+  final Future<void> Function({
+    required String otherUid,
+    required String otherName,
+    required String otherAvatar,
+  }) onStartChat;
+
+  const _SearchableConvList({
+    required this.merged,
+    required this.query,
+    required this.hasQuery,
+    required this.existingUids,
+    required this.onOpenConv,
+    required this.onOpenEvent,
+    required this.onStartChat,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUid = ref.watch(authStateProvider).value?.uid;
+    final followingAsync = currentUid == null
+        ? const AsyncValue<List<String>>.data([])
+        : ref.watch(followingProvider(currentUid));
+    final followingUids = followingAsync.valueOrNull ?? const <String>[];
+
+    final showFollowed = hasQuery && currentUid != null;
+    final candidateFollowedUids = showFollowed
+        ? followingUids
+            .where((uid) => !existingUids.contains(uid))
+            .toList()
+        : const <String>[];
+
+    if (merged.isEmpty && !showFollowed) {
+      return Center(
+        child: Text(
+          'No messages yet',
+          style: TextStyle(color: context.textSecondary),
+        ),
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        SliverList.builder(
+          itemCount: merged.length,
+          itemBuilder: (_, i) {
+            final row = merged[i];
+            if (row is OneToOneRow) {
+              return _ConvTile(
+                conv: row.conv,
+                onTap: () => onOpenConv(row.conv),
+              );
+            }
+            if (row is EventRow) {
+              return _EventConvTile(
+                chat: row.chat,
+                onTap: () => onOpenEvent(row.chat),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        if (showFollowed)
+          SliverToBoxAdapter(
+            child: _FollowedPeopleSection(
+              followedUids: candidateFollowedUids,
+              query: query,
+              hasExistingChats: merged.isNotEmpty,
+              onStartChat: onStartChat,
+            ),
+          ),
+        const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+      ],
+    );
+  }
+}
+
+/// Section header + tappable rows for followed users matching [query]
+/// that the current user has no chat with yet. Each row resolves the
+/// user's live profile via [userByUidProvider] so we always show the
+/// freshest username/avatar.
+class _FollowedPeopleSection extends ConsumerWidget {
+  final List<String> followedUids;
+  final String query;
+  final bool hasExistingChats;
+  final Future<void> Function({
+    required String otherUid,
+    required String otherName,
+    required String otherAvatar,
+  }) onStartChat;
+
+  const _FollowedPeopleSection({
+    required this.followedUids,
+    required this.query,
+    required this.hasExistingChats,
+    required this.onStartChat,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (followedUids.isEmpty) {
+      if (hasExistingChats) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Center(
+          child: Text(
+            'No matches',
+            style: TextStyle(color: context.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasExistingChats) const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+          child: Text(
+            'People you follow',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: context.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        for (final uid in followedUids)
+          _FollowedUserTile(
+            uid: uid,
+            query: query,
+            onTap: ({required name, required avatar}) => onStartChat(
+              otherUid: uid,
+              otherName: name,
+              otherAvatar: avatar,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FollowedUserTile extends ConsumerWidget {
+  final String uid;
+  final String query;
+  final void Function({required String name, required String avatar}) onTap;
+
+  const _FollowedUserTile({
+    required this.uid,
+    required this.query,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(userByUidProvider(uid));
+    final data = userAsync.value;
+    if (data == null) {
+      // Don't render a hollow row while the user doc resolves.
+      return const SizedBox.shrink();
+    }
+    final username = (data['username'] as String?) ?? '';
+    final fullName = (data['fullName'] as String?) ?? '';
+    final avatar = (data['avatarUrl'] as String?) ?? '';
+    final q = query.toLowerCase();
+    if (q.isNotEmpty &&
+        !username.toLowerCase().contains(q) &&
+        !fullName.toLowerCase().contains(q)) {
+      return const SizedBox.shrink();
+    }
+    return ListTile(
+      onTap: () => onTap(
+        name: username.isNotEmpty ? username : (fullName.isNotEmpty ? fullName : 'User'),
+        avatar: avatar,
+      ),
+      leading: CircleAvatar(
+        radius: 26,
+        backgroundColor: context.inputFill,
+        backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+        child: avatar.isEmpty
+            ? Icon(Icons.person, color: context.textSecondary)
+            : null,
+      ),
+      title: Text(
+        username.isNotEmpty ? username : 'User',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          color: context.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        fullName.isNotEmpty ? fullName : 'Tap to start a chat',
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
+      ),
+      trailing: Icon(Icons.chat_bubble_outline,
+          size: 18, color: context.textSecondary),
     );
   }
 }

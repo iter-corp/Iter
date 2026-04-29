@@ -16,15 +16,19 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/block_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/event_chat_providers.dart';
+import '../../providers/reaction_providers.dart';
 import '../../services/chat_service.dart';
+import '../../services/reaction_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/translate_service.dart';
 import '../model/post_model.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
+import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -656,24 +660,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _autoTranslateTarget,
-                      decoration: const InputDecoration(
-                        labelText: 'Translate into',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: [
-                        for (final lang in kTranslateLanguages)
-                          DropdownMenuItem(
+                    Builder(
+                      builder: (context) {
+                        // De-duplicate by language code so the dropdown's
+                        // "exactly one item per value" assertion holds.
+                        // kTranslateLanguages lists English twice (USA / UK)
+                        // for dictation locale variety; the translate
+                        // target only cares about the BCP-47 code.
+                        final seen = <String>{};
+                        final items = <DropdownMenuItem<String>>[];
+                        for (final lang in kTranslateLanguages) {
+                          if (!seen.add(lang.code)) continue;
+                          items.add(DropdownMenuItem(
                             value: lang.code,
                             child: Text(lang.label),
+                          ));
+                        }
+                        return DropdownButtonFormField<String>(
+                          initialValue: _autoTranslateTarget,
+                          decoration: const InputDecoration(
+                            labelText: 'Translate into',
+                            border: OutlineInputBorder(),
                           ),
-                      ],
-                      onChanged: (v) {
-                        if (v == null) return;
-                        setSheetState(() {});
-                        setState(() => _autoTranslateTarget = v);
-                        _saveAutoTranslatePrefs();
+                          items: items,
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setSheetState(() {});
+                            setState(() => _autoTranslateTarget = v);
+                            _saveAutoTranslatePrefs();
+                          },
+                        );
                       },
                     ),
                     const SizedBox(height: 16),
@@ -760,6 +776,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ? null
         : ref.watch(typingWatchProvider('${widget.chatId}|${widget.otherUid}'));
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
+    // Block state. Hide the message composer when either side has
+    // blocked the other so the rules-blocked write isn't attempted (and
+    // the user understands *why* they can't type).
+    final iBlockedThem = !isGroup &&
+        widget.otherUid.isNotEmpty &&
+        (ref.watch(isBlockedProvider(widget.otherUid)).value ?? false);
+    final theyBlockedMe = !isGroup &&
+        widget.otherUid.isNotEmpty &&
+        (ref.watch(isBlockedByProvider(widget.otherUid)).value ?? false);
+    final blockBannerLabel = iBlockedThem
+        ? 'You\'ve blocked this user. Unblock from their profile to send messages.'
+        : (theyBlockedMe
+            ? 'You can\'t reply to this conversation.'
+            : null);
 
     ref.listen(messagesProvider(widget.chatId), (_, __) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -870,6 +900,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           : context.textSecondary,
                     ),
                   ),
+                  if (isGroup)
+                    IconButton(
+                      tooltip: 'Group settings',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => GroupSettingsScreen(
+                              chatId: widget.chatId,
+                              groupName: groupName,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: Icon(
+                        Icons.group_outlined,
+                        color: context.textSecondary,
+                      ),
+                    ),
                   IconButton(
                     tooltip: 'Shared media',
                     onPressed: () {
@@ -944,8 +992,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onCancel: () => setState(() => _replyTarget = null),
               ),
 
-            // INPUT
-            Padding(
+            // INPUT (or block banner)
+            if (blockBannerLabel != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: context.inputFill,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: context.borderColor),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.block,
+                          size: 18, color: context.textSecondary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          blockBannerLabel,
+                          style: TextStyle(
+                              color: context.textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Padding(
               padding: const EdgeInsets.all(12),
               child: _isRecording
                   ? _RecordingBar(
@@ -1582,31 +1659,76 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   }
 
   void _showBubbleMenu(BuildContext context, WidgetRef ref) {
+    final parentPath = 'chats/${widget.chatId}/messages';
     showModalBottomSheet(
       context: context,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (sheet) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 8),
+            // Reactions strip — surfaced at the top so a tap on a
+            // message goes straight to picking an emoji, no extra tap
+            // through an "Add reaction" item.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Consumer(
+                builder: (context, sheetRef, _) {
+                  final myAsync = sheetRef.watch(myReactionProvider(
+                    '$parentPath::${msg.id}',
+                  ));
+                  final mine = myAsync.value;
+                  return SizedBox(
+                    height: 56,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: kReactionEmojis.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 4),
+                      itemBuilder: (_, i) {
+                        final e = kReactionEmojis[i];
+                        final selected = mine == e;
+                        return GestureDetector(
+                          onTap: () async {
+                            await sheetRef
+                                .read(reactionServiceProvider)
+                                .toggle(
+                                  parentPath: parentPath,
+                                  messageId: msg.id,
+                                  emoji: e,
+                                );
+                            if (sheet.mounted) Navigator.pop(sheet);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? context.purpleSoft
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                            child:
+                                Text(e, style: const TextStyle(fontSize: 28)),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.reply),
               title: const Text('Reply'),
               onTap: () {
                 Navigator.pop(sheet);
                 onReply();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.add_reaction_outlined),
-              title: const Text('Add reaction'),
-              onTap: () {
-                Navigator.pop(sheet);
-                showReactionsSheet(
-                  context,
-                  ref: ref,
-                  parentPath: 'chats/${widget.chatId}/messages',
-                  messageId: msg.id,
-                );
               },
             ),
           ],

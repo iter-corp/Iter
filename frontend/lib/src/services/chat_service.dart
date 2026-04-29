@@ -177,6 +177,14 @@ class ChatService {
       final cu = currentSnap.data() ?? {};
       final ou = otherSnap.data() ?? {};
 
+      // Mutual follow ("friends") skips the request gate so the receiver
+      // sees the new chat in their inbox immediately. Otherwise only the
+      // initiator has accepted and the receiver gets a request.
+      final mutualFollow = await _isMutualFollow(currentUid, otherUid);
+      final acceptedBy = mutualFollow
+          ? <String>[currentUid, otherUid]
+          : <String>[currentUid];
+
       await _chatDoc(id).set({
         'participants': [currentUid, otherUid],
         'userData': {
@@ -193,12 +201,30 @@ class ChatService {
         'lastMessageSenderUid': '',
         'lastTime': FieldValue.serverTimestamp(),
         'unread': {currentUid: 0, otherUid: 0},
-        // Only the initiator has accepted; receiver sees it as a request.
-        'acceptedBy': [currentUid],
+        'acceptedBy': acceptedBy,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
     return id;
+  }
+
+  /// True if both users follow each other with `status == 'active'`.
+  /// Returns false on any rule/network error so callers default to the
+  /// safer "request" state rather than silently auto-accepting.
+  Future<bool> _isMutualFollow(String a, String b) async {
+    try {
+      final aFollowsB =
+          await _db.doc('users/$a/following/$b').get();
+      if (!aFollowsB.exists) return false;
+      if ((aFollowsB.data()?['status'] as String?) == 'pending') return false;
+      final bFollowsA =
+          await _db.doc('users/$b/following/$a').get();
+      if (!bFollowsA.exists) return false;
+      if ((bFollowsA.data()?['status'] as String?) == 'pending') return false;
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Sends a text message and updates the chat summary atomically.
@@ -287,11 +313,24 @@ class ChatService {
       'seenBy': [senderUid],
     });
 
+    // Auto-accept the chat for the receiver when both users follow each
+    // other. Without this, mutual followers would still see the first
+    // message in their Requests tab even though they've already opted
+    // into each other's content.
+    final acceptedUids = <String>{senderUid};
+    if (!isGroup && recipients.length == 1) {
+      final receiver = recipients.first;
+      if (receiver.isNotEmpty &&
+          await _isMutualFollow(senderUid, receiver)) {
+        acceptedUids.add(receiver);
+      }
+    }
+
     final summary = <String, Object?>{
       'lastMessage': lastMessage,
       'lastMessageSenderUid': senderUid,
       'lastTime': FieldValue.serverTimestamp(),
-      'acceptedBy': FieldValue.arrayUnion([senderUid]),
+      'acceptedBy': FieldValue.arrayUnion(acceptedUids.toList()),
       'unread.$senderUid': 0,
     };
     for (final uid in recipients) {

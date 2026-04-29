@@ -1,11 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../navigation/user_profile_nav.dart';
+import '../../providers/auth_providers.dart';
+import '../../providers/chat_providers.dart';
 import '../../theme/app_theme.dart';
 
-/// Group chat settings screen - allows admins to manage group permissions
-/// such as restricting messaging, enabling admin-only mode, and controlling media sharing.
+/// Group chat settings screen — shows the member list (with the admin
+/// badge for the user who created the group), gives non-admins a "Leave
+/// group" action, and exposes the existing permission toggles to admins.
 class GroupSettingsScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String groupName;
@@ -17,216 +22,441 @@ class GroupSettingsScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<GroupSettingsScreen> createState() => _GroupSettingsScreenState();
+  ConsumerState<GroupSettingsScreen> createState() =>
+      _GroupSettingsScreenState();
 }
 
 class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
-  late bool _restrictMessaging;
-  late bool _adminOnly;
-  late bool _mediaShare;
-  bool _isLoading = true;
   bool _isSaving = false;
-  String? _errorMessage;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(widget.chatId)
-          .get();
-
-      final data = doc.data();
-      setState(() {
-        _restrictMessaging = data?['restrictMessaging'] ?? false;
-        _adminOnly = data?['adminOnly'] ?? false;
-        _mediaShare = data?['mediaShare'] ?? true;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load settings: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _saveSettings() async {
+  Future<void> _savePermissions({
+    required bool restrictMessaging,
+    required bool adminOnly,
+    required bool mediaShare,
+  }) async {
     setState(() => _isSaving = true);
-
     try {
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(widget.chatId)
           .update({
-        'restrictMessaging': _restrictMessaging,
-        'adminOnly': _adminOnly,
-        'mediaShare': _mediaShare,
+        'restrictMessaging': restrictMessaging,
+        'adminOnly': adminOnly,
+        'mediaShare': mediaShare,
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved successfully')),
-        );
-        Navigator.pop(context);
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Settings saved')),
+      );
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to save settings: $e';
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _leaveGroup() async {
+    final currentUid = ref.read(authStateProvider).value?.uid;
+    if (currentUid == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Leave group?'),
+        content: Text(
+          'You will stop receiving messages from "${widget.groupName}". '
+          'You can be added back by an admin.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Leave',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    try {
+      await ref.read(chatServiceProvider).leaveOrRemoveGroupMember(
+            chatId: widget.chatId,
+            uid: currentUid,
+          );
+      if (!mounted) return;
+      // Pop the settings screen and the underlying chat screen so we
+      // don't leave the user stranded in a group they're no longer in.
+      Navigator.of(context)
+        ..pop()
+        ..pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to leave: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = ref.watch(authStateProvider).value?.uid;
+    final chatDocAsync = ref.watch(chatDocProvider(widget.chatId));
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.groupName} Settings'),
+        title: Text(widget.groupName),
         centerTitle: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  if (_errorMessage != null) ...[
-                    Container(
-                      color: Colors.red.shade100,
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.all(16),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade900),
-                      ),
+      body: chatDocAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (data) {
+          if (data == null) {
+            return const Center(child: Text('Group not found'));
+          }
+          final participants =
+              List<String>.from(data['participants'] as List? ?? []);
+          final adminUid = (data['adminUid'] as String?) ?? '';
+          final userData =
+              (data['userData'] as Map<String, dynamic>?) ?? const {};
+          final isAdmin = currentUid != null && currentUid == adminUid;
+          final restrictMessaging =
+              (data['restrictMessaging'] as bool?) ?? false;
+          final adminOnly = (data['adminOnly'] as bool?) ?? false;
+          final mediaShare = (data['mediaShare'] as bool?) ?? true;
+
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _MembersHeader(count: participants.length),
+              for (final uid in _sortMembers(participants, adminUid))
+                _MemberTile(
+                  uid: uid,
+                  cachedData: (userData[uid] as Map<String, dynamic>?) ??
+                      const {},
+                  isAdmin: uid == adminUid,
+                  isMe: uid == currentUid,
+                ),
+              const SizedBox(height: 8),
+              if (currentUid != null && !isAdmin)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                  ],
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header
-                        Text(
-                          'Messaging Permissions',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
+                    onPressed: _leaveGroup,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Leave group'),
+                  ),
+                ),
+              if (isAdmin) ...[
+                const SizedBox(height: 8),
+                _PermissionsSection(
+                  restrictMessaging: restrictMessaging,
+                  adminOnly: adminOnly,
+                  mediaShare: mediaShare,
+                  saving: _isSaving,
+                  onSave: _savePermissions,
+                ),
+              ],
+              const SizedBox(height: 24),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-                        // Restrict Messaging Toggle
-                        _buildPermissionCard(
-                          icon: Icons.lock_outline,
-                          title: 'Restrict Messaging',
-                          subtitle:
-                              'Only group admins can send messages. Members can still view messages.',
-                          value: _restrictMessaging,
-                          onChanged: (value) {
-                            setState(() {
-                              _restrictMessaging = value;
-                              // If restrict is enabled, disable adminOnly (they conflict)
-                              if (value) {
-                                _adminOnly = false;
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
+  /// Admin first, then everyone else in the original order. Keeps the
+  /// "creator" visually anchored at the top of the list.
+  List<String> _sortMembers(List<String> uids, String adminUid) {
+    if (adminUid.isEmpty) return uids;
+    final out = <String>[
+      if (uids.contains(adminUid)) adminUid,
+      ...uids.where((u) => u != adminUid),
+    ];
+    return out;
+  }
+}
 
-                        // Admin Only Toggle
-                        _buildPermissionCard(
-                          icon: Icons.admin_panel_settings_outlined,
-                          title: 'Admin-Only Mode',
-                          subtitle:
-                              'Only group admins can send messages (alternative to restrict).',
-                          value: _adminOnly,
-                          onChanged: (value) {
-                            setState(() {
-                              _adminOnly = value;
-                              // If admin-only is enabled, disable restrict (they conflict)
-                              if (value) {
-                                _restrictMessaging = false;
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
+class _MembersHeader extends StatelessWidget {
+  final int count;
+  const _MembersHeader({required this.count});
 
-                        // Media Sharing Toggle
-                        _buildPermissionCard(
-                          icon: Icons.image_outlined,
-                          title: 'Enable Media Sharing',
-                          subtitle:
-                              'Allow members to share images and send voice messages.',
-                          value: _mediaShare,
-                          onChanged: (value) {
-                            setState(() => _mediaShare = value);
-                          },
-                        ),
-                        const SizedBox(height: 24),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Icon(Icons.groups, size: 20, color: context.textSecondary),
+          const SizedBox(width: 8),
+          Text(
+            '$count ${count == 1 ? 'member' : 'members'}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: context.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                        // Permission Summary
-                        _buildPermissionSummary(),
-                        const SizedBox(height: 24),
+class _MemberTile extends ConsumerWidget {
+  final String uid;
+  final Map<String, dynamic> cachedData;
+  final bool isAdmin;
+  final bool isMe;
 
-                        // Save Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveSettings,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFB05ECC),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              disabledBackgroundColor: Colors.grey.shade400,
-                            ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Save Settings',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
+  const _MemberTile({
+    required this.uid,
+    required this.cachedData,
+    required this.isAdmin,
+    required this.isMe,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liveAsync = ref.watch(userByUidProvider(uid));
+    final live = liveAsync.value;
+    final username = (live?['username'] as String?) ??
+        (cachedData['username'] as String?) ??
+        '';
+    final avatarUrl = (live?['avatarUrl'] as String?) ??
+        (cachedData['avatarUrl'] as String?) ??
+        '';
+
+    return ListTile(
+      onTap: () => openUserProfile(context, uid: uid),
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: context.inputFill,
+        backgroundImage:
+            avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+        child: avatarUrl.isEmpty
+            ? Icon(Icons.person, color: context.textSecondary)
+            : null,
+      ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              username.isEmpty ? 'User' : username,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: context.textPrimary,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (isMe) ...[
+            const SizedBox(width: 6),
+            Text(
+              '· You',
+              style: TextStyle(color: context.textSecondary, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+      trailing: isAdmin
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: context.purpleSoft,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.shield,
+                    size: 12,
+                    color: Color(0xFFB05ECC),
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Admin',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB05ECC),
                     ),
                   ),
                 ],
               ),
-            ),
+            )
+          : null,
     );
   }
+}
 
-  Widget _buildPermissionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required Function(bool) onChanged,
-  }) {
+class _PermissionsSection extends StatefulWidget {
+  final bool restrictMessaging;
+  final bool adminOnly;
+  final bool mediaShare;
+  final bool saving;
+  final Future<void> Function({
+    required bool restrictMessaging,
+    required bool adminOnly,
+    required bool mediaShare,
+  }) onSave;
+
+  const _PermissionsSection({
+    required this.restrictMessaging,
+    required this.adminOnly,
+    required this.mediaShare,
+    required this.saving,
+    required this.onSave,
+  });
+
+  @override
+  State<_PermissionsSection> createState() => _PermissionsSectionState();
+}
+
+class _PermissionsSectionState extends State<_PermissionsSection> {
+  late bool _restrict;
+  late bool _adminOnly;
+  late bool _media;
+
+  @override
+  void initState() {
+    super.initState();
+    _restrict = widget.restrictMessaging;
+    _adminOnly = widget.adminOnly;
+    _media = widget.mediaShare;
+  }
+
+  @override
+  void didUpdateWidget(covariant _PermissionsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Keep local toggle state in sync with the live chat doc, except
+    // while a save is in flight (so an in-progress edit isn't snapped
+    // back to its previous value).
+    if (!widget.saving) {
+      _restrict = widget.restrictMessaging;
+      _adminOnly = widget.adminOnly;
+      _media = widget.mediaShare;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Messaging Permissions',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          _PermissionCard(
+            icon: Icons.lock_outline,
+            title: 'Restrict Messaging',
+            subtitle:
+                'Only group admins can send messages. Members can still view messages.',
+            value: _restrict,
+            onChanged: (v) => setState(() {
+              _restrict = v;
+              if (v) _adminOnly = false;
+            }),
+          ),
+          const SizedBox(height: 10),
+          _PermissionCard(
+            icon: Icons.admin_panel_settings_outlined,
+            title: 'Admin-Only Mode',
+            subtitle:
+                'Only group admins can send messages (alternative to restrict).',
+            value: _adminOnly,
+            onChanged: (v) => setState(() {
+              _adminOnly = v;
+              if (v) _restrict = false;
+            }),
+          ),
+          const SizedBox(height: 10),
+          _PermissionCard(
+            icon: Icons.image_outlined,
+            title: 'Enable Media Sharing',
+            subtitle:
+                'Allow members to share images and send voice messages.',
+            value: _media,
+            onChanged: (v) => setState(() => _media = v),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: widget.saving
+                  ? null
+                  : () => widget.onSave(
+                        restrictMessaging: _restrict,
+                        adminOnly: _adminOnly,
+                        mediaShare: _media,
+                      ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFB05ECC),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                disabledBackgroundColor: Colors.grey.shade400,
+              ),
+              child: widget.saving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Save Settings',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermissionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _PermissionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -259,8 +489,6 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                     color: context.textSecondary,
                     fontSize: 12,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -273,40 +501,6 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
             activeTrackColor: const Color(0xFFB05ECC).withValues(alpha: 0.3),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPermissionSummary() {
-    String summary = 'Current Permissions: ';
-
-    if (_restrictMessaging) {
-      summary += 'Messaging Restricted (Admins Only)';
-    } else if (_adminOnly) {
-      summary += 'Admin-Only Mode';
-    } else {
-      summary += 'All Members Can Message';
-    }
-
-    if (!_mediaShare) {
-      summary += ' • Media Sharing Disabled';
-    } else {
-      summary += ' • Media Sharing Enabled';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.purpleSoft,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        summary,
-        style: TextStyle(
-          color: context.textPrimary,
-          fontSize: 13,
-          fontStyle: FontStyle.italic,
-        ),
       ),
     );
   }

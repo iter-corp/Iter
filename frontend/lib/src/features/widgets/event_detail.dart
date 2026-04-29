@@ -97,17 +97,29 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   children: [
                     // 🔹 Circular avatar
                     ClipOval(
-                      child: Image.network(
-                        widget.imageUrls.first,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 44,
-                          height: 44,
-                          color: context.borderColor,
-                        ),
-                      ),
+                      child: widget.imageUrls.isEmpty
+                          ? Container(
+                              width: 44,
+                              height: 44,
+                              color: context.borderColor,
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.event,
+                                color: context.textSecondary,
+                                size: 22,
+                              ),
+                            )
+                          : Image.network(
+                              widget.imageUrls.first,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 44,
+                                height: 44,
+                                color: context.borderColor,
+                              ),
+                            ),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -139,61 +151,64 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               const SizedBox(height: 14),
 
               // 📌 SECTION: Full-width image carousel (zero horizontal padding, no border radius)
-              SizedBox(
-                width: double.infinity,
-                height: 210,
-                child: Stack(
-                  children: [
-                    // 🔹 PageView — full bleed
-                    Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                            20), // 🔹 change value as needed
-                        child: PageView.builder(
-                          controller: _pageController,
-                          itemCount: widget.imageUrls.length,
-                          onPageChanged: (i) =>
-                              setState(() => _currentImage = i),
-                          itemBuilder: (_, i) => Image.network(
-                            widget.imageUrls[i],
-                            width: double.infinity,
-                            height: 210,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: context.borderColor),
+              if (widget.imageUrls.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  height: 210,
+                  child: Stack(
+                    children: [
+                      // 🔹 PageView — full bleed
+                      Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                              20), // 🔹 change value as needed
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: widget.imageUrls.length,
+                            onPageChanged: (i) =>
+                                setState(() => _currentImage = i),
+                            itemBuilder: (_, i) => Image.network(
+                              widget.imageUrls[i],
+                              width: double.infinity,
+                              height: 210,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  Container(color: context.borderColor),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    // 🔹 Left arrow — vertically centered
-                    Positioned(
-                      left: 12,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: _ArrowButton(
-                          icon: Icons.chevron_left,
-                          onTap: _prev,
+                      // 🔹 Left arrow — vertically centered
+                      if (widget.imageUrls.length > 1)
+                        Positioned(
+                          left: 12,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: _ArrowButton(
+                              icon: Icons.chevron_left,
+                              onTap: _prev,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
 
-                    // 🔹 Right arrow — vertically centered
-                    Positioned(
-                      right: 12,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: _ArrowButton(
-                          icon: Icons.chevron_right,
-                          onTap: _next,
+                      // 🔹 Right arrow — vertically centered
+                      if (widget.imageUrls.length > 1)
+                        Positioned(
+                          right: 12,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: _ArrowButton(
+                              icon: Icons.chevron_right,
+                              onTap: _next,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
               const SizedBox(height: 18),
 

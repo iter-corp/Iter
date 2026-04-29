@@ -276,7 +276,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   },
                   isBlocked: isBlocked,
                 ),
-                UserNameBio(username: username, handle: handle, isPrivate: isPrivate),
+                UserNameBio(
+                  username: username,
+                  handle: handle,
+                  bio: (user['bio'] as String?) ?? '',
+                  isPrivate: isPrivate,
+                ),
                 if (!hideContent) ...[
                   UserStats(
                     followers: followers,
@@ -318,15 +323,79 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ]
                 ] else ...[
                   Padding(
-                    padding: const EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Text(
-                        isBlockedBy
-                            ? 'User not found'
-                            : 'You have blocked this user',
-                        style: TextStyle(
-                            fontSize: 16, color: context.textSecondary),
-                      ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 32),
+                    child: Column(
+                      children: [
+                        Icon(
+                          isBlockedBy ? Icons.person_off_outlined : Icons.block,
+                          size: 36,
+                          color: context.textSecondary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          isBlockedBy
+                              ? 'User not found'
+                              : 'You have blocked this user',
+                          style: TextStyle(
+                              fontSize: 16, color: context.textSecondary),
+                        ),
+                        if (isBlocked && !isBlockedBy) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Their posts, reposts and saved items are hidden, '
+                            'and they can\'t message you.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.lock_open, size: 18),
+                              label: const Text('Unblock'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFB05ECC),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              onPressed: () async {
+                                if (currentUser == null) return;
+                                try {
+                                  await ref
+                                      .read(blockServiceProvider)
+                                      .unblockUser(
+                                        currentUid: currentUser.uid,
+                                        targetUid: widget.uid,
+                                      );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text('User unblocked')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('Failed to unblock: $e'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],

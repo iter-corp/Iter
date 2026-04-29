@@ -213,6 +213,47 @@ class StoryService {
         .map((s) => s.exists);
   }
 
+  /// Live count of users who liked the story. Used by the story viewer to
+  /// render the "Y likes" pill next to the views pill (story-owner view).
+  Stream<int> streamLikesCount(String storyId) {
+    return _col
+        .doc(storyId)
+        .collection('likes')
+        .snapshots()
+        .map((s) => s.docs.length);
+  }
+
+  /// Live list of users who liked the story, newest first. Used by the
+  /// likes bottom sheet shown when the story owner taps the likes pill.
+  Stream<List<StoryViewer>> streamLikers(String storyId) {
+    return _col
+        .doc(storyId)
+        .collection('likes')
+        .snapshots()
+        .asyncMap((snap) async {
+      // The likes subcollection only stores {createdAt}. Hydrate each entry
+      // with the corresponding user doc so we can render avatar/username.
+      final entries = await Future.wait(snap.docs.map((d) async {
+        final userSnap = await _db.collection('users').doc(d.id).get();
+        final u = userSnap.data() ?? {};
+        return StoryViewer(
+          uid: d.id,
+          username: (u['username'] as String?) ?? '',
+          avatarUrl: u['avatarUrl'] as String?,
+          viewedAt: (d.data()['createdAt'] as Timestamp?)?.toDate(),
+        );
+      }));
+      entries.sort((a, b) {
+        final av = a.viewedAt;
+        final bv = b.viewedAt;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return bv.compareTo(av);
+      });
+      return entries;
+    });
+  }
+
   Future<void> addComment({
     required String storyId,
     required String authorUid,

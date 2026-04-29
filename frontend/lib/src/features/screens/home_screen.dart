@@ -486,19 +486,35 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                         padding: const EdgeInsets.only(top: 8, bottom: 100),
                         sliver: SliverList.builder(
                           itemCount: posts.length,
-                          itemBuilder: (context, index) => PostCard(
-                            post: posts[index],
-                            travelMode: _mode == _HomeMode.travel,
-                            travelPlace: _mode == _HomeMode.travel &&
-                                    posts[index].postLocationExact
-                                ? _travelPlaceLabel(posts[index])
-                                : null,
-                            travelDistance: _mode == _HomeMode.travel
-                                ? (posts[index].postLocationExact
-                                    ? (posts[index].travelDistanceLabel ?? '')
-                                    : '')
-                                : null,
-                          ),
+                          itemBuilder: (context, index) {
+                            final p = posts[index];
+                            final placeLabel = _travelPlaceLabel(p);
+                            final hasPlace = placeLabel.isNotEmpty;
+                            final viewerLocOff = _mode == _HomeMode.travel &&
+                                (_viewerLat == null || _viewerLng == null);
+                            return PostCard(
+                              post: p,
+                              travelMode: _mode == _HomeMode.travel,
+                              travelPlace: _mode == _HomeMode.travel && hasPlace
+                                  ? placeLabel
+                                  : null,
+                              travelDistance: _mode == _HomeMode.travel
+                                  ? (p.travelDistanceLabel ?? '')
+                                  : null,
+                              viewerLocationOff: viewerLocOff,
+                              onTurnOnLocationTap: viewerLocOff
+                                  ? () async {
+                                      final status =
+                                          await _ensureViewerLocation();
+                                      _showLocationStatusMessage(status);
+                                      if (status == _LocationStatus.ok) {
+                                        ref.invalidate(travelFeedProvider(
+                                            _buildTravelQuery()));
+                                      }
+                                    }
+                                  : null,
+                            );
+                          },
                         ),
                       ),
                     ],

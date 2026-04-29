@@ -20,6 +20,12 @@ class PostCard extends ConsumerStatefulWidget {
   final bool travelMode;
   final String? travelPlace;
   final String? travelDistance;
+  /// When true the viewer's GPS location isn't available (services off or
+  /// permission denied). The travel-mode card replaces the distance pill
+  /// with a tappable "Turn on location" CTA so users know why distance
+  /// is missing and can fix it in one tap.
+  final bool viewerLocationOff;
+  final VoidCallback? onTurnOnLocationTap;
 
   const PostCard({
     super.key,
@@ -27,6 +33,8 @@ class PostCard extends ConsumerStatefulWidget {
     this.travelMode = false,
     this.travelPlace,
     this.travelDistance,
+    this.viewerLocationOff = false,
+    this.onTurnOnLocationTap,
   });
 
   @override
@@ -293,80 +301,94 @@ class _PostCardState extends ConsumerState<PostCard> {
             bottom: 12,
             left: 12,
             right: 12,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isMulti) ...[
-                  Center(
-                    child:
-                        _PageDots(count: imageCount, activeIndex: _currentPage),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: _toggleLike,
-                      child: Row(
-                        children: [
-                          Icon(
-                            isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: isLiked ? Colors.red : Colors.white,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 4),
-                          Text('${post.likesCount}',
-                              style: const TextStyle(color: Colors.white)),
-                        ],
-                      ),
+            // The action strip floats over the post image. Without an
+            // opaque hit-test wrapper, taps in the gaps between icons
+            // (or under empty Row space) bubbled down to the image
+            // GestureDetector and opened the fullscreen viewer.
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {},
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isMulti) ...[
+                    Center(
+                      child: _PageDots(
+                          count: imageCount, activeIndex: _currentPage),
                     ),
-                    const SizedBox(width: 16),
-                    GestureDetector(
-                      onTap: () => showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: context.cardBg,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(20)),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _toggleLike,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isLiked ? Icons.favorite : Icons.favorite_border,
+                              color: isLiked ? Colors.red : Colors.white,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 4),
+                            Text('${post.likesCount}',
+                                style: const TextStyle(color: Colors.white)),
+                          ],
                         ),
-                        builder: (_) => CommentScreen(post: post),
                       ),
-                      child: _miniIcon(
-                          'assets/icons/Group.svg', '${post.commentsCount}'),
-                    ),
-                    if (repostsEnabled) ...[
                       const SizedBox(width: 16),
                       GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: context.cardBg,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (_) => CommentScreen(post: post),
+                        ),
+                        child: _miniIcon(
+                            'assets/icons/Group.svg', '${post.commentsCount}'),
+                      ),
+                      if (repostsEnabled) ...[
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => ref
+                              .read(postServiceProvider)
+                              .toggleRepost(post.id),
+                          child: Icon(
+                            Icons.repeat,
+                            color: isReposted
+                                ? const Color(0xFFB05ECC)
+                                : Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _openShareSheet(context, ref),
+                        child: _miniIcon('assets/icons/Send.svg', ''),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: () =>
-                            ref.read(postServiceProvider).toggleRepost(post.id),
+                            ref.read(postServiceProvider).toggleSave(post.id),
                         child: Icon(
-                          Icons.repeat,
-                          color: isReposted
-                              ? const Color(0xFFB05ECC)
-                              : Colors.white,
+                          isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color:
+                              isSaved ? const Color(0xFFB05ECC) : Colors.white,
                           size: 22,
                         ),
                       ),
                     ],
-                    const SizedBox(width: 16),
-                    GestureDetector(
-                      onTap: () => _openShareSheet(context, ref),
-                      child: _miniIcon('assets/icons/Send.svg', ''),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () =>
-                          ref.read(postServiceProvider).toggleSave(post.id),
-                      child: Icon(
-                        isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        color: isSaved ? const Color(0xFFB05ECC) : Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
                 if (hasImage && post.caption.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   GestureDetector(
@@ -379,33 +401,75 @@ class _PostCardState extends ConsumerState<PostCard> {
                     ),
                   ),
                 ],
-                if (widget.travelMode &&
-                    travelDistance != null &&
-                    travelDistance.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.28),
-                        ),
-                      ),
-                      child: Text(
-                        travelDistance,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
+                if (widget.travelMode) ...[
+                  if (widget.viewerLocationOff &&
+                      (travelPlace != null && travelPlace.isNotEmpty)) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: widget.onTurnOnLocationTap,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFB05ECC)
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_off,
+                                color: Colors.white,
+                                size: 13,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Turn on location',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ] else if (travelDistance != null &&
+                      travelDistance.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: Text(
+                          travelDistance,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ],
+              ),
             ),
           ),
         ],

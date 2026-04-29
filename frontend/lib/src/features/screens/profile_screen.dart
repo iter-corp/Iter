@@ -186,16 +186,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _tabContent(String uid) {
-    switch (selectedTab) {
-      case 0:
-        return UserPostsGrid(uid: uid);
-      case 1:
-        return UserRepostsGrid(uid: uid);
-      case 2:
-        return UserSavedGrid(uid: uid);
-      default:
-        return UserPostsGrid(uid: uid);
-    }
+    final child = switch (selectedTab) {
+      0 => UserPostsGrid(uid: uid),
+      1 => UserRepostsGrid(uid: uid),
+      2 => UserSavedGrid(uid: uid),
+      _ => UserPostsGrid(uid: uid),
+    };
+    // Smooth crossfade + subtle slide when switching tabs. The
+    // ValueKey on each child forces AnimatedSwitcher to treat tabs as
+    // distinct widgets so it can run the transition between them.
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final offset = Tween<Offset>(
+          begin: const Offset(0.04, 0.0),
+          end: Offset.zero,
+        ).animate(animation);
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(position: offset, child: child),
+        );
+      },
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          ...previous,
+          if (current != null) current,
+        ],
+      ),
+      child: KeyedSubtree(
+        key: ValueKey(selectedTab),
+        child: child,
+      ),
+    );
   }
 
   void _showSettings(BuildContext context) {
@@ -610,6 +635,12 @@ class UserRepostsGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repostsAsync = ref.watch(userRepostsProvider(uid));
+    // Hide reposts whose author is in the viewer's block list — once
+    // you block someone, their content shouldn't reappear via your own
+    // profile's Reposts tab.
+    final blockedSet =
+        (ref.watch(blockedUsersProvider).valueOrNull ?? const <String>[])
+            .toSet();
     return repostsAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(40),
@@ -619,7 +650,10 @@ class UserRepostsGrid extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         child: Center(child: Text('Error: $e')),
       ),
-      data: (posts) {
+      data: (allPosts) {
+        final posts = allPosts
+            .where((p) => !blockedSet.contains(p.authorUid))
+            .toList();
         if (posts.isEmpty) {
           return const _EmptyTab(
             icon: Icons.repeat,
@@ -696,6 +730,9 @@ class UserSavedGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final savedAsync = ref.watch(userSavedProvider(uid));
+    final blockedSet =
+        (ref.watch(blockedUsersProvider).valueOrNull ?? const <String>[])
+            .toSet();
     return savedAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(40),
@@ -705,7 +742,10 @@ class UserSavedGrid extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         child: Center(child: Text('Error: $e')),
       ),
-      data: (posts) {
+      data: (allPosts) {
+        final posts = allPosts
+            .where((p) => !blockedSet.contains(p.authorUid))
+            .toList();
         if (posts.isEmpty) {
           return const _EmptyTab(
             icon: Icons.bookmark_border,
