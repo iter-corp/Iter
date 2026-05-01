@@ -89,10 +89,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
+
   /// Per-message GlobalKeys so [_scrollToMessage] can jump back to the
   /// original of a reply. Stale entries are cleared on rebuild because
   /// we only insert keys for messages currently rendered.
   final Map<String, GlobalKey> _messageKeys = {};
+
+  /// Latest ordered message ids (oldest -> newest) from the stream,
+  /// used to seek a replied-to message even when its widget is off-screen.
+  final List<String> _messageOrder = [];
+
   /// id of the message currently flashing as the result of a reply
   /// quote tap. The bubble paints a brief highlight tween while this
   /// is set so the user can see *which* message we landed on.
@@ -110,8 +116,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() => _pending.add(p));
   }
 
-  void _updatePending(String localId,
-      {_PendingStatus? status, String? error}) {
+  void _updatePending(String localId, {_PendingStatus? status, String? error}) {
     final i = _pending.indexWhere((p) => p.localId == localId);
     if (i < 0) return;
     setState(() {
@@ -248,36 +253,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.clear();
     final reply = _replyTarget;
     setState(() => _replyTarget = null);
-    
+
     try {
       // Check group permissions if this is a group chat
       final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
       if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
         // Check if messaging is restricted
-        final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
+        final restrictMessaging =
+            chatDoc['restrictMessaging'] as bool? ?? false;
         final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
         final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
         final isAdmin = admins.contains(uid);
-        
+
         if (restrictMessaging && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Messaging is restricted in this group')),
+              const SnackBar(
+                  content: Text('Messaging is restricted in this group')),
             );
           }
           return;
         }
-        
+
         if (adminOnly && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Only admins can message in this group')),
+              const SnackBar(
+                  content: Text('Only admins can message in this group')),
             );
           }
           return;
         }
       }
-      
+
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
             senderUid: uid,
@@ -306,7 +314,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
       if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
         final mediaShare = chatDoc['mediaShare'] as bool? ?? true;
-        final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
+        final restrictMessaging =
+            chatDoc['restrictMessaging'] as bool? ?? false;
         final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
         final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
         final isAdmin = admins.contains(uid);
@@ -315,8 +324,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content:
-                      Text('Media sharing is disabled in this group')),
+                  content: Text('Media sharing is disabled in this group')),
             );
           }
           return false;
@@ -363,14 +371,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             const SizedBox(height: 4),
             ListTile(
-              leading: const Icon(Icons.image_outlined,
-                  color: Color(0xFFB05ECC)),
+              leading:
+                  const Icon(Icons.image_outlined, color: Color(0xFFB05ECC)),
               title: const Text('Photo'),
               onTap: () => Navigator.pop(sheet, _AttachKind.image),
             ),
             ListTile(
-              leading: const Icon(Icons.videocam_outlined,
-                  color: Color(0xFFB05ECC)),
+              leading:
+                  const Icon(Icons.videocam_outlined, color: Color(0xFFB05ECC)),
               title: const Text('Video'),
               onTap: () => Navigator.pop(sheet, _AttachKind.video),
             ),
@@ -454,8 +462,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     required ChatMessage? reply,
   }) async {
     try {
-      final url = await StorageService()
-          .uploadChatImage(pending.file, widget.chatId);
+      final url =
+          await StorageService().uploadChatImage(pending.file, widget.chatId);
       _updatePending(pending.localId, status: _PendingStatus.sending);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
@@ -489,7 +497,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (videoSize > _kMaxAttachmentBytes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Video is too large. Max size is 1 GB.')),
+          const SnackBar(
+              content: Text('Video is too large. Max size is 1 GB.')),
         );
       }
       return;
@@ -529,8 +538,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     required ChatMessage? reply,
   }) async {
     try {
-      final url = await StorageService()
-          .uploadChatVideo(pending.file, widget.chatId);
+      final url =
+          await StorageService().uploadChatVideo(pending.file, widget.chatId);
       _updatePending(pending.localId, status: _PendingStatus.sending);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
@@ -558,8 +567,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: const [
-          'pdf', 'doc', 'docx', 'xls', 'xlsx',
-          'ppt', 'pptx', 'txt', 'rtf', 'csv', 'zip',
+          'pdf',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'ppt',
+          'pptx',
+          'txt',
+          'rtf',
+          'csv',
+          'zip',
         ],
         withData: false,
         allowMultiple: false,
@@ -626,8 +644,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     required ChatMessage? reply,
   }) async {
     try {
-      final url = await StorageService()
-          .uploadChatFile(pending.file, widget.chatId);
+      final url =
+          await StorageService().uploadChatFile(pending.file, widget.chatId);
       _updatePending(pending.localId, status: _PendingStatus.sending);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
@@ -683,7 +701,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
       if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
         final mediaShare = chatDoc['mediaShare'] as bool? ?? true;
-        final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
+        final restrictMessaging =
+            chatDoc['restrictMessaging'] as bool? ?? false;
         final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
         final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
         final isAdmin = admins.contains(uid);
@@ -691,16 +710,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Media sharing is disabled in this group')),
+              const SnackBar(
+                  content: Text('Media sharing is disabled in this group')),
             );
           }
           return;
         }
-        
+
         if ((restrictMessaging || adminOnly) && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('You cannot send voice messages in this group')),
+              const SnackBar(
+                  content:
+                      Text('You cannot send voice messages in this group')),
             );
           }
           return;
@@ -852,7 +874,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         debugPrint('[chat-voice] too short, aborting');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Voice message too short (min 300ms)')),
+            const SnackBar(
+                content: Text('Voice message too short (min 300ms)')),
           );
         }
         try {
@@ -862,15 +885,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
 
       debugPrint('[chat-voice] starting upload to storage…');
-      final url = await StorageService()
-          .uploadChatAudio(file, widget.chatId);
+      final url = await StorageService().uploadChatAudio(file, widget.chatId);
       debugPrint('[chat-voice] upload returned url=$url');
 
       if (url.isEmpty) {
         debugPrint('[chat-voice] upload returned EMPTY url');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to upload voice message - empty URL')),
+            const SnackBar(
+                content: Text('Failed to upload voice message - empty URL')),
           );
         }
         return;
@@ -1089,8 +1112,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   children: [
                     const Text(
                       'Translation',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w600),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1098,10 +1121,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       'into your preferred language. You can still tap any '
                       'message to see the original.',
                       style: TextStyle(
-                          color: Theme.of(sheetContext)
-                              .textTheme
-                              .bodySmall
-                              ?.color,
+                          color:
+                              Theme.of(sheetContext).textTheme.bodySmall?.color,
                           fontSize: 12),
                     ),
                     const SizedBox(height: 16),
@@ -1165,28 +1186,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // parked above the latest message.
   bool _initialScrollDone = false;
 
-  /// Scroll the chat list to the message identified by [messageId] and
-  /// flash it briefly so the user can spot the original of a reply.
-  /// Falls back gracefully when the message has scrolled out of the
-  /// rendered window (we just toast and stay put).
-  void _scrollToMessage(String messageId) {
-    final key = _messageKeys[messageId];
-    final ctx = key?.currentContext;
-    if (ctx == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Original message is no longer in view'),
-          duration: Duration(milliseconds: 1500),
-        ),
-      );
-      return;
-    }
-    Scrollable.ensureVisible(
-      ctx,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      alignment: 0.3,
-    );
+  void _flashMessage(String messageId) {
     setState(() => _flashedMessageId = messageId);
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
@@ -1194,6 +1194,93 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         setState(() => _flashedMessageId = null);
       }
     });
+  }
+
+  Future<bool> _ensureMessageVisible(String messageId) async {
+    final key = _messageKeys[messageId];
+    final ctx = key?.currentContext;
+    if (ctx == null) return false;
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: 0.3,
+    );
+    if (!mounted) return true;
+    _flashMessage(messageId);
+    return true;
+  }
+
+  void _showReplyNavSnack(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(milliseconds: 1500),
+      ),
+    );
+  }
+
+  /// Scroll the chat list to the message identified by [messageId] and
+  /// flash it briefly so the user can spot the original of a reply.
+  ///
+  /// If the target widget is not currently mounted (off-screen), we seek by
+  /// stream index and retry ensureVisible before showing an error toast.
+  Future<void> _scrollToMessage(String messageId) async {
+    if (await _ensureMessageVisible(messageId)) return;
+
+    if (_messageOrder.isEmpty) {
+      _showReplyNavSnack('Original message is no longer in view');
+      return;
+    }
+
+    final targetIndex = _messageOrder.indexOf(messageId);
+    if (targetIndex < 0) {
+      _showReplyNavSnack('Original message was deleted');
+      return;
+    }
+
+    if (!_scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_scrollToMessage(messageId));
+      });
+      return;
+    }
+
+    final totalItems = _messageOrder.length + _pending.length;
+    if (totalItems <= 0) {
+      _showReplyNavSnack('Original message is no longer in view');
+      return;
+    }
+
+    final position = _scrollController.position;
+    final avgExtent =
+        (position.maxScrollExtent + position.viewportDimension) / totalItems;
+    final proportional = totalItems <= 1
+        ? 0.0
+        : position.maxScrollExtent * (targetIndex / (totalItems - 1));
+    final centered =
+        avgExtent * targetIndex - position.viewportDimension * 0.35;
+    final candidates = <double>[
+      centered,
+      proportional,
+      centered - position.viewportDimension * 0.9,
+      centered + position.viewportDimension * 0.9,
+    ];
+
+    for (final candidate in candidates) {
+      final target = candidate.clamp(0.0, position.maxScrollExtent);
+      await _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+      );
+      await WidgetsBinding.instance.endOfFrame;
+      if (await _ensureMessageVisible(messageId)) return;
+    }
+
+    _showReplyNavSnack('Original message is no longer in view');
   }
 
   void _scrollToBottom({bool animated = true}) {
@@ -1274,9 +1361,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         (ref.watch(isBlockedByProvider(widget.otherUid)).value ?? false);
     final blockBannerLabel = iBlockedThem
         ? 'You\'ve blocked this user. Unblock from their profile to send messages.'
-        : (theyBlockedMe
-            ? 'You can\'t reply to this conversation.'
-            : null);
+        : (theyBlockedMe ? 'You can\'t reply to this conversation.' : null);
 
     ref.listen(messagesProvider(widget.chatId), (_, __) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -1381,7 +1466,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         : 'Translation settings',
                     onPressed: _openTranslationSettings,
                     icon: Icon(
-                      _autoTranslate ? Icons.translate : Icons.translate_outlined,
+                      _autoTranslate
+                          ? Icons.translate
+                          : Icons.translate_outlined,
                       color: _autoTranslate
                           ? const Color(0xFFB05ECC)
                           : context.textSecondary,
@@ -1424,15 +1511,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   PopupMenuButton<String>(
                     tooltip: 'Chat options',
-                    icon: Icon(Icons.more_vert,
-                        color: context.textSecondary),
+                    icon: Icon(Icons.more_vert, color: context.textSecondary),
                     onSelected: (value) {
                       switch (value) {
                         case 'auto-delete':
                           _showAutoDeletePicker(
                             currentSeconds:
-                                (chatDoc['autoDeleteSeconds'] as num?)
-                                    ?.toInt(),
+                                (chatDoc['autoDeleteSeconds'] as num?)?.toInt(),
                           );
                           break;
                         case 'delete':
@@ -1478,6 +1563,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (msgs) {
+                  final ids = msgs.map((m) => m.id).toList(growable: false);
+                  _messageOrder
+                    ..clear()
+                    ..addAll(ids);
+                  final liveIds = ids.toSet();
+                  _messageKeys.removeWhere((id, _) => !liveIds.contains(id));
+
                   final currentUid = _currentUid ?? '';
                   if (msgs.isEmpty && _pending.isEmpty) {
                     return Center(
@@ -1501,8 +1593,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         );
                       }
                       final msg = msgs[i];
-                      final key = _messageKeys.putIfAbsent(
-                          msg.id, () => GlobalKey());
+                      final key =
+                          _messageKeys.putIfAbsent(msg.id, () => GlobalKey());
                       return KeyedSubtree(
                         key: key,
                         child: _MessageBubble(
@@ -1554,8 +1646,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.block,
-                          size: 18, color: context.textSecondary),
+                      Icon(Icons.block, size: 18, color: context.textSecondary),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -1570,148 +1661,148 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               )
             else
               Padding(
-              padding: const EdgeInsets.all(12),
-              child: _isRecording
-                  ? _RecordingBar(
-                      startedAt: _recordStartedAt,
-                      onCancel: _cancelRecording,
-                      onStop: _stopAndSendVoiceRecording,
-                    )
-                  : Row(
-                      children: [
-                        IconButton(
-                          tooltip: 'Attach',
-                          onPressed: _showAttachMenu,
-                          icon: Icon(Icons.attach_file,
-                              color: context.textSecondary),
-                        ),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.only(left: 16, right: 4),
-                            decoration: BoxDecoration(
-                              color: context.inputFill,
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _controller,
-                                    onChanged: _onTextChanged,
-                                    decoration: InputDecoration(
-                                      hintText: 'Message...',
-                                      hintStyle: TextStyle(
-                                          color: context.textMuted,
-                                          fontSize: 14),
-                                      border: InputBorder.none,
-                                    ),
-                                    onSubmitted: (_) => _sendMessage(),
-                                  ),
-                                ),
-                                // Tap-to-dictate sits INSIDE the input pill so
-                                // it reads as a text-input affordance. We use
-                                // a plain GestureDetector with opaque hit-test
-                                // because IconButton/InkWell inside a
-                                // BoxDecoration container was swallowing taps
-                                // (gesture arena conflict with Tooltip's
-                                // long-press recognizer).
-                                GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: _toggleDictation,
-                                  onLongPress: _pickDictationLocale,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Icon(
-                                      _isDictating
-                                          ? Icons.keyboard_voice
-                                          : Icons.keyboard_voice_outlined,
-                                      color: _isDictating
-                                          ? const Color(0xFFB05ECC)
-                                          : context.textSecondary,
+                padding: const EdgeInsets.all(12),
+                child: _isRecording
+                    ? _RecordingBar(
+                        startedAt: _recordStartedAt,
+                        onCancel: _cancelRecording,
+                        onStop: _stopAndSendVoiceRecording,
+                      )
+                    : Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Attach',
+                            onPressed: _showAttachMenu,
+                            icon: Icon(Icons.attach_file,
+                                color: context.textSecondary),
+                          ),
+                          Expanded(
+                            child: Container(
+                              padding:
+                                  const EdgeInsets.only(left: 16, right: 4),
+                              decoration: BoxDecoration(
+                                color: context.inputFill,
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _controller,
+                                      onChanged: _onTextChanged,
+                                      decoration: InputDecoration(
+                                        hintText: 'Message...',
+                                        hintStyle: TextStyle(
+                                            color: context.textMuted,
+                                            fontSize: 14),
+                                        border: InputBorder.none,
+                                      ),
+                                      onSubmitted: (_) => _sendMessage(),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  // Tap-to-dictate sits INSIDE the input pill so
+                                  // it reads as a text-input affordance. We use
+                                  // a plain GestureDetector with opaque hit-test
+                                  // because IconButton/InkWell inside a
+                                  // BoxDecoration container was swallowing taps
+                                  // (gesture arena conflict with Tooltip's
+                                  // long-press recognizer).
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: _toggleDictation,
+                                    onLongPress: _pickDictationLocale,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Icon(
+                                        _isDictating
+                                            ? Icons.keyboard_voice
+                                            : Icons.keyboard_voice_outlined,
+                                        color: _isDictating
+                                            ? const Color(0xFFB05ECC)
+                                            : context.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Voice ↔ Send morph. We watch the input controller
-                        // so the button swaps the moment the user starts /
-                        // stops typing instead of waiting for the next
-                        // unrelated rebuild. AnimatedSwitcher gives a soft
-                        // scale+rotate crossfade, and the wrapping circle
-                        // also fills with purple when "send" appears so the
-                        // change reads as a single fluid morph.
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: _controller,
-                          builder: (context, value, _) {
-                            final hasText = value.text.trim().isNotEmpty;
-                            if (_uploadingVoice) {
-                              return const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFFB05ECC)),
-                                ),
-                              );
-                            }
-                            return GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: hasText
-                                  ? _sendMessage
-                                  : _startVoiceRecording,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 220),
-                                curve: Curves.easeOutCubic,
-                                width: 44,
-                                height: 44,
-                                margin: const EdgeInsets.all(4),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: hasText
-                                      ? const Color(0xFFB05ECC)
-                                      : Colors.transparent,
-                                ),
-                                child: AnimatedSwitcher(
-                                  duration:
-                                      const Duration(milliseconds: 220),
-                                  switchInCurve: Curves.easeOutBack,
-                                  switchOutCurve: Curves.easeIn,
-                                  transitionBuilder: (child, animation) {
-                                    return ScaleTransition(
-                                      scale: animation,
-                                      child: RotationTransition(
-                                        turns: Tween<double>(
-                                                begin: 0.75, end: 1.0)
-                                            .animate(animation),
-                                        child: FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Icon(
-                                    hasText ? Icons.send : Icons.mic_none,
-                                    key: ValueKey(hasText),
+                          const SizedBox(width: 4),
+                          // Voice ↔ Send morph. We watch the input controller
+                          // so the button swaps the moment the user starts /
+                          // stops typing instead of waiting for the next
+                          // unrelated rebuild. AnimatedSwitcher gives a soft
+                          // scale+rotate crossfade, and the wrapping circle
+                          // also fills with purple when "send" appears so the
+                          // change reads as a single fluid morph.
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _controller,
+                            builder: (context, value, _) {
+                              final hasText = value.text.trim().isNotEmpty;
+                              if (_uploadingVoice) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFFB05ECC)),
+                                  ),
+                                );
+                              }
+                              return GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: hasText
+                                    ? _sendMessage
+                                    : _startVoiceRecording,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  width: 44,
+                                  height: 44,
+                                  margin: const EdgeInsets.all(4),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
                                     color: hasText
-                                        ? Colors.white
-                                        : const Color(0xFFB05ECC),
-                                    size: 22,
+                                        ? const Color(0xFFB05ECC)
+                                        : Colors.transparent,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 220),
+                                    switchInCurve: Curves.easeOutBack,
+                                    switchOutCurve: Curves.easeIn,
+                                    transitionBuilder: (child, animation) {
+                                      return ScaleTransition(
+                                        scale: animation,
+                                        child: RotationTransition(
+                                          turns: Tween<double>(
+                                                  begin: 0.75, end: 1.0)
+                                              .animate(animation),
+                                          child: FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Icon(
+                                      hasText ? Icons.send : Icons.mic_none,
+                                      key: ValueKey(hasText),
+                                      color: hasText
+                                          ? Colors.white
+                                          : const Color(0xFFB05ECC),
+                                      size: 22,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-            ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+              ),
           ],
         ),
       ),
@@ -2001,10 +2092,12 @@ class _MessageBubble extends ConsumerStatefulWidget {
   final VoidCallback onReply;
   final bool autoTranslate;
   final String autoTranslateTarget;
+
   /// Tapping the "replied to" quote inside a bubble should scroll the
   /// chat back to the original message. The parent owns the scroll
   /// controller + per-message keys, so we accept the callback here.
   final void Function(String replyToId)? onReplyQuoteTap;
+
   /// True while the parent has just scrolled to this bubble in
   /// response to a reply-quote tap. The bubble paints a brief
   /// highlight tween so the user can spot which one we landed on.
@@ -2123,9 +2216,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
         ? msg.text
         : (_translated ?? msg.text); // until translation arrives, show original
 
-    final hintColor = isMe
-        ? Colors.white.withValues(alpha: 0.85)
-        : const Color(0xFFB05ECC);
+    final hintColor =
+        isMe ? Colors.white.withValues(alpha: 0.85) : const Color(0xFFB05ECC);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2293,8 +2385,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                               text: msg.replyToText ?? '',
                               onTap: widget.onReplyQuoteTap == null
                                   ? null
-                                  : () => widget.onReplyQuoteTap!(
-                                      msg.replyToId!),
+                                  : () =>
+                                      widget.onReplyQuoteTap!(msg.replyToId!),
                             ),
                           if (msg.storyId != null && msg.storyId!.isNotEmpty)
                             _StoryReplyBanner(
@@ -2313,9 +2405,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                             if (msg.text.isNotEmpty) ...[
                               const SizedBox(height: 6),
                               _buildBody(
-                                textColor: isMe
-                                    ? Colors.white
-                                    : context.textPrimary,
+                                textColor:
+                                    isMe ? Colors.white : context.textPrimary,
                               ),
                             ],
                           ] else if (msg.fileUrl != null &&
@@ -2330,9 +2421,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                             if (msg.text.isNotEmpty) ...[
                               const SizedBox(height: 6),
                               _buildBody(
-                                textColor: isMe
-                                    ? Colors.white
-                                    : context.textPrimary,
+                                textColor:
+                                    isMe ? Colors.white : context.textPrimary,
                               ),
                             ],
                           ] else if (msg.sharedPostId != null &&
@@ -2361,9 +2451,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                             if (msg.text.isNotEmpty) ...[
                               const SizedBox(height: 6),
                               _buildBody(
-                                textColor: isMe
-                                    ? Colors.white
-                                    : context.textPrimary,
+                                textColor:
+                                    isMe ? Colors.white : context.textPrimary,
                               ),
                             ],
                           ] else
@@ -2467,9 +2556,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                         final selected = mine == e;
                         return GestureDetector(
                           onTap: () async {
-                            await sheetRef
-                                .read(reactionServiceProvider)
-                                .toggle(
+                            await sheetRef.read(reactionServiceProvider).toggle(
                                   parentPath: parentPath,
                                   messageId: msg.id,
                                   emoji: e,
@@ -2540,13 +2627,12 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
               ListTile(
                 leading: const Icon(Icons.subtitles_outlined),
                 title: const Text('Show transcript'),
-                subtitle:
-                    (msg.voiceTranscript ?? '').trim().isEmpty
-                        ? const Text(
-                            'Transcript unavailable for this message',
-                            style: TextStyle(fontSize: 11),
-                          )
-                        : null,
+                subtitle: (msg.voiceTranscript ?? '').trim().isEmpty
+                    ? const Text(
+                        'Transcript unavailable for this message',
+                        style: TextStyle(fontSize: 11),
+                      )
+                    : null,
                 enabled: (msg.voiceTranscript ?? '').trim().isNotEmpty,
                 onTap: () {
                   Navigator.pop(sheet);
@@ -2562,8 +2648,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                     final target = sheetRef.watch(preferredLanguageProvider);
                     return ListTile(
                       leading: const Icon(Icons.translate),
-                      title: Text(
-                          'Translate voice to ${target.toUpperCase()}'),
+                      title: Text('Translate voice to ${target.toUpperCase()}'),
                       onTap: () {
                         Navigator.pop(sheet);
                         _showTranslationSheet(
@@ -2755,6 +2840,7 @@ class _RepliedQuote extends ConsumerWidget {
   final bool isMe;
   final String senderUid;
   final String text;
+
   /// Tapping the quote scrolls the chat to the original message.
   /// Wired up by [_MessageBubble] when [onReplyQuoteTap] is provided.
   final VoidCallback? onTap;
@@ -3037,8 +3123,7 @@ class _WaveformPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (heights.isEmpty) return;
     const barWidth = 2.5;
-    final gap =
-        (size.width - barWidth * heights.length) / (heights.length - 1);
+    final gap = (size.width - barWidth * heights.length) / (heights.length - 1);
     final centerY = size.height / 2;
     final progressX = size.width * progress;
 
@@ -3272,9 +3357,8 @@ class _StoryReplyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = isMe
-        ? Colors.white.withValues(alpha: 0.85)
-        : const Color(0xFFB05ECC);
+    final fg =
+        isMe ? Colors.white.withValues(alpha: 0.85) : const Color(0xFFB05ECC);
     final bg = isMe
         ? Colors.white.withValues(alpha: 0.15)
         : Colors.black.withValues(alpha: 0.05);
@@ -3308,8 +3392,7 @@ class _StoryReplyBanner extends StatelessWidget {
                   width: 28,
                   height: 36,
                   color: Colors.black26,
-                  child:
-                      Icon(Icons.broken_image, size: 14, color: fg),
+                  child: Icon(Icons.broken_image, size: 14, color: fg),
                 ),
               ),
             )
@@ -3402,8 +3485,8 @@ class _VideoMessageBubbleState extends State<_VideoMessageBubble> {
                 Container(color: Colors.black.withValues(alpha: 0.55)),
               if (_initFailed)
                 const Center(
-                  child: Icon(Icons.broken_image,
-                      color: Colors.white70, size: 36),
+                  child:
+                      Icon(Icons.broken_image, color: Colors.white70, size: 36),
                 )
               else
                 const Center(
@@ -3435,8 +3518,7 @@ class _VideoFullscreenScreen extends StatefulWidget {
   const _VideoFullscreenScreen({required this.url});
 
   @override
-  State<_VideoFullscreenScreen> createState() =>
-      _VideoFullscreenScreenState();
+  State<_VideoFullscreenScreen> createState() => _VideoFullscreenScreenState();
 }
 
 class _VideoFullscreenScreenState extends State<_VideoFullscreenScreen> {
@@ -3559,7 +3641,8 @@ class _FileMessageBubbleState extends State<_FileMessageBubble> {
     setState(() => _opening = true);
     try {
       final dir = await getTemporaryDirectory();
-      final safeName = widget.fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final safeName =
+          widget.fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
       final path = '${dir.path}/$safeName';
       final file = File(path);
       if (!await file.exists()) {
@@ -3597,8 +3680,9 @@ class _FileMessageBubbleState extends State<_FileMessageBubble> {
   @override
   Widget build(BuildContext context) {
     final fg = widget.isMe ? Colors.white : context.textPrimary;
-    final fgMuted =
-        widget.isMe ? Colors.white.withValues(alpha: 0.8) : context.textSecondary;
+    final fgMuted = widget.isMe
+        ? Colors.white.withValues(alpha: 0.8)
+        : context.textSecondary;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 240),
       child: GestureDetector(
@@ -3840,8 +3924,7 @@ class _AttachmentPreviewScreenState extends State<_AttachmentPreviewScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white24),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text('Cancel'),
                     ),
@@ -3853,8 +3936,7 @@ class _AttachmentPreviewScreenState extends State<_AttachmentPreviewScreen> {
                       icon: const Icon(Icons.send),
                       label: const Text('Send'),
                       style: FilledButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),

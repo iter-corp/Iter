@@ -15,13 +15,58 @@ import 'event_chat_screen.dart';
 import 'post_detail_screen.dart';
 import 'user_screen.dart';
 
-class NotificationScreen extends ConsumerWidget {
+enum _NotificationCategory { activity, follow, event }
+
+class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends ConsumerState<NotificationScreen> {
+  _NotificationCategory _selectedCategory = _NotificationCategory.activity;
+
+  bool _matchesCategory(AppNotification notification) {
+    switch (_selectedCategory) {
+      case _NotificationCategory.activity:
+        return notification.type == 'like' ||
+            notification.type == 'comment' ||
+            notification.type == 'repost' ||
+            notification.type == 'story_like' ||
+            notification.type == 'story_comment' ||
+            notification.type == 'story_reply' ||
+            notification.type == 'message';
+      case _NotificationCategory.follow:
+        return notification.type == 'follow' ||
+            notification.type == 'follow_request' ||
+            notification.type == 'follow_accept';
+      case _NotificationCategory.event:
+        return notification.type == 'event_approved' ||
+            notification.type == 'event_rejected' ||
+            notification.type == 'event_invited' ||
+            notification.type == 'event_removed';
+    }
+  }
+
+  String _emptyLabel() {
+    switch (_selectedCategory) {
+      case _NotificationCategory.activity:
+        return 'No activity notifications yet';
+      case _NotificationCategory.follow:
+        return 'No follow notifications yet';
+      case _NotificationCategory.event:
+        return 'No event notifications yet';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
     final user = ref.watch(authStateProvider).value;
+    final followRequestsAsync = user == null
+        ? const AsyncData<List<String>>(<String>[])
+        : ref.watch(followRequestsProvider(user.uid));
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -64,42 +109,153 @@ class NotificationScreen extends ConsumerWidget {
               ),
             ),
 
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _CategoryChip(
+                      label: 'Activity',
+                      selected:
+                          _selectedCategory == _NotificationCategory.activity,
+                      onTap: () => setState(() {
+                        _selectedCategory = _NotificationCategory.activity;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _CategoryChip(
+                      label: 'Follow',
+                      selected:
+                          _selectedCategory == _NotificationCategory.follow,
+                      onTap: () => setState(() {
+                        _selectedCategory = _NotificationCategory.follow;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _CategoryChip(
+                      label: 'Event',
+                      selected:
+                          _selectedCategory == _NotificationCategory.event,
+                      onTap: () => setState(() {
+                        _selectedCategory = _NotificationCategory.event;
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
             /// LIST
             Expanded(
               child: notificationsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (notifications) {
-                  if (notifications.isEmpty) {
+                  final followRequests =
+                      followRequestsAsync.valueOrNull ?? const <String>[];
+                  final existingRequestActors = notifications
+                      .where((n) => n.type == 'follow_request')
+                      .map((n) => n.actorUid)
+                      .toSet();
+
+                  // Fallback source for pending requests when notification docs
+                  // are missing (for example on Spark-only setups).
+                  final syntheticRequests = followRequests
+                      .where((uid) => !existingRequestActors.contains(uid))
+                      .map(
+                        (uid) => AppNotification(
+                          id: 'follow_request_$uid',
+                          type: 'follow_request',
+                          actorUid: uid,
+                          targetId: uid,
+                          read: false,
+                          createdAt: null,
+                        ),
+                      )
+                      .toList();
+
+                  final items = <AppNotification>[
+                    ...syntheticRequests,
+                    ...notifications,
+                  ].where(_matchesCategory).toList();
+
+                  if (items.isEmpty) {
                     return Center(
                       child: Text(
-                        'No notifications yet',
+                        _emptyLabel(),
                         style: TextStyle(color: context.textMuted),
                       ),
                     );
                   }
+
+                  final persistedIds = notifications.map((n) => n.id).toSet();
+
                   return ListView.builder(
                     padding: const EdgeInsets.only(bottom: 24),
-                    itemCount: notifications.length,
+                    itemCount: items.length,
                     itemBuilder: (_, i) => _NotificationItem(
-                      notif: notifications[i],
+                      notif: items[i],
                       onMarkRead: user == null
                           ? null
-                          : () => ref
-                              .read(notificationServiceProvider)
-                              .markRead(user.uid, notifications[i].id),
+                          : persistedIds.contains(items[i].id)
+                              ? () => ref
+                                  .read(notificationServiceProvider)
+                                  .markRead(user.uid, items[i].id)
+                              : null,
                       onDelete: user == null
                           ? null
-                          : () => ref
-                              .read(notificationServiceProvider)
-                              .deleteNotification(
-                                  user.uid, notifications[i].id),
+                          : persistedIds.contains(items[i].id)
+                              ? () => ref
+                                  .read(notificationServiceProvider)
+                                  .deleteNotification(user.uid, items[i].id)
+                              : null,
                     ),
                   );
                 },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: selected ? const Color(0xFFB44FFF) : context.cardBg,
+          border: Border.all(
+            color: selected ? const Color(0xFFB44FFF) : context.borderColor,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : context.textPrimary,
+          ),
         ),
       ),
     );
@@ -127,8 +283,7 @@ class _FollowStateButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          color:
-              isFollowing ? context.borderColor : const Color(0xFFB44FFF),
+          color: isFollowing ? context.borderColor : const Color(0xFFB44FFF),
         ),
         child: Text(
           isFollowing ? 'Following' : 'Follow back',
@@ -202,18 +357,23 @@ class _NotificationItem extends ConsumerWidget {
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             if (currentUser != null) {
-              final followRequestsAsync = ref.watch(followRequestsProvider(currentUser.uid));
-              final followersAsync = ref.watch(followersProvider(currentUser.uid));
-              
+              final followRequestsAsync =
+                  ref.watch(followRequestsProvider(currentUser.uid));
+              final followersAsync =
+                  ref.watch(followersProvider(currentUser.uid));
+
               final followRequests = followRequestsAsync.valueOrNull;
               final followers = followersAsync.valueOrNull;
 
               if (followRequests == null || followers == null) {
-                 trailingWidget = const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
+                trailingWidget = const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2));
               } else {
                 final isPending = followRequests.contains(notif.actorUid);
                 final isFollower = followers.contains(notif.actorUid);
-                
+
                 // Show action buttons only if request is still pending
                 if (isPending && !isFollower) {
                   trailingWidget = _FollowRequestActions(
@@ -224,7 +384,8 @@ class _NotificationItem extends ConsumerWidget {
                   // Request was already processed (accepted or rejected)
                   trailingWidget = Text(
                     isFollower ? 'Accepted' : 'Rejected',
-                    style: TextStyle(color: context.textSecondary, fontSize: 12),
+                    style:
+                        TextStyle(color: context.textSecondary, fontSize: 12),
                   );
                 }
               }
@@ -291,6 +452,29 @@ class _NotificationItem extends ConsumerWidget {
           );
         }
 
+        final tile = GestureDetector(
+          onTap: () {
+            onMarkRead?.call();
+            _navigateToTarget(context, notif);
+          },
+          child: Opacity(
+            opacity: notif.read ? 0.55 : 1.0,
+            child: NotificationTile(
+              avatar: avatar,
+              title: title,
+              subtitle: subtitle,
+              trailingType: trailingType,
+              isLike: isLike,
+              onFollowTap: onFollow,
+              trailingWidget: trailingWidget,
+            ),
+          ),
+        );
+
+        if (notif.type == 'follow_request') {
+          return tile;
+        }
+
         return Dismissible(
           key: ValueKey(notif.id),
           direction: DismissDirection.endToStart,
@@ -301,24 +485,7 @@ class _NotificationItem extends ConsumerWidget {
             child: const Icon(Icons.delete_outline, color: Colors.white),
           ),
           onDismissed: (_) => onDelete?.call(),
-          child: GestureDetector(
-            onTap: () {
-              onMarkRead?.call();
-              _navigateToTarget(context, notif);
-            },
-            child: Opacity(
-              opacity: notif.read ? 0.55 : 1.0,
-              child: NotificationTile(
-                avatar: avatar,
-                title: title,
-                subtitle: subtitle,
-                trailingType: trailingType,
-                isLike: isLike,
-                onFollowTap: onFollow,
-                trailingWidget: trailingWidget,
-              ),
-            ),
-          ),
+          child: tile,
         );
       },
     );
@@ -477,8 +644,7 @@ class _InviteActionsState extends ConsumerState<_InviteActions> {
         InkWell(
           onTap: _busy ? null : _reject,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFE04E5C)),
@@ -496,8 +662,7 @@ class _InviteActionsState extends ConsumerState<_InviteActions> {
         InkWell(
           onTap: _busy ? null : _accept,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               color: const Color(0xFFB44FFF),
@@ -549,11 +714,12 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
 
       // Delete the follow request notification using the deterministic ID that matches the backend
       // The backend creates notifications with ID format: follow_request_${followerUid}
-      final deterministicNotificationId = 'follow_request_${widget.requesterUid}';
+      final deterministicNotificationId =
+          'follow_request_${widget.requesterUid}';
       await ref.read(notificationServiceProvider).deleteNotification(
-        widget.currentUid,
-        deterministicNotificationId,
-      );
+            widget.currentUid,
+            deterministicNotificationId,
+          );
 
       if (mounted) setState(() => _success = true);
     } catch (e) {
@@ -577,11 +743,12 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
 
       // Delete the follow request notification using the deterministic ID that matches the backend
       // The backend creates notifications with ID format: follow_request_${followerUid}
-      final deterministicNotificationId = 'follow_request_${widget.requesterUid}';
+      final deterministicNotificationId =
+          'follow_request_${widget.requesterUid}';
       await ref.read(notificationServiceProvider).deleteNotification(
-        widget.currentUid,
-        deterministicNotificationId,
-      );
+            widget.currentUid,
+            deterministicNotificationId,
+          );
 
       if (mounted) setState(() => _success = true);
     } catch (e) {

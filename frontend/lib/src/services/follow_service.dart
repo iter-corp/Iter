@@ -6,6 +6,40 @@ class FollowService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
 
+  String _buildDirectChatId(String a, String b) {
+    final sorted = [a, b]..sort();
+    return '${sorted[0]}_${sorted[1]}';
+  }
+
+  /// If both users now have an active (non-pending) follow relationship,
+  /// move their existing 1:1 chat to accepted for both sides so it appears
+  /// in the All inbox immediately.
+  Future<void> _promoteDirectChatIfMutualFollow({
+    required String uidA,
+    required String uidB,
+  }) async {
+    try {
+      final aToB = await _followingCol(uidA).doc(uidB).get();
+      final bToA = await _followingCol(uidB).doc(uidA).get();
+      final aActive =
+          aToB.exists && (aToB.data()?['status'] as String?) != 'pending';
+      final bActive =
+          bToA.exists && (bToA.data()?['status'] as String?) != 'pending';
+      if (!aActive || !bActive) return;
+
+      final chatId = _buildDirectChatId(uidA, uidB);
+      final chatRef = _db.collection('chats').doc(chatId);
+      final chatSnap = await chatRef.get();
+      if (!chatSnap.exists) return;
+
+      await chatRef.update({
+        'acceptedBy': FieldValue.arrayUnion([uidA, uidB]),
+      });
+    } catch (_) {
+      // Best-effort: follow acceptance should not fail if chat promotion fails.
+    }
+  }
+
   DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
       _db.collection('users').doc(uid);
 
@@ -21,6 +55,9 @@ class FollowService {
   /// unfollows / refollows.
   String _followNotifId(String actorUid) => 'follow_$actorUid';
 
+  /// Deterministic notification doc id for a pending follow request.
+  String _followRequestNotifId(String actorUid) => 'follow_request_$actorUid';
+
   Future<void> follow({
     required String currentUid,
     required String targetUid,
@@ -35,27 +72,29 @@ class FollowService {
     final followerRef = _followersCol(targetUid).doc(currentUid);
 
     final batch = _db.batch();
-    batch.set(followingRef, {'uid': targetUid, 'createdAt': now, 'status': status});
-    batch.set(followerRef, {'uid': currentUid, 'createdAt': now, 'status': status});
+    batch.set(
+        followingRef, {'uid': targetUid, 'createdAt': now, 'status': status});
+    batch.set(
+        followerRef, {'uid': currentUid, 'createdAt': now, 'status': status});
     await batch.commit();
 
-    if (!isPrivate) {
-      try {
-        // upsert by deterministic id so a follow → unfollow → follow
-        // cycle doesn't pile up notification rows. The unfollow path
-        // below also removes this id, so the badge clears when the
-        // relationship goes away.
-        await _notifications.upsertNotification(
-          targetUid: targetUid,
-          docId: _followNotifId(currentUid),
-          type: 'follow',
-          actorUid: currentUid,
-        );
-      } catch (_) {}
-    }
-    // Note: For pending follow_requests (when isPrivate=true), the backend's
-    // onFollowCreate trigger already creates the notification with a deterministic ID.
-    // Do not create a duplicate notification on the client.
+    // If this follow completed a mutual relationship, immediately promote any
+    // existing direct chat out of Requests and into All.
+    await _promoteDirectChatIfMutualFollow(uidA: currentUid, uidB: targetUid);
+
+    try {
+      // Use deterministic ids so repeated follow/request cycles update a
+      // single row instead of piling up duplicates.
+      await _notifications.upsertNotification(
+        targetUid: targetUid,
+        docId: isPrivate
+            ? _followRequestNotifId(currentUid)
+            : _followNotifId(currentUid),
+        type: isPrivate ? 'follow_request' : 'follow',
+        actorUid: currentUid,
+        targetId: currentUid,
+      );
+    } catch (_) {}
   }
 
   Future<void> unfollow({
@@ -83,6 +122,12 @@ class FollowService {
         _followNotifId(currentUid),
       );
     } catch (_) {}
+    try {
+      await _notifications.removeNotificationById(
+        targetUid,
+        _followRequestNotifId(currentUid),
+      );
+    } catch (_) {}
   }
 
   Future<void> acceptFollowRequest({
@@ -94,7 +139,8 @@ class FollowService {
     final followerSnap = await followerRef.get();
 
     if (!followerSnap.exists) {
-      throw Exception('Follow request not found at path: users/$currentUid/followers/$requesterUid');
+      throw Exception(
+          'Follow request not found at path: users/$currentUid/followers/$requesterUid');
     }
 
     // 2. Verify the following document reference
@@ -102,19 +148,25 @@ class FollowService {
 
     // 3. Update both documents to 'active' using set(merge: true).
     // Using set(merge: true) is more robust than update() because it succeeds
-    // even if the document was temporarily deleted or desynced, avoiding 
+    // even if the document was temporarily deleted or desynced, avoiding
     // PERMISSION_DENIED errors on non-existent documents.
     final batch = _db.batch();
 
-    batch.set(followerRef, {
-      'status': 'active',
-      'acceptedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    batch.set(
+        followerRef,
+        {
+          'status': 'active',
+          'acceptedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true));
 
-    batch.set(followingRef, {
-      'status': 'active',
-      'acceptedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    batch.set(
+        followingRef,
+        {
+          'status': 'active',
+          'acceptedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true));
 
     // 4. Create an 'accept' notification for the requester
     final notificationRef = _db
@@ -130,10 +182,23 @@ class FollowService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    batch.delete(
+      _db
+          .collection('notifications')
+          .doc(currentUid)
+          .collection('items')
+          .doc(_followRequestNotifId(requesterUid)),
+    );
+
     try {
       await batch.commit();
+      await _promoteDirectChatIfMutualFollow(
+        uidA: currentUid,
+        uidB: requesterUid,
+      );
     } catch (e) {
-      throw Exception('Failed to accept follow request. Error: $e. Make sure you are authenticated as the account receiving the follow request (currentUid: $currentUid)');
+      throw Exception(
+          'Failed to accept follow request. Error: $e. Make sure you are authenticated as the account receiving the follow request (currentUid: $currentUid)');
     }
   }
 
@@ -146,7 +211,8 @@ class FollowService {
     final followerSnap = await followerRef.get();
 
     if (!followerSnap.exists) {
-      throw Exception('Follow request not found at path: users/$currentUid/followers/$requesterUid');
+      throw Exception(
+          'Follow request not found at path: users/$currentUid/followers/$requesterUid');
     }
 
     // Delete both documents in an atomic batch
@@ -154,8 +220,15 @@ class FollowService {
     // Which means: the requester can delete, the target can delete, or admin can delete
     try {
       await unfollow(currentUid: requesterUid, targetUid: currentUid);
+      try {
+        await _notifications.removeNotificationById(
+          currentUid,
+          _followRequestNotifId(requesterUid),
+        );
+      } catch (_) {}
     } catch (e) {
-      throw Exception('Failed to reject follow request. Error: $e. Make sure you are authenticated as the account receiving the follow request (currentUid: $currentUid)');
+      throw Exception(
+          'Failed to reject follow request. Error: $e. Make sure you are authenticated as the account receiving the follow request (currentUid: $currentUid)');
     }
   }
 
@@ -183,7 +256,8 @@ class FollowService {
 
   Stream<List<String>> getFollowers(String uid) {
     return _followersCol(uid).snapshots().map((snap) {
-      final activeDocs = snap.docs.where((d) => d.data()['status'] != 'pending').toList();
+      final activeDocs =
+          snap.docs.where((d) => d.data()['status'] != 'pending').toList();
       activeDocs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
         final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
@@ -198,7 +272,8 @@ class FollowService {
 
   Stream<List<String>> getFollowRequests(String uid) {
     return _followersCol(uid).snapshots().map((snap) {
-      final pendingDocs = snap.docs.where((d) => d.data()['status'] == 'pending').toList();
+      final pendingDocs =
+          snap.docs.where((d) => d.data()['status'] == 'pending').toList();
       pendingDocs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
         final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
@@ -213,7 +288,8 @@ class FollowService {
 
   Stream<List<String>> getFollowing(String uid) {
     return _followingCol(uid).snapshots().map((snap) {
-      final activeDocs = snap.docs.where((d) => d.data()['status'] != 'pending').toList();
+      final activeDocs =
+          snap.docs.where((d) => d.data()['status'] != 'pending').toList();
       activeDocs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
         final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();

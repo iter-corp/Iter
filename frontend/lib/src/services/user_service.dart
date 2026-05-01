@@ -15,7 +15,7 @@ class UserService {
       _doc(uid).snapshots().map((s) => s.data());
 
   Future<void> updateUser(String uid, Map<String, dynamic> data) =>
-      _doc(uid).update(data);
+      _doc(uid).set(data, SetOptions(merge: true));
 
   Future<bool> isUsernameTaken(String username) async {
     final q = await _db

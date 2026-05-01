@@ -41,6 +41,24 @@ class ProfileSettingsScreen extends ConsumerWidget {
         children: [
           const _SectionHeader(title: 'Account'),
           ListTile(
+            leading: const Icon(Icons.email_outlined, color: AppColors.purple),
+            title: const Text('Change email'),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            onTap: () => _changeEmail(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_reset, color: AppColors.purple),
+            title: Text(
+                _isEmailPasswordUser() ? 'Change password' : 'Set a password'),
+            subtitle: _isEmailPasswordUser()
+                ? null
+                : Text('Add a password so you can also sign in with email',
+                    style:
+                        TextStyle(fontSize: 12, color: context.textSecondary)),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            onTap: () => _changePassword(context),
+          ),
+          ListTile(
             leading: Icon(
               isPrivate ? Icons.lock_outline : Icons.lock_open,
               color: AppColors.purple,
@@ -80,8 +98,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 if (visitorCount > 0)
                   Container(
                     margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: context.purpleSoft,
                       borderRadius: BorderRadius.circular(12),
@@ -104,7 +122,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
-
           const _SectionHeader(title: 'Language'),
           ListTile(
             leading: const Icon(Icons.translate, color: AppColors.purple),
@@ -122,7 +139,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
             onTap: () => _pickLanguage(context, ref, current: preferredLang),
           ),
-
           const _SectionHeader(title: 'Appearance'),
           ListTile(
             leading: Icon(
@@ -137,21 +153,18 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
           ),
-
           const _SectionHeader(title: 'Safety'),
           ListTile(
             leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
             title: const Text('Blocked users'),
-            trailing:
-                Icon(Icons.chevron_right, color: context.textSecondary),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _showBlockedUsers(context),
           ),
-
           if (isAdmin) ...[
             const _SectionHeader(title: 'Admin'),
             ListTile(
-              leading: const Icon(Icons.shield_outlined,
-                  color: Color(0xFF7E3BE8)),
+              leading:
+                  const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
               title: const Text(
                 'Admin panel',
                 style: TextStyle(
@@ -162,12 +175,10 @@ class ProfileSettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/admin'),
             ),
           ],
-
           const _SectionHeader(title: 'Danger zone'),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title:
-                const Text('Log out', style: TextStyle(color: Colors.red)),
+            title: const Text('Log out', style: TextStyle(color: Colors.red)),
             onTap: () async {
               await ref.read(authServiceProvider).signOut();
               ref.invalidate(adminConfigProvider);
@@ -194,6 +205,447 @@ class ProfileSettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Returns true if the current user signed up with email+password.
+  bool _isEmailPasswordUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.providerData.any((p) => p.providerId == 'password') ?? false;
+  }
+
+  Future<void> _changeEmail(BuildContext context) async {
+    if (!_isEmailPasswordUser()) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cannot change email'),
+          content: const Text(
+            'Your email address is your Google account email. '
+            'It can only be changed from your Google account settings at myaccount.google.com.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    bool obscure = true;
+    String? error;
+    bool loading = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Change email'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                decoration: const InputDecoration(labelText: 'New email'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'Current password',
+                  suffixIcon: IconButton(
+                    icon:
+                        Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 10),
+                Text(error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final newEmail = emailCtrl.text.trim();
+                      final password = passCtrl.text;
+                      if (newEmail.isEmpty || password.isEmpty) {
+                        setState(() => error = 'All fields are required.');
+                        return;
+                      }
+                      setState(() {
+                        loading = true;
+                        error = null;
+                      });
+                      try {
+                        final user = FirebaseAuth.instance.currentUser!;
+                        final cred = EmailAuthProvider.credential(
+                          email: user.email!,
+                          password: password,
+                        );
+                        await user.reauthenticateWithCredential(cred);
+                        await user.verifyBeforeUpdateEmail(newEmail);
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Verification email sent. Check your inbox to confirm the new address.'),
+                            ),
+                          );
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        setState(() {
+                          loading = false;
+                          error = switch (e.code) {
+                            'wrong-password' ||
+                            'invalid-credential' =>
+                              'Incorrect password.',
+                            'email-already-in-use' =>
+                              'That email is already in use.',
+                            'invalid-email' =>
+                              'That email address looks invalid.',
+                            _ => e.message ?? 'Something went wrong.',
+                          };
+                        });
+                      } catch (_) {
+                        setState(() {
+                          loading = false;
+                          error = 'Something went wrong. Please try again.';
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save',
+                      style: TextStyle(color: AppColors.purple)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    emailCtrl.dispose();
+    passCtrl.dispose();
+  }
+
+  Future<void> _changePassword(BuildContext context) async {
+    final hasPassword = _isEmailPasswordUser();
+    // Google users who haven't set a password yet link a new credential.
+    // Google users who already linked a password, or plain email users,
+    // go through the normal current-password verification flow.
+    if (!hasPassword) {
+      await _setPasswordForSocialUser(context);
+    } else {
+      await _changePasswordForEmailUser(context);
+    }
+  }
+
+  /// Google (or other social) users who have no password yet.
+  /// Links an EmailAuthProvider credential so they can also sign in
+  /// with email + password going forward.
+  Future<void> _setPasswordForSocialUser(BuildContext context) async {
+    final newPassCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    String? error;
+    bool loading = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Set a password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add a password to your account so you can also sign in with your email.',
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: newPassCtrl,
+                obscureText: obscureNew,
+                decoration: InputDecoration(
+                  labelText: 'New password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        obscureNew ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => obscureNew = !obscureNew),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmPassCtrl,
+                obscureText: obscureConfirm,
+                decoration: InputDecoration(
+                  labelText: 'Confirm password',
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureConfirm
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: () =>
+                        setState(() => obscureConfirm = !obscureConfirm),
+                  ),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 10),
+                Text(error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final newPass = newPassCtrl.text;
+                      final confirm = confirmPassCtrl.text;
+                      if (newPass.isEmpty || confirm.isEmpty) {
+                        setState(() => error = 'All fields are required.');
+                        return;
+                      }
+                      if (newPass.length < 6) {
+                        setState(() =>
+                            error = 'Password must be at least 6 characters.');
+                        return;
+                      }
+                      if (newPass != confirm) {
+                        setState(() => error = 'Passwords do not match.');
+                        return;
+                      }
+                      setState(() {
+                        loading = true;
+                        error = null;
+                      });
+                      try {
+                        final user = FirebaseAuth.instance.currentUser!;
+                        final cred = EmailAuthProvider.credential(
+                          email: user.email!,
+                          password: newPass,
+                        );
+                        await user.linkWithCredential(cred);
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Password set. You can now sign in with your email and this password.'),
+                            ),
+                          );
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        setState(() {
+                          loading = false;
+                          error = switch (e.code) {
+                            'weak-password' => 'Password is too weak.',
+                            'provider-already-linked' =>
+                              'A password is already linked to this account.',
+                            _ => e.message ?? 'Something went wrong.',
+                          };
+                        });
+                      } catch (_) {
+                        setState(() {
+                          loading = false;
+                          error = 'Something went wrong. Please try again.';
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Set password',
+                      style: TextStyle(color: AppColors.purple)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    newPassCtrl.dispose();
+    confirmPassCtrl.dispose();
+  }
+
+  /// Email+password users, or social users who already linked a password.
+  Future<void> _changePasswordForEmailUser(BuildContext context) async {
+    final currentPassCtrl = TextEditingController();
+    final newPassCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    String? error;
+    bool loading = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Change password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentPassCtrl,
+                obscureText: obscureCurrent,
+                decoration: InputDecoration(
+                  labelText: 'Current password',
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureCurrent
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: () =>
+                        setState(() => obscureCurrent = !obscureCurrent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newPassCtrl,
+                obscureText: obscureNew,
+                decoration: InputDecoration(
+                  labelText: 'New password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        obscureNew ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => obscureNew = !obscureNew),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmPassCtrl,
+                obscureText: obscureConfirm,
+                decoration: InputDecoration(
+                  labelText: 'Confirm new password',
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureConfirm
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: () =>
+                        setState(() => obscureConfirm = !obscureConfirm),
+                  ),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 10),
+                Text(error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final current = currentPassCtrl.text;
+                      final newPass = newPassCtrl.text;
+                      final confirm = confirmPassCtrl.text;
+                      if (current.isEmpty ||
+                          newPass.isEmpty ||
+                          confirm.isEmpty) {
+                        setState(() => error = 'All fields are required.');
+                        return;
+                      }
+                      if (newPass.length < 6) {
+                        setState(() =>
+                            error = 'Password must be at least 6 characters.');
+                        return;
+                      }
+                      if (newPass != confirm) {
+                        setState(() => error = 'Passwords do not match.');
+                        return;
+                      }
+                      setState(() {
+                        loading = true;
+                        error = null;
+                      });
+                      try {
+                        final user = FirebaseAuth.instance.currentUser!;
+                        final cred = EmailAuthProvider.credential(
+                          email: user.email!,
+                          password: current,
+                        );
+                        await user.reauthenticateWithCredential(cred);
+                        await user.updatePassword(newPass);
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Password updated successfully.')),
+                          );
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        setState(() {
+                          loading = false;
+                          error = switch (e.code) {
+                            'wrong-password' ||
+                            'invalid-credential' =>
+                              'Incorrect current password.',
+                            'weak-password' => 'New password is too weak.',
+                            _ => e.message ?? 'Something went wrong.',
+                          };
+                        });
+                      } catch (_) {
+                        setState(() {
+                          loading = false;
+                          error = 'Something went wrong. Please try again.';
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save',
+                      style: TextStyle(color: AppColors.purple)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    currentPassCtrl.dispose();
+    newPassCtrl.dispose();
+    confirmPassCtrl.dispose();
   }
 
   String _languageLabel(String code) {
@@ -270,8 +722,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                           ),
                         ),
                         trailing: selected
-                            ? const Icon(Icons.check,
-                                color: AppColors.purple)
+                            ? const Icon(Icons.check, color: AppColors.purple)
                             : null,
                         onTap: () => Navigator.pop(sheet, lang.code),
                       );

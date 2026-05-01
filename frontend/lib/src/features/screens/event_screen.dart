@@ -26,7 +26,6 @@ const List<String> _kPartnerFilters = [
   'Gender',
 ];
 
-
 double? _distanceKm(dynamic a, dynamic b) {
   if (a is! Map || b is! Map) return null;
   final aLat = (a['lat'] as num?)?.toDouble();
@@ -76,7 +75,6 @@ class _EventBodyState extends ConsumerState<EventBody> {
   String? _selectedCity;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  int _selectedTab = 0;
 
   @override
   void initState() {

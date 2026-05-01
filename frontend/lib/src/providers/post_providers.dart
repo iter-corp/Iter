@@ -36,11 +36,16 @@ class TravelFeedQuery {
 final postServiceProvider = Provider<PostService>((_) => PostService());
 
 final feedProvider = StreamProvider<List<Post>>((ref) {
-  final currentUid = ref.watch(authStateProvider).value?.uid;
+  // Rebuild only when the effective UID changes to avoid restarting the feed
+  // stream during transient auth state re-emissions.
+  final currentUid = ref.watch(
+    authStateProvider.select((a) => a.value?.uid),
+  );
   if (currentUid == null) return const Stream.empty();
 
   final followService = ref.watch(followServiceProvider);
-  final blockedStream = ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
+  final blockedStream =
+      ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
 
   return Rx.combineLatest3(
     ref.watch(postServiceProvider).streamFeed().onErrorReturn(<Post>[]),
@@ -57,9 +62,13 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
   );
 });
 
-final userPostsProvider = StreamProvider.family<List<Post>, String>(
-  (ref, uid) => ref.watch(postServiceProvider).streamUserPosts(uid),
-);
+final userPostsProvider = StreamProvider.family<List<Post>, String>((ref, uid) {
+  // Gate on auth being settled. posts require signedIn() in Firestore rules;
+  // opening the stream before the token propagates causes permission-denied.
+  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (authed == null) return const Stream.empty();
+  return ref.watch(postServiceProvider).streamUserPosts(uid);
+});
 
 final travelFeedProvider =
     FutureProvider.family<List<Post>, TravelFeedQuery>((ref, query) async {
@@ -74,33 +83,32 @@ final travelFeedProvider =
 final isLikedProvider = StreamProvider.family<bool, String>((ref, postId) {
   // Watch auth so the stream rebuilds after logout/re-login, preventing a
   // stuck Stream.value(false) created while auth was initialising.
-  final uid = (ref.watch(authStateProvider).value ??
-          ref.watch(authServiceProvider).currentUser)
-      ?.uid;
+  final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
   if (uid == null) return Stream.value(false);
   return ref.watch(postServiceProvider).streamIsLiked(postId, uid: uid);
 });
 
 final isRepostedProvider = StreamProvider.family<bool, String>((ref, postId) {
-  final uid = (ref.watch(authStateProvider).value ??
-          ref.watch(authServiceProvider).currentUser)
-      ?.uid;
+  final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
   if (uid == null) return Stream.value(false);
   return ref.watch(postServiceProvider).streamIsReposted(postId, uid: uid);
 });
 
-final userRepostsProvider = StreamProvider.family<List<Post>, String>(
-  (ref, uid) => ref.watch(postServiceProvider).streamUserReposts(uid),
-);
+final userRepostsProvider =
+    StreamProvider.family<List<Post>, String>((ref, uid) {
+  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (authed == null) return const Stream.empty();
+  return ref.watch(postServiceProvider).streamUserReposts(uid);
+});
 
 final isSavedProvider = StreamProvider.family<bool, String>((ref, postId) {
-  final uid = (ref.watch(authStateProvider).value ??
-          ref.watch(authServiceProvider).currentUser)
-      ?.uid;
+  final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
   if (uid == null) return Stream.value(false);
   return ref.watch(postServiceProvider).streamIsSaved(postId, uid: uid);
 });
 
-final userSavedProvider = StreamProvider.family<List<Post>, String>(
-  (ref, uid) => ref.watch(postServiceProvider).streamUserSaved(uid),
-);
+final userSavedProvider = StreamProvider.family<List<Post>, String>((ref, uid) {
+  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (authed == null) return const Stream.empty();
+  return ref.watch(postServiceProvider).streamUserSaved(uid);
+});

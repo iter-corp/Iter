@@ -15,55 +15,19 @@
       },
       "oauth_client": [
         {
-          "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBBqeOrAoIPgBzOVvfXc6NP93_KbHwXMl0"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "751233585713-apph3tgnten6j4kj12kcps3g3jqfjfg7.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.team.coil"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:751233585713:android:5dce8e83bba17fa4a97b10",
-        "android_client_info": {
-          "package_name": "com.team.coil"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "751233585713-inc610u5mvtg0or1pssi314kn6fagkls.apps.googleusercontent.com",
+          "client_id": "751233585713-cevn2bh9pd6qm6bc5gp3gsjgmhkfd5nd.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.team.coil",
-            "certificate_hash": "c7ef0605d3fccba29be0b02ca2423563386d923d"
+            "package_name": "com.iter.ai",
+            "certificate_hash": "e52d6b26bba5bec9acc1fc6f48947a2c20caa05c"
           }
         },
         {
-          "client_id": "751233585713-u7s2ksgng7c63bjhqsr05j1vsh2ssnvt.apps.googleusercontent.com",
+          "client_id": "751233585713-gsd5pe59pv2456h3a283af2euj7scfdo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.team.coil",
-            "certificate_hash": "e52d6b26bba5bec9acc1fc6f48947a2c20caa05c"
+            "package_name": "com.iter.ai",
+            "certificate_hash": "c7ef0605d3fccba29be0b02ca2423563386d923d"
           }
         },
         {

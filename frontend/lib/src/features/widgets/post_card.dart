@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
@@ -21,6 +22,7 @@ class PostCard extends ConsumerStatefulWidget {
   final bool travelMode;
   final String? travelPlace;
   final String? travelDistance;
+
   /// When true the viewer's GPS location isn't available (services off or
   /// permission denied). The travel-mode card replaces the distance pill
   /// with a tappable "Turn on location" CTA so users know why distance
@@ -66,6 +68,16 @@ class _PostCardState extends ConsumerState<PostCard> {
     } finally {
       if (mounted) setState(() => _pendingLike = null);
     }
+  }
+
+  String _formatPostTimestamp(DateTime? dt) {
+    if (dt == null) return 'just now';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return DateFormat('MMM d, yyyy').format(dt);
   }
 
   @override
@@ -263,13 +275,26 @@ class _PostCardState extends ConsumerState<PostCard> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          username,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              username,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatPostTimestamp(post.createdAt),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                         if (widget.travelMode &&
                             travelPlace != null &&
@@ -423,86 +448,88 @@ class _PostCardState extends ConsumerState<PostCard> {
                       ),
                     ],
                   ),
-                if (hasImage && post.caption.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: () => _showFullCaption(context, avatarUrl, username),
-                    child: Text(
-                      post.caption,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                  if (hasImage && post.caption.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () =>
+                          _showFullCaption(context, avatarUrl, username),
+                      child: Text(
+                        post.caption,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 13),
+                      ),
                     ),
-                  ),
-                ],
-                if (widget.travelMode) ...[
-                  if (widget.viewerLocationOff &&
-                      (travelPlace != null && travelPlace.isNotEmpty)) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: GestureDetector(
-                        onTap: widget.onTurnOnLocationTap,
+                  ],
+                  if (widget.travelMode) ...[
+                    if (widget.viewerLocationOff &&
+                        (travelPlace != null && travelPlace.isNotEmpty)) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: widget.onTurnOnLocationTap,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFB05ECC)
+                                    .withValues(alpha: 0.6),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.location_off,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Turn on location',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else if (travelDistance != null &&
+                        travelDistance.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: Colors.black.withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: const Color(0xFFB05ECC)
-                                  .withValues(alpha: 0.6),
+                              color: Colors.white.withValues(alpha: 0.28),
                             ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.location_off,
-                                color: Colors.white,
-                                size: 13,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Turn on location',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            travelDistance,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ] else if (travelDistance != null &&
-                      travelDistance.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.28),
-                          ),
-                        ),
-                        child: Text(
-                          travelDistance,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
+                    ],
                   ],
                 ],
-              ],
               ),
             ),
           ),
@@ -511,7 +538,8 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
   }
 
-  void _showFullCaption(BuildContext context, String? avatarUrl, String username) {
+  void _showFullCaption(
+      BuildContext context, String? avatarUrl, String username) {
     showModalBottomSheet(
       context: context,
       backgroundColor: context.cardBg,
@@ -1044,9 +1072,10 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
     _translate();
   }
 
-  String _labelOf(String code) =>
-      kTranslateLanguages.firstWhere((l) => l.code == code,
-          orElse: () => const TranslateLanguage('?', '?')).label;
+  String _labelOf(String code) => kTranslateLanguages
+      .firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?'))
+      .label;
 
   @override
   Widget build(BuildContext context) {
@@ -1124,8 +1153,7 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
                   onPressed: _translated == null || _loading
                       ? null
                       : () {
-                          Clipboard.setData(
-                              ClipboardData(text: _translated!));
+                          Clipboard.setData(ClipboardData(text: _translated!));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Translation copied'),

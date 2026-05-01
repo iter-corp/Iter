@@ -45,7 +45,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     });
   }
 
-  Future<void> _toggleFollow(bool currentlyFollowing, bool currentlyRequested, bool isPrivate) async {
+  Future<void> _toggleFollow(
+      bool currentlyFollowing, bool currentlyRequested, bool isPrivate) async {
     final currentUser = ref.read(authStateProvider).value ??
         ref.read(authServiceProvider).currentUser;
     if (currentUser == null || _followBusy) return;
@@ -205,7 +206,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final isRequestedAsync = ref.watch(hasRequestedFollowProvider(widget.uid));
     final followersAsync = ref.watch(followersProvider(widget.uid));
     final followingAsync = ref.watch(followingProvider(widget.uid));
-    
+
     final isBlockedAsync = ref.watch(isBlockedProvider(widget.uid));
     final isBlockedByAsync = ref.watch(isBlockedByProvider(widget.uid));
 
@@ -216,7 +217,24 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (user) {
           if (user == null) {
-            return const Center(child: Text('User not found'));
+            return SafeArea(
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text('User not found'),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
           final username = (user['username'] as String?) ?? 'User';
           final handle = (user['handle'] as String?) ?? '';
@@ -317,7 +335,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       isPrivate: isPrivate,
                       onFollowTap: _followBusy
                           ? () {}
-                          : () => _toggleFollow(isFollowing, isRequested, isPrivate),
+                          : () => _toggleFollow(
+                              isFollowing, isRequested, isPrivate),
                       onMessageTap: _messageBusy
                           ? null
                           : () => _openMessage(username, avatarUrl ?? ''),
@@ -373,8 +392,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFB05ECC),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 ),
@@ -398,8 +417,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content:
-                                            Text('Failed to unblock: $e'),
+                                        content: Text('Failed to unblock: $e'),
                                       ),
                                     );
                                   }

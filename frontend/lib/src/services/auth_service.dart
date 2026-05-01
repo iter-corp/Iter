@@ -7,13 +7,22 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
-/// Thrown when sign-in succeeded against Firebase Auth but the email has
-/// been blacklisted (the account was previously deleted by an admin or by
-/// the user themselves). Caught by the login UI to show a friendly message.
+/// Legacy exception kept for compatibility with existing UI catches.
 class AccountDeletedException implements Exception {
   const AccountDeletedException();
   @override
-  String toString() => 'This account has been deleted and can no longer sign in.';
+  String toString() =>
+      'This account has been deleted and can no longer sign in.';
+}
+
+enum GoogleAuthIntent { login, signup }
+
+class GoogleAuthFlowException implements Exception {
+  final String message;
+  const GoogleAuthFlowException(this.message);
+
+  @override
+  String toString() => message;
 }
 
 class AuthService {
@@ -24,53 +33,44 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  /// Returns true when [email] has a tombstone in `blacklist/{email}`.
-  /// Empty emails are treated as not blacklisted so anonymous-style accounts
-  /// don't get permanently locked out.
-  Future<bool> isEmailBlacklisted(String email) async {
-    if (email.isEmpty) return false;
-    try {
-      final snap = await _db.collection('blacklist').doc(email).get();
-      return snap.exists;
-    } catch (_) {
-      // If the read fails (e.g. transient network issue) we let the user
-      // through — a stale blacklist hit will be caught on the next call.
-      return false;
-    }
+  Map<String, dynamic> _defaultUserDoc(User user, {String? avatarUrl}) {
+    return {
+      'uid': user.uid,
+      'email': user.email,
+      'username': null,
+      'handle': null,
+      'bio': '',
+      'avatarUrl': avatarUrl,
+      'coverUrl': null,
+      'gender': null,
+      'role': 'user',
+      'suspended': false,
+      'isPrivate': false,
+      'followersCount': 0,
+      'followingCount': 0,
+      'postsCount': 0,
+      'fcmTokens': <String>[],
+      'createdAt': FieldValue.serverTimestamp(),
+    };
   }
 
-  /// If the just-signed-in [user] has a blacklisted email, immediately sign
-  /// them back out and throw [AccountDeletedException] so the UI can react.
-  Future<void> _enforceBlacklist(User user) async {
-    final email = user.email ?? '';
-    if (await isEmailBlacklisted(email)) {
-      await _auth.signOut();
-      try {
-        await _googleSignIn.signOut();
-      } catch (_) {}
-      throw const AccountDeletedException();
-    }
+  Future<void> _ensureUserDoc(User user, {String? avatarUrl}) async {
+    final ref = _db.collection('users').doc(user.uid);
+    final snap = await ref.get();
+    if (snap.exists) return;
+    await ref.set(_defaultUserDoc(user, avatarUrl: avatarUrl));
   }
 
   Future<User?> signUp({
     required String email,
     required String password,
   }) async {
-    // Block re-registration for emails that were previously deleted. Checked
-    // BEFORE creating the Firebase Auth account so a blacklisted address
-    // never gets a fresh user record.
-    if (await isEmailBlacklisted(email.trim())) {
-      throw const AccountDeletedException();
-    }
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
     final user = cred.user;
     if (user != null) {
-      // Defensive second check in case the blacklist was written between
-      // the pre-flight read and account creation.
-      await _enforceBlacklist(user);
       await _db.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'email': user.email,
@@ -102,11 +102,18 @@ class AuthService {
       password: password,
     );
     final user = cred.user;
-    if (user != null) await _enforceBlacklist(user);
+    if (user != null) {
+      await _ensureUserDoc(user);
+    }
     return user;
   }
 
-  Future<User?> signInWithGoogle() async {
+  Future<User?> signInWithGoogle({required GoogleAuthIntent intent}) async {
+    // Always sign out first to clear any cached account so the account picker
+    // is shown every time rather than silently reusing the last session.
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
     final googleUser = await _googleSignIn.signIn();
     if (googleUser == null) return null;
 
@@ -119,9 +126,35 @@ class AuthService {
     final cred = await _auth.signInWithCredential(credential);
     final user = cred.user;
     if (user == null) return null;
-    await _enforceBlacklist(user);
 
+    // Validate intent BEFORE _ensureUserDoc and before the router can react
+    // to auth state changes, so there is no visible login flash.
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
+    if (intent == GoogleAuthIntent.login && isNew) {
+      try {
+        await user.delete();
+      } catch (_) {}
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+      await _auth.signOut();
+      throw const GoogleAuthFlowException(
+        'No account found for this Google email. Please sign up first.',
+      );
+    }
+    if (intent == GoogleAuthIntent.signup && !isNew) {
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+      await _auth.signOut();
+      throw const GoogleAuthFlowException(
+        'An account with this Google email already exists. Please log in instead.',
+      );
+    }
+
+    // Intent validated — safe to persist/update the user doc now.
+    await _ensureUserDoc(user, avatarUrl: user.photoURL);
+
     if (isNew) {
       await _db.collection('users').doc(user.uid).set({
         'uid': user.uid,
@@ -165,7 +198,8 @@ class AuthService {
     final cred = await _auth.signInWithCredential(oauthCredential);
     final user = cred.user;
     if (user == null) return null;
-    await _enforceBlacklist(user);
+
+    await _ensureUserDoc(user);
 
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
     if (isNew) {
@@ -209,15 +243,9 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    // Disable Firestore network BEFORE revoking the auth token. This stops all
-    // active stream subscriptions cleanly instead of letting them receive
-    // permission-denied errors when the token is invalidated.
-    await FirebaseFirestore.instance.disableNetwork();
     try {
       await _googleSignIn.signOut();
-    } catch (_) {
-      // Ignore errors if Google sign in wasn't used or not initialized
-    }
+    } catch (_) {}
     await _auth.signOut();
   }
 

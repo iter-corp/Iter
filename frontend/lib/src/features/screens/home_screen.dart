@@ -172,23 +172,27 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       status = _LocationStatus.unknown;
       return status;
     } finally {
-      // Always try the saved profile location as a silent fallback so the
-      // travel feed has *something* to render even when GPS is unavailable.
-      if (_viewerLat == null || _viewerLng == null) {
-        final profile = ref.read(currentUserDocProvider).valueOrNull;
-        final profileLoc = profile?['location'];
-        if (profileLoc is Map) {
-          final lat = (profileLoc['lat'] as num?)?.toDouble();
-          final lng = (profileLoc['lng'] as num?)?.toDouble();
-          if (lat != null && lng != null && mounted) {
-            setState(() {
-              _viewerLat = lat;
-              _viewerLng = lng;
-              final city = (profile?['city'] as String?)?.trim();
-              if (city != null && city.isNotEmpty) {
-                _viewerCity = city;
-              }
-            });
+      if (!mounted) {
+        _resolvingLocation = false;
+      } else {
+        // Always try the saved profile location as a silent fallback so the
+        // travel feed has *something* to render even when GPS is unavailable.
+        if (_viewerLat == null || _viewerLng == null) {
+          final profile = ref.read(currentUserDocProvider).valueOrNull;
+          final profileLoc = profile?['location'];
+          if (profileLoc is Map) {
+            final lat = (profileLoc['lat'] as num?)?.toDouble();
+            final lng = (profileLoc['lng'] as num?)?.toDouble();
+            if (lat != null && lng != null && mounted) {
+              setState(() {
+                _viewerLat = lat;
+                _viewerLng = lng;
+                final city = (profile?['city'] as String?)?.trim();
+                if (city != null && city.isNotEmpty) {
+                  _viewerCity = city;
+                }
+              });
+            }
           }
         }
       }
@@ -308,6 +312,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
 
     if (mode == _HomeMode.travel) {
       final status = await _ensureViewerLocation();
+      if (!mounted) return;
       _showLocationStatusMessage(status);
       final query = _buildTravelQuery();
       ref.invalidate(travelFeedProvider(query));
@@ -368,8 +373,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                     );
                   });
                 },
-          onSelectRecent: (place) =>
-              setState(() => _selectedPlace = place),
+          onSelectRecent: (place) => setState(() => _selectedPlace = place),
         ),
       ],
     ];
@@ -422,6 +426,8 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
             child: RefreshIndicator(
               onRefresh: () => _refresh(ref),
               child: postsAsync.when(
+                skipLoadingOnReload: true,
+                skipLoadingOnRefresh: true,
                 loading: () => ListView(
                   controller: widget.scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -1225,7 +1231,9 @@ class _TravelFilterChip extends StatelessWidget {
     const purple = Color(0xFFB05ECC);
     final bg = selected
         ? purple
-        : (disabled ? context.inputFill.withValues(alpha: 0.5) : context.inputFill);
+        : (disabled
+            ? context.inputFill.withValues(alpha: 0.5)
+            : context.inputFill);
     final fg = selected
         ? Colors.white
         : (disabled ? context.textMuted : context.textPrimary);

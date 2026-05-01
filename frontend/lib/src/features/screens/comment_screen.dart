@@ -126,6 +126,12 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
+        final mq = MediaQuery.of(context);
+        final composerBottomInset = (mq.viewInsets.bottom > 0
+                ? mq.viewInsets.bottom
+                : mq.padding.bottom) +
+            12;
+
         return Column(
           children: [
             // Handle bar
@@ -289,7 +295,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                 left: 12,
                 right: 12,
                 top: 8,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+                bottom: composerBottomInset,
               ),
               child: Row(
                 children: [
@@ -422,7 +428,7 @@ class _CommentTile extends ConsumerWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      DateFormat('MMM d').format(comment.createdAt),
+                      DateFormat('MMM d, h:mm a').format(comment.createdAt),
                       style: TextStyle(color: context.textMuted, fontSize: 11),
                     ),
                   ],
@@ -561,9 +567,10 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
     _translate();
   }
 
-  String _labelOf(String code) =>
-      kTranslateLanguages.firstWhere((l) => l.code == code,
-          orElse: () => const TranslateLanguage('?', '?')).label;
+  String _labelOf(String code) => kTranslateLanguages
+      .firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?'))
+      .label;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +611,9 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
                       decoration: BoxDecoration(
                         color: selected
                             ? const Color(0xFFB05ECC)
-                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
@@ -640,8 +649,7 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
                   onPressed: _translated == null || _loading
                       ? null
                       : () {
-                          Clipboard.setData(
-                              ClipboardData(text: _translated!));
+                          Clipboard.setData(ClipboardData(text: _translated!));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Translation copied'),

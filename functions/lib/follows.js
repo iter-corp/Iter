@@ -33,19 +33,36 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onFollowDelete = exports.onFollowCreate = void 0;
+exports.onFollowDelete = exports.onFollowUpdate = exports.onFollowCreate = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const db = admin.firestore();
+function isPendingFollow(data) {
+    return data?.status === 'pending';
+}
+function followNotificationId(followerUid) {
+    return `follow_${followerUid}`;
+}
+function followRequestNotificationId(followerUid) {
+    return `follow_request_${followerUid}`;
+}
 exports.onFollowCreate = (0, firestore_1.onDocumentCreated)('users/{targetUid}/followers/{followerUid}', async (event) => {
     const targetUid = event.params.targetUid;
     const followerUid = event.params.followerUid;
+    const data = event.data?.data();
+    const pending = isPendingFollow(data);
     const batch = db.batch();
-    batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
-    batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
-    const notifRef = db.collection('notifications').doc(targetUid).collection('items').doc();
+    if (!pending) {
+        batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+        batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+    }
+    const notifRef = db
+        .collection('notifications')
+        .doc(targetUid)
+        .collection('items')
+        .doc(pending ? followRequestNotificationId(followerUid) : followNotificationId(followerUid));
     batch.set(notifRef, {
-        type: 'follow',
+        type: pending ? 'follow_request' : 'follow',
         actorUid: followerUid,
         targetId: followerUid,
         read: false,
@@ -53,11 +70,54 @@ exports.onFollowCreate = (0, firestore_1.onDocumentCreated)('users/{targetUid}/f
     });
     await batch.commit();
 });
+exports.onFollowUpdate = (0, firestore_1.onDocumentUpdated)('users/{targetUid}/followers/{followerUid}', async (event) => {
+    const targetUid = event.params.targetUid;
+    const followerUid = event.params.followerUid;
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    const wasPending = isPendingFollow(before);
+    const isPending = isPendingFollow(after);
+    if (wasPending === isPending) {
+        return;
+    }
+    const batch = db.batch();
+    if (wasPending && !isPending) {
+        batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+        batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+        batch.delete(db.collection('notifications')
+            .doc(targetUid)
+            .collection('items')
+            .doc(followRequestNotificationId(followerUid)));
+    }
+    if (!wasPending && isPending) {
+        batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+        batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+        batch.set(db.collection('notifications')
+            .doc(targetUid)
+            .collection('items')
+            .doc(followRequestNotificationId(followerUid)), {
+            type: 'follow_request',
+            actorUid: followerUid,
+            targetId: followerUid,
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+    await batch.commit();
+});
 exports.onFollowDelete = (0, firestore_1.onDocumentDeleted)('users/{targetUid}/followers/{followerUid}', async (event) => {
     const targetUid = event.params.targetUid;
     const followerUid = event.params.followerUid;
+    const data = event.data?.data();
+    const pending = isPendingFollow(data);
     const batch = db.batch();
-    batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
-    batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+    if (!pending) {
+        batch.set(db.collection('users').doc(targetUid), { followersCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+        batch.set(db.collection('users').doc(followerUid), { followingCount: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+    }
+    batch.delete(db.collection('notifications')
+        .doc(targetUid)
+        .collection('items')
+        .doc(pending ? followRequestNotificationId(followerUid) : followNotificationId(followerUid)));
     await batch.commit();
 });

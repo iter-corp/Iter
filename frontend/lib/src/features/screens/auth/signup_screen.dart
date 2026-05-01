@@ -20,8 +20,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _loading = false;
+  bool _googleLoading = false;
   bool _obscurePassword = true;
   String? _error;
+
+  String _friendlyError(FirebaseAuthException e,
+      {String fallback = 'Signup failed'}) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'That email address looks invalid.';
+      case 'email-already-in-use':
+        return 'An account with this email already exists.';
+      case 'weak-password':
+        return 'Password is too weak. Use at least 6 characters.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      default:
+        return fallback;
+    }
+  }
 
   @override
   void dispose() {
@@ -47,9 +64,32 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Signup failed');
+      setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _googleLoading = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(authServiceProvider)
+          .signInWithGoogle(intent: GoogleAuthIntent.signup);
+    } on GoogleAuthFlowException catch (e) {
+      setState(() => _error = e.toString());
+    } on AccountDeletedException catch (e) {
+      setState(() => _error = e.toString());
+    } on FirebaseAuthException catch (e) {
+      setState(
+          () => _error = _friendlyError(e, fallback: 'Google sign-in failed.'));
+    } catch (e) {
+      setState(() => _error = 'Google sign-in failed: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
@@ -133,7 +173,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: context.isDark ? const Color(0xFF3D1F1F) : const Color(0xFFFFEEEE),
+                      color: context.isDark
+                          ? const Color(0xFF3D1F1F)
+                          : const Color(0xFFFFEEEE),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -188,9 +230,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildSocialButton(
-                  label: 'Sign In with Google',
-                  icon: _buildSocialBadge('G', const Color(0xFF4285F4)),
-                  onTap: () {},
+                  label:
+                      _googleLoading ? 'Signing in...' : 'Continue with Google',
+                  icon: _googleLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : _buildSocialBadge('G', const Color(0xFF4285F4)),
+                  onTap: _googleLoading ? () {} : _signInWithGoogle,
                 ),
                 const SizedBox(height: 12),
                 _buildSocialButton(

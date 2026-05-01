@@ -33,7 +33,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// record corresponding to this identifier..."). This collapses every
   /// "wrong credentials" variant into one clear line so the user knows
   /// exactly what to fix.
-  String _friendlyError(FirebaseAuthException e, {String fallback = 'Login failed'}) {
+  String _friendlyError(FirebaseAuthException e,
+      {String fallback = 'Login failed'}) {
     switch (e.code) {
       case 'invalid-email':
         return 'That email address looks invalid.';
@@ -63,8 +64,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
-      setState(() =>
-          _error = _friendlyError(e, fallback: 'Apple sign-in failed.'));
+      setState(
+          () => _error = _friendlyError(e, fallback: 'Apple sign-in failed.'));
     } catch (_) {
       setState(() => _error = 'Apple sign-in failed.');
     } finally {
@@ -78,12 +79,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithGoogle();
+      await ref
+          .read(authServiceProvider)
+          .signInWithGoogle(intent: GoogleAuthIntent.login);
+    } on GoogleAuthFlowException catch (e) {
+      setState(() => _error = e.toString());
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
-      setState(() =>
-          _error = _friendlyError(e, fallback: 'Google sign-in failed.'));
+      setState(
+          () => _error = _friendlyError(e, fallback: 'Google sign-in failed.'));
     } catch (e) {
       debugPrint('[google-signin] error: $e');
       setState(() => _error = 'Google sign-in failed: $e');
@@ -200,7 +205,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: context.isDark ? const Color(0xFF3D1F1F) : const Color(0xFFFFEEEE),
+                      color: context.isDark
+                          ? const Color(0xFF3D1F1F)
+                          : const Color(0xFFFFEEEE),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -255,9 +262,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildSocialButton(
-                  label: _googleLoading
-                      ? 'Signing in...'
-                      : 'Continue with Google',
+                  label:
+                      _googleLoading ? 'Signing in...' : 'Continue with Google',
                   icon: _googleLoading
                       ? const SizedBox(
                           width: 20,
@@ -270,16 +276,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 if (_isIOS) ...[
                   const SizedBox(height: 12),
                   _buildSocialButton(
-                    label: _appleLoading
-                        ? 'Signing in...'
-                        : 'Continue with Apple',
+                    label:
+                        _appleLoading ? 'Signing in...' : 'Continue with Apple',
                     icon: _appleLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Icon(Icons.apple, size: 24, color: context.textPrimary),
+                        : Icon(Icons.apple,
+                            size: 24, color: context.textPrimary),
                     onTap: _appleLoading ? () {} : _signInWithApple,
                   ),
                 ],

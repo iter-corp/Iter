@@ -377,7 +377,7 @@ service cloud.firestore {
     match /notifications/{uid}/items/{itemId} {
       allow read: if isSelf(uid) || isAdmin();
       allow update: if isSelf(uid);
-      allow delete: if isSelf(uid) || isAdmin();
+      allow delete: if isSelf(uid) || isAdmin() || resource.data.actorUid == request.auth.uid;
       allow create: if signedIn() &&
         request.resource.data.actorUid == request.auth.uid;
     }

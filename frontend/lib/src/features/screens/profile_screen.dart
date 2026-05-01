@@ -119,9 +119,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserDocProvider);
-    final currentUid = (ref.watch(authStateProvider).value ??
-            ref.watch(authServiceProvider).currentUser)
-        ?.uid;
+    final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final followersAsync = currentUid == null
         ? const AsyncValue<List<String>>.data([])
         : ref.watch(followersProvider(currentUid));
@@ -279,8 +277,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Consumer(
                 builder: (context, ref, _) {
                   final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
-                  final isPrivate =
-                      (userDoc?['isPrivate'] as bool?) ?? false;
+                  final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
                   return ListTile(
                     leading: Icon(
                       isPrivate ? Icons.lock_outline : Icons.lock_open,
@@ -291,8 +288,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       isPrivate
                           ? 'Only followers can see your posts'
                           : 'Anyone can see your posts',
-                      style: TextStyle(
-                          fontSize: 12, color: context.textSecondary),
+                      style:
+                          TextStyle(fontSize: 12, color: context.textSecondary),
                     ),
                     trailing: Switch.adaptive(
                       value: isPrivate,
@@ -320,8 +317,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Dark mode
               Consumer(
                 builder: (context, ref, _) {
-                  final isDark =
-                      ref.watch(themeModeProvider) == ThemeMode.dark;
+                  final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
                   return ListTile(
                     leading: Icon(
                       isDark ? Icons.dark_mode : Icons.light_mode,
@@ -334,18 +330,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       onChanged: (_) =>
                           ref.read(themeModeProvider.notifier).toggle(),
                     ),
-                    onTap: () =>
-                        ref.read(themeModeProvider.notifier).toggle(),
+                    onTap: () => ref.read(themeModeProvider.notifier).toggle(),
                   );
                 },
               ),
               // Blocked users
               ListTile(
-                leading:
-                    const Icon(Icons.block, color: Color(0xFFD27B2B)),
+                leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
                 title: const Text('Blocked users'),
-                trailing: Icon(Icons.chevron_right,
-                    color: context.textSecondary),
+                trailing:
+                    Icon(Icons.chevron_right, color: context.textSecondary),
                 onTap: () {
                   Navigator.pop(context);
                   _showBlockedUsers(context);
@@ -368,8 +362,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Divider(color: context.borderColor, height: 1),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Log out',
-                    style: TextStyle(color: Colors.red)),
+                title:
+                    const Text('Log out', style: TextStyle(color: Colors.red)),
                 onTap: () async {
                   Navigator.pop(context);
                   await ref.read(authServiceProvider).signOut();
@@ -383,8 +377,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_forever,
-                    color: Colors.redAccent),
+                leading:
+                    const Icon(Icons.delete_forever, color: Colors.redAccent),
                 title: const Text('Delete account',
                     style: TextStyle(color: Colors.redAccent)),
                 subtitle: const Text(
@@ -434,23 +428,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Expanded(
                 child: Consumer(
                   builder: (context, ref, _) {
-                    final blockedAsync =
-                        ref.watch(blockedUsersProvider);
+                    final blockedAsync = ref.watch(blockedUsersProvider);
                     return blockedAsync.when(
-                      loading: () => const Center(
-                          child: CircularProgressIndicator()),
-                      error: (e, _) =>
-                          Center(child: Text('Error: $e')),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Error: $e')),
                       data: (blockedUids) {
                         if (blockedUids.isEmpty) {
                           return Center(
                             child: Column(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.block,
-                                    size: 48,
-                                    color: context.textMuted),
+                                    size: 48, color: context.textMuted),
                                 const SizedBox(height: 12),
                                 Text(
                                   'No blocked users',
@@ -670,9 +660,8 @@ class UserRepostsGrid extends ConsumerWidget {
         child: Center(child: Text('Error: $e')),
       ),
       data: (allPosts) {
-        final posts = allPosts
-            .where((p) => !blockedSet.contains(p.authorUid))
-            .toList();
+        final posts =
+            allPosts.where((p) => !blockedSet.contains(p.authorUid)).toList();
         if (posts.isEmpty) {
           return const _EmptyTab(
             icon: Icons.repeat,
@@ -762,9 +751,8 @@ class UserSavedGrid extends ConsumerWidget {
         child: Center(child: Text('Error: $e')),
       ),
       data: (allPosts) {
-        final posts = allPosts
-            .where((p) => !blockedSet.contains(p.authorUid))
-            .toList();
+        final posts =
+            allPosts.where((p) => !blockedSet.contains(p.authorUid)).toList();
         if (posts.isEmpty) {
           return const _EmptyTab(
             icon: Icons.bookmark_border,
@@ -932,19 +920,15 @@ class _BlockedUserTile extends ConsumerWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: context.inputFill,
-        backgroundImage:
-            avatarUrl != null ? NetworkImage(avatarUrl) : null,
-        child: avatarUrl == null
-            ? const Icon(Icons.person, size: 18)
-            : null,
+        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+        child: avatarUrl == null ? const Icon(Icons.person, size: 18) : null,
       ),
       title: Text(username),
       trailing: SizedBox(
         height: 32,
         child: OutlinedButton(
           onPressed: () async {
-            final currentUser =
-                ref.read(authServiceProvider).currentUser;
+            final currentUser = ref.read(authServiceProvider).currentUser;
             if (currentUser == null) return;
             await ref.read(blockServiceProvider).unblockUser(
                   currentUid: currentUser.uid,

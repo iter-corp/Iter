@@ -9,51 +9,46 @@ final followServiceProvider = Provider<FollowService>((_) => FollowService());
 
 final isFollowingProvider =
     StreamProvider.family<bool, String>((ref, targetUid) {
-  final currentUser = ref.watch(authStateProvider).value ??
-      ref.watch(authServiceProvider).currentUser;
-  if (currentUser == null) return Stream.value(false);
+  final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (currentUid == null) return Stream.value(false);
 
   return ref.watch(followServiceProvider).isFollowing(
-        currentUid: currentUser.uid,
+        currentUid: currentUid,
         targetUid: targetUid,
       );
 });
 
 final followersProvider =
     StreamProvider.family<List<String>, String>((ref, uid) {
-  final sessionUser = ref.watch(authStateProvider).value ??
-      ref.watch(authServiceProvider).currentUser;
-  if (sessionUser == null) return Stream.value(const []);
+  final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (sessionUid == null) return Stream.value(const []);
 
   return ref.watch(followServiceProvider).getFollowers(uid);
 });
 
 final followingProvider =
     StreamProvider.family<List<String>, String>((ref, uid) {
-  final sessionUser = ref.watch(authStateProvider).value ??
-      ref.watch(authServiceProvider).currentUser;
-  if (sessionUser == null) return Stream.value(const []);
+  final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (sessionUid == null) return Stream.value(const []);
 
   return ref.watch(followServiceProvider).getFollowing(uid);
 });
 
 final hasRequestedFollowProvider =
     StreamProvider.family<bool, String>((ref, targetUid) {
-  final currentUser = ref.watch(authStateProvider).value ??
-      ref.watch(authServiceProvider).currentUser;
-  if (currentUser == null) return Stream.value(false);
+  final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (currentUid == null) return Stream.value(false);
 
   return ref.watch(followServiceProvider).hasRequestedFollow(
-        currentUid: currentUser.uid,
+        currentUid: currentUid,
         targetUid: targetUid,
       );
 });
 
 final followRequestsProvider =
     StreamProvider.family<List<String>, String>((ref, uid) {
-  final sessionUser = ref.watch(authStateProvider).value ??
-      ref.watch(authServiceProvider).currentUser;
-  if (sessionUser == null) return Stream.value(const []);
+  final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (sessionUid == null) return Stream.value(const []);
 
   return ref.watch(followServiceProvider).getFollowRequests(uid);
 });

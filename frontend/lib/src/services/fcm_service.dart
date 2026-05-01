@@ -1,9 +1,9 @@
 import 'dart:async';
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
 // ─────────────────────────────────────────────
 // Background message handler (top-level, not a class method)
@@ -63,7 +63,8 @@ class FcmService {
       // On iOS/macOS, getToken() fails unless the APNS token is already set by
       // the OS. On first launch (and occasionally on cold start) APNS registration
       // hasn't completed yet, so poll briefly before giving up.
-      if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS) {
+      if (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
         String? apns;
         for (var i = 0; i < 10; i++) {
           apns = await _messaging.getAPNSToken();
@@ -118,17 +119,17 @@ class FcmService {
     try {
       final token = await _messaging.getToken();
       if (token == null) return;
-      await _db.collection('users').doc(uid).update({
+      await _db.collection('users').doc(uid).set({
         'fcmTokens': FieldValue.arrayRemove([token]),
-      });
+      }, SetOptions(merge: true));
     } catch (_) {
       // No APNS/FCM token to remove — ignore.
     }
   }
 
   Future<void> _saveToken(String uid, String token) async {
-    await _db.collection('users').doc(uid).update({
+    await _db.collection('users').doc(uid).set({
       'fcmTokens': FieldValue.arrayUnion([token]),
-    });
+    }, SetOptions(merge: true));
   }
 }

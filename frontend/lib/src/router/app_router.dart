@@ -20,51 +20,50 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authAsync = ref.read(authStateProvider);
       final loc = state.matchedLocation;
 
-      // While auth is loading, show the splash screen.
+      // Show splash only on initial boot. During later auth refreshes, keep the
+      // current route to avoid visible /home <-> /splash route churn.
       if (authAsync.isLoading) {
-        return loc == '/splash' ? null : '/splash';
+        return loc == '/splash' ? null : null;
       }
 
       final user = authAsync.value;
-      final loggedIn = user != null;
-      // Auth flow pages (explicit login/signup/forgot). Do NOT include splash
-      // so that once loading finishes unauthenticated users are forwarded to
-      // the login page instead of remaining on splash.
       final inAuthFlow = loc == '/login' ||
           loc == '/signup' ||
           loc == '/forgot-password' ||
           loc == '/otp';
 
-      if (!loggedIn) {
-        // If the user isn't logged in, send them to login unless they're
-        // already on an auth page.
+      if (user == null) {
+        // Not logged in - go to login unless already on auth page
         return inAuthFlow ? null : '/login';
       }
 
-      // Logged in — check if profile setup needed.
+      // Logged in - check onboarding
       final userDocAsync = ref.read(currentUserDocProvider);
-      final userDoc = userDocAsync.value;
 
-      // While user doc is still loading (first emission hasn't happened yet),
-      // keep showing the splash instead of bouncing them to /home with no
-      // knowledge of onboarding state. A transient null during a fresh
-      // sign-up (auth user exists, users/{uid} doc write still in flight)
-      // also falls through to /splash so we don't boot them out mid-flow.
-      if (userDocAsync.isLoading ||
-          (userDocAsync.hasValue && userDoc == null)) {
-        return loc == '/splash' ? null : '/splash';
+      // Keep current route while the user doc stream resolves; redirect once we
+      // have a concrete value so we don't repeatedly reopen pages.
+      if (userDocAsync.isLoading) {
+        return null;
       }
 
-      final needsOnboarding = userDoc != null && (userDoc['username'] == null);
-
-      if (needsOnboarding && loc != '/onboarding' && loc != '/otp') {
+      final userDoc = userDocAsync.value;
+      if (userDoc == null) {
+        if (loc == '/onboarding' || loc == '/otp') return null;
         return '/onboarding';
       }
-      // Anywhere we're still on the splash or in auth flow, move to home.
-      if (!needsOnboarding &&
-          (inAuthFlow || loc == '/onboarding' || loc == '/splash')) {
+
+      final needsOnboarding = userDoc['username'] == null;
+
+      if (needsOnboarding) {
+        if (loc == '/onboarding' || loc == '/otp') return null;
+        return '/onboarding';
+      }
+
+      // Onboarding done - send to home
+      if (inAuthFlow || loc == '/onboarding' || loc == '/splash') {
         return '/home';
       }
+
       return null;
     },
     routes: [
@@ -95,9 +94,46 @@ final routerProvider = Provider<GoRouter>((ref) {
 });
 
 class _AuthListenable extends ChangeNotifier {
+  late final void Function()? _removeListener;
+  bool _isDisposed = false;
+
   _AuthListenable(this._ref) {
-    _ref.listen(authStateProvider, (_, __) => notifyListeners());
-    _ref.listen(currentUserDocProvider, (_, __) => notifyListeners());
+    // Use select to only listen for specific value changes that matter for routing.
+    // This prevents excessive notifications when intermediate loading states emit.
+    _removeListener = _ref.listen(
+      _routingStateSelector,
+      (prev, next) {
+        if (!_isDisposed) {
+          // Only notify if the important values actually changed
+          if (prev != next) {
+            notifyListeners();
+          }
+        }
+      },
+    ).close;
   }
+
   final Ref _ref;
+
+  // Selector that only emits when values that affect routing actually change
+  static final _routingStateSelector = Provider((ref) {
+    final authAsync = ref.watch(authStateProvider);
+    final userDocAsync = ref.watch(currentUserDocProvider);
+
+    // Return a tuple of only the values that matter for routing decisions
+    return (
+      isAuthLoading: authAsync.isLoading,
+      user: authAsync.value?.uid, // Only compare UIDs, not whole User objects
+      isUserDocLoading: userDocAsync.isLoading,
+      needsOnboarding:
+          userDocAsync.value != null && userDocAsync.value!['username'] == null,
+    );
+  });
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _removeListener?.call();
+    super.dispose();
+  }
 }

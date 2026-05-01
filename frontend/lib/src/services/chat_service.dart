@@ -17,6 +17,7 @@ class ChatMessage {
   final String? sharedPostId;
   final String? voiceUrl;
   final int? voiceDurationMs;
+
   /// Live transcript captured on the sender's device while recording
   /// the voice message. Lets the receiver read or translate the audio
   /// without round-tripping through a backend transcription job.
@@ -24,6 +25,7 @@ class ChatMessage {
   final String? replyToId;
   final String? replyToText;
   final String? replyToSenderUid;
+
   /// When this message was sent in response to a story, [storyId] holds the
   /// story doc id and [storyImageUrl] holds the story thumbnail. The chat
   /// bubble renders a "Replied to story" header so the receiver can see
@@ -202,9 +204,8 @@ class ChatService {
       // sees the new chat in their inbox immediately. Otherwise only the
       // initiator has accepted and the receiver gets a request.
       final mutualFollow = await _isMutualFollow(currentUid, otherUid);
-      final acceptedBy = mutualFollow
-          ? <String>[currentUid, otherUid]
-          : <String>[currentUid];
+      final acceptedBy =
+          mutualFollow ? <String>[currentUid, otherUid] : <String>[currentUid];
 
       await _chatDoc(id).set({
         'participants': [currentUid, otherUid],
@@ -234,12 +235,10 @@ class ChatService {
   /// safer "request" state rather than silently auto-accepting.
   Future<bool> _isMutualFollow(String a, String b) async {
     try {
-      final aFollowsB =
-          await _db.doc('users/$a/following/$b').get();
+      final aFollowsB = await _db.doc('users/$a/following/$b').get();
       if (!aFollowsB.exists) return false;
       if ((aFollowsB.data()?['status'] as String?) == 'pending') return false;
-      final bFollowsA =
-          await _db.doc('users/$b/following/$a').get();
+      final bFollowsA = await _db.doc('users/$b/following/$a').get();
       if (!bFollowsA.exists) return false;
       if ((bFollowsA.data()?['status'] as String?) == 'pending') return false;
       return true;
@@ -286,8 +285,7 @@ class ChatService {
         normalizedImageUrl != null && normalizedImageUrl.isNotEmpty;
     final hasVideo =
         normalizedVideoUrl != null && normalizedVideoUrl.isNotEmpty;
-    final hasFile =
-        normalizedFileUrl != null && normalizedFileUrl.isNotEmpty;
+    final hasFile = normalizedFileUrl != null && normalizedFileUrl.isNotEmpty;
     final hasSharedPost =
         normalizedSharedPostId != null && normalizedSharedPostId.isNotEmpty;
     final hasVoice =
@@ -376,8 +374,7 @@ class ChatService {
     final acceptedUids = <String>{senderUid};
     if (!isGroup && recipients.length == 1) {
       final receiver = recipients.first;
-      if (receiver.isNotEmpty &&
-          await _isMutualFollow(senderUid, receiver)) {
+      if (receiver.isNotEmpty && await _isMutualFollow(senderUid, receiver)) {
         acceptedUids.add(receiver);
       }
     }
@@ -467,19 +464,56 @@ class ChatService {
   }
 
   Stream<List<ChatConversation>> streamRequests(String uid) {
-    return streamInbox(uid).map(
-      (conversations) => conversations
-          .where((conversation) => conversation.isRequest)
-          .toList(),
-    );
+    return streamInbox(uid).asyncMap((conversations) async {
+      if (conversations.isEmpty) return const <ChatConversation>[];
+      final mutualFriends = await _getMutualFriendUids(uid);
+      return conversations
+          .where(
+            (conversation) =>
+                conversation.isRequest &&
+                !mutualFriends.contains(conversation.otherUid),
+          )
+          .toList();
+    });
   }
 
   Stream<List<ChatConversation>> streamAcceptedInbox(String uid) {
-    return streamInbox(uid).map(
-      (conversations) => conversations
-          .where((conversation) => !conversation.isRequest)
-          .toList(),
-    );
+    return streamInbox(uid).asyncMap((conversations) async {
+      if (conversations.isEmpty) return const <ChatConversation>[];
+      final mutualFriends = await _getMutualFriendUids(uid);
+      return conversations
+          .where(
+            (conversation) =>
+                !conversation.isRequest ||
+                mutualFriends.contains(conversation.otherUid),
+          )
+          .toList();
+    });
+  }
+
+  Future<Set<String>> _getMutualFriendUids(String uid) async {
+    try {
+      final userRef = _db.collection('users').doc(uid);
+      final snaps = await Future.wait([
+        userRef.collection('following').get(),
+        userRef.collection('followers').get(),
+      ]);
+
+      final following = snaps[0]
+          .docs
+          .where((d) => (d.data()['status'] as String?) != 'pending')
+          .map((d) => d.id)
+          .toSet();
+      final followers = snaps[1]
+          .docs
+          .where((d) => (d.data()['status'] as String?) != 'pending')
+          .map((d) => d.id)
+          .toSet();
+
+      return following.intersection(followers);
+    } catch (_) {
+      return const <String>{};
+    }
   }
 
   /// Create a multi-party group chat. [creatorUid] becomes the group admin.
