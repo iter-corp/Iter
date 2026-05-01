@@ -40,6 +40,30 @@ import 'post_detail_screen.dart';
 /// top-level so it can be returned from the modal sheet.
 enum _AttachKind { image, video, file }
 
+enum _PendingStatus { uploading, sending, failed }
+
+/// In-flight attachment being sent. Rendered as an outgoing bubble while
+/// the upload + Firestore write run, so the user sees their send instantly
+/// and watches its status update. Once the real message arrives over the
+/// Firestore stream, the matching pending entry is removed.
+class _PendingAttachment {
+  final String localId;
+  final _AttachKind kind;
+  final File file;
+  final String fileName;
+  final int sizeBytes;
+  _PendingStatus status = _PendingStatus.uploading;
+  String? errorMessage;
+
+  _PendingAttachment({
+    required this.localId,
+    required this.kind,
+    required this.file,
+    required this.fileName,
+    required this.sizeBytes,
+  });
+}
+
 class ChatScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String otherUid;
@@ -59,10 +83,12 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
+  // Hard cap for any chat attachment (file or video). 1 GB.
+  static const int _kMaxAttachmentBytes = 1024 * 1024 * 1024;
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
-  bool _sendingImage = false;
   /// Per-message GlobalKeys so [_scrollToMessage] can jump back to the
   /// original of a reply. Stale entries are cleared on rebuild because
   /// we only insert keys for messages currently rendered.
@@ -74,6 +100,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   // Reply state — the message currently being replied to (null when none).
   ChatMessage? _replyTarget;
+
+  // Outgoing attachments currently uploading or being sent. Rendered as
+  // bubbles below the real message stream so the user sees their send
+  // instantly with a live status indicator.
+  final List<_PendingAttachment> _pending = [];
+
+  void _addPending(_PendingAttachment p) {
+    setState(() => _pending.add(p));
+  }
+
+  void _updatePending(String localId,
+      {_PendingStatus? status, String? error}) {
+    final i = _pending.indexWhere((p) => p.localId == localId);
+    if (i < 0) return;
+    setState(() {
+      if (status != null) _pending[i].status = status;
+      if (error != null) _pending[i].errorMessage = error;
+    });
+  }
+
+  void _removePending(String localId) {
+    setState(() => _pending.removeWhere((p) => p.localId == localId));
+  }
+
+  /// Re-run the upload+send pipeline for a pending entry that previously
+  /// failed. The reply target is intentionally not re-applied — by the
+  /// time the user retries, the original reply context may be stale.
+  void _retryPending(_PendingAttachment pending) {
+    final uid = _currentUid;
+    if (uid == null) return;
+    _updatePending(pending.localId,
+        status: _PendingStatus.uploading, error: '');
+    switch (pending.kind) {
+      case _AttachKind.image:
+        unawaited(_runImageUpload(uid: uid, pending: pending, reply: null));
+        break;
+      case _AttachKind.video:
+        unawaited(_runVideoUpload(uid: uid, pending: pending, reply: null));
+        break;
+      case _AttachKind.file:
+        unawaited(_runFileUpload(uid: uid, pending: pending, reply: null));
+        break;
+    }
+  }
 
   // Voice recording state.
   final AudioRecorder _recorder = AudioRecorder();
@@ -271,7 +341,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// old "tap camera = open gallery" flow so users can also send videos
   /// and arbitrary files.
   Future<void> _showAttachMenu() async {
-    if (_sendingImage) return;
     if (!_checkCanSendMedia()) return;
     final choice = await showModalBottomSheet<_AttachKind>(
       context: context,
@@ -337,7 +406,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _pickAndSendImage() async {
-    if (_sendingImage) return;
     final uid = _currentUid;
     if (uid == null || !_checkCanSendMedia()) return;
 
@@ -348,13 +416,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       maxWidth: 1600,
     );
     if (picked == null) return;
+    if (!mounted) return;
 
-    setState(() => _sendingImage = true);
+    final size = await File(picked.path).length();
+    if (!mounted) return;
+
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _AttachmentPreviewScreen(
+          kind: _AttachKind.image,
+          file: File(picked.path),
+          fileName: picked.name,
+          fileSizeBytes: size,
+          recipient: widget.otherName,
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    final reply = _replyTarget;
+    setState(() => _replyTarget = null);
+    final pending = _PendingAttachment(
+      localId: 'p_${DateTime.now().microsecondsSinceEpoch}',
+      kind: _AttachKind.image,
+      file: File(picked.path),
+      fileName: picked.name,
+      sizeBytes: size,
+    );
+    _addPending(pending);
+    unawaited(_runImageUpload(uid: uid, pending: pending, reply: reply));
+  }
+
+  Future<void> _runImageUpload({
+    required String uid,
+    required _PendingAttachment pending,
+    required ChatMessage? reply,
+  }) async {
     try {
       final url = await StorageService()
-          .uploadChatImage(File(picked.path), widget.chatId);
-      final reply = _replyTarget;
-      setState(() => _replyTarget = null);
+          .uploadChatImage(pending.file, widget.chatId);
+      _updatePending(pending.localId, status: _PendingStatus.sending);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
             senderUid: uid,
@@ -365,19 +467,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             replyToText: reply == null ? null : _previewOf(reply),
             replyToSenderUid: reply?.senderUid,
           );
+      _removePending(pending.localId);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image upload failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sendingImage = false);
+      _updatePending(pending.localId,
+          status: _PendingStatus.failed, error: e.toString());
     }
   }
 
   Future<void> _pickAndSendVideo() async {
-    if (_sendingImage) return;
     final uid = _currentUid;
     if (uid == null || !_checkCanSendMedia()) return;
 
@@ -388,12 +485,53 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     if (picked == null) return;
 
-    setState(() => _sendingImage = true);
+    final videoSize = await picked.length();
+    if (videoSize > _kMaxAttachmentBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Video is too large. Max size is 1 GB.')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _AttachmentPreviewScreen(
+          kind: _AttachKind.video,
+          file: File(picked.path),
+          fileName: picked.name,
+          fileSizeBytes: videoSize,
+          recipient: widget.otherName,
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    final reply = _replyTarget;
+    setState(() => _replyTarget = null);
+    final pending = _PendingAttachment(
+      localId: 'p_${DateTime.now().microsecondsSinceEpoch}',
+      kind: _AttachKind.video,
+      file: File(picked.path),
+      fileName: picked.name,
+      sizeBytes: videoSize,
+    );
+    _addPending(pending);
+    unawaited(_runVideoUpload(uid: uid, pending: pending, reply: reply));
+  }
+
+  Future<void> _runVideoUpload({
+    required String uid,
+    required _PendingAttachment pending,
+    required ChatMessage? reply,
+  }) async {
     try {
       final url = await StorageService()
-          .uploadChatVideo(File(picked.path), widget.chatId);
-      final reply = _replyTarget;
-      setState(() => _replyTarget = null);
+          .uploadChatVideo(pending.file, widget.chatId);
+      _updatePending(pending.localId, status: _PendingStatus.sending);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
             senderUid: uid,
@@ -404,56 +542,110 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             replyToText: reply == null ? null : _previewOf(reply),
             replyToSenderUid: reply?.senderUid,
           );
+      _removePending(pending.localId);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Video upload failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sendingImage = false);
+      _updatePending(pending.localId,
+          status: _PendingStatus.failed, error: e.toString());
     }
   }
 
   Future<void> _pickAndSendFile() async {
-    if (_sendingImage) return;
     final uid = _currentUid;
     if (uid == null || !_checkCanSendMedia()) return;
 
-    final result = await FilePicker.platform.pickFiles(withData: false);
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const [
+          'pdf', 'doc', 'docx', 'xls', 'xlsx',
+          'ppt', 'pptx', 'txt', 'rtf', 'csv', 'zip',
+        ],
+        withData: false,
+        allowMultiple: false,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open file picker: $e')),
+        );
+      }
+      return;
+    }
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.first;
     final path = picked.path;
-    if (path == null) return;
+    if (path == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read selected file')),
+        );
+      }
+      return;
+    }
+    if (picked.size > _kMaxAttachmentBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File is too large. Max size is 1 GB.')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
 
-    setState(() => _sendingImage = true);
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _AttachmentPreviewScreen(
+          kind: _AttachKind.file,
+          file: File(path),
+          fileName: picked.name,
+          fileSizeBytes: picked.size,
+          recipient: widget.otherName,
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    final reply = _replyTarget;
+    setState(() => _replyTarget = null);
+    final pending = _PendingAttachment(
+      localId: 'p_${DateTime.now().microsecondsSinceEpoch}',
+      kind: _AttachKind.file,
+      file: File(path),
+      fileName: picked.name,
+      sizeBytes: picked.size,
+    );
+    _addPending(pending);
+    unawaited(_runFileUpload(uid: uid, pending: pending, reply: reply));
+  }
+
+  Future<void> _runFileUpload({
+    required String uid,
+    required _PendingAttachment pending,
+    required ChatMessage? reply,
+  }) async {
     try {
-      final file = File(path);
-      final url =
-          await StorageService().uploadChatFile(file, widget.chatId);
-      final reply = _replyTarget;
-      setState(() => _replyTarget = null);
+      final url = await StorageService()
+          .uploadChatFile(pending.file, widget.chatId);
+      _updatePending(pending.localId, status: _PendingStatus.sending);
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
             senderUid: uid,
             receiverUid: widget.otherUid,
             text: '',
             fileUrl: url,
-            fileName: picked.name,
-            fileMimeType: _mimeFromName(picked.name),
-            fileSizeBytes: picked.size,
+            fileName: pending.fileName,
+            fileMimeType: _mimeFromName(pending.fileName),
+            fileSizeBytes: pending.sizeBytes,
             replyToId: reply?.id,
             replyToText: reply == null ? null : _previewOf(reply),
             replyToSenderUid: reply?.senderUid,
           );
+      _removePending(pending.localId);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('File upload failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sendingImage = false);
+      _updatePending(pending.localId,
+          status: _PendingStatus.failed, error: e.toString());
     }
   }
 
@@ -1287,18 +1479,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (msgs) {
                   final currentUid = _currentUid ?? '';
-                  if (msgs.isEmpty) {
+                  if (msgs.isEmpty && _pending.isEmpty) {
                     return Center(
                       child: Text('Say hello!',
                           style: TextStyle(color: context.textSecondary)),
                     );
                   }
+                  final pendingCount = _pending.length;
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
-                    itemCount: msgs.length,
+                    itemCount: msgs.length + pendingCount,
                     itemBuilder: (context, i) {
+                      if (i >= msgs.length) {
+                        final p = _pending[i - msgs.length];
+                        return _PendingAttachmentBubble(
+                          pending: p,
+                          onRetry: () => _retryPending(p),
+                          onDismiss: () => _removePending(p.localId),
+                        );
+                      }
                       final msg = msgs[i];
                       final key = _messageKeys.putIfAbsent(
                           msg.id, () => GlobalKey());
@@ -1380,16 +1581,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       children: [
                         IconButton(
                           tooltip: 'Attach',
-                          onPressed: _sendingImage ? null : _showAttachMenu,
-                          icon: _sendingImage
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Color(0xFFB05ECC)),
-                                )
-                              : Icon(Icons.attach_file,
-                                  color: context.textSecondary),
+                          onPressed: _showAttachMenu,
+                          icon: Icon(Icons.attach_file,
+                              color: context.textSecondary),
                         ),
                         Expanded(
                           child: Container(
@@ -3460,6 +3654,406 @@ class _FileMessageBubbleState extends State<_FileMessageBubble> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Full-screen confirmation shown after the user picks an image, video, or
+/// document. Pops `true` when the user taps Send and `false` (or null) when
+/// they cancel. The caller does the actual upload — this screen is purely a
+/// preview.
+class _AttachmentPreviewScreen extends StatefulWidget {
+  final _AttachKind kind;
+  final File file;
+  final String fileName;
+  final int? fileSizeBytes;
+  final String recipient;
+
+  const _AttachmentPreviewScreen({
+    required this.kind,
+    required this.file,
+    required this.fileName,
+    required this.recipient,
+    this.fileSizeBytes,
+  });
+
+  @override
+  State<_AttachmentPreviewScreen> createState() =>
+      _AttachmentPreviewScreenState();
+}
+
+class _AttachmentPreviewScreenState extends State<_AttachmentPreviewScreen> {
+  VideoPlayerController? _videoController;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.kind == _AttachKind.video) {
+      final c = VideoPlayerController.file(widget.file);
+      _videoController = c;
+      c.initialize().then((_) {
+        if (!mounted) return;
+        c.setLooping(true);
+        c.play();
+        setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  String _formatBytes(int bytes) {
+    const kb = 1024;
+    const mb = kb * 1024;
+    const gb = mb * 1024;
+    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
+    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
+    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(0)} KB';
+    return '$bytes B';
+  }
+
+  Widget _buildBody() {
+    switch (widget.kind) {
+      case _AttachKind.image:
+        return Center(
+          child: InteractiveViewer(
+            maxScale: 4,
+            child: Image.file(widget.file, fit: BoxFit.contain),
+          ),
+        );
+      case _AttachKind.video:
+        final c = _videoController;
+        if (c == null || !c.value.isInitialized) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
+        }
+        return Center(
+          child: AspectRatio(
+            aspectRatio: c.value.aspectRatio,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                VideoPlayer(c),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      c.value.isPlaying ? c.pause() : c.play();
+                    });
+                  },
+                  child: AnimatedOpacity(
+                    opacity: c.value.isPlaying ? 0 : 1,
+                    duration: const Duration(milliseconds: 200),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: const Icon(Icons.play_arrow,
+                          color: Colors.white, size: 48),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      case _AttachKind.file:
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.insert_drive_file_outlined,
+                    color: Colors.white,
+                    size: 56,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  widget.fileName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (widget.fileSizeBytes != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _formatBytes(widget.fileSizeBytes!),
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text('Send to ${widget.recipient}'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(child: _buildBody()),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              color: Colors.black,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white24),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      icon: const Icon(Icons.send),
+                      label: const Text('Send'),
+                      style: FilledButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Outgoing chat bubble shown for an attachment whose upload + Firestore
+/// write are still in flight. Pops out of the list when the upload
+/// completes and the real message arrives over the messages stream, or
+/// transitions to a failed state with retry/dismiss buttons on error.
+class _PendingAttachmentBubble extends StatelessWidget {
+  final _PendingAttachment pending;
+  final VoidCallback onRetry;
+  final VoidCallback onDismiss;
+
+  const _PendingAttachmentBubble({
+    required this.pending,
+    required this.onRetry,
+    required this.onDismiss,
+  });
+
+  String _statusLabel() {
+    switch (pending.status) {
+      case _PendingStatus.uploading:
+        return 'Uploading…';
+      case _PendingStatus.sending:
+        return 'Sending…';
+      case _PendingStatus.failed:
+        return 'Failed to send';
+    }
+  }
+
+  Widget _buildPreview(BuildContext context) {
+    switch (pending.kind) {
+      case _AttachKind.image:
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            pending.file,
+            width: 220,
+            height: 220,
+            fit: BoxFit.cover,
+          ),
+        );
+      case _AttachKind.video:
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 220,
+            height: 220,
+            color: Colors.black,
+            alignment: Alignment.center,
+            child: const Icon(Icons.movie_outlined,
+                color: Colors.white70, size: 56),
+          ),
+        );
+      case _AttachKind.file:
+        return Container(
+          padding: const EdgeInsets.all(12),
+          constraints: const BoxConstraints(maxWidth: 260),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.insert_drive_file_outlined,
+                  color: Colors.white, size: 32),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  pending.fileName,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isFailed = pending.status == _PendingStatus.failed;
+    final bubbleColor =
+        isFailed ? Colors.red.withValues(alpha: 0.85) : const Color(0xFFB05ECC);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Stack(
+                  children: [
+                    Opacity(
+                      opacity: isFailed ? 0.6 : 1,
+                      child: Container(
+                        padding: pending.kind == _AttachKind.file
+                            ? EdgeInsets.zero
+                            : const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: bubbleColor,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(16),
+                            topRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(4),
+                          ),
+                        ),
+                        child: _buildPreview(context),
+                      ),
+                    ),
+                    if (!isFailed)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Center(
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              padding: const EdgeInsets.all(10),
+                              child: const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isFailed
+                          ? Icons.error_outline
+                          : Icons.cloud_upload_outlined,
+                      size: 13,
+                      color: isFailed ? Colors.red : Colors.white70,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _statusLabel(),
+                      style: TextStyle(
+                        color: isFailed ? Colors.red : Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (isFailed) ...[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: onRetry,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 0),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child:
+                            const Text('Retry', style: TextStyle(fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: onDismiss,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 0),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Dismiss',
+                            style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -93,6 +93,16 @@ service cloud.firestore {
         allow delete: if isSelf(uid) || isAdmin();
         allow update: if false;
       }
+
+      // "Who viewed my profile" — one doc per visitor at
+      // users/{uid}/visitors/{visitorUid}. Only the profile owner (or an
+      // admin) can read the list. The visitor writes their own doc on
+      // visit; the owner may delete entries to clear their list.
+      match /visitors/{visitorUid} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create, update: if isSelf(visitorUid) && visitorUid != uid;
+        allow delete: if isSelf(uid) || isSelf(visitorUid) || isAdmin();
+      }
     }
 
     // Collection-group access for admin cleanup (deleteUser cascade).

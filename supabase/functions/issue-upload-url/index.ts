@@ -2,7 +2,7 @@
 // Verifies a Firebase ID token and returns a signed Supabase Storage upload URL
 // scoped to the user's own folder inside the requested bucket.
 //
-// Request body: { bucket: 'avatars' | 'posts', kind: 'avatar'|'cover'|'post'|'story'|'chat'|'audio', ext: string, subPath?: string }
+// Request body: { bucket: 'avatars' | 'posts', kind: 'avatar'|'cover'|'post'|'story'|'chat'|'chat-video'|'chat-file'|'audio', ext: string, subPath?: string }
 // Response:     { uploadUrl, token, path, publicUrl }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -15,7 +15,17 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ALLOWED_BUCKETS = new Set(["avatars", "posts"]);
 const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic"]);
 const AUDIO_EXTS = new Set(["m4a", "aac", "mp3", "wav", "ogg"]);
-const ALLOWED_EXTS = new Set([...IMAGE_EXTS, ...AUDIO_EXTS]);
+const VIDEO_EXTS = new Set(["mp4", "mov", "webm", "m4v", "3gp"]);
+const DOC_EXTS = new Set([
+  "pdf", "doc", "docx", "xls", "xlsx",
+  "ppt", "pptx", "txt", "rtf", "csv", "zip",
+]);
+const ALLOWED_EXTS = new Set([
+  ...IMAGE_EXTS,
+  ...AUDIO_EXTS,
+  ...VIDEO_EXTS,
+  ...DOC_EXTS,
+]);
 
 const JWKS = createRemoteJWKSet(
   new URL(
@@ -96,6 +106,22 @@ Deno.serve(async (req) => {
       return json(400, { error: "bad subPath" });
     }
     path = `${uid}/chats/${subPath}/${ts}_${rand}.${ext}`;
+  } else if (kind === "chat-video" && subPath) {
+    if (!/^[A-Za-z0-9_]+$/.test(subPath)) {
+      return json(400, { error: "bad subPath" });
+    }
+    if (!VIDEO_EXTS.has(ext)) {
+      return json(400, { error: "chat-video kind requires video ext" });
+    }
+    path = `${uid}/chats/${subPath}/videos/${ts}_${rand}.${ext}`;
+  } else if (kind === "chat-file" && subPath) {
+    if (!/^[A-Za-z0-9_]+$/.test(subPath)) {
+      return json(400, { error: "bad subPath" });
+    }
+    if (!DOC_EXTS.has(ext)) {
+      return json(400, { error: "chat-file kind requires document ext" });
+    }
+    path = `${uid}/chats/${subPath}/files/${ts}_${rand}.${ext}`;
   } else if (kind === "audio" && subPath) {
     // Voice messages live alongside chat media but in a /voices/ folder
     // so they're easy to enumerate separately.

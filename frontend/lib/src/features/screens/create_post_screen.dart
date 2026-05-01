@@ -371,17 +371,27 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                TextButton.icon(
-                                  onPressed: _useCurrentLocationForPlace,
-                                  icon:
-                                      const Icon(Icons.my_location_rounded),
-                                  label: const Text('Use current location'),
+                                Expanded(
+                                  child: TextButton.icon(
+                                    onPressed: _useCurrentLocationForPlace,
+                                    icon: const Icon(
+                                        Icons.my_location_rounded),
+                                    label: const Text(
+                                      'Use current location',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
-                                TextButton.icon(
-                                  onPressed: _locateTypedPlaceOnMap,
-                                  icon: const Icon(Icons.map_outlined),
-                                  label: const Text('Locate on map'),
+                                Expanded(
+                                  child: TextButton.icon(
+                                    onPressed: _locateTypedPlaceOnMap,
+                                    icon: const Icon(Icons.map_outlined),
+                                    label: const Text(
+                                      'Locate on map',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
