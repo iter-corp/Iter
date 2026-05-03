@@ -88,18 +88,13 @@ class HiddenRequestsScreen extends StatelessWidget {
                       ),
                     ),
                     subtitle: Text(
-                      msg.lastMessage,
+                      msg.unreadCount > 0
+                          ? '${msg.unreadCount} new ${msg.unreadCount == 1 ? 'message' : 'messages'}'
+                          : msg.lastMessage,
                       style: TextStyle(color: context.textMuted, fontSize: 12),
                     ),
                     trailing: msg.unreadCount > 0
-                        ? Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFB05ECC),
-                              shape: BoxShape.circle,
-                            ),
-                          )
+                        ? _UnreadCountBadge(count: msg.unreadCount)
                         : null,
                   );
                 },
@@ -181,24 +176,47 @@ class RequestsTab extends StatelessWidget {
                   ),
                 ),
                 subtitle: Text(
-                  msg.lastMessage,
+                  msg.unreadCount > 0
+                      ? '${msg.unreadCount} new ${msg.unreadCount == 1 ? 'message' : 'messages'}'
+                      : msg.lastMessage,
                   style: TextStyle(color: context.textMuted, fontSize: 12),
                 ),
                 trailing: msg.unreadCount > 0
-                    ? Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFB05ECC),
-                          shape: BoxShape.circle,
-                        ),
-                      )
+                    ? _UnreadCountBadge(count: msg.unreadCount)
                     : null,
               );
             },
           ),
         ),
       ],
+    );
+  }
+}
+
+class _UnreadCountBadge extends StatelessWidget {
+  final int count;
+
+  const _UnreadCountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: const BoxDecoration(
+        color: Color(0xFFB05ECC),
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
+      constraints: const BoxConstraints(minWidth: 20),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

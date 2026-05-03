@@ -126,6 +126,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final followingAsync = currentUid == null
         ? const AsyncValue<List<String>>.data([])
         : ref.watch(followingProvider(currentUid));
+    final postsAsync = currentUid == null
+        ? const AsyncValue<List<Post>>.data([])
+        : ref.watch(userPostsProvider(currentUid));
 
     return Scaffold(
       backgroundColor: context.cardBg,
@@ -155,7 +158,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   following: followingAsync.valueOrNull?.length ??
                       (user['followingCount'] as int?) ??
                       0,
-                  posts: (user['postsCount'] as int?) ?? 0,
+                  posts: postsAsync.valueOrNull?.length ??
+                      (user['postsCount'] as int?) ??
+                      0,
                   onFollowersTap: () => _showUserListSheet(
                     title: 'Followers',
                     uids: followersAsync.value ?? const [],

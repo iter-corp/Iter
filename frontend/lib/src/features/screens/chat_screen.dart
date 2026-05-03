@@ -111,6 +111,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // bubbles below the real message stream so the user sees their send
   // instantly with a live status indicator.
   final List<_PendingAttachment> _pending = [];
+  bool _markingSeen = false;
+  DateTime? _lastMarkSeenAt;
 
   void _addPending(_PendingAttachment p) {
     setState(() => _pending.add(p));
@@ -204,6 +206,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     await prefs.setString(_prefsLangKey, _autoTranslateTarget);
   }
 
+  Future<void> _markSeenNow() async {
+    final uid = _currentUid;
+    if (uid == null || _markingSeen) return;
+    final now = DateTime.now();
+    if (_lastMarkSeenAt != null &&
+        now.difference(_lastMarkSeenAt!) < const Duration(milliseconds: 700)) {
+      return;
+    }
+
+    _markingSeen = true;
+    _lastMarkSeenAt = now;
+    try {
+      await ref
+          .read(chatServiceProvider)
+          .markSeen(chatId: widget.chatId, uid: uid);
+    } catch (_) {
+      // Best-effort read receipt update; ignore transient failures.
+    } finally {
+      _markingSeen = false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -212,7 +236,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final uid = _currentUid;
       if (uid == null) return;
       ref.read(presenceServiceProvider).setOnline(uid);
-      ref.read(chatServiceProvider).markSeen(chatId: widget.chatId, uid: uid);
+      unawaited(_markSeenNow());
     });
   }
 
@@ -1364,7 +1388,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         : (theyBlockedMe ? 'You can\'t reply to this conversation.' : null);
 
     ref.listen(messagesProvider(widget.chatId), (_, __) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+        unawaited(_markSeenNow());
+      });
     });
 
     final isOnline = presenceAsync?.whenOrNull(data: (p) => p.online) ?? false;

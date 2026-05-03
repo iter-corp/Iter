@@ -135,12 +135,11 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
 
   @override
   Widget build(BuildContext context) {
-    final acceptedInboxAsync = ref.watch(acceptedInboxProvider);
+    final inboxAsync = ref.watch(inboxProvider);
     final requestsAsync = ref.watch(requestsProvider);
     final eventChatsAsync = ref.watch(myEventChatsProvider);
 
-    final oneToOne =
-        (acceptedInboxAsync.valueOrNull ?? []).where(_matches).toList();
+    final oneToOne = (inboxAsync.valueOrNull ?? []).where(_matches).toList();
     final eventRows =
         (eventChatsAsync.valueOrNull ?? []).where(_matchesEvent).toList();
     final requestConvs =
@@ -219,7 +218,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
           // ── Conversation list ────────────────────────────────────────
           Expanded(
             child: selectedTab == 0
-                ? acceptedInboxAsync.when(
+                ? inboxAsync.when(
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
                     error: (e, _) => Center(child: Text('Error: $e')),
@@ -302,9 +301,7 @@ class _SearchableConvList extends ConsumerWidget {
 
     final showFollowed = hasQuery && currentUid != null;
     final candidateFollowedUids = showFollowed
-        ? followingUids
-            .where((uid) => !existingUids.contains(uid))
-            .toList()
+        ? followingUids.where((uid) => !existingUids.contains(uid)).toList()
         : const <String>[];
 
     if (merged.isEmpty && !showFollowed) {
@@ -449,7 +446,9 @@ class _FollowedUserTile extends ConsumerWidget {
     }
     return ListTile(
       onTap: () => onTap(
-        name: username.isNotEmpty ? username : (fullName.isNotEmpty ? fullName : 'User'),
+        name: username.isNotEmpty
+            ? username
+            : (fullName.isNotEmpty ? fullName : 'User'),
         avatar: avatar,
       ),
       leading: CircleAvatar(
@@ -548,20 +547,15 @@ class _ConvTile extends StatelessWidget {
         ],
       ),
       subtitle: Text(
-        conv.lastMessage,
+        conv.unreadCount > 0
+            ? '${conv.unreadCount} new ${conv.unreadCount == 1 ? 'message' : 'messages'}'
+            : conv.lastMessage,
         style: TextStyle(color: context.textSecondary, fontSize: 12),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       trailing: conv.unreadCount > 0
-          ? Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Color(0xFFB05ECC),
-                shape: BoxShape.circle,
-              ),
-            )
+          ? _UnreadCountBadge(count: conv.unreadCount)
           : null,
     );
   }
@@ -620,21 +614,44 @@ class _EventConvTile extends StatelessWidget {
         ],
       ),
       subtitle: Text(
-        preview,
+        chat.unreadCount > 0
+            ? '${chat.unreadCount} new ${chat.unreadCount == 1 ? 'message' : 'messages'}'
+            : preview,
         style: TextStyle(color: context.textSecondary, fontSize: 12),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       trailing: chat.unreadCount > 0
-          ? Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Color(0xFFB05ECC),
-                shape: BoxShape.circle,
-              ),
-            )
+          ? _UnreadCountBadge(count: chat.unreadCount)
           : null,
+    );
+  }
+}
+
+class _UnreadCountBadge extends StatelessWidget {
+  final int count;
+
+  const _UnreadCountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: const BoxDecoration(
+        color: Color(0xFFB05ECC),
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
+      constraints: const BoxConstraints(minWidth: 20),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

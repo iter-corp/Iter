@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../services/chat_service.dart';
 import '../screens/home_screen.dart';
 import '../screens/event_screen.dart'; // ✅ Added
 import '../screens/message_screen.dart';
@@ -66,6 +68,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final inboxAsync = ref.watch(inboxProvider);
+    final inbox = inboxAsync.valueOrNull ?? const <ChatConversation>[];
+    final unreadChats = inbox.where((c) => c.unreadCount > 0).length;
+
     return Scaffold(
       backgroundColor: _backgroundColor(context),
       extendBody: true,
@@ -105,6 +111,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(_navIcons.length, (index) {
                   final bool isSelected = _selectedIndex == index;
+                  final showMessageBadge = index == 3 && unreadChats > 0;
                   return GestureDetector(
                     onTap: () => _onNavTap(index),
                     child: AnimatedContainer(
@@ -114,21 +121,40 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         color: isSelected ? Colors.white : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
-                      child: index == 1
-                          ? Icon(
-                              Icons.diversity_3_rounded,
-                              size: 24,
-                              color: isSelected ? Colors.black : Colors.white,
-                            )
-                          : SvgPicture.asset(
-                              _navIcons[index],
-                              width: 24,
-                              height: 24,
-                              colorFilter: ColorFilter.mode(
-                                isSelected ? Colors.black : Colors.white,
-                                BlendMode.srcIn,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          index == 1
+                              ? Icon(
+                                  Icons.diversity_3_rounded,
+                                  size: 24,
+                                  color:
+                                      isSelected ? Colors.black : Colors.white,
+                                )
+                              : SvgPicture.asset(
+                                  _navIcons[index],
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: ColorFilter.mode(
+                                    isSelected ? Colors.black : Colors.white,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                          if (showMessageBadge)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                width: 9,
+                                height: 9,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFF4D4D),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                             ),
+                        ],
+                      ),
                     ),
                   );
                 }),

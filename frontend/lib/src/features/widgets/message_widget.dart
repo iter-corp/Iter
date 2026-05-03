@@ -82,9 +82,8 @@ class MessageTile extends ConsumerWidget {
       leading: CircleAvatar(
         radius: 26,
         backgroundColor: context.inputFill,
-        backgroundImage: avatarUrl != null
-            ? CachedNetworkImageProvider(avatarUrl)
-            : null,
+        backgroundImage:
+            avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
         child: avatarUrl == null
             ? Icon(Icons.person, color: context.textMuted)
             : null,
@@ -94,19 +93,42 @@ class MessageTile extends ConsumerWidget {
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       subtitle: Text(
-        message.lastMessage,
+        message.unreadCount > 0
+            ? '${message.unreadCount} new ${message.unreadCount == 1 ? 'message' : 'messages'}'
+            : message.lastMessage,
         style: TextStyle(color: context.textSecondary, fontSize: 12),
       ),
       trailing: message.unreadCount > 0
-          ? Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Color(0xFFB05ECC),
-                shape: BoxShape.circle,
-              ),
-            )
+          ? _UnreadCountBadge(count: message.unreadCount)
           : null,
+    );
+  }
+}
+
+class _UnreadCountBadge extends StatelessWidget {
+  final int count;
+
+  const _UnreadCountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: const BoxDecoration(
+        color: Color(0xFFB05ECC),
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
+      constraints: const BoxConstraints(minWidth: 20),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

@@ -120,6 +120,38 @@ class ChatConversation {
     this.participants = const [],
   });
 
+  ChatConversation copyWith({
+    String? chatId,
+    String? otherUid,
+    String? otherUsername,
+    String? otherAvatarUrl,
+    String? lastMessage,
+    DateTime? lastTime,
+    int? unreadCount,
+    bool? isRequest,
+    bool? isGroup,
+    String? groupName,
+    String? groupAvatarUrl,
+    String? adminUid,
+    List<String>? participants,
+  }) {
+    return ChatConversation(
+      chatId: chatId ?? this.chatId,
+      otherUid: otherUid ?? this.otherUid,
+      otherUsername: otherUsername ?? this.otherUsername,
+      otherAvatarUrl: otherAvatarUrl ?? this.otherAvatarUrl,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastTime: lastTime ?? this.lastTime,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isRequest: isRequest ?? this.isRequest,
+      isGroup: isGroup ?? this.isGroup,
+      groupName: groupName ?? this.groupName,
+      groupAvatarUrl: groupAvatarUrl ?? this.groupAvatarUrl,
+      adminUid: adminUid ?? this.adminUid,
+      participants: participants ?? this.participants,
+    );
+  }
+
   factory ChatConversation.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
     String currentUid,
@@ -130,7 +162,7 @@ class ChatConversation {
     final isGroup = kind == 'group';
     final userData = (d['userData'] as Map<String, dynamic>?) ?? {};
     final acceptedBy = List<String>.from(d['acceptedBy'] as List? ?? []);
-    final unread = (d['unread'] as Map<String, dynamic>?) ?? {};
+    final unreadRaw = d['unread'];
 
     String otherUid = '';
     String otherUsername = 'User';
@@ -141,10 +173,28 @@ class ChatConversation {
         (uid) => uid != currentUid,
         orElse: () => '',
       );
+      // Backward-compat: older direct-chat docs may miss participants.
+      if (otherUid.isEmpty && doc.id.contains('_')) {
+        final ids = doc.id.split('_');
+        if (ids.length == 2) {
+          otherUid = ids.first == currentUid ? ids.last : ids.first;
+        }
+      }
       final otherData = (userData[otherUid] as Map<String, dynamic>?) ?? {};
       otherUsername = (otherData['username'] as String?) ?? 'User';
       otherAvatarUrl = (otherData['avatarUrl'] as String?) ?? '';
     }
+
+    int unreadCount = 0;
+    if (unreadRaw is Map) {
+      final raw = unreadRaw[currentUid];
+      if (raw is num) {
+        unreadCount = raw.toInt();
+      } else if (raw is String) {
+        unreadCount = int.tryParse(raw) ?? 0;
+      }
+    }
+    if (unreadCount < 0) unreadCount = 0;
 
     return ChatConversation(
       chatId: doc.id,
@@ -153,7 +203,7 @@ class ChatConversation {
       otherAvatarUrl: otherAvatarUrl,
       lastMessage: (d['lastMessage'] as String?) ?? '',
       lastTime: (d['lastTime'] as Timestamp?)?.toDate(),
-      unreadCount: (unread[currentUid] as int?) ?? 0,
+      unreadCount: unreadCount,
       // Groups are always "accepted" since you explicitly opted in.
       isRequest: !isGroup && !acceptedBy.contains(currentUid),
       isGroup: isGroup,
@@ -312,7 +362,16 @@ class ChatService {
         ? ((chatData['participants'] as List?)?.cast<String>() ?? const [])
             .where((u) => u != senderUid)
             .toList()
-        : <String>[receiverUid];
+        : <String>[
+            if (receiverUid.trim().isNotEmpty)
+              receiverUid.trim()
+            else
+              ((chatData['participants'] as List?)?.cast<String>() ?? const [])
+                  .firstWhere(
+                (u) => u != senderUid,
+                orElse: () => '',
+              ),
+          ];
 
     final batch = _db.batch();
     final msgRef = _messagesCol(chatId).doc();
@@ -405,7 +464,10 @@ class ChatService {
     required String chatId,
     required String uid,
   }) async {
-    await _chatDoc(chatId).update({'unread.$uid': 0});
+    await _chatDoc(chatId).update({
+      'unread.$uid': 0,
+      'lastSeenAt.$uid': FieldValue.serverTimestamp(),
+    });
 
     final recent = await _messagesCol(chatId)
         .orderBy('createdAt', descending: true)
@@ -441,7 +503,29 @@ class ChatService {
         .collection('chats')
         .where('participants', arrayContains: uid)
         .snapshots()
-        .map((s) {
+        .asyncMap((s) async {
+      final withUnread = await Future.wait(s.docs.map((doc) async {
+        var conv = ChatConversation.fromDoc(doc, uid);
+        final d = doc.data();
+
+        // If summary unread is zero/stale but latest message is from
+        // someone else, derive unread from message-level seenBy.
+        if (conv.unreadCount <= 0) {
+          final lastSender = (d['lastMessageSenderUid'] as String?) ?? '';
+          if (lastSender.isNotEmpty && lastSender != uid) {
+            final derived = await _deriveUnreadFromMessages(
+              chatId: doc.id,
+              uid: uid,
+            );
+            if (derived > 0) {
+              conv = conv.copyWith(unreadCount: derived);
+            }
+          }
+        }
+
+        return conv;
+      }));
+
       // Hide chats that have no messages yet. openChat creates the doc
       // as soon as you visit a profile and tap "Message"; without this
       // filter the recipient saw a request notification for a chat the
@@ -449,8 +533,7 @@ class ChatService {
       // even when empty since the explicit invite already implies
       // intent. We use lastMessage as the gate (not lastTime) because
       // openChat sets a serverTimestamp on creation.
-      final convs = s.docs
-          .map((doc) => ChatConversation.fromDoc(doc, uid))
+      final convs = withUnread
           .where((c) => c.isGroup || c.lastMessage.isNotEmpty)
           .toList();
       // Sort in Dart to avoid requiring a Firestore composite index.
@@ -461,6 +544,30 @@ class ChatService {
       });
       return convs;
     });
+  }
+
+  Future<int> _deriveUnreadFromMessages({
+    required String chatId,
+    required String uid,
+  }) async {
+    try {
+      final recent = await _messagesCol(chatId)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+      var count = 0;
+      for (final doc in recent.docs) {
+        final data = doc.data();
+        if (data['senderUid'] == uid) continue;
+        final seenBy = List<String>.from(data['seenBy'] as List? ?? const []);
+        if (!seenBy.contains(uid)) {
+          count++;
+        }
+      }
+      return count;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Stream<List<ChatConversation>> streamRequests(String uid) {
