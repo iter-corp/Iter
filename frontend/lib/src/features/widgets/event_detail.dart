@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../providers/event_registration_providers.dart';
 import '../../services/event_registration_service.dart';
@@ -225,7 +226,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
+
+              // 📌 SECTION: Plan your trip (booking placeholders)
+              if (widget.location.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _PlanTripSection(location: widget.location),
+                ),
+
+              const SizedBox(height: 24),
 
               // 📌 SECTION: Registration
               Padding(
@@ -421,6 +431,178 @@ class _RegistrationButton extends ConsumerWidget {
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// 📌 SECTION: Plan-your-trip booking placeholders
+//
+// External-link shortcuts to Booking.com (hotels) and Google Flights
+// (flights). These are intentionally URL-based — no booking SDK is
+// integrated yet. The destination is parsed from the event's location
+// string, taking the first comma-separated segment as the city.
+class _PlanTripSection extends StatelessWidget {
+  final String location;
+  const _PlanTripSection({required this.location});
+
+  String get _destination {
+    final first = location.split(',').first.trim();
+    return first.isEmpty ? location.trim() : first;
+  }
+
+  Future<void> _openHotels(BuildContext context) async {
+    final uri = Uri.parse(
+      'https://www.booking.com/searchresults.html?ss=${Uri.encodeQueryComponent(_destination)}',
+    );
+    await _launch(context, uri, label: 'hotel search');
+  }
+
+  Future<void> _openFlights(BuildContext context) async {
+    final uri = Uri.parse(
+      'https://www.google.com/travel/flights?q=${Uri.encodeQueryComponent('Flights to $_destination')}',
+    );
+    await _launch(context, uri, label: 'flight search');
+  }
+
+  Future<void> _launch(BuildContext context, Uri uri,
+      {required String label}) async {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $label')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.travel_explore_rounded,
+                size: 18, color: Color(0xFFB05ECC)),
+            const SizedBox(width: 6),
+            Text(
+              'Plan your trip',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: context.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Heading to $_destination? Find a place to stay or a flight in.',
+          style: TextStyle(
+            fontSize: 12.5,
+            color: context.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _BookingTile(
+                icon: Icons.hotel_rounded,
+                label: 'Hotels',
+                subtitle: 'Find stays',
+                onTap: () => _openHotels(context),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _BookingTile(
+                icon: Icons.flight_takeoff_rounded,
+                label: 'Flights',
+                subtitle: 'Search routes',
+                onTap: () => _openFlights(context),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _BookingTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _BookingTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFB05ECC), Color(0xFF8A3FB8)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_outward_rounded,
+                  size: 14, color: context.textSecondary),
+            ],
           ),
         ),
       ),

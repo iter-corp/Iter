@@ -4,7 +4,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart' as geo;
+import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
@@ -49,6 +53,14 @@ double _toRad(double d) => d * math.pi / 180;
 
 enum _MainTab { partners, events }
 
+enum _EventsLayout { list, map }
+
+String _eventCity(AdminEvent e) {
+  final loc = e.location.trim();
+  if (loc.isEmpty) return '';
+  return loc.split(',').first.trim();
+}
+
 final _partnersStreamProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   return FirebaseFirestore.instance
@@ -73,6 +85,8 @@ class _EventBodyState extends ConsumerState<EventBody> {
   _MainTab _mainTab = _MainTab.partners;
   int _partnerFilter = 0;
   String? _selectedCity;
+  String? _selectedEventCity;
+  _EventsLayout _eventsLayout = _EventsLayout.list;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
@@ -97,6 +111,35 @@ class _EventBodyState extends ConsumerState<EventBody> {
       _mainTab = tab;
       _searchController.clear();
     });
+    if (tab == _MainTab.events) {
+      _maybeShowEventsQuickStart();
+    }
+  }
+
+  Future<void> _maybeShowEventsQuickStart() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('events_quickstart_seen') ?? false) return;
+    if (!mounted) return;
+    await prefs.setBool('events_quickstart_seen', true);
+    if (!mounted) return;
+    await showTravelQuickStartSheet(context);
+  }
+
+  Future<void> _onEventCityTap(List<AdminEvent> events) async {
+    final cities = events
+        .map(_eventCity)
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    if (cities.isEmpty) return;
+    final chosen = await _pickFromSheet(
+      title: 'Filter events by city',
+      options: cities,
+      selected: _selectedEventCity,
+    );
+    if (chosen == null) return;
+    setState(() => _selectedEventCity = chosen.isEmpty ? null : chosen);
   }
 
   Future<void> _onPartnerFilterTap(int i) async {
@@ -192,6 +235,15 @@ class _EventBodyState extends ConsumerState<EventBody> {
                     : _EventsView(
                         key: const ValueKey('events'),
                         query: _query,
+                        selectedCity: _selectedEventCity,
+                        layout: _eventsLayout,
+                        onCityTap: _onEventCityTap,
+                        onClearCity: () =>
+                            setState(() => _selectedEventCity = null),
+                        onLayoutChanged: (l) =>
+                            setState(() => _eventsLayout = l),
+                        onShowQuickStart: () =>
+                            showTravelQuickStartSheet(context),
                       ),
               ),
             ),
@@ -974,7 +1026,23 @@ class _Tag extends StatelessWidget {
 // ─────────────────────────────────────────────────────────
 class _EventsView extends ConsumerWidget {
   final String query;
-  const _EventsView({super.key, required this.query});
+  final String? selectedCity;
+  final _EventsLayout layout;
+  final ValueChanged<List<AdminEvent>> onCityTap;
+  final VoidCallback onClearCity;
+  final ValueChanged<_EventsLayout> onLayoutChanged;
+  final VoidCallback onShowQuickStart;
+
+  const _EventsView({
+    super.key,
+    required this.query,
+    required this.selectedCity,
+    required this.layout,
+    required this.onCityTap,
+    required this.onClearCity,
+    required this.onLayoutChanged,
+    required this.onShowQuickStart,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -988,56 +1056,258 @@ class _EventsView extends ConsumerWidget {
       ),
       data: (events) {
         final q = query.toLowerCase();
-        final filtered = q.isEmpty
-            ? events
-            : events.where((e) {
-                return e.title.toLowerCase().contains(q) ||
-                    e.subtitle.toLowerCase().contains(q) ||
-                    e.location.toLowerCase().contains(q) ||
-                    e.description.toLowerCase().contains(q);
-              }).toList();
+        final cityPick = selectedCity?.toLowerCase().trim();
+        final filtered = events.where((e) {
+          if (q.isNotEmpty) {
+            final inText = e.title.toLowerCase().contains(q) ||
+                e.subtitle.toLowerCase().contains(q) ||
+                e.location.toLowerCase().contains(q) ||
+                e.description.toLowerCase().contains(q);
+            if (!inText) return false;
+          }
+          if (cityPick != null && cityPick.isNotEmpty) {
+            if (_eventCity(e).toLowerCase() != cityPick) return false;
+          }
+          return true;
+        }).toList();
 
-        if (filtered.isEmpty) {
-          return _EmptyState(
-            icon: Icons.event_busy_outlined,
-            title: q.isEmpty ? 'No events yet' : 'No events matching "$query"',
-            subtitle: q.isEmpty
-                ? 'New events will appear here when posted.'
-                : 'Try a different keyword.',
-          );
-        }
-
-        return RefreshIndicator(
-          color: _kBrandPurple,
-          onRefresh: () async {
-            ref.invalidate(adminEventsProvider);
-            await Future.delayed(const Duration(milliseconds: 400));
-          },
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+        return Column(
+          children: [
+            _EventFilterBar(
+              selectedCity: selectedCity,
+              layout: layout,
+              onCityTap: () => onCityTap(events),
+              onClearCity: onClearCity,
+              onLayoutChanged: onLayoutChanged,
+              onShowQuickStart: onShowQuickStart,
             ),
-            slivers: [
-              const SliverToBoxAdapter(child: _BecomeAdminBanner()),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.78,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _EventCard(event: filtered[i]),
-                    childCount: filtered.length,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? _EmptyState(
+                      icon: Icons.event_busy_outlined,
+                      title: q.isEmpty && (cityPick == null || cityPick.isEmpty)
+                          ? 'No events yet'
+                          : (q.isNotEmpty
+                              ? 'No events matching "$query"'
+                              : 'No events in $selectedCity'),
+                      subtitle: q.isEmpty &&
+                              (cityPick == null || cityPick.isEmpty)
+                          ? 'New events will appear here when posted.'
+                          : 'Try a different keyword or location.',
+                    )
+                  : layout == _EventsLayout.map
+                      ? _EventsMapView(events: filtered)
+                      : RefreshIndicator(
+                          color: _kBrandPurple,
+                          onRefresh: () async {
+                            ref.invalidate(adminEventsProvider);
+                            await Future.delayed(
+                                const Duration(milliseconds: 400));
+                          },
+                          child: CustomScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            slivers: [
+                              const SliverToBoxAdapter(
+                                  child: _BecomeAdminBanner()),
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                                sliver: SliverGrid(
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.78,
+                                  ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, i) =>
+                                        _EventCard(event: filtered[i]),
+                                    childCount: filtered.length,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+// Event filter bar: city chip, list/map toggle, quick-start help.
+class _EventFilterBar extends StatelessWidget {
+  final String? selectedCity;
+  final _EventsLayout layout;
+  final VoidCallback onCityTap;
+  final VoidCallback onClearCity;
+  final ValueChanged<_EventsLayout> onLayoutChanged;
+  final VoidCallback onShowQuickStart;
+
+  const _EventFilterBar({
+    required this.selectedCity,
+    required this.layout,
+    required this.onCityTap,
+    required this.onClearCity,
+    required this.onLayoutChanged,
+    required this.onShowQuickStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cityActive = selectedCity != null && selectedCity!.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: onCityTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: cityActive ? _kBrandPurple : context.cardBg,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: cityActive ? _kBrandPurple : context.borderColor,
+                  ),
+                  boxShadow: cityActive
+                      ? [
+                          BoxShadow(
+                            color: _kBrandPurple.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      size: 16,
+                      color: cityActive ? Colors.white : _kBrandPurple,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        cityActive ? selectedCity! : 'Filter by city',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color:
+                              cityActive ? Colors.white : context.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (cityActive)
+                      GestureDetector(
+                        onTap: onClearCity,
+                        child: const Icon(Icons.close_rounded,
+                            size: 15, color: Colors.white),
+                      )
+                    else
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 18, color: context.textSecondary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _LayoutToggle(layout: layout, onChanged: onLayoutChanged),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: onShowQuickStart,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: context.cardBg,
+                shape: BoxShape.circle,
+                border: Border.all(color: context.borderColor),
+              ),
+              child: const Icon(
+                Icons.help_outline_rounded,
+                size: 18,
+                color: _kBrandPurple,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LayoutToggle extends StatelessWidget {
+  final _EventsLayout layout;
+  final ValueChanged<_EventsLayout> onChanged;
+  const _LayoutToggle({required this.layout, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _layoutButton(
+            icon: Icons.grid_view_rounded,
+            active: layout == _EventsLayout.list,
+            onTap: () => onChanged(_EventsLayout.list),
+          ),
+          _layoutButton(
+            icon: Icons.map_outlined,
+            active: layout == _EventsLayout.map,
+            onTap: () => onChanged(_EventsLayout.map),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _layoutButton({
+    required IconData icon,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 40,
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: active
+              ? const LinearGradient(
+                  colors: [_kBrandPurple, _kBrandDeep],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 17,
+          color: active ? Colors.white : const Color(0xFF8A8A92),
+        ),
+      ),
     );
   }
 }
@@ -1706,6 +1976,528 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Events map view — geocodes each event's location string and
+// drops a pin at the resolved coordinate.
+// ─────────────────────────────────────────────────────────
+
+// Process-wide cache so we don't re-hit the geocoder when the user
+// flips between list and map.
+final Map<String, LatLng?> _eventGeocodeCache = {};
+
+class _EventsMapView extends StatefulWidget {
+  final List<AdminEvent> events;
+  const _EventsMapView({required this.events});
+
+  @override
+  State<_EventsMapView> createState() => _EventsMapViewState();
+}
+
+class _EventsMapViewState extends State<_EventsMapView> {
+  final Map<String, LatLng> _resolved = {};
+  bool _resolving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveAll();
+  }
+
+  @override
+  void didUpdateWidget(covariant _EventsMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _resolveAll();
+  }
+
+  Future<void> _resolveAll() async {
+    if (_resolving) return;
+    _resolving = true;
+    for (final e in widget.events) {
+      final loc = e.location.trim();
+      if (loc.isEmpty) continue;
+      if (_resolved.containsKey(e.id)) continue;
+      final cached = _eventGeocodeCache[loc];
+      if (_eventGeocodeCache.containsKey(loc)) {
+        if (cached != null) {
+          _resolved[e.id] = cached;
+        }
+        continue;
+      }
+      try {
+        final results = await geo.locationFromAddress(loc);
+        if (results.isNotEmpty) {
+          final p = LatLng(results.first.latitude, results.first.longitude);
+          _eventGeocodeCache[loc] = p;
+          _resolved[e.id] = p;
+        } else {
+          _eventGeocodeCache[loc] = null;
+        }
+      } catch (_) {
+        _eventGeocodeCache[loc] = null;
+      }
+      if (mounted) setState(() {});
+    }
+    _resolving = false;
+  }
+
+  LatLng _initialCenter() {
+    if (_resolved.isEmpty) {
+      // Fallback: roughly centered on Europe / Africa so the empty world
+      // doesn't open zoomed on the wrong hemisphere.
+      return const LatLng(20, 10);
+    }
+    double sumLat = 0, sumLng = 0;
+    for (final p in _resolved.values) {
+      sumLat += p.latitude;
+      sumLng += p.longitude;
+    }
+    return LatLng(sumLat / _resolved.length, sumLng / _resolved.length);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final markers = <Marker>[];
+    for (final e in widget.events) {
+      final p = _resolved[e.id];
+      if (p == null) continue;
+      markers.add(
+        Marker(
+          point: p,
+          width: 44,
+          height: 44,
+          alignment: Alignment.topCenter,
+          child: GestureDetector(
+            onTap: () => _showEventSheet(context, e),
+            child: const _EventMapPin(),
+          ),
+        ),
+      );
+    }
+
+    final unresolved = widget.events.length - markers.length;
+
+    return Stack(
+      children: [
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: _initialCenter(),
+            initialZoom: markers.length > 1 ? 4 : 11,
+            minZoom: 2,
+            maxZoom: 18,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.coil.app',
+            ),
+            MarkerLayer(markers: markers),
+            const RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution('OpenStreetMap contributors'),
+              ],
+            ),
+          ],
+        ),
+        if (unresolved > 0)
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline,
+                      size: 14, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _resolving
+                          ? 'Locating $unresolved event${unresolved == 1 ? '' : 's'}...'
+                          : '$unresolved event${unresolved == 1 ? '' : 's'} could not be mapped',
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 11.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showEventSheet(BuildContext context, AdminEvent e) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EventMapSheet(event: e),
+    );
+  }
+}
+
+class _EventMapPin extends StatelessWidget {
+  const _EventMapPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: _kBrandPurple,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.event_rounded, color: Colors.white, size: 18),
+    );
+  }
+}
+
+class _EventMapSheet extends StatelessWidget {
+  final AdminEvent event;
+  const _EventMapSheet({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = event.imageUrls.isNotEmpty ? event.imageUrls.first : null;
+    return Container(
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: cover != null
+                    ? CachedNetworkImage(
+                        imageUrl: cover,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 64,
+                        height: 64,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_kBrandPurple, _kBrandDeep],
+                          ),
+                        ),
+                        child: const Icon(Icons.event_rounded,
+                            color: Colors.white),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      event.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded,
+                            size: 13, color: _kBrandPurple),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            event.location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EventDetailScreen(
+                      eventId: event.id,
+                      title: event.title,
+                      subtitle: event.subtitle,
+                      location: event.location,
+                      imageUrls: event.imageUrls,
+                      description: event.description,
+                      phone: event.phone,
+                      email: event.email,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+              label: const Text('View event'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kBrandPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Travel Mode Quick-Start sheet
+// Shown on first-ever entry to the Events tab; reachable
+// later via the (?) help button next to the filter.
+// ─────────────────────────────────────────────────────────
+Future<void> showTravelQuickStartSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (_) => const _TravelQuickStartSheet(),
+  );
+}
+
+class _TravelQuickStartSheet extends StatelessWidget {
+  const _TravelQuickStartSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.borderColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_kBrandPurple, _kBrandDeep],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.travel_explore_rounded,
+                          color: Colors.white, size: 28),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Travel Mode',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Quick start guide',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const _QuickStartStep(
+                  icon: Icons.swap_horiz_rounded,
+                  title: 'Switch to Travel feed',
+                  body:
+                      'On Home, tap the Travel toggle to see posts from people in other places — not just the ones you follow.',
+                ),
+                const _QuickStartStep(
+                  icon: Icons.location_on_rounded,
+                  title: 'Filter by city',
+                  body:
+                      'In Events, tap "Filter by city" to narrow events down to a specific destination.',
+                ),
+                const _QuickStartStep(
+                  icon: Icons.map_outlined,
+                  title: 'See events on a map',
+                  body:
+                      'Use the map toggle next to the city filter to drop pins for every event and tap any pin to preview it.',
+                ),
+                const _QuickStartStep(
+                  icon: Icons.flight_takeoff_rounded,
+                  title: 'Plan your trip',
+                  body:
+                      'Open any event and use the Hotels and Flights shortcuts to start planning before you go.',
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kBrandPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _QuickStartStep extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _QuickStartStep({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _kBrandPurple.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: _kBrandPurple, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

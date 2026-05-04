@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -35,6 +36,28 @@ import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
+
+// Pick a text direction from the first strong-directional codepoint in
+// [text]. Falls back to LTR for empty / neutral-only strings so the
+// caret sits on the left while the user is choosing what to type.
+// Covers the standard RTL Unicode blocks: Hebrew, Arabic (incl. Supplement
+// and Extended-A), Syriac, Thaana, NKo, and the Arabic Presentation Forms.
+ui.TextDirection _detectTextDirection(String text) {
+  for (final r in text.runes) {
+    if ((r >= 0x0590 && r <= 0x05FF) || // Hebrew
+        (r >= 0x0600 && r <= 0x06FF) || // Arabic
+        (r >= 0x0700 && r <= 0x074F) || // Syriac
+        (r >= 0x0750 && r <= 0x077F) || // Arabic Supplement
+        (r >= 0x0780 && r <= 0x07BF) || // Thaana
+        (r >= 0x07C0 && r <= 0x07FF) || // NKo
+        (r >= 0x08A0 && r <= 0x08FF) || // Arabic Extended-A
+        (r >= 0xFB1D && r <= 0xFDFF) || // Hebrew + Arabic Presentation Forms-A
+        (r >= 0xFE70 && r <= 0xFEFF)) { // Arabic Presentation Forms-B
+      return ui.TextDirection.rtl;
+    }
+  }
+  return ui.TextDirection.ltr;
+}
 
 /// Choices surfaced by [_MessageBubbleState._showAttachMenu]. Kept at
 /// top-level so it can be returned from the modal sheet.
@@ -1714,17 +1737,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               child: Row(
                                 children: [
                                   Expanded(
-                                    child: TextField(
-                                      controller: _controller,
-                                      onChanged: _onTextChanged,
-                                      decoration: InputDecoration(
-                                        hintText: 'Message...',
-                                        hintStyle: TextStyle(
-                                            color: context.textMuted,
-                                            fontSize: 14),
-                                        border: InputBorder.none,
-                                      ),
-                                      onSubmitted: (_) => _sendMessage(),
+                                    child: ValueListenableBuilder<
+                                        TextEditingValue>(
+                                      valueListenable: _controller,
+                                      builder: (context, value, _) {
+                                        final dir =
+                                            _detectTextDirection(value.text);
+                                        return TextField(
+                                          controller: _controller,
+                                          onChanged: _onTextChanged,
+                                          minLines: 1,
+                                          maxLines: 6,
+                                          keyboardType: TextInputType.multiline,
+                                          textInputAction:
+                                              TextInputAction.newline,
+                                          textDirection: dir,
+                                          textAlign: dir == ui.TextDirection.rtl
+                                              ? TextAlign.right
+                                              : TextAlign.left,
+                                          decoration: InputDecoration(
+                                            hintText: 'Message...',
+                                            hintStyle: TextStyle(
+                                                color: context.textMuted,
+                                                fontSize: 14),
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    vertical: 10),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                                   // Tap-to-dictate sits INSIDE the input pill so
