@@ -5,12 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // ─────────────────────────────────────────────
 
 /// Notification types written by Cloud Functions or client-side logic.
-/// type values: 'follow', 'like', 'comment', 'story_like', 'story_comment', 'story_reply'
+/// type values: 'follow', 'like', 'comment', 'comment_like', 'story_like', 'story_comment', 'story_reply'
 class AppNotification {
   final String id;
   final String type;
   final String actorUid;
   final String? targetId; // postId for like / comment notifications
+  final String? commentId; // for comment_like: the specific comment id
   final bool read;
   final String? status; // 'accepted', 'rejected', etc.
   final DateTime? createdAt;
@@ -20,6 +21,7 @@ class AppNotification {
     required this.type,
     required this.actorUid,
     this.targetId,
+    this.commentId,
     required this.read,
     this.status,
     this.createdAt,
@@ -34,6 +36,7 @@ class AppNotification {
       type: (d['type'] as String?) ?? 'unknown',
       actorUid: (d['actorUid'] as String?) ?? '',
       targetId: d['targetId'] as String?,
+      commentId: d['commentId'] as String?,
       read: (d['read'] as bool?) ?? false,
       status: d['status'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
@@ -69,7 +72,8 @@ class NotificationService {
       _items(uid).doc(notifId).update({'read': true});
 
   /// Update the status of a notification (e.g. 'accepted', 'rejected')
-  Future<void> updateNotificationStatus(String uid, String notifId, String status) =>
+  Future<void> updateNotificationStatus(
+          String uid, String notifId, String status) =>
       _items(uid).doc(notifId).update({
         'status': status,
         'read': true, // Auto-mark as read when taking action
@@ -111,11 +115,13 @@ class NotificationService {
     required String type,
     required String actorUid,
     String? targetId,
+    String? commentId,
   }) async {
     await _items(targetUid).doc(docId).set({
       'type': type,
       'actorUid': actorUid,
       if (targetId != null) 'targetId': targetId,
+      if (commentId != null) 'commentId': commentId,
       'read': false,
       'createdAt': FieldValue.serverTimestamp(),
     });

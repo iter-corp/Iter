@@ -99,6 +99,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     });
   }
 
+  String _normalizeUsername(String raw) => raw.trim().toLowerCase();
+
+  bool _isValidUsername(String username) {
+    return RegExp(r'^[a-z0-9._]{3,24}$').hasMatch(username);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -108,8 +114,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       final userService = ref.read(userServiceProvider);
       final uid = ref.read(authServiceProvider).currentUser!.uid;
-      final username = _usernameCtrl.text.trim();
-      final taken = await userService.isUsernameTaken(username);
+      final username = _normalizeUsername(_usernameCtrl.text);
+      if (!_isValidUsername(username)) {
+        setState(() {
+          _error = 'Username must be 3-24 chars and use only a-z, 0-9, . or _';
+        });
+        return;
+      }
+      final taken =
+          await userService.isUsernameTaken(username, excludeUid: uid);
       if (taken) {
         setState(() => _error = 'Username already taken');
         return;
@@ -117,7 +130,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
       final city = _cityCtrl.text.trim();
       final data = <String, dynamic>{
+        'name': username,
         'username': username,
+        'usernameLower': username,
         'handle': '@$username',
         'bio': _bioCtrl.text.trim(),
         'gender': _gender,
@@ -269,7 +284,8 @@ class _LocationSection extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Lets the Connect tab show people near you. Optional — you can skip and just enter your city.',
-            style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.3),
+            style: TextStyle(
+                fontSize: 12, color: context.textSecondary, height: 1.3),
           ),
           const SizedBox(height: 12),
           Row(

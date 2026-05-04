@@ -56,8 +56,14 @@ class ProfileCoverAvatar extends StatelessWidget {
 /// NAME + BIO
 class ProfileNameBio extends StatelessWidget {
   final String name;
+  final String handle;
   final String bio;
-  const ProfileNameBio({super.key, required this.name, required this.bio});
+  const ProfileNameBio({
+    super.key,
+    required this.name,
+    required this.handle,
+    required this.bio,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +76,13 @@ class ProfileNameBio extends StatelessWidget {
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: context.textPrimary)),
+          if (handle.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              handle,
+              style: TextStyle(fontSize: 13, color: context.textSecondary),
+            ),
+          ],
           const SizedBox(height: 4),
           Text(bio,
               style: TextStyle(fontSize: 13, color: context.textSecondary)),

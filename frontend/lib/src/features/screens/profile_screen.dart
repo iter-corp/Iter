@@ -148,7 +148,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   avatarUrl: user['avatarUrl'] as String?,
                 ),
                 ProfileNameBio(
-                  name: (user['username'] as String?) ?? 'No name',
+                  name: (user['name'] as String?) ??
+                      (user['username'] as String?) ??
+                      'No name',
+                  handle: (user['handle'] as String?) ??
+                      ((user['username'] as String?) != null
+                          ? '@${user['username']}'
+                          : ''),
                   bio: (user['bio'] as String?) ?? '',
                 ),
                 ProfileStats(

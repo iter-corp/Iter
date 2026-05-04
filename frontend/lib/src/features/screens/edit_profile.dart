@@ -17,6 +17,7 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
   // Gender is no longer free-text — picked from a fixed list. Stored as
@@ -41,6 +42,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
     super.dispose();
@@ -48,7 +50,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   void _hydrate(Map<String, dynamic> user) {
     if (_initialized) return;
-    _usernameController.text = (user['username'] as String?) ?? '';
+    final username = (user['username'] as String?) ?? '';
+    _nameController.text = (user['name'] as String?) ?? username;
+    _usernameController.text = username;
     _bioController.text = (user['bio'] as String?) ?? '';
     final raw = (user['gender'] as String?)?.trim() ?? '';
     if (raw.isEmpty) {
@@ -64,6 +68,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _avatarUrl = user['avatarUrl'] as String?;
     _coverUrl = user['coverUrl'] as String?;
     _initialized = true;
+  }
+
+  String _normalizeUsername(String raw) => raw.trim().toLowerCase();
+
+  bool _isValidUsername(String username) {
+    return RegExp(r'^[a-z0-9._]{3,24}$').hasMatch(username);
   }
 
   Future<void> _pickAndUploadAvatar() async {
@@ -124,25 +134,65 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _save() async {
     if (_saving) return;
-    final username = _usernameController.text.trim();
+    final username = _normalizeUsername(_usernameController.text);
     if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Username can\'t be empty')),
       );
       return;
     }
+    if (!_isValidUsername(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Username must be 3-24 chars and use only a-z, 0-9, . or _',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       final uid = ref.read(authServiceProvider).currentUser!.uid;
+      final currentUser = ref.read(currentUserDocProvider).valueOrNull;
+      final existingUsername =
+          _normalizeUsername((currentUser?['username'] as String?) ?? '');
+      if (username != existingUsername) {
+        final taken = await ref
+            .read(userServiceProvider)
+            .isUsernameTaken(username, excludeUid: uid);
+        if (taken) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Username is already taken')),
+            );
+          }
+          return;
+        }
+      }
+
+      final name = _nameController.text.trim();
+      final nameToSave = name.isEmpty ? username : name;
       // "Prefer not to say" / null both write an empty string so the
       // field exists in Firestore but doesn't surface anywhere.
       final genderToSave =
           (_gender == null || _gender == 'Prefer not to say') ? '' : _gender!;
       await ref.read(userServiceProvider).updateUser(uid, {
+        'name': nameToSave,
         'username': username,
+        'usernameLower': username,
+        'handle': '@$username',
         'bio': _bioController.text.trim(),
         'gender': genderToSave,
       });
+
+      // Keep FirebaseAuth profile displayName aligned for legacy fallbacks.
+      await ref
+          .read(authServiceProvider)
+          .currentUser
+          ?.updateDisplayName(nameToSave);
+
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -196,10 +246,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         const SizedBox(height: 24),
                         const _SectionLabel(text: 'About you'),
                         _LabeledInput(
+                          label: 'Name',
+                          icon: Icons.person_outline,
+                          controller: _nameController,
+                          hint: 'Your display name',
+                          maxLength: 40,
+                        ),
+                        _LabeledInput(
                           label: 'Username',
                           icon: Icons.alternate_email,
                           controller: _usernameController,
-                          hint: 'username',
+                          hint: 'unique username',
                           maxLength: 24,
                         ),
                         _LabeledInput(
@@ -335,8 +392,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFB05ECC),
                             shape: BoxShape.circle,
-                            border: Border.all(
-                                color: context.cardBg, width: 2),
+                            border: Border.all(color: context.cardBg, width: 2),
                           ),
                           child: const Icon(Icons.edit,
                               color: Colors.white, size: 14),
@@ -500,8 +556,7 @@ class _LabeledInput extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon,
-                    size: 16, color: const Color(0xFFB05ECC)),
+                Icon(icon, size: 16, color: const Color(0xFFB05ECC)),
                 const SizedBox(width: 6),
                 Text(
                   label,
@@ -524,11 +579,9 @@ class _LabeledInput extends StatelessWidget {
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle:
-                    TextStyle(color: context.textMuted, fontSize: 14),
+                hintStyle: TextStyle(color: context.textMuted, fontSize: 14),
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 6),
+                contentPadding: const EdgeInsets.symmetric(vertical: 6),
                 border: InputBorder.none,
                 counterText: '',
               ),
@@ -605,11 +658,9 @@ class _LabeledDropdown extends StatelessWidget {
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle:
-                    TextStyle(color: context.textMuted, fontSize: 14),
+                hintStyle: TextStyle(color: context.textMuted, fontSize: 14),
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,

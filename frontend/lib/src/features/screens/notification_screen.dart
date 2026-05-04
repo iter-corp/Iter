@@ -27,11 +27,58 @@ class NotificationScreen extends ConsumerStatefulWidget {
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   _NotificationCategory _selectedCategory = _NotificationCategory.activity;
 
+  _NotificationCategory _categoryForType(String type) {
+    switch (type) {
+      case 'follow':
+      case 'follow_request':
+      case 'follow_accept':
+        return _NotificationCategory.follow;
+      case 'event_approved':
+      case 'event_rejected':
+      case 'event_invited':
+      case 'event_removed':
+        return _NotificationCategory.event;
+      default:
+        return _NotificationCategory.activity;
+    }
+  }
+
+  Map<_NotificationCategory, int> _buildUnreadCounts({
+    required List<AppNotification> notifications,
+    required List<String> followRequests,
+  }) {
+    final counts = <_NotificationCategory, int>{
+      _NotificationCategory.activity: 0,
+      _NotificationCategory.follow: 0,
+      _NotificationCategory.event: 0,
+    };
+
+    for (final notification in notifications.where((n) => !n.read)) {
+      final category = _categoryForType(notification.type);
+      counts[category] = (counts[category] ?? 0) + 1;
+    }
+
+    final persistedRequestActors = notifications
+        .where((n) => n.type == 'follow_request')
+        .map((n) => n.actorUid)
+        .toSet();
+
+    final syntheticFollowUnread = followRequests
+        .where((uid) => !persistedRequestActors.contains(uid))
+        .length;
+
+    counts[_NotificationCategory.follow] =
+        (counts[_NotificationCategory.follow] ?? 0) + syntheticFollowUnread;
+
+    return counts;
+  }
+
   bool _matchesCategory(AppNotification notification) {
     switch (_selectedCategory) {
       case _NotificationCategory.activity:
         return notification.type == 'like' ||
             notification.type == 'comment' ||
+            notification.type == 'comment_like' ||
             notification.type == 'repost' ||
             notification.type == 'story_like' ||
             notification.type == 'story_comment' ||
@@ -67,6 +114,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final followRequestsAsync = user == null
         ? const AsyncData<List<String>>(<String>[])
         : ref.watch(followRequestsProvider(user.uid));
+    final notifications =
+        notificationsAsync.valueOrNull ?? const <AppNotification>[];
+    final followRequests = followRequestsAsync.valueOrNull ?? const <String>[];
+    final unreadByCategory = _buildUnreadCounts(
+      notifications: notifications,
+      followRequests: followRequests,
+    );
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -119,6 +173,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       label: 'Activity',
                       selected:
                           _selectedCategory == _NotificationCategory.activity,
+                      unreadCount:
+                          unreadByCategory[_NotificationCategory.activity] ?? 0,
                       onTap: () => setState(() {
                         _selectedCategory = _NotificationCategory.activity;
                       }),
@@ -128,6 +184,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       label: 'Follow',
                       selected:
                           _selectedCategory == _NotificationCategory.follow,
+                      unreadCount:
+                          unreadByCategory[_NotificationCategory.follow] ?? 0,
                       onTap: () => setState(() {
                         _selectedCategory = _NotificationCategory.follow;
                       }),
@@ -137,6 +195,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       label: 'Event',
                       selected:
                           _selectedCategory == _NotificationCategory.event,
+                      unreadCount:
+                          unreadByCategory[_NotificationCategory.event] ?? 0,
                       onTap: () => setState(() {
                         _selectedCategory = _NotificationCategory.event;
                       }),
@@ -226,11 +286,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
 class _CategoryChip extends StatelessWidget {
   final String label;
   final bool selected;
+  final int unreadCount;
   final VoidCallback onTap;
 
   const _CategoryChip({
     required this.label,
     required this.selected,
+    required this.unreadCount,
     required this.onTap,
   });
 
@@ -249,13 +311,38 @@ class _CategoryChip extends StatelessWidget {
             color: selected ? const Color(0xFFB44FFF) : context.borderColor,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : context.textPrimary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : context.textPrimary,
+              ),
+            ),
+            if (unreadCount > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                constraints: const BoxConstraints(minWidth: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white : const Color(0xFFFF4D4D),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  unreadCount > 99 ? '99+' : '$unreadCount',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? const Color(0xFFFF4D4D) : Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -397,6 +484,12 @@ class _NotificationItem extends ConsumerWidget {
             trailingType = NotificationType.image;
             isLike = true;
             break;
+          case 'comment_like':
+            title = '$username liked your comment';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            isLike = true;
+            break;
           case 'comment':
             title = '$username commented on your post';
             subtitle = _timeAgo(notif.createdAt);
@@ -439,7 +532,9 @@ class _NotificationItem extends ConsumerWidget {
         }
 
         // Build the trailing widget for like/comment (post thumbnail).
-        if ((notif.type == 'like' || notif.type == 'comment') &&
+        if ((notif.type == 'like' ||
+                notif.type == 'comment' ||
+                notif.type == 'comment_like') &&
             notif.targetId != null) {
           trailingWidget = _PostThumbnail(postId: notif.targetId!);
         }
@@ -508,6 +603,19 @@ class _NotificationItem extends ConsumerWidget {
             context,
             MaterialPageRoute(
               builder: (_) => PostDetailScreen(postId: notif.targetId!),
+            ),
+          );
+        }
+        break;
+      case 'comment_like':
+        if (notif.targetId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PostDetailScreen(
+                postId: notif.targetId!,
+                highlightCommentId: notif.commentId,
+              ),
             ),
           );
         }

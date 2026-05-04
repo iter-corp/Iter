@@ -17,12 +17,43 @@ class UserService {
   Future<void> updateUser(String uid, Map<String, dynamic> data) =>
       _doc(uid).set(data, SetOptions(merge: true));
 
-  Future<bool> isUsernameTaken(String username) async {
-    final q = await _db
+  String normalizeUsername(String username) => username.trim().toLowerCase();
+
+  Future<bool> isUsernameTaken(
+    String username, {
+    String? excludeUid,
+  }) async {
+    final normalized = normalizeUsername(username);
+    if (normalized.isEmpty) return false;
+
+    bool _containsOtherUid(QuerySnapshot<Map<String, dynamic>> snap) {
+      return snap.docs.any((d) => excludeUid == null || d.id != excludeUid);
+    }
+
+    // Fast path for current schema.
+    final byLower = await _db
         .collection('users')
-        .where('username', isEqualTo: username)
-        .limit(1)
+        .where('usernameLower', isEqualTo: normalized)
+        .limit(5)
         .get();
-    return q.docs.isNotEmpty;
+    if (_containsOtherUid(byLower)) return true;
+
+    // Compatibility for docs that may only have lowercase username.
+    final byExact = await _db
+        .collection('users')
+        .where('username', isEqualTo: normalized)
+        .limit(5)
+        .get();
+    if (_containsOtherUid(byExact)) return true;
+
+    // Legacy fallback: compare case-insensitively for older docs where
+    // usernameLower may be missing and username had mixed casing.
+    final allUsers = await _db.collection('users').get();
+    for (final doc in allUsers.docs) {
+      if (excludeUid != null && doc.id == excludeUid) continue;
+      final existing = (doc.data()['username'] as String?) ?? '';
+      if (normalizeUsername(existing) == normalized) return true;
+    }
+    return false;
   }
 }

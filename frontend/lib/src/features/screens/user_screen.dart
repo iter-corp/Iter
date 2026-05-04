@@ -237,7 +237,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             );
           }
           final username = (user['username'] as String?) ?? 'User';
-          final handle = (user['handle'] as String?) ?? '';
+          final displayName = (user['name'] as String?) ?? username;
+          final handle = (user['handle'] as String?) ?? '@$username';
           final avatarUrl = user['avatarUrl'] as String?;
           final coverUrl = user['coverUrl'] as String?;
           final isPrivate = (user['isPrivate'] as bool?) ?? false;
@@ -308,7 +309,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   isBlocked: isBlocked,
                 ),
                 UserNameBio(
-                  username: username,
+                  username: displayName,
                   handle: handle,
                   bio: (user['bio'] as String?) ?? '',
                   isPrivate: isPrivate,

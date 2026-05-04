@@ -11,7 +11,7 @@ class HeaderWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadCount = ref.watch(unreadCountProvider).value ?? 0;
+    final unreadCount = ref.watch(unreadCountProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -47,7 +47,8 @@ class HeaderWidget extends ConsumerWidget {
             clipBehavior: Clip.none,
             children: [
               IconButton(
-                icon: Icon(Icons.notifications_outlined, size: 26, color: context.textPrimary),
+                icon: Icon(Icons.notifications_outlined,
+                    size: 26, color: context.textPrimary),
                 onPressed: () {
                   Navigator.push(
                     context,
