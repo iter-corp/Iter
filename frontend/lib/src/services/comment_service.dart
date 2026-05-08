@@ -102,9 +102,44 @@ class CommentService {
     });
     await batch.commit();
 
-    // Fire a reply notification to the parent commenter (not to self).
-    if (parentCommentId != null) {
-      try {
+    // Spark-safe fallback: generate notifications from the client for Q&A
+    // events and replies when backend functions are unavailable.
+    try {
+      final postSnap = await _postRef(postId).get();
+      final postData = postSnap.data() ?? {};
+      final isQa = (postData['postType'] as String?) == 'qa';
+
+      if (isQa) {
+        if (parentCommentId == null) {
+          final questionAuthorUid = postData['authorUid'] as String?;
+          if (questionAuthorUid != null && questionAuthorUid != authorUid) {
+            await _notifications.upsertNotification(
+              targetUid: questionAuthorUid,
+              docId: 'qa_answer_${postId}_${commentRef.id}_$authorUid',
+              type: 'qa_answer',
+              actorUid: authorUid,
+              targetId: postId,
+              commentId: commentRef.id,
+            );
+          }
+        } else {
+          final parentSnap = await _comments(postId).doc(parentCommentId).get();
+          final parentAuthorUid = parentSnap.data()?['authorUid'] as String?;
+          if (parentAuthorUid != null && parentAuthorUid != authorUid) {
+            await _notifications.upsertNotification(
+              targetUid: parentAuthorUid,
+              docId: 'qa_reply_${postId}_${commentRef.id}_$authorUid',
+              type: 'qa_reply',
+              actorUid: authorUid,
+              targetId: postId,
+              commentId: commentRef.id,
+            );
+          }
+        }
+        return;
+      }
+
+      if (parentCommentId != null) {
         final parentSnap = await _comments(postId).doc(parentCommentId).get();
         final parentAuthorUid = parentSnap.data()?['authorUid'] as String?;
         if (parentAuthorUid != null && parentAuthorUid != authorUid) {
@@ -115,9 +150,9 @@ class CommentService {
             targetId: postId,
           );
         }
-      } catch (_) {
-        // Notification is best-effort — comment was already saved.
       }
+    } catch (_) {
+      // Notification is best-effort — comment was already saved.
     }
   }
 
@@ -220,13 +255,16 @@ class CommentService {
 
     final commentRef = _comments(postId).doc(commentId);
     final reactionRef = _reactions(postId, commentId).doc(uid);
+    String? previousType;
+    String? nextType;
 
     await _db.runTransaction((tx) async {
       final commentSnap = await tx.get(commentRef);
       if (!commentSnap.exists) return;
 
       final reactionSnap = await tx.get(reactionRef);
-      final previousType = reactionSnap.data()?['type'] as String?;
+      previousType = reactionSnap.data()?['type'] as String?;
+      nextType = previousType == type ? null : type;
 
       var helpful = (commentSnap.data()?['helpfulCount'] as num?)?.toInt() ?? 0;
       var unhelpful =
@@ -246,7 +284,8 @@ class CommentService {
         dec(previousType!);
         tx.delete(reactionRef);
       } else {
-        if (previousType != null) dec(previousType);
+        final prev = previousType;
+        if (prev != null) dec(prev);
         inc(type);
         tx.set(reactionRef, {
           'type': type,
@@ -259,5 +298,50 @@ class CommentService {
         'unhelpfulCount': unhelpful,
       });
     });
+
+    // Spark-safe fallback for answer reaction notifications in Q&A threads.
+    try {
+      final postSnap = await _postRef(postId).get();
+      if ((postSnap.data()?['postType'] as String?) != 'qa') return;
+
+      final commentSnap = await commentRef.get();
+      final answerAuthorUid = commentSnap.data()?['authorUid'] as String?;
+      if (answerAuthorUid == null || answerAuthorUid == uid) return;
+
+      final likeNotifId = 'qa_answer_like_${postId}_${commentId}_$uid';
+      final dislikeNotifId = 'qa_answer_dislike_${postId}_${commentId}_$uid';
+
+      if (previousType == 'heart') {
+        await _notifications.removeNotificationById(
+            answerAuthorUid, likeNotifId);
+      }
+      if (previousType == 'broken') {
+        await _notifications.removeNotificationById(
+            answerAuthorUid, dislikeNotifId);
+      }
+
+      if (nextType == 'heart') {
+        await _notifications.upsertNotification(
+          targetUid: answerAuthorUid,
+          docId: likeNotifId,
+          type: 'qa_answer_like',
+          actorUid: uid,
+          targetId: postId,
+          commentId: commentId,
+        );
+      }
+      if (nextType == 'broken') {
+        await _notifications.upsertNotification(
+          targetUid: answerAuthorUid,
+          docId: dislikeNotifId,
+          type: 'qa_answer_dislike',
+          actorUid: uid,
+          targetId: postId,
+          commentId: commentId,
+        );
+      }
+    } catch (_) {
+      // Notification is best-effort — reaction was already saved.
+    }
   }
 }

@@ -35,9 +35,26 @@ export const sendPushOnNotificationCreate = onDocumentCreated(
         title = 'New like';
         body = `${actorName} liked your post`;
         break;
+      case 'qa_answer_like':
+        title = 'New like';
+        body = `${actorName} liked your answer`;
+        break;
+      case 'qa_answer_dislike':
+        title = 'New reaction';
+        body = `${actorName} disliked your answer`;
+        break;
       case 'comment':
         title = 'New comment';
         body = `${actorName} commented on your post`;
+        break;
+      case 'qa_answer':
+        title = 'New answer';
+        body = `${actorName} answered your question`;
+        break;
+      case 'qa_reply':
+      case 'reply':
+        title = 'New reply';
+        body = `${actorName} replied to you`;
         break;
       case 'message':
         title = 'New message';

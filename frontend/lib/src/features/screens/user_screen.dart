@@ -14,6 +14,7 @@ import '../model/post_model.dart';
 import '../widgets/user_profile_widget.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart' show PostDetailScreen;
+import 'qa_thread_screen.dart';
 
 final _otherUserProvider =
     StreamProvider.family<Map<String, dynamic>?, String>((ref, uid) {
@@ -557,48 +558,59 @@ class _UserQaActivitySectionState
               final p = posts[i];
               final title = p.caption.trim().split('\n').first.trim();
               final time = _userQaTimeAgo(p.createdAt);
-              return Container(
-                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => QaThreadScreen(
+                      post: p,
+                      highlightAuthorUid: asked ? null : widget.uid,
+                    ),
+                  ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      asked ? Icons.help_outline_rounded : Icons.rate_review,
-                      size: 18,
-                      color: const Color(0xFF7E3BE8),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title.isEmpty ? 'Untitled question' : title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: context.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$time • ${p.commentsCount} answers',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecondary,
-                            ),
-                          ),
-                        ],
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+                  decoration: BoxDecoration(
+                    color: context.cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.borderColor),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        asked ? Icons.help_outline_rounded : Icons.rate_review,
+                        size: 18,
+                        color: const Color(0xFF7E3BE8),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title.isEmpty ? 'Untitled question' : title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$time • ${p.commentsCount} answers',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },

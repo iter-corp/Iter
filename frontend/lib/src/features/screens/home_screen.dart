@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -642,8 +643,6 @@ class _HomeModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardBg = context.cardBg;
-    final trackColor = context.inputFill;
     final selectedIndex = mode == _HomeMode.feed
         ? 0
         : mode == _HomeMode.travel
@@ -654,82 +653,112 @@ class _HomeModeToggle extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: trackColor,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final available = constraints.maxWidth;
-            // Row: SizedBox(2) + Expanded*3 + SizedBox(6)*2 + SizedBox(2)
-            final flexWidth = available - 2 - 6 - 6 - 2;
-            final w = flexes.map((f) => flexWidth * f / totalFlex).toList();
-            final x = [
-              2.0,
-              2.0 + w[0] + 6,
-              2.0 + w[0] + 6 + w[1] + 6,
-            ];
-            return SizedBox(
-              height: 44,
-              child: Stack(
-                children: [
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 240),
-                    curve: Curves.easeInOut,
-                    left: x[selectedIndex],
-                    width: w[selectedIndex],
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: context.borderColor),
-                      ),
-                    ),
-                  ),
-                  Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color.fromARGB(255, 74, 73, 73)
+                      .withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final available = constraints.maxWidth;
+                // Row: SizedBox(2) + Expanded*3 + SizedBox(6)*2 + SizedBox(2)
+                final flexWidth = available - 2 - 6 - 6 - 2;
+                final w = flexes.map((f) => flexWidth * f / totalFlex).toList();
+                final x = [
+                  2.0,
+                  2.0 + w[0] + 6,
+                  2.0 + w[0] + 6 + w[1] + 6,
+                ];
+                return SizedBox(
+                  height: 44,
+                  child: Stack(
                     children: [
-                      const SizedBox(width: 2),
-                      Expanded(
-                        flex: 10,
-                        child: _ModePillButton(
-                          label: 'Feed',
-                          icon: Icons.dynamic_feed_rounded,
-                          selected: mode == _HomeMode.feed,
-                          onTap: () => onChanged(_HomeMode.feed),
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeInOut,
+                        left: x[selectedIndex],
+                        width: w[selectedIndex],
+                        top: 0,
+                        bottom: 0,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.26),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.26),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        flex: 12,
-                        child: _ModePillButton(
-                          label: 'Travel Mode',
-                          icon: Icons.flight,
-                          selected: mode == _HomeMode.travel,
-                          selectedHorizontalPadding: 10,
-                          onTap: () => onChanged(_HomeMode.travel),
-                        ),
+                      Row(
+                        children: [
+                          const SizedBox(width: 2),
+                          Expanded(
+                            flex: 10,
+                            child: _ModePillButton(
+                              label: 'Feed',
+                              icon: Icons.dynamic_feed_rounded,
+                              selected: mode == _HomeMode.feed,
+                              onTap: () => onChanged(_HomeMode.feed),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 12,
+                            child: _ModePillButton(
+                              label: 'Travel Mode',
+                              icon: Icons.flight,
+                              selected: mode == _HomeMode.travel,
+                              selectedHorizontalPadding: 10,
+                              onTap: () => onChanged(_HomeMode.travel),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 10,
+                            child: _ModePillButton(
+                              label: 'Q&A',
+                              icon: Icons.forum_outlined,
+                              selected: mode == _HomeMode.qa,
+                              onTap: () => onChanged(_HomeMode.qa),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        flex: 10,
-                        child: _ModePillButton(
-                          label: 'Q&A',
-                          icon: Icons.forum_outlined,
-                          selected: mode == _HomeMode.qa,
-                          onTap: () => onChanged(_HomeMode.qa),
-                        ),
-                      ),
-                      const SizedBox(width: 2),
                     ],
                   ),
-                ],
-              ),
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -1351,14 +1380,20 @@ class _ModePillButton extends StatelessWidget {
         curve: Curves.easeOut,
         padding: EdgeInsets.symmetric(
           vertical: 10,
-          horizontal: selected ? selectedHorizontalPadding : 8,
+          horizontal: selectedHorizontalPadding,
         ),
         color: Colors.transparent,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (selected && icon != null) ...[
-              Icon(icon, size: 16, color: context.textPrimary),
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 16,
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.62),
+              ),
               const SizedBox(width: 4),
             ],
             Flexible(
@@ -1369,8 +1404,10 @@ class _ModePillButton extends StatelessWidget {
                 softWrap: false,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: context.textPrimary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.62),
                 ),
               ),
             ),

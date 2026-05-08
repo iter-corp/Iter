@@ -13,7 +13,18 @@ import '../model/post_model.dart';
 class QaThreadScreen extends ConsumerStatefulWidget {
   final Post post;
 
-  const QaThreadScreen({super.key, required this.post});
+  /// When set, this user's answers are pinned to the top of the list.
+  final String? highlightAuthorUid;
+
+  /// When set, this answer is pinned above all other answers.
+  final String? highlightCommentId;
+
+  const QaThreadScreen({
+    super.key,
+    required this.post,
+    this.highlightAuthorUid,
+    this.highlightCommentId,
+  });
 
   @override
   ConsumerState<QaThreadScreen> createState() => _QaThreadScreenState();
@@ -136,7 +147,21 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                     data: (comments) {
                       final topAnswers =
                           comments.where((c) => !c.isReply).toList();
+                      final pinUid = widget.highlightAuthorUid;
+                      final pinCommentId = widget.highlightCommentId;
                       topAnswers.sort((a, b) {
+                        // Pin a specific answer when provided.
+                        if (pinCommentId != null) {
+                          final aPin = a.id == pinCommentId ? 0 : 1;
+                          final bPin = b.id == pinCommentId ? 0 : 1;
+                          if (aPin != bPin) return aPin.compareTo(bPin);
+                        }
+                        // Pin the highlighted user's answers to the top.
+                        if (pinUid != null) {
+                          final aPin = a.authorUid == pinUid ? 0 : 1;
+                          final bPin = b.authorUid == pinUid ? 0 : 1;
+                          if (aPin != bPin) return aPin.compareTo(bPin);
+                        }
                         final byHelpful =
                             b.helpfulCount.compareTo(a.helpfulCount);
                         if (byHelpful != 0) return byHelpful;
@@ -168,10 +193,14 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                           final answer = topAnswers[index - 2];
                           final replies =
                               repliesByParent[answer.id] ?? const <Comment>[];
+                          final highlighted = (pinCommentId != null &&
+                                  answer.id == pinCommentId) ||
+                              (pinUid != null && answer.authorUid == pinUid);
                           return _AnswerBlock(
                             postId: post.id,
                             answer: answer,
                             replies: replies,
+                            highlighted: highlighted,
                             onReply: _startReply,
                           );
                         },
@@ -358,12 +387,14 @@ class _AnswerBlock extends ConsumerWidget {
   final Comment answer;
   final List<Comment> replies;
   final void Function(Comment target) onReply;
+  final bool highlighted;
 
   const _AnswerBlock({
     required this.postId,
     required this.answer,
     required this.replies,
     required this.onReply,
+    this.highlighted = false,
   });
 
   @override
@@ -374,9 +405,16 @@ class _AnswerBlock extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
-        color: context.cardBg,
+        color: highlighted
+            ? const Color(0xFF7E3BE8).withValues(alpha: 0.08)
+            : context.cardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: highlighted
+              ? const Color(0xFF7E3BE8).withValues(alpha: 0.5)
+              : context.borderColor,
+          width: highlighted ? 1.5 : 1.0,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,21 +518,19 @@ class _AnswerReactionBar extends ConsumerWidget {
   final Comment answer;
   final VoidCallback onReply;
   final bool compact;
-  final bool showDelete;
 
   const _AnswerReactionBar({
     required this.postId,
     required this.answer,
     required this.onReply,
     this.compact = false,
-    this.showDelete = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final service = ref.read(commentServiceProvider);
-    final canDelete = showDelete && uid != null && uid == answer.authorUid;
+    final canDelete = uid != null && uid == answer.authorUid;
 
     Future<void> setReaction(String type) async {
       if (uid == null) return;

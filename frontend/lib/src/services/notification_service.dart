@@ -5,7 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // ─────────────────────────────────────────────
 
 /// Notification types written by Cloud Functions or client-side logic.
-/// type values: 'follow', 'like', 'comment', 'comment_like', 'story_like', 'story_comment', 'story_reply'
+/// type values: 'follow', 'like', 'comment', 'comment_like', 'reply',
+/// 'qa_answer', 'qa_reply', 'qa_answer_like', 'qa_answer_dislike',
+/// 'story_like', 'story_comment', 'story_reply'
 class AppNotification {
   final String id;
   final String type;

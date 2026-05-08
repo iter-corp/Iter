@@ -7,12 +7,14 @@ import '../../providers/auth_providers.dart';
 import '../../providers/event_chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/notification_providers.dart';
+import '../model/post_model.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
 import 'post_detail_screen.dart';
+import 'qa_thread_screen.dart';
 import 'user_screen.dart';
 
 enum _NotificationCategory { activity, follow, event }
@@ -77,8 +79,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     switch (_selectedCategory) {
       case _NotificationCategory.activity:
         return notification.type == 'like' ||
+            notification.type == 'reply' ||
             notification.type == 'comment' ||
             notification.type == 'comment_like' ||
+            notification.type == 'qa_answer' ||
+            notification.type == 'qa_reply' ||
+            notification.type == 'qa_answer_like' ||
+            notification.type == 'qa_answer_dislike' ||
             notification.type == 'repost' ||
             notification.type == 'story_like' ||
             notification.type == 'story_comment' ||
@@ -495,6 +502,32 @@ class _NotificationItem extends ConsumerWidget {
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
+          case 'reply':
+            title = '$username replied to your comment';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'qa_answer':
+            title = '$username answered your question';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'qa_reply':
+            title = '$username replied to your answer';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
+          case 'qa_answer_like':
+            title = '$username liked your answer';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            isLike = true;
+            break;
+          case 'qa_answer_dislike':
+            title = '$username disliked your answer';
+            subtitle = _timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
           case 'message':
             title = '$username sent you a message';
             subtitle = _timeAgo(notif.createdAt);
@@ -534,7 +567,12 @@ class _NotificationItem extends ConsumerWidget {
         // Build the trailing widget for like/comment (post thumbnail).
         if ((notif.type == 'like' ||
                 notif.type == 'comment' ||
-                notif.type == 'comment_like') &&
+                notif.type == 'comment_like' ||
+                notif.type == 'reply' ||
+                notif.type == 'qa_answer' ||
+                notif.type == 'qa_reply' ||
+                notif.type == 'qa_answer_like' ||
+                notif.type == 'qa_answer_dislike') &&
             notif.targetId != null) {
           trailingWidget = _PostThumbnail(postId: notif.targetId!);
         }
@@ -598,25 +636,27 @@ class _NotificationItem extends ConsumerWidget {
         break;
       case 'like':
       case 'comment':
+      case 'reply':
+      case 'qa_answer':
+      case 'qa_reply':
+      case 'qa_answer_like':
+      case 'qa_answer_dislike':
         if (notif.targetId != null) {
-          Navigator.push(
+          _openPostTarget(
             context,
-            MaterialPageRoute(
-              builder: (_) => PostDetailScreen(postId: notif.targetId!),
-            ),
+            notif.targetId!,
+            highlightCommentId: notif.commentId,
+            highlightAuthorUid: notif.actorUid,
           );
         }
         break;
       case 'comment_like':
         if (notif.targetId != null) {
-          Navigator.push(
+          _openPostTarget(
             context,
-            MaterialPageRoute(
-              builder: (_) => PostDetailScreen(
-                postId: notif.targetId!,
-                highlightCommentId: notif.commentId,
-              ),
-            ),
+            notif.targetId!,
+            highlightCommentId: notif.commentId,
+            highlightAuthorUid: notif.actorUid,
           );
         }
         break;
@@ -636,6 +676,56 @@ class _NotificationItem extends ConsumerWidget {
         // Nothing to navigate to — the user is no longer in the group.
         break;
     }
+  }
+
+  Future<void> _openPostTarget(
+    BuildContext context,
+    String postId, {
+    String? highlightCommentId,
+    String? highlightAuthorUid,
+  }) async {
+    final snap =
+        await FirebaseFirestore.instance.collection('posts').doc(postId).get();
+    if (!context.mounted) return;
+
+    if (!snap.exists) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PostDetailScreen(
+            postId: postId,
+            highlightCommentId: highlightCommentId,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final data = snap.data() ?? {};
+    final isQa = (data['postType'] as String?) == 'qa';
+    if (isQa) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QaThreadScreen(
+            post: Post.fromDoc(snap),
+            highlightAuthorUid: highlightAuthorUid,
+            highlightCommentId: highlightCommentId,
+          ),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostDetailScreen(
+          postId: postId,
+          highlightCommentId: highlightCommentId,
+        ),
+      ),
+    );
   }
 
   /// Resolves the event chat metadata and navigates into it.

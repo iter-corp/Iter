@@ -82,7 +82,7 @@ class EventBody extends ConsumerStatefulWidget {
 }
 
 class _EventBodyState extends ConsumerState<EventBody> {
-  _MainTab _mainTab = _MainTab.partners;
+  _MainTab _mainTab = _MainTab.events;
   int _partnerFilter = 0;
   String? _selectedCity;
   String? _selectedEventCity;
@@ -93,6 +93,11 @@ class _EventBodyState extends ConsumerState<EventBody> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_mainTab == _MainTab.events) {
+        _maybeShowEventsQuickStart();
+      }
+    });
     _searchController.addListener(() {
       final next = _searchController.text.trim();
       if (next != _query) setState(() => _query = next);
@@ -269,7 +274,7 @@ class _MainToggle extends StatelessWidget {
         const padding = 4.0;
         final innerWidth = constraints.maxWidth - padding * 2;
         final pillWidth = innerWidth / 2;
-        final isPartners = active == _MainTab.partners;
+        final isEvents = active == _MainTab.events;
         return Container(
           height: 48,
           padding: const EdgeInsets.all(padding),
@@ -284,7 +289,7 @@ class _MainToggle extends StatelessWidget {
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
                 alignment:
-                    isPartners ? Alignment.centerLeft : Alignment.centerRight,
+                    isEvents ? Alignment.centerLeft : Alignment.centerRight,
                 child: Container(
                   width: pillWidth,
                   height: 40,
@@ -307,18 +312,18 @@ class _MainToggle extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _ToggleItem(
-                      label: 'Connect',
-                      icon: Icons.people_alt_rounded,
-                      active: isPartners,
-                      onTap: () => onChanged(_MainTab.partners),
+                      label: 'Events',
+                      icon: Icons.event_rounded,
+                      active: isEvents,
+                      onTap: () => onChanged(_MainTab.events),
                     ),
                   ),
                   Expanded(
                     child: _ToggleItem(
-                      label: 'Events',
-                      icon: Icons.event_rounded,
-                      active: !isPartners,
-                      onTap: () => onChanged(_MainTab.events),
+                      label: 'Connect',
+                      icon: Icons.people_alt_rounded,
+                      active: !isEvents,
+                      onTap: () => onChanged(_MainTab.partners),
                     ),
                   ),
                 ],
@@ -1090,10 +1095,10 @@ class _EventsView extends ConsumerWidget {
                           : (q.isNotEmpty
                               ? 'No events matching "$query"'
                               : 'No events in $selectedCity'),
-                      subtitle: q.isEmpty &&
-                              (cityPick == null || cityPick.isEmpty)
-                          ? 'New events will appear here when posted.'
-                          : 'Try a different keyword or location.',
+                      subtitle:
+                          q.isEmpty && (cityPick == null || cityPick.isEmpty)
+                              ? 'New events will appear here when posted.'
+                              : 'Try a different keyword or location.',
                     )
                   : layout == _EventsLayout.map
                       ? _EventsMapView(events: filtered)
@@ -2109,24 +2114,22 @@ class _EventsMapViewState extends State<_EventsMapView> {
             left: 16,
             right: 16,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline,
-                      size: 14, color: Colors.white),
+                  const Icon(Icons.info_outline, size: 14, color: Colors.white),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       _resolving
                           ? 'Locating $unresolved event${unresolved == 1 ? '' : 's'}...'
                           : '$unresolved event${unresolved == 1 ? '' : 's'} could not be mapped',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 11.5),
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 11.5),
                     ),
                   ),
                 ],
@@ -2330,8 +2333,7 @@ class _TravelQuickStartSheet extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: context.cardBg,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SingleChildScrollView(
             controller: scrollController,

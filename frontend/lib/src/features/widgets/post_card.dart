@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,7 +16,6 @@ import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
-import '../screens/user_screen.dart';
 import 'location_map.dart';
 
 class PostCard extends ConsumerStatefulWidget {
@@ -47,6 +48,7 @@ class PostCard extends ConsumerStatefulWidget {
 class _PostCardState extends ConsumerState<PostCard> {
   // Optimistic UI: non-null while a like toggle is in-flight.
   bool? _pendingLike;
+  bool _captionBoxLowered = false;
 
   // Carousel state for multi-image posts.
   final PageController _pageController = PageController();
@@ -102,34 +104,46 @@ class _PostCardState extends ConsumerState<PostCard> {
 
     final imageCount = post.imageUrls.length;
     final isMulti = imageCount > 1;
+    final hasCaption = post.caption.trim().isNotEmpty;
+    final hasTravelPlace =
+        widget.travelMode && travelPlace != null && travelPlace.isNotEmpty;
+    final captionPreview =
+        hasCaption ? post.caption.trim() : (hasTravelPlace ? travelPlace : '');
+    final postTime = _formatPostTimestamp(post.createdAt);
 
     final isDark = context.isDark;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(30),
         border: isDark
-            ? Border.all(color: Colors.white.withValues(alpha: 0.08))
+            ? Border.all(color: Colors.white.withValues(alpha: 0.1))
             : null,
         boxShadow: isDark
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
               ]
-            : null,
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: hasImage
-                ? SizedBox(
-                    height: 400,
-                    width: double.infinity,
-                    child: isMulti
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: SizedBox(
+          height: hasImage ? 480 : 430,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: hasImage
+                    ? (isMulti
                         ? PageView.builder(
                             controller: _pageController,
                             itemCount: imageCount,
@@ -164,376 +178,451 @@ class _PostCardState extends ConsumerState<PostCard> {
                               imageUrl: post.imageUrls.first,
                               fit: BoxFit.cover,
                             ),
-                          ),
-                  )
-                : Container(
-                    height: 400,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: isDark
-                            ? const [Color(0xFF3A2F52), Color(0xFF23202E)]
-                            : const [Color(0xFF3A2F52), Color(0xFF2B2D30)],
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ExpandableCaption(
-                          text: post.caption,
-                          collapsedMaxLines: 8,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 18),
-                          toggleColor: Colors.white,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 10),
-                        GestureDetector(
-                          onTap: () => _translateCaption(context),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.translate,
-                                  size: 14, color: Colors.white70),
-                              SizedBox(width: 4),
-                              Text(
-                                'Translate',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
+                          ))
+                    : Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF4A3A68), Color(0xFF1F1D30)],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-          ),
-          if (hasImage)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.center,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.7),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (isOwner)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: _OwnerMenu(post: post, ref: ref),
-            ),
-          Positioned(
-            top: 12,
-            left: 12,
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => UserProfileScreen(uid: post.authorUid),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.grey.shade700,
-                      backgroundImage: avatarUrl != null
-                          ? CachedNetworkImageProvider(avatarUrl)
-                          : null,
-                      child: avatarUrl == null
-                          ? const Icon(Icons.person,
-                              size: 14, color: Colors.white)
-                          : null,
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              username,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: _ExpandableCaption(
+                              text: post.caption,
+                              collapsedMaxLines: 4,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                height: 1.3,
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _formatPostTimestamp(post.createdAt),
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.85),
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (widget.travelMode &&
-                            travelPlace != null &&
-                            travelPlace.isNotEmpty)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              final lat = post.postLat;
-                              final lng = post.postLng;
-                              if (lat == null || lng == null) return;
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => LocationMapScreen(
-                                    lat: lat,
-                                    lng: lng,
-                                    label: travelPlace,
-                                    subtitle: post.postPlaceCity,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  size: 11,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  travelPlace,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 11,
-                                    decoration: post.postLat != null &&
-                                            post.postLng != null
-                                        ? TextDecoration.underline
-                                        : null,
-                                    decorationColor:
-                                        Colors.white.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                                if (post.postLat != null &&
-                                    post.postLng != null) ...[
-                                  const SizedBox(width: 3),
-                                  const Icon(
-                                    Icons.map_outlined,
-                                    size: 11,
-                                    color: Colors.white,
-                                  ),
-                                ],
-                              ],
+                              toggleColor: Colors.white,
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                      ],
+                        ),
+                      ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.18),
+                          Colors.transparent,
+                          Colors.black
+                              .withValues(alpha: hasImage ? 0.62 : 0.44),
+                        ],
+                        stops: const [0.0, 0.35, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 14,
+                left: 14,
+                child: _frostedChip(
+                  avatarUrl: avatarUrl,
+                  text: '$username • $postTime',
+                ),
+              ),
+              if (isOwner)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: _OwnerMenu(post: post, ref: ref),
+                ),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSlide(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      offset: _captionBoxLowered
+                          ? const Offset(0, 0.72)
+                          : Offset.zero,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isMulti) ...[
+                            Center(
+                              child: _frostedPanel(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  child: _PageDots(
+                                    count: imageCount,
+                                    activeIndex: _currentPage,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {},
+                            child: _frostedPanel(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (captionPreview.isNotEmpty)
+                                      GestureDetector(
+                                        onTap: hasCaption
+                                            ? () => _showFullCaption(
+                                                context, avatarUrl, username)
+                                            : null,
+                                        child: Text(
+                                          captionPreview,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.92),
+                                            fontSize: 14,
+                                            height: 1.35,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    if (captionPreview.isNotEmpty)
+                                      const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: _toggleLike,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isLiked
+                                                    ? Icons.favorite
+                                                    : Icons.favorite_border,
+                                                color: isLiked
+                                                    ? Colors.red
+                                                    : Colors.white,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${post.likesCount}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () => showModalBottomSheet(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: context.cardBg,
+                                            shape: const RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.vertical(
+                                                top: Radius.circular(20),
+                                              ),
+                                            ),
+                                            builder: (_) =>
+                                                CommentScreen(post: post),
+                                          ),
+                                          child: _miniIcon(
+                                            'assets/icons/Group.svg',
+                                            '${post.commentsCount}',
+                                          ),
+                                        ),
+                                        if (repostsEnabled) ...[
+                                          const SizedBox(width: 14),
+                                          GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onTap: () => ref
+                                                .read(postServiceProvider)
+                                                .toggleRepost(post.id),
+                                            child: Icon(
+                                              Icons.repeat,
+                                              color: isReposted
+                                                  ? const Color(0xFFB05ECC)
+                                                  : Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(width: 14),
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () =>
+                                              _openShareSheet(context, ref),
+                                          child: _miniIcon(
+                                              'assets/icons/Send.svg', ''),
+                                        ),
+                                        const Spacer(),
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () => ref
+                                              .read(postServiceProvider)
+                                              .toggleSave(post.id),
+                                          child: Icon(
+                                            isSaved
+                                                ? Icons.bookmark
+                                                : Icons.bookmark_border,
+                                            color: isSaved
+                                                ? const Color(0xFFB05ECC)
+                                                : Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () => setState(() {
+                                            _captionBoxLowered =
+                                                !_captionBoxLowered;
+                                          }),
+                                          child: Container(
+                                            width: 26,
+                                            height: 26,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.18),
+                                              border: Border.all(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.28),
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              _captionBoxLowered
+                                                  ? Icons
+                                                      .keyboard_arrow_up_rounded
+                                                  : Icons
+                                                      .keyboard_arrow_down_rounded,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (hasTravelPlace) ...[
+                                      const SizedBox(height: 10),
+                                      GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: () {
+                                          final lat = post.postLat;
+                                          final lng = post.postLng;
+                                          if (lat == null || lng == null)
+                                            return;
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => LocationMapScreen(
+                                                lat: lat,
+                                                lng: lng,
+                                                label: travelPlace,
+                                                subtitle: post.postPlaceCity,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.location_on,
+                                              size: 13,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                travelPlace,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.92),
+                                                  fontSize: 11,
+                                                  decoration: post.postLat !=
+                                                              null &&
+                                                          post.postLng != null
+                                                      ? TextDecoration.underline
+                                                      : null,
+                                                ),
+                                              ),
+                                            ),
+                                            if (widget.viewerLocationOff)
+                                              GestureDetector(
+                                                onTap:
+                                                    widget.onTurnOnLocationTap,
+                                                child: _frostedChip(
+                                                  icon: Icons.location_off,
+                                                  text: 'Turn on location',
+                                                  compact: true,
+                                                ),
+                                              )
+                                            else if (travelDistance != null &&
+                                                travelDistance.isNotEmpty)
+                                              _frostedChip(
+                                                icon: Icons.route,
+                                                text: travelDistance,
+                                                compact: true,
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 12,
-            left: 12,
-            right: 12,
-            // The action strip floats over the post image. Without an
-            // opaque hit-test wrapper, taps in the gaps between icons
-            // (or under empty Row space) bubbled down to the image
-            // GestureDetector and opened the fullscreen viewer.
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {},
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isMulti) ...[
-                    Center(
-                      child: _PageDots(
-                          count: imageCount, activeIndex: _currentPage),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  Row(
-                    children: [
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _toggleLike,
-                        child: Row(
-                          children: [
-                            Icon(
-                              isLiked ? Icons.favorite : Icons.favorite_border,
-                              color: isLiked ? Colors.red : Colors.white,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 4),
-                            Text('${post.likesCount}',
-                                style: const TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: context.cardBg,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.vertical(top: Radius.circular(20)),
-                          ),
-                          builder: (_) => CommentScreen(post: post),
-                        ),
-                        child: _miniIcon(
-                            'assets/icons/Group.svg', '${post.commentsCount}'),
-                      ),
-                      if (repostsEnabled) ...[
-                        const SizedBox(width: 16),
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => ref
-                              .read(postServiceProvider)
-                              .toggleRepost(post.id),
-                          child: Icon(
-                            Icons.repeat,
-                            color: isReposted
-                                ? const Color(0xFFB05ECC)
-                                : Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => _openShareSheet(context, ref),
-                        child: _miniIcon('assets/icons/Send.svg', ''),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () =>
-                            ref.read(postServiceProvider).toggleSave(post.id),
-                        child: Icon(
-                          isSaved ? Icons.bookmark : Icons.bookmark_border,
-                          color:
-                              isSaved ? const Color(0xFFB05ECC) : Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (hasImage && post.caption.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    GestureDetector(
-                      onTap: () =>
-                          _showFullCaption(context, avatarUrl, username),
-                      child: Text(
-                        post.caption,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                  if (widget.travelMode) ...[
-                    if (widget.viewerLocationOff &&
-                        (travelPlace != null && travelPlace.isNotEmpty)) ...[
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(
-                          onTap: widget.onTurnOnLocationTap,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFFB05ECC)
-                                    .withValues(alpha: 0.6),
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.location_off,
-                                  color: Colors.white,
-                                  size: 13,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Turn on location',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else if (travelDistance != null &&
-                        travelDistance.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
+              if (_captionBoxLowered)
+                Positioned(
+                  right: 20,
+                  bottom: 14,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _captionBoxLowered = false),
+                    child: ClipOval(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                          width: 30,
+                          height: 30,
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(16),
+                            shape: BoxShape.circle,
+                            color: Colors.black.withValues(alpha: 0.3),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.28),
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.22),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            travelDistance,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
+                          child: const Icon(
+                            Icons.keyboard_arrow_up_rounded,
+                            color: Colors.white,
+                            size: 18,
                           ),
                         ),
                       ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _frostedPanel({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _frostedChip({
+    String? avatarUrl,
+    IconData? icon,
+    required String text,
+    bool compact = false,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(compact ? 14 : 22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: compact ? 10 : 14,
+          sigmaY: compact ? 10 : 14,
+        ),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 12,
+            vertical: compact ? 5 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(compact ? 14 : 22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: compact ? 0.2 : 0.3),
+                blurRadius: compact ? 10 : 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (avatarUrl != null)
+                CircleAvatar(
+                  radius: compact ? 8 : 12,
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  backgroundImage: CachedNetworkImageProvider(avatarUrl),
+                )
+              else
+                Icon(
+                  icon ?? Icons.person,
+                  color: Colors.white,
+                  size: compact ? 12 : 16,
+                ),
+              SizedBox(width: compact ? 5 : 8),
+              Text(
+                text,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: compact ? 11 : 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -907,29 +996,22 @@ class _PageDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(count, (i) {
-          final isActive = i == activeIndex;
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: EdgeInsets.symmetric(horizontal: i == 0 ? 0 : 3),
-            width: isActive ? 7 : 5,
-            height: isActive ? 7 : 5,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color:
-                  isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
-            ),
-          );
-        }),
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (i) {
+        final isActive = i == activeIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: EdgeInsets.symmetric(horizontal: i == 0 ? 0 : 3),
+          width: isActive ? 7 : 5,
+          height: isActive ? 7 : 5,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color:
+                isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
+          ),
+        );
+      }),
     );
   }
 }
