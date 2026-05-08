@@ -35,6 +35,7 @@ import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
+import '../widgets/sticker_picker_sheet.dart';
 
 /// Choices surfaced by [_MessageBubbleState._showAttachMenu]. Kept at
 /// top-level so it can be returned from the modal sheet.
@@ -112,6 +113,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // instantly with a live status indicator.
   final List<_PendingAttachment> _pending = [];
   bool _markingSeen = false;
+  bool _showStickerPicker = false;
   DateTime? _lastMarkSeenAt;
 
   void _addPending(_PendingAttachment p) {
@@ -1352,12 +1354,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   String _previewOf(ChatMessage m) {
+    if (m.stickerUrl != null && m.stickerUrl!.isNotEmpty) return 'Sticker';
     if (m.voiceUrl != null && m.voiceUrl!.isNotEmpty) return 'Voice message';
     if (m.imageUrl != null && m.imageUrl!.isNotEmpty) return 'Photo';
     if (m.sharedPostId != null && m.sharedPostId!.isNotEmpty) {
       return 'Shared post';
     }
     return m.text;
+  }
+
+  Future<void> _sendSticker(String stickerUrl, String? packId) async {
+    final uid = _currentUid;
+    if (uid == null) return;
+    setState(() => _showStickerPicker = false);
+    final reply = _replyTarget;
+    setState(() => _replyTarget = null);
+
+    try {
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: '',
+            stickerUrl: stickerUrl,
+            stickerPackId: packId,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send sticker: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -1703,6 +1734,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             icon: Icon(Icons.attach_file,
                                 color: context.textSecondary),
                           ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() => _showStickerPicker = !_showStickerPicker);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  _showStickerPicker
+                                      ? Icons.keyboard
+                                      : Icons.emoji_emotions_outlined,
+                                  key: ValueKey(_showStickerPicker),
+                                  size: 24,
+                                  color: _showStickerPicker
+                                      ? const Color(0xFFB05ECC)
+                                      : context.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
                           Expanded(
                             child: Container(
                               padding:
@@ -1829,6 +1882,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                         ],
                       ),
+              ),
+
+            // STICKER PICKER (slides up below the input, like Telegram)
+            if (_showStickerPicker && _currentUid != null)
+              StickerPickerSheet(
+                currentUid: _currentUid!,
+                onStickerSelected: _sendSticker,
               ),
           ],
         ),
@@ -2307,6 +2367,59 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     );
   }
 
+  /// Renders a sticker message without the colored bubble background
+  /// (like Telegram) — stickers float as large emoji or images.
+  Widget _buildStickerBubble(BuildContext context, bool hasReply) {
+    final stickerUrl = msg.stickerUrl!;
+    final isEmoji = !stickerUrl.startsWith('http') && !stickerUrl.startsWith('asset:');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasReply)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: context.inputFill,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: _RepliedQuote(
+              isMe: isMe,
+              senderUid: msg.replyToSenderUid ?? '',
+              text: msg.replyToText ?? '',
+              onTap: widget.onReplyQuoteTap == null
+                  ? null
+                  : () => widget.onReplyQuoteTap!(msg.replyToId!),
+            ),
+          ),
+        if (isEmoji)
+          Text(
+            stickerUrl,
+            style: const TextStyle(fontSize: 80),
+          )
+        else
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: stickerUrl,
+              width: 140,
+              height: 140,
+              fit: BoxFit.contain,
+              placeholder: (_, __) => const SizedBox(
+                width: 140,
+                height: 140,
+                child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // In groups we look up each sender's live profile dynamically. In 1:1
@@ -2321,6 +2434,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
 
     final hasReply = msg.replyToId != null && msg.replyToId!.isNotEmpty;
     final hasVoice = msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty;
+    final hasSticker = msg.stickerUrl != null && msg.stickerUrl!.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2374,7 +2488,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                   secondaryBackground: _replySwipeBg(context, alignLeft: false),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 260),
-                    child: AnimatedContainer(
+                      child: hasSticker
+                          ? _buildStickerBubble(context, hasReply)
+                          : AnimatedContainer(
                       duration: const Duration(milliseconds: 280),
                       curve: Curves.easeOut,
                       padding: const EdgeInsets.symmetric(
