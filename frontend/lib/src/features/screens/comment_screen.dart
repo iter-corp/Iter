@@ -25,8 +25,14 @@ class _ReplyTarget {
 class CommentScreen extends ConsumerStatefulWidget {
   final Post post;
   final String? highlightCommentId;
+  final bool showPostContext;
 
-  const CommentScreen({super.key, required this.post, this.highlightCommentId});
+  const CommentScreen({
+    super.key,
+    required this.post,
+    this.highlightCommentId,
+    this.showPostContext = false,
+  });
 
   @override
   ConsumerState<CommentScreen> createState() => _CommentScreenState();
@@ -168,6 +174,26 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
             ),
 
             Divider(height: 1, color: Theme.of(context).dividerColor),
+
+            if (widget.showPostContext)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                decoration: BoxDecoration(
+                  color: context.inputFill,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Text(
+                  widget.post.caption.trim(),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.textPrimary,
+                    height: 1.35,
+                  ),
+                ),
+              ),
 
             // Comment list
             Expanded(

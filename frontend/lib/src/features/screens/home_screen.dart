@@ -11,11 +11,13 @@ import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
 import '../../services/post_service.dart';
 import '../model/post_model.dart';
+import 'create_post_screen.dart';
+import 'qa_thread_screen.dart';
 import '../widgets/header.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_section.dart';
 
-enum _HomeMode { feed, travel }
+enum _HomeMode { feed, travel, qa }
 
 enum _LocationStatus {
   ok,
@@ -67,6 +69,8 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
   _HomeMode _mode = _HomeMode.feed;
   _PlaceSuggestion? _selectedPlace;
   final List<_PlaceSuggestion> _recentPlaces = [];
+  final TextEditingController _qaSearchCtrl = TextEditingController();
+  String _qaSearch = '';
   double? _viewerLat;
   double? _viewerLng;
   String _viewerCity = 'Location unavailable';
@@ -87,6 +91,12 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     });
   }
 
+  @override
+  void dispose() {
+    _qaSearchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _refresh(WidgetRef ref) async {
     if (_mode == _HomeMode.travel) {
       if (mounted) {
@@ -102,6 +112,16 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       );
       ref.invalidate(travelFeedProvider(query));
       await ref.read(travelFeedProvider(query).future);
+      return;
+    }
+
+    if (_mode == _HomeMode.qa) {
+      ref.invalidate(qaFeedProvider);
+      try {
+        await ref.read(qaFeedProvider.future);
+      } catch (_) {
+        // Swallow — the error state already renders in the list.
+      }
       return;
     }
 
@@ -324,6 +344,16 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       return;
     }
 
+    if (mode == _HomeMode.qa) {
+      ref.invalidate(qaFeedProvider);
+      try {
+        await ref.read(qaFeedProvider.future);
+      } catch (_) {
+        // Let the UI render the provider error state.
+      }
+      return;
+    }
+
     ref.invalidate(feedProvider);
     try {
       await ref.read(feedProvider.future);
@@ -348,6 +378,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
         onChanged: _switchMode,
       ),
       if (_mode == _HomeMode.travel) ...[
+        _TravelPromptStrip(onPost: () => _openCreatePost(context)),
         _TravelLocationRow(
           selectedPlace: _selectedPlace,
           onSearchPressed: _openPlaceSearch,
@@ -375,6 +406,18 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 },
           onSelectRecent: (place) => setState(() => _selectedPlace = place),
         ),
+      ] else if (_mode == _HomeMode.qa) ...[
+        _QaPromptStrip(onAsk: () => _showAskSheet(context)),
+        _QaSearchBar(
+          controller: _qaSearchCtrl,
+          onChanged: (value) => setState(() => _qaSearch = value.trim()),
+          onClear: () {
+            _qaSearchCtrl.clear();
+            setState(() => _qaSearch = '');
+          },
+        ),
+      ] else ...[
+        _FeedPromptStrip(onPost: () => _openCreatePost(context)),
       ],
     ];
   }
@@ -409,7 +452,9 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
 
     final postsAsync = _mode == _HomeMode.travel
         ? ref.watch(travelFeedProvider(travelQuery))
-        : ref.watch(feedProvider);
+        : _mode == _HomeMode.qa
+            ? ref.watch(qaFeedProvider)
+            : ref.watch(feedProvider);
 
     // Tolerate the adminConfig doc being missing or the rules not yet
     // deployed — both should fail silently (no banner shown).
@@ -457,7 +502,16 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                   ],
                 ),
                 data: (posts) {
-                  if (posts.isEmpty) {
+                  final visiblePosts = _mode == _HomeMode.qa
+                      ? _filterQaPosts(posts, _qaSearch)
+                      : posts;
+
+                  if (visiblePosts.isEmpty) {
+                    final emptyText = _mode == _HomeMode.qa
+                        ? (_qaSearch.isEmpty
+                            ? 'No Q&A threads yet. Ask the first question!'
+                            : 'No matching questions found.')
+                        : 'No posts yet. Create the first one!';
                     return ListView(
                       controller: widget.scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -469,8 +523,8 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                           showStories: showStories,
                         ),
                         const SizedBox(height: 24),
-                        const Center(
-                          child: Text('No posts yet. Create the first one!'),
+                        Center(
+                          child: Text(emptyText),
                         ),
                       ],
                     );
@@ -491,9 +545,12 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                       SliverPadding(
                         padding: const EdgeInsets.only(top: 8, bottom: 100),
                         sliver: SliverList.builder(
-                          itemCount: posts.length,
+                          itemCount: visiblePosts.length,
                           itemBuilder: (context, index) {
-                            final p = posts[index];
+                            final p = visiblePosts[index];
+                            if (_mode == _HomeMode.qa) {
+                              return _QaThreadCard(post: p);
+                            }
                             final placeLabel = _travelPlaceLabel(p);
                             final hasPlace = placeLabel.isNotEmpty;
                             final viewerLocOff = _mode == _HomeMode.travel &&
@@ -534,6 +591,29 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     );
   }
 
+  void _showAskSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AskQuestionSheet(
+        onPosted: () {
+          ref.invalidate(qaFeedProvider);
+        },
+      ),
+    );
+  }
+
+  Future<void> _openCreatePost(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CreatePostScreen()),
+    );
+    ref.invalidate(feedProvider);
+    ref.invalidate(travelFeedProvider(_buildTravelQuery()));
+  }
+
   String _travelPlaceLabel(Post post) {
     final name = (post.postPlaceName ?? '').trim();
     final city = (post.postPlaceCity ?? '').trim();
@@ -541,6 +621,17 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     if (city.isEmpty) return name;
     return '$name, $city';
   }
+}
+
+List<Post> _filterQaPosts(List<Post> posts, String query) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return posts;
+
+  return posts.where((post) {
+    final caption = post.caption.toLowerCase();
+    final author = post.authorUsername.toLowerCase();
+    return caption.contains(q) || author.contains(q);
+  }).toList();
 }
 
 class _HomeModeToggle extends StatelessWidget {
@@ -551,56 +642,703 @@ class _HomeModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedColor = context.cardBg;
-    final unselectedColor = context.inputFill;
+    final cardBg = context.cardBg;
+    final trackColor = context.inputFill;
+    final selectedIndex = mode == _HomeMode.feed
+        ? 0
+        : mode == _HomeMode.travel
+            ? 1
+            : 2;
+    const flexes = [10.0, 12.0, 10.0];
+    const totalFlex = 32.0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: unselectedColor,
+          color: trackColor,
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _ModePillButton(
-                label: 'Feed',
-                selected: mode == _HomeMode.feed,
-                selectedColor: selectedColor,
-                onTap: () => onChanged(_HomeMode.feed),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final available = constraints.maxWidth;
+            // Row: SizedBox(2) + Expanded*3 + SizedBox(6)*2 + SizedBox(2)
+            final flexWidth = available - 2 - 6 - 6 - 2;
+            final w = flexes.map((f) => flexWidth * f / totalFlex).toList();
+            final x = [
+              2.0,
+              2.0 + w[0] + 6,
+              2.0 + w[0] + 6 + w[1] + 6,
+            ];
+            return SizedBox(
+              height: 44,
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeInOut,
+                    left: x[selectedIndex],
+                    width: w[selectedIndex],
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      const SizedBox(width: 2),
+                      Expanded(
+                        flex: 10,
+                        child: _ModePillButton(
+                          label: 'Feed',
+                          icon: Icons.dynamic_feed_rounded,
+                          selected: mode == _HomeMode.feed,
+                          onTap: () => onChanged(_HomeMode.feed),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 12,
+                        child: _ModePillButton(
+                          label: 'Travel Mode',
+                          icon: Icons.flight,
+                          selected: mode == _HomeMode.travel,
+                          selectedHorizontalPadding: 10,
+                          onTap: () => onChanged(_HomeMode.travel),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 10,
+                        child: _ModePillButton(
+                          label: 'Q&A',
+                          icon: Icons.forum_outlined,
+                          selected: mode == _HomeMode.qa,
+                          onTap: () => onChanged(_HomeMode.qa),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _ModePillButton(
-                label: 'Travel Mode',
-                icon: Icons.flight,
-                selected: mode == _HomeMode.travel,
-                selectedColor: selectedColor,
-                onTap: () => onChanged(_HomeMode.travel),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
+class _QaThreadCard extends ConsumerWidget {
+  final Post post;
+
+  const _QaThreadCard({required this.post});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+    final isLiked = ref.watch(isLikedProvider(post.id)).value ?? false;
+    final canDelete = currentUid != null && currentUid == post.authorUid;
+    final caption = post.caption.trim();
+    final lines = caption
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final title = lines.isEmpty ? 'Untitled question' : lines.first;
+    final body = lines.length > 1 ? lines.sublist(1).join(' ') : '';
+    final preview = _twoSentencePreview(body);
+    final timeLabel = _relativeTime(post.createdAt);
+    final isQuestion = title.contains('?');
+
+    void openThread() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QaThreadScreen(post: post),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: openThread,
+          child: Ink(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withValues(alpha: context.isDark ? 0.12 : 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: context.purpleSoft,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(
+                        isQuestion
+                            ? Icons.help_outline_rounded
+                            : Icons.forum_outlined,
+                        size: 18,
+                        color: const Color(0xFF7E3BE8),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post.authorUsername,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$timeLabel ago',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: context.purpleSoft,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        isQuestion ? 'Question' : 'Discussion',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF7E3BE8),
+                        ),
+                      ),
+                    ),
+                    if (canDelete) ...[
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        tooltip: 'Question actions',
+                        icon: Icon(Icons.more_horiz,
+                            color: context.textSecondary),
+                        onSelected: (value) async {
+                          if (value != 'delete') return;
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Delete question?'),
+                              content: const Text(
+                                'This will permanently remove your question from Q&A.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm != true) return;
+                          try {
+                            await ref
+                                .read(postServiceProvider)
+                                .deletePost(post.id);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Question deleted')),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Could not delete: $e')),
+                            );
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Text('Delete question'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                    height: 1.2,
+                  ),
+                ),
+                if (preview.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    preview,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _QaMeta(
+                      icon: Icons.chat_bubble_outline,
+                      label: '${post.commentsCount} answers',
+                      onTap: openThread,
+                    ),
+                    _QaMeta(
+                      icon: isLiked ? Icons.favorite : Icons.favorite_border,
+                      label: '${post.likesCount} helpful',
+                      highlighted: isLiked,
+                      onTap: () async {
+                        try {
+                          await ref
+                              .read(postServiceProvider)
+                              .toggleLike(post.id);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Could not like question: $e')),
+                          );
+                        }
+                      },
+                    ),
+                    _QaMeta(
+                      icon: Icons.edit_outlined,
+                      label: 'Write answer',
+                      onTap: openThread,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _twoSentencePreview(String text) {
+  final normalized = text.replaceAll('\n', ' ').trim();
+  if (normalized.isEmpty) return '';
+  final parts = RegExp(r'[^.!?]+[.!?]?')
+      .allMatches(normalized)
+      .map((m) => (m.group(0) ?? '').trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return normalized;
+  return parts.take(2).join(' ');
+}
+
+class _QaPromptStrip extends StatelessWidget {
+  final VoidCallback onAsk;
+  const _QaPromptStrip({required this.onAsk});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: context.isDark
+              ? const [Color(0xFF2B2638), Color(0xFF252333)]
+              : const [Color(0xFFF8F1FF), Color(0xFFF3F7FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDark
+              ? const Color(0xFF4A4066)
+              : const Color(0xFFDCC8E6),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: const Icon(
+              Icons.question_answer_rounded,
+              size: 20,
+              color: Color(0xFF7E3BE8),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Have a question? Ask the community',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Get quick answers from people nearby.',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.tonal(
+            onPressed: onAsk,
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Ask'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedPromptStrip extends StatelessWidget {
+  final VoidCallback onPost;
+
+  const _FeedPromptStrip({required this.onPost});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: context.isDark
+              ? const [Color(0xFF23303A), Color(0xFF202A34)]
+              : const [Color(0xFFEFF9FF), Color(0xFFF3F7FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDark
+              ? const Color(0xFF395168)
+              : const Color(0xFFC9DDEE),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: const Icon(
+              Icons.dynamic_feed_rounded,
+              size: 20,
+              color: Color(0xFF2F7CA8),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Got something to share? Post it',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Share updates, photos, and moments with your feed.',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.tonal(
+            onPressed: onPost,
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Post'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TravelPromptStrip extends StatelessWidget {
+  final VoidCallback onPost;
+
+  const _TravelPromptStrip({required this.onPost});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: context.isDark
+              ? const [Color(0xFF2B3125), Color(0xFF253026)]
+              : const [Color(0xFFF2FFE9), Color(0xFFEAF9FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDark
+              ? const Color(0xFF4A6143)
+              : const Color(0xFFCFE6C2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: const Icon(
+              Icons.explore_rounded,
+              size: 20,
+              color: Color(0xFF3E8B44),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Traveling somewhere? Post from there',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Share place-based moments others can discover.',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.tonal(
+            onPressed: onPost,
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Post'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QaSearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _QaSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search questions or users...',
+          prefixIcon: Icon(Icons.search, color: context.textSecondary),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Clear search',
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QaMeta extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool highlighted;
+  final VoidCallback? onTap;
+
+  const _QaMeta({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = highlighted ? const Color(0xFF7E3BE8) : context.textSecondary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: highlighted ? context.purpleSoft : context.inputFill,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: fg,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _relativeTime(DateTime? dt) {
+  if (dt == null) return 'just now';
+  final now = DateTime.now();
+  final diff = now.difference(dt);
+  if (diff.inMinutes < 1) return 'now';
+  if (diff.inHours < 1) return '${diff.inMinutes}m';
+  if (diff.inDays < 1) return '${diff.inHours}h';
+  if (diff.inDays < 30) return '${diff.inDays}d';
+  final months = (diff.inDays / 30).floor();
+  if (months < 12) return '${months}mo';
+  return '${(months / 12).floor()}y';
+}
+
 class _ModePillButton extends StatelessWidget {
   final String label;
   final IconData? icon;
   final bool selected;
-  final Color selectedColor;
+  final double selectedHorizontalPadding;
   final VoidCallback onTap;
 
   const _ModePillButton({
     required this.label,
     this.icon,
     required this.selected,
-    required this.selectedColor,
+    this.selectedHorizontalPadding = 8,
     required this.onTap,
   });
 
@@ -611,30 +1349,237 @@ class _ModePillButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? selectedColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: selected
-              ? Border.all(color: context.borderColor)
-              : Border.all(color: Colors.transparent),
+        padding: EdgeInsets.symmetric(
+          vertical: 10,
+          horizontal: selected ? selectedHorizontalPadding : 8,
         ),
+        color: Colors.transparent,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null) ...[
+            if (selected && icon != null) ...[
               Icon(icon, size: 16, color: context.textPrimary),
               const SizedBox(width: 4),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: context.textPrimary,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: context.textPrimary,
+                ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// 📌 SECTION: Ask Question Sheet
+// ─────────────────────────────────────────────
+
+class _AskQuestionSheet extends ConsumerStatefulWidget {
+  final VoidCallback onPosted;
+
+  const _AskQuestionSheet({required this.onPosted});
+
+  @override
+  ConsumerState<_AskQuestionSheet> createState() => _AskQuestionSheetState();
+}
+
+class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
+  final _questionCtrl = TextEditingController();
+  final _detailsCtrl = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _questionCtrl.dispose();
+    _detailsCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final question = _questionCtrl.text.trim();
+    if (question.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Write your question first')));
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await ref.read(postServiceProvider).createQaPost(
+            question: question,
+            details: _detailsCtrl.text.trim(),
+          );
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onPosted();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final bottomInset =
+        mq.viewInsets.bottom > 0 ? mq.viewInsets.bottom : mq.padding.bottom;
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      behavior: HitTestBehavior.translucent,
+      child: Container(
+        // Let the sheet grow to fill remaining space so SingleChildScrollView
+        // has a bounded height and keyboard insets can be absorbed cleanly.
+        margin: EdgeInsets.only(top: mq.size.height * 0.25),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: bottomInset + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.borderColor,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: context.purpleSoft,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(
+                      Icons.help_outline_rounded,
+                      size: 20,
+                      color: Color(0xFF7E3BE8),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Ask the community',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Question field
+              TextField(
+                controller: _questionCtrl,
+                autofocus: true,
+                maxLines: 2,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: context.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: "What's your question?",
+                  hintStyle: TextStyle(
+                      color: context.textSecondary,
+                      fontWeight: FontWeight.w400),
+                  filled: true,
+                  fillColor: context.inputFill,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Optional details field
+              TextField(
+                controller: _detailsCtrl,
+                maxLines: 4,
+                minLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(fontSize: 14, color: context.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Add more context (optional)...',
+                  hintStyle: TextStyle(color: context.textSecondary),
+                  filled: true,
+                  fillColor: context.inputFill,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF7E3BE8),
+                    disabledBackgroundColor:
+                        const Color(0xFF7E3BE8).withValues(alpha: 0.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Post Question',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

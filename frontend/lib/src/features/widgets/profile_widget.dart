@@ -211,7 +211,7 @@ class ProfileButtons extends StatelessWidget {
 
 /// TABS — animated pill underline + colour fade. The selected tab
 /// glides under the icons rather than snapping, giving the profile a
-/// more "modern" feel when switching between Posts / Reposts / Saved.
+/// more "modern" feel when switching between sections.
 class ProfileTabBar extends StatelessWidget {
   final int selectedTab;
   final Function(int) onTap;
@@ -224,7 +224,12 @@ class ProfileTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const icons = [Icons.grid_on, Icons.repeat, Icons.bookmark_border];
+    const icons = [
+      Icons.grid_on,
+      Icons.question_answer_outlined,
+      Icons.repeat,
+      Icons.bookmark_border,
+    ];
     return SizedBox(
       height: 48,
       child: LayoutBuilder(

@@ -351,6 +351,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     ),
                     if (selectedTab == 0)
                       _UserPostsGrid(uid: widget.uid)
+                    else if (selectedTab == 1)
+                      _UserQaActivitySection(uid: widget.uid)
                     else
                       _UserRepostsGrid(uid: widget.uid),
                   ]
@@ -502,6 +504,198 @@ class _UserRepostsGrid extends ConsumerWidget {
       },
     );
   }
+}
+
+class _UserQaActivitySection extends ConsumerStatefulWidget {
+  final String uid;
+  const _UserQaActivitySection({required this.uid});
+
+  @override
+  ConsumerState<_UserQaActivitySection> createState() =>
+      _UserQaActivitySectionState();
+}
+
+class _UserQaActivitySectionState
+    extends ConsumerState<_UserQaActivitySection> {
+  int _innerTab = 0; // 0 asked, 1 answered
+
+  @override
+  Widget build(BuildContext context) {
+    final askedAsync = ref.watch(userQaAskedProvider(widget.uid));
+    final answeredAsync = ref.watch(userQaAnsweredProvider(widget.uid));
+
+    Widget activityList(AsyncValue<List<Post>> asyncPosts,
+        {required bool asked}) {
+      return asyncPosts.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.all(40),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, _) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(child: Text('Error: $e')),
+        ),
+        data: (posts) {
+          if (posts.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 60),
+              child: Center(
+                child: Text(
+                  asked ? 'No questions asked yet' : 'No answers yet',
+                  style: TextStyle(color: context.textSecondary),
+                ),
+              ),
+            );
+          }
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            itemCount: posts.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, i) {
+              final p = posts[i];
+              final title = p.caption.trim().split('\n').first.trim();
+              final time = _userQaTimeAgo(p.createdAt);
+              return Container(
+                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+                decoration: BoxDecoration(
+                  color: context.cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      asked ? Icons.help_outline_rounded : Icons.rate_review,
+                      size: 18,
+                      color: const Color(0xFF7E3BE8),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title.isEmpty ? 'Untitled question' : title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$time • ${p.commentsCount} answers',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: context.inputFill,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _UserQaInnerTab(
+                    label: 'Questions Asked',
+                    selected: _innerTab == 0,
+                    onTap: () => setState(() => _innerTab = 0),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _UserQaInnerTab(
+                    label: 'Questions Answered',
+                    selected: _innerTab == 1,
+                    onTap: () => setState(() => _innerTab = 1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _innerTab == 0
+            ? activityList(askedAsync, asked: true)
+            : activityList(answeredAsync, asked: false),
+      ],
+    );
+  }
+}
+
+class _UserQaInnerTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _UserQaInnerTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? context.cardBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: selected
+              ? Border.all(color: context.borderColor)
+              : Border.all(color: Colors.transparent),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            color: context.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _userQaTimeAgo(DateTime? dt) {
+  if (dt == null) return 'just now';
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'now';
+  if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+  if (diff.inDays < 1) return '${diff.inHours}h ago';
+  if (diff.inDays < 30) return '${diff.inDays}d ago';
+  final mo = (diff.inDays / 30).floor();
+  if (mo < 12) return '${mo}mo ago';
+  return '${(mo / 12).floor()}y ago';
 }
 
 Widget _postsGrid(BuildContext context, List<Post> posts) {

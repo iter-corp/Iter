@@ -11,6 +11,8 @@ class Comment {
   final DateTime createdAt;
   final String? parentCommentId;
   final String? replyToUsername;
+  final int helpfulCount;
+  final int unhelpfulCount;
 
   const Comment({
     required this.id,
@@ -21,6 +23,8 @@ class Comment {
     required this.createdAt,
     this.parentCommentId,
     this.replyToUsername,
+    this.helpfulCount = 0,
+    this.unhelpfulCount = 0,
   });
 
   bool get isReply => parentCommentId != null;
@@ -36,6 +40,8 @@ class Comment {
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       parentCommentId: d['parentCommentId'] as String?,
       replyToUsername: d['replyToUsername'] as String?,
+      helpfulCount: (d['helpfulCount'] as num?)?.toInt() ?? 0,
+      unhelpfulCount: (d['unhelpfulCount'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -55,6 +61,12 @@ class CommentService {
 
   DocumentReference<Map<String, dynamic>> _postRef(String postId) =>
       _db.collection('posts').doc(postId);
+
+  CollectionReference<Map<String, dynamic>> _reactions(
+    String postId,
+    String commentId,
+  ) =>
+      _comments(postId).doc(commentId).collection('reactions');
 
   Stream<List<Comment>> streamComments(String postId) {
     return _comments(postId)
@@ -80,6 +92,8 @@ class CommentService {
       'authorAvatar': authorAvatar,
       'text': text,
       'createdAt': FieldValue.serverTimestamp(),
+      'helpfulCount': 0,
+      'unhelpfulCount': 0,
       if (parentCommentId != null) 'parentCommentId': parentCommentId,
       if (replyToUsername != null) 'replyToUsername': replyToUsername,
     });
@@ -181,5 +195,69 @@ class CommentService {
     return _likes(postId, commentId)
         .snapshots()
         .map((snap) => snap.docs.length);
+  }
+
+  Stream<String?> streamUserAnswerReaction({
+    required String postId,
+    required String commentId,
+    required String uid,
+  }) {
+    return _reactions(postId, commentId)
+        .doc(uid)
+        .snapshots()
+        .map((snap) => snap.data()?['type'] as String?);
+  }
+
+  Future<void> setAnswerReaction({
+    required String postId,
+    required String commentId,
+    required String uid,
+    required String type,
+  }) async {
+    if (type != 'heart' && type != 'broken') {
+      throw ArgumentError('type must be heart or broken');
+    }
+
+    final commentRef = _comments(postId).doc(commentId);
+    final reactionRef = _reactions(postId, commentId).doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final commentSnap = await tx.get(commentRef);
+      if (!commentSnap.exists) return;
+
+      final reactionSnap = await tx.get(reactionRef);
+      final previousType = reactionSnap.data()?['type'] as String?;
+
+      var helpful = (commentSnap.data()?['helpfulCount'] as num?)?.toInt() ?? 0;
+      var unhelpful =
+          (commentSnap.data()?['unhelpfulCount'] as num?)?.toInt() ?? 0;
+
+      void dec(String t) {
+        if (t == 'heart' && helpful > 0) helpful -= 1;
+        if (t == 'broken' && unhelpful > 0) unhelpful -= 1;
+      }
+
+      void inc(String t) {
+        if (t == 'heart') helpful += 1;
+        if (t == 'broken') unhelpful += 1;
+      }
+
+      if (previousType == type) {
+        dec(previousType!);
+        tx.delete(reactionRef);
+      } else {
+        if (previousType != null) dec(previousType);
+        inc(type);
+        tx.set(reactionRef, {
+          'type': type,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      tx.update(commentRef, {
+        'helpfulCount': helpful,
+        'unhelpfulCount': unhelpful,
+      });
+    });
   }
 }

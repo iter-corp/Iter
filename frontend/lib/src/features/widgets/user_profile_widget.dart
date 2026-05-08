@@ -65,7 +65,8 @@ class UserCoverAvatar extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.4),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                child:
+                    const Icon(Icons.more_vert, color: Colors.white, size: 20),
               ),
               itemBuilder: (context) => [
                 PopupMenuItem(
@@ -194,7 +195,8 @@ class UserNameBio extends StatelessWidget {
             children: [
               Text(
                 username,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               if (isPrivate) ...[
                 const SizedBox(width: 6),
@@ -260,26 +262,14 @@ class UserStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(
-            context, 
-            isPrivateAndNotFollowing ? "—" : _fmt(followers), 
-            "Followers", 
-            isPrivateAndNotFollowing ? null : onFollowersTap
-          ),
+          _statItem(context, isPrivateAndNotFollowing ? "—" : _fmt(followers),
+              "Followers", isPrivateAndNotFollowing ? null : onFollowersTap),
           _divider(context),
-          _statItem(
-            context, 
-            isPrivateAndNotFollowing ? "—" : _fmt(following), 
-            "Following", 
-            isPrivateAndNotFollowing ? null : onFollowingTap
-          ),
+          _statItem(context, isPrivateAndNotFollowing ? "—" : _fmt(following),
+              "Following", isPrivateAndNotFollowing ? null : onFollowingTap),
           _divider(context),
-          _statItem(
-            context, 
-            isPrivateAndNotFollowing ? "—" : _fmt(posts), 
-            "Posts", 
-            null
-          ),
+          _statItem(context, isPrivateAndNotFollowing ? "—" : _fmt(posts),
+              "Posts", null),
         ],
       ),
     );
@@ -335,8 +325,9 @@ class UserButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool active = isFollowing || isRequested;
-    final String text = isFollowing ? "Following" : (isRequested ? "Requested" : "Follow");
-    
+    final String text =
+        isFollowing ? "Following" : (isRequested ? "Requested" : "Follow");
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -350,8 +341,7 @@ class UserButtons extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
-                    color:
-                        active ? context.cardBg : const Color(0xFFB05ECC),
+                    color: active ? context.cardBg : const Color(0xFFB05ECC),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: active
@@ -427,11 +417,12 @@ class UserTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final icons = [
       Icons.grid_on,
+      Icons.question_answer_outlined,
       Icons.repeat,
     ];
 
     return Row(
-      children: List.generate(2, (index) {
+      children: List.generate(icons.length, (index) {
         final bool isActive = selectedTab == index;
         return Expanded(
           child: GestureDetector(

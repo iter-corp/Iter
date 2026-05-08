@@ -62,12 +62,51 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
   );
 });
 
+final qaFeedProvider = StreamProvider<List<Post>>((ref) {
+  final currentUid = ref.watch(
+    authStateProvider.select((a) => a.value?.uid),
+  );
+  if (currentUid == null) return const Stream.empty();
+
+  final followService = ref.watch(followServiceProvider);
+  final blockedStream =
+      ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
+
+  return Rx.combineLatest3(
+    ref.watch(postServiceProvider).streamQaFeed().onErrorReturn(<Post>[]),
+    followService.getFollowing(currentUid).onErrorReturn(<String>[]),
+    blockedStream.onErrorReturn(<String>[]),
+    (List<Post> posts, List<String> following, List<String> blocked) {
+      final allowed = {...following, currentUid};
+      final blockedSet = blocked.toSet();
+      return posts
+          .where((p) => !blockedSet.contains(p.authorUid))
+          .where((p) => !p.isPrivate || allowed.contains(p.authorUid))
+          .toList();
+    },
+  );
+});
+
 final userPostsProvider = StreamProvider.family<List<Post>, String>((ref, uid) {
   // Gate on auth being settled. posts require signedIn() in Firestore rules;
   // opening the stream before the token propagates causes permission-denied.
   final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
   if (authed == null) return const Stream.empty();
   return ref.watch(postServiceProvider).streamUserPosts(uid);
+});
+
+final userQaAskedProvider =
+    StreamProvider.family<List<Post>, String>((ref, uid) {
+  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (authed == null) return const Stream.empty();
+  return ref.watch(postServiceProvider).streamUserQaAsked(uid);
+});
+
+final userQaAnsweredProvider =
+    StreamProvider.family<List<Post>, String>((ref, uid) {
+  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
+  if (authed == null) return const Stream.empty();
+  return ref.watch(postServiceProvider).streamUserQaAnswered(uid);
 });
 
 final travelFeedProvider =

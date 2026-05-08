@@ -81,9 +81,72 @@ class PostService {
   Stream<List<Post>> streamFeed({int limit = 50}) {
     return _posts
         .orderBy('createdAt', descending: true)
-        .limit(limit)
+        .limit(limit * 4)
         .snapshots()
-        .map((s) => s.docs.map(Post.fromDoc).toList());
+        .map((s) {
+      // Keep Q&A threads out of the normal feed.
+      final filtered = s.docs
+          .where((d) => (d.data()['postType'] as String?) != 'qa')
+          .map(Post.fromDoc)
+          .toList();
+      if (filtered.length <= limit) return filtered;
+      return filtered.take(limit).toList();
+    });
+  }
+
+  /// Creates a Q&A thread. The document is stored in the same `posts`
+  /// collection but tagged with `postType: 'qa'` so it is only surfaced
+  /// in the Q&A feed and never pollutes the regular feed.
+  Future<String> createQaPost({
+    required String question,
+    String details = '',
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final username = userDoc.data()?['username'] as String? ?? 'user';
+    final avatar = userDoc.data()?['avatarUrl'] as String?;
+
+    // Store question + optional body as caption so the existing Post model
+    // works without schema changes.
+    final caption = details.trim().isEmpty
+        ? question.trim()
+        : '${question.trim()}\n${details.trim()}';
+
+    final ref = await _posts.add({
+      'authorUid': user.uid,
+      'authorUsername': username,
+      'authorAvatar': avatar,
+      'caption': caption,
+      'imageUrls': <String>[],
+      'likesCount': 0,
+      'commentsCount': 0,
+      'isPrivate': false,
+      'postType': 'qa',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    return ref.id;
+  }
+
+  /// Q&A feed is isolated from normal posts by requiring postType == 'qa'.
+  /// We sort client-side to avoid composite-index requirements.
+  Stream<List<Post>> streamQaFeed({int limit = 80}) {
+    return _posts
+        .where('postType', isEqualTo: 'qa')
+        .limit(240)
+        .snapshots()
+        .map((s) {
+      final out = s.docs.map(Post.fromDoc).toList()
+        ..sort((a, b) {
+          final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bt.compareTo(at);
+        });
+      if (out.length <= limit) return out;
+      return out.take(limit).toList();
+    });
   }
 
   double? _distanceKm({
@@ -272,16 +335,80 @@ class PostService {
         .where('authorUid', isEqualTo: uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map(Post.fromDoc).toList());
+        .map((s) => s.docs
+            .where((d) => (d.data()['postType'] as String?) != 'qa')
+            .map(Post.fromDoc)
+            .toList());
+  }
+
+  /// Questions asked by this user (Q&A-only posts authored by uid).
+  Stream<List<Post>> streamUserQaAsked(String uid, {int limit = 120}) {
+    return _posts
+        .where('authorUid', isEqualTo: uid)
+        .where('postType', isEqualTo: 'qa')
+        .limit(limit)
+        .snapshots()
+        .map((s) {
+      final out = s.docs.map(Post.fromDoc).toList()
+        ..sort((a, b) {
+          final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bt.compareTo(at);
+        });
+      return out;
+    });
+  }
+
+  /// Questions this user has answered (via comments on Q&A posts).
+  Stream<List<Post>> streamUserQaAnswered(String uid, {int limit = 120}) {
+    return _db
+        .collectionGroup('comments')
+        .where('authorUid', isEqualTo: uid)
+        .limit(360)
+        .snapshots()
+        .asyncMap((snap) async {
+      final postIds = <String>{};
+      for (final c in snap.docs) {
+        final postRef = c.reference.parent.parent;
+        if (postRef != null) postIds.add(postRef.id);
+      }
+
+      if (postIds.isEmpty) return const <Post>[];
+
+      final docs = await Future.wait(postIds.map((id) => _posts.doc(id).get()));
+      final out = docs
+          .where((d) => d.exists)
+          .map((d) => MapEntry(d, d.data()))
+          .where((pair) => (pair.value?['postType'] as String?) == 'qa')
+          .map((pair) => Post.fromDoc(pair.key))
+          .toList()
+        ..sort((a, b) {
+          final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bt.compareTo(at);
+        });
+
+      if (out.length <= limit) return out;
+      return out.take(limit).toList();
+    });
   }
 
   Future<void> deletePost(String postId) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Not signed in');
-    await _posts.doc(postId).delete();
-    await _db.collection('users').doc(uid).update({
-      'postsCount': FieldValue.increment(-1),
-    });
+    final postRef = _posts.doc(postId);
+    final snap = await postRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final isQa = (data['postType'] as String?) == 'qa';
+    await postRef.delete();
+
+    if (!isQa) {
+      await _db.collection('users').doc(uid).update({
+        'postsCount': FieldValue.increment(-1),
+      });
+    }
   }
 
   Future<void> updatePost(
