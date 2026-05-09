@@ -255,10 +255,12 @@ class FollowService {
   }
 
   Stream<List<String>> getFollowers(String uid) {
-    return _followersCol(uid).snapshots().map((snap) {
-      final activeDocs =
-          snap.docs.where((d) => d.data()['status'] != 'pending').toList();
-      activeDocs.sort((a, b) {
+    return _followersCol(uid)
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .map((snap) {
+      final docs = snap.docs.toList();
+      docs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
         final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
         if (aCreatedAt == null && bCreatedAt == null) return 0;
@@ -266,15 +268,17 @@ class FollowService {
         if (bCreatedAt == null) return -1;
         return bCreatedAt.compareTo(aCreatedAt);
       });
-      return activeDocs.map((doc) => doc.id).toList();
+      return docs.map((doc) => doc.id).toList();
     });
   }
 
   Stream<List<String>> getFollowRequests(String uid) {
-    return _followersCol(uid).snapshots().map((snap) {
-      final pendingDocs =
-          snap.docs.where((d) => d.data()['status'] == 'pending').toList();
-      pendingDocs.sort((a, b) {
+    return _followersCol(uid)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snap) {
+      final docs = snap.docs.toList();
+      docs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
         final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
         if (aCreatedAt == null && bCreatedAt == null) return 0;
@@ -282,15 +286,17 @@ class FollowService {
         if (bCreatedAt == null) return -1;
         return bCreatedAt.compareTo(aCreatedAt);
       });
-      return pendingDocs.map((doc) => doc.id).toList();
+      return docs.map((doc) => doc.id).toList();
     });
   }
 
   Stream<List<String>> getFollowing(String uid) {
-    return _followingCol(uid).snapshots().map((snap) {
-      final activeDocs =
-          snap.docs.where((d) => d.data()['status'] != 'pending').toList();
-      activeDocs.sort((a, b) {
+    return _followingCol(uid)
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .map((snap) {
+      final docs = snap.docs.toList();
+      docs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
         final bCreatedAt = (b.data()['createdAt'] as Timestamp?)?.toDate();
         if (aCreatedAt == null && bCreatedAt == null) return 0;
@@ -298,7 +304,7 @@ class FollowService {
         if (bCreatedAt == null) return -1;
         return bCreatedAt.compareTo(aCreatedAt);
       });
-      return activeDocs.map((doc) => doc.id).toList();
+      return docs.map((doc) => doc.id).toList();
     });
   }
 }
