@@ -11,8 +11,8 @@ service cloud.firestore {
 
     function canSeeContent(uid) {
       let user = get(/databases/$(database)/documents/users/$(uid)).data;
-      return !user.isPrivate || isSelf(uid) || 
-             (exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)) && 
+          return !user.isPrivate || isSelf(uid) ||
+            (exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)) &&
               get(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)).data.status == 'active');
     }
 
@@ -130,14 +130,6 @@ service cloud.firestore {
       allow create, delete: if isSelf(followerUid);
     }
 
-    // Explicit top-level coverage for answer reactions under post comments.
-    // Firestore doc snapshot listeners are evaluated as queries (`list`), so
-    // keep `get` and `list` spelled out here for this exact path.
-    match /posts/{postId}/comments/{commentId}/reactions/{uid} {
-      allow get, list: if signedIn();
-      allow create, update, delete: if isSelf(uid) || isAdmin();
-    }
-
     match /posts/{postId} {
       // Any signed-in user can read posts. Privacy/blocking is enforced on
       // the client (the feed filters posts whose author is private and not
@@ -168,22 +160,13 @@ service cloud.firestore {
         allow delete: if signedIn() && (
           resource.data.authorUid == request.auth.uid || isAdmin()
         );
-        allow update: if signedIn() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'helpfulCount',
-            'unhelpfulCount'
-          ]);
+        allow update: if false;
 
         match /likes/{uid} {
           allow read: if signedIn();
           allow create: if isSelf(uid);
           allow delete: if isSelf(uid) || isAdmin();
           allow update: if false;
-        }
-
-        match /reactions/{uid} {
-          allow read: if signedIn();
-          allow create, update, delete: if isSelf(uid) || isAdmin();
         }
       }
 

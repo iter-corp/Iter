@@ -430,7 +430,7 @@ class _FollowedUserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(userByUidProvider(uid));
-    final data = userAsync.value;
+    final data = userAsync.valueOrNull;
     if (data == null) {
       // Don't render a hollow row while the user doc resolves.
       return const SizedBox.shrink();

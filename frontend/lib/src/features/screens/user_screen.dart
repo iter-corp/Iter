@@ -34,6 +34,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   bool _followBusy = false;
   bool _messageBusy = false;
 
+  // Local overrides for instant UI feedback. When non-null, these take
+  // precedence over the Firestore stream values until the stream catches up.
+  bool? _localIsFollowing;
+  bool? _localIsRequested;
+
   @override
   void initState() {
     super.initState();
@@ -46,13 +51,48 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     });
   }
 
+  /// Clears local overrides so the Firestore stream becomes the sole
+  /// source of truth again.
+  void _clearLocalOverrides() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _localIsFollowing = null;
+          _localIsRequested = null;
+        });
+      }
+    });
+  }
+
   Future<void> _toggleFollow(
       bool currentlyFollowing, bool currentlyRequested, bool isPrivate) async {
     final currentUser = ref.read(authStateProvider).value ??
         ref.read(authServiceProvider).currentUser;
     if (currentUser == null || _followBusy) return;
 
-    setState(() => _followBusy = true);
+    // ── Optimistic local update (instant) ──
+    if (currentlyFollowing || currentlyRequested) {
+      // Unfollowing / cancelling request.
+      setState(() {
+        _followBusy = true;
+        _localIsFollowing = false;
+        _localIsRequested = false;
+      });
+    } else {
+      // Following.
+      setState(() {
+        _followBusy = true;
+        if (isPrivate) {
+          _localIsFollowing = false;
+          _localIsRequested = true;
+          // No follower-count change for a pending request.
+        } else {
+          _localIsFollowing = true;
+          _localIsRequested = false;
+        }
+      });
+    }
+
     try {
       final service = ref.read(followServiceProvider);
       if (currentlyFollowing || currentlyRequested) {
@@ -67,8 +107,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           isPrivate: isPrivate,
         );
       }
+      // Server confirmed — let the stream take over after a short grace.
+      _clearLocalOverrides();
     } catch (e) {
+      // Rollback local overrides on failure.
       if (mounted) {
+        setState(() {
+          _localIsFollowing = null;
+          _localIsRequested = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Follow action failed: $e')),
         );
@@ -243,8 +290,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           final avatarUrl = user['avatarUrl'] as String?;
           final coverUrl = user['coverUrl'] as String?;
           final isPrivate = (user['isPrivate'] as bool?) ?? false;
-          final isFollowing = isFollowingAsync.value ?? false;
-          final isRequested = isRequestedAsync.value ?? false;
+          // Merge local overrides with stream values for instant feedback.
+          final isFollowing =
+              _localIsFollowing ?? (isFollowingAsync.value ?? false);
+          final isRequested =
+              _localIsRequested ?? (isRequestedAsync.value ?? false);
           final followers = followersAsync.valueOrNull?.length ??
               (user['followersCount'] as int?) ??
               0;

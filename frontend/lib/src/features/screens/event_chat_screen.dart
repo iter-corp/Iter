@@ -91,7 +91,7 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
     final currentUid = _currentUid;
     final isAdmin = currentUid != null && currentUid == widget.adminUid;
     final msgsAsync = ref.watch(eventChatMessagesProvider(widget.eventId));
-    final adminLive = ref.watch(userByUidProvider(widget.adminUid)).value;
+    final adminLive = ref.watch(userByUidProvider(widget.adminUid)).valueOrNull;
     final adminAvatar = (adminLive?['avatarUrl'] as String?) ?? '';
     final adminName = (adminLive?['username'] as String?) ?? 'Admin';
 
@@ -294,7 +294,7 @@ class _EventMessageBubble extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final senderLive = ref.watch(userByUidProvider(msg.senderUid)).value;
+    final senderLive = ref.watch(userByUidProvider(msg.senderUid)).valueOrNull;
     final senderName =
         (senderLive?['username'] as String?) ?? (isFromAdmin ? 'Admin' : 'User');
     final senderAvatar = (senderLive?['avatarUrl'] as String?) ?? '';

@@ -18,6 +18,11 @@ class ChatMessage {
   final String? voiceUrl;
   final int? voiceDurationMs;
 
+  /// Sticker support — either a bundled asset path (starts with 'asset:') or
+  /// a Firebase Storage URL for user-uploaded custom stickers.
+  final String? stickerUrl;
+  final String? stickerPackId;
+
   /// Live transcript captured on the sender's device while recording
   /// the voice message. Lets the receiver read or translate the audio
   /// without round-tripping through a backend transcription job.
@@ -49,6 +54,8 @@ class ChatMessage {
     this.voiceUrl,
     this.voiceDurationMs,
     this.voiceTranscript,
+    this.stickerUrl,
+    this.stickerPackId,
     this.replyToId,
     this.replyToText,
     this.replyToSenderUid,
@@ -74,6 +81,8 @@ class ChatMessage {
       voiceUrl: d['voiceUrl'] as String?,
       voiceDurationMs: (d['voiceDurationMs'] as num?)?.toInt(),
       voiceTranscript: d['voiceTranscript'] as String?,
+      stickerUrl: d['stickerUrl'] as String?,
+      stickerPackId: d['stickerPackId'] as String?,
       replyToId: d['replyToId'] as String?,
       replyToText: d['replyToText'] as String?,
       replyToSenderUid: d['replyToSenderUid'] as String?,
@@ -320,6 +329,8 @@ class ChatService {
     String? replyToSenderUid,
     String? storyId,
     String? storyImageUrl,
+    String? stickerUrl,
+    String? stickerPackId,
   }) async {
     final trimmedText = text.trim();
     final normalizedImageUrl = imageUrl?.trim();
@@ -331,6 +342,8 @@ class ChatService {
     final normalizedVoiceTranscript = voiceTranscript?.trim();
     final normalizedStoryId = storyId?.trim();
     final normalizedStoryImageUrl = storyImageUrl?.trim();
+    final normalizedStickerUrl = stickerUrl?.trim();
+    final normalizedStickerPackId = stickerPackId?.trim();
     final hasImage =
         normalizedImageUrl != null && normalizedImageUrl.isNotEmpty;
     final hasVideo =
@@ -342,13 +355,16 @@ class ChatService {
         normalizedVoiceUrl != null && normalizedVoiceUrl.isNotEmpty;
     final hasStoryRef =
         normalizedStoryId != null && normalizedStoryId.isNotEmpty;
+    final hasSticker =
+        normalizedStickerUrl != null && normalizedStickerUrl.isNotEmpty;
     if (trimmedText.isEmpty &&
         !hasImage &&
         !hasVideo &&
         !hasFile &&
         !hasSharedPost &&
         !hasVoice &&
-        !hasStoryRef) {
+        !hasStoryRef &&
+        !hasSticker) {
       return;
     }
 
@@ -378,17 +394,19 @@ class ChatService {
     final chatRef = _chatDoc(chatId);
     final lastMessage = trimmedText.isNotEmpty
         ? trimmedText
-        : hasSharedPost
-            ? 'Shared a post'
-            : hasVoice
-                ? 'Voice message'
-                : hasVideo
-                    ? 'Sent a video'
-                    : hasFile
-                        ? 'Sent a file'
-                        : hasImage
-                            ? 'Sent a photo'
-                            : '';
+        : hasSticker
+            ? 'Sent a sticker'
+            : hasSharedPost
+                ? 'Shared a post'
+                : hasVoice
+                    ? 'Voice message'
+                    : hasVideo
+                        ? 'Sent a video'
+                        : hasFile
+                            ? 'Sent a file'
+                            : hasImage
+                                ? 'Sent a photo'
+                                : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,
@@ -422,6 +440,11 @@ class ChatService {
           normalizedStoryImageUrl != null &&
           normalizedStoryImageUrl.isNotEmpty)
         'storyImageUrl': normalizedStoryImageUrl,
+      if (hasSticker) 'stickerUrl': normalizedStickerUrl,
+      if (hasSticker &&
+          normalizedStickerPackId != null &&
+          normalizedStickerPackId.isNotEmpty)
+        'stickerPackId': normalizedStickerPackId,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
     });
