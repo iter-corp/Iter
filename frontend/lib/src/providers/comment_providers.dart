@@ -59,3 +59,25 @@ final commentsProvider =
   final service = ref.watch(commentServiceProvider);
   return _retryStream(() => service.streamComments(postId));
 });
+
+typedef UserAnswerReactionArgs = ({
+  String postId,
+  String commentId,
+  String uid,
+});
+
+final userAnswerReactionProvider =
+    StreamProvider.family<String?, UserAnswerReactionArgs>((ref, args) {
+  // Gate on the auth provider that eagerly fetches the current token, then
+  // retry because Firestore can still lag one auth tick behind FirebaseAuth.
+  final user = ref.watch(authStateProvider).value;
+  if (user == null || user.uid != args.uid) return const Stream.empty();
+  final service = ref.watch(commentServiceProvider);
+  return _retryStream(
+    () => service.streamUserAnswerReaction(
+      postId: args.postId,
+      commentId: args.commentId,
+      uid: args.uid,
+    ),
+  );
+});

@@ -117,7 +117,7 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: const Text('Q&A Thread'),
+            title: const Text('Discuss Thread'),
             foregroundColor: context.textPrimary,
           ),
           body: SafeArea(
@@ -592,16 +592,14 @@ class _AnswerReactionBar extends ConsumerWidget {
       );
     }
 
-    return StreamBuilder<String?>(
-      stream: service
-          .streamUserAnswerReaction(
-            postId: postId,
-            commentId: answer.id,
-            uid: uid,
-          )
-          .handleError((_, __) {}),
-      builder: (context, snapshot) {
-        final myReaction = snapshot.data;
+    final myReactionAsync = ref.watch(userAnswerReactionProvider((
+      postId: postId,
+      commentId: answer.id,
+      uid: uid,
+    )));
+
+    return myReactionAsync.when(
+      data: (myReaction) {
         final heartOn = myReaction == 'heart';
         final brokenOn = myReaction == 'broken';
 
@@ -646,6 +644,86 @@ class _AnswerReactionBar extends ConsumerWidget {
           ],
         );
       },
+      loading: () => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _ReactionChip(
+            icon: Icons.favorite_border,
+            label: '${answer.helpfulCount}',
+            active: false,
+            activeColor: const Color(0xFFE54865),
+            compact: compact,
+            onTap: () => setReaction('heart'),
+          ),
+          _ReactionChip(
+            icon: Icons.heart_broken_outlined,
+            label: '${answer.unhelpfulCount}',
+            active: false,
+            activeColor: const Color(0xFF8A6A30),
+            compact: compact,
+            onTap: () => setReaction('broken'),
+          ),
+          _ReplyReactionChip(onTap: onReply, compact: compact),
+          if (canDelete)
+            _DeleteMenuButton(
+              compact: compact,
+              onDelete: () async {
+                try {
+                  await service.deleteComment(
+                    postId: postId,
+                    commentId: answer.id,
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not delete reply: $e')),
+                  );
+                }
+              },
+            ),
+        ],
+      ),
+      error: (_, __) => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _ReactionChip(
+            icon: Icons.favorite_border,
+            label: '${answer.helpfulCount}',
+            active: false,
+            activeColor: const Color(0xFFE54865),
+            compact: compact,
+            onTap: () => setReaction('heart'),
+          ),
+          _ReactionChip(
+            icon: Icons.heart_broken_outlined,
+            label: '${answer.unhelpfulCount}',
+            active: false,
+            activeColor: const Color(0xFF8A6A30),
+            compact: compact,
+            onTap: () => setReaction('broken'),
+          ),
+          _ReplyReactionChip(onTap: onReply, compact: compact),
+          if (canDelete)
+            _DeleteMenuButton(
+              compact: compact,
+              onDelete: () async {
+                try {
+                  await service.deleteComment(
+                    postId: postId,
+                    commentId: answer.id,
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not delete reply: $e')),
+                  );
+                }
+              },
+            ),
+        ],
+      ),
     );
   }
 }

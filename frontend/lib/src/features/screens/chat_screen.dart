@@ -52,7 +52,8 @@ ui.TextDirection _detectTextDirection(String text) {
         (r >= 0x07C0 && r <= 0x07FF) || // NKo
         (r >= 0x08A0 && r <= 0x08FF) || // Arabic Extended-A
         (r >= 0xFB1D && r <= 0xFDFF) || // Hebrew + Arabic Presentation Forms-A
-        (r >= 0xFE70 && r <= 0xFEFF)) { // Arabic Presentation Forms-B
+        (r >= 0xFE70 && r <= 0xFEFF)) {
+      // Arabic Presentation Forms-B
       return ui.TextDirection.rtl;
     }
   }
@@ -110,8 +111,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   static const int _kMaxAttachmentBytes = 1024 * 1024 * 1024;
 
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _messageFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
+  bool _isInputFocused = false;
 
   /// Per-message GlobalKeys so [_scrollToMessage] can jump back to the
   /// original of a reply. Stale entries are cleared on rebuild because
@@ -254,6 +257,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _messageFocusNode.addListener(() {
+      if (!mounted) return;
+      setState(() => _isInputFocused = _messageFocusNode.hasFocus);
+    });
     _loadAutoTranslatePrefs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final uid = _currentUid;
@@ -267,6 +274,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void dispose() {
     _typingTimer?.cancel();
     _controller.dispose();
+    _messageFocusNode.dispose();
     _scrollController.dispose();
     _recorder.dispose();
     if (_isDictating) {
@@ -1727,74 +1735,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 color: context.textSecondary),
                           ),
                           Expanded(
-                            child: Container(
-                              padding:
-                                  const EdgeInsets.only(left: 16, right: 4),
-                              decoration: BoxDecoration(
-                                color: context.inputFill,
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: ValueListenableBuilder<
-                                        TextEditingValue>(
-                                      valueListenable: _controller,
-                                      builder: (context, value, _) {
-                                        final dir =
-                                            _detectTextDirection(value.text);
-                                        return TextField(
-                                          controller: _controller,
-                                          onChanged: _onTextChanged,
-                                          minLines: 1,
-                                          maxLines: 6,
-                                          keyboardType: TextInputType.multiline,
-                                          textInputAction:
-                                              TextInputAction.newline,
-                                          textDirection: dir,
-                                          textAlign: dir == ui.TextDirection.rtl
-                                              ? TextAlign.right
-                                              : TextAlign.left,
-                                          decoration: InputDecoration(
-                                            hintText: 'Message...',
-                                            hintStyle: TextStyle(
-                                                color: context.textMuted,
-                                                fontSize: 14),
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                    vertical: 10),
-                                          ),
-                                        );
-                                      },
+                            child: ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _controller,
+                              builder: (context, value, _) {
+                                final hasText = value.text.trim().isNotEmpty;
+                                final dir = _detectTextDirection(value.text);
+                                final activeBorder = _isInputFocused || hasText;
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
+                                  padding: const EdgeInsets.only(
+                                      left: 14, right: 10, top: 2, bottom: 2),
+                                  decoration: BoxDecoration(
+                                    color: context.inputFill,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: activeBorder
+                                          ? const Color(0xFFB05ECC)
+                                          : context.borderColor
+                                              .withValues(alpha: 0.72),
+                                      width: activeBorder ? 1.3 : 1,
                                     ),
+                                    boxShadow: activeBorder
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFFB05ECC)
+                                                  .withValues(alpha: 0.16),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                        : const [],
                                   ),
-                                  // Tap-to-dictate sits INSIDE the input pill so
-                                  // it reads as a text-input affordance. We use
-                                  // a plain GestureDetector with opaque hit-test
-                                  // because IconButton/InkWell inside a
-                                  // BoxDecoration container was swallowing taps
-                                  // (gesture arena conflict with Tooltip's
-                                  // long-press recognizer).
-                                  GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: _toggleDictation,
-                                    onLongPress: _pickDictationLocale,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Icon(
-                                        _isDictating
-                                            ? Icons.keyboard_voice
-                                            : Icons.keyboard_voice_outlined,
-                                        color: _isDictating
-                                            ? const Color(0xFFB05ECC)
-                                            : context.textSecondary,
+                                  child: TextField(
+                                    controller: _controller,
+                                    focusNode: _messageFocusNode,
+                                    onChanged: _onTextChanged,
+                                    onTapOutside: (_) =>
+                                        _messageFocusNode.unfocus(),
+                                    minLines: 1,
+                                    maxLines: 6,
+                                    keyboardType: TextInputType.multiline,
+                                    textInputAction: TextInputAction.newline,
+                                    textDirection: dir,
+                                    textAlign: dir == ui.TextDirection.rtl
+                                        ? TextAlign.right
+                                        : TextAlign.left,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    decoration: InputDecoration(
+                                      hintText: 'Write a message',
+                                      hintStyle: TextStyle(
+                                        color: context.textMuted,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
                                       ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 10),
                                     ),
                                   ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 4),

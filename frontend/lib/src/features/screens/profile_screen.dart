@@ -868,7 +868,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
               icon: asked ? Icons.help_outline_rounded : Icons.rate_review,
               title: asked ? 'No questions asked yet' : 'No answers yet',
               subtitle: asked
-                  ? 'Questions you ask in Q&A will appear here.'
+                  ? 'Questions you ask in Discuss will appear here.'
                   : 'Questions you answered will appear here.',
             );
           }

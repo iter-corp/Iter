@@ -127,6 +127,14 @@ service cloud.firestore {
       allow create, delete: if isSelf(followerUid);
     }
 
+    // Explicit top-level coverage for answer reactions under post comments.
+    // Firestore doc snapshot listeners are evaluated as queries (`list`), so
+    // keep `get` and `list` spelled out here for this exact path.
+    match /posts/{postId}/comments/{commentId}/reactions/{uid} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isSelf(uid) || isAdmin();
+    }
+
     match /posts/{postId} {
       // Any signed-in user can read posts. Privacy/blocking is enforced on
       // the client (the feed filters posts whose author is private and not

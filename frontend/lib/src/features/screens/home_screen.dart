@@ -510,7 +510,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                   if (visiblePosts.isEmpty) {
                     final emptyText = _mode == _HomeMode.qa
                         ? (_qaSearch.isEmpty
-                            ? 'No Q&A threads yet. Ask the first question!'
+                            ? 'No Discuss threads yet. Ask the first question!'
                             : 'No matching questions found.')
                         : 'No posts yet. Create the first one!';
                     return ListView(
@@ -744,7 +744,7 @@ class _HomeModeToggle extends StatelessWidget {
                           Expanded(
                             flex: 10,
                             child: _ModePillButton(
-                              label: 'Q&A',
+                              label: 'Discuss',
                               icon: Icons.forum_outlined,
                               selected: mode == _HomeMode.qa,
                               onTap: () => onChanged(_HomeMode.qa),
@@ -893,7 +893,7 @@ class _QaThreadCard extends ConsumerWidget {
                             builder: (dialogContext) => AlertDialog(
                               title: const Text('Delete question?'),
                               content: const Text(
-                                'This will permanently remove your question from Q&A.',
+                                'This will permanently remove your question from Discuss.',
                               ),
                               actions: [
                                 TextButton(
