@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 import 'admin_blacklist_screen.dart';
+import 'admin_error_reports_screen.dart';
 import 'admin_event_registrations_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
@@ -103,9 +104,22 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _AdminTile(
+            icon: Icons.bug_report_outlined,
+            title: 'Error reports',
+            subtitle: 'App-wide error detection & crash log',
+            color: const Color(0xFFE04E5C),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AdminErrorReportsScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AdminTile(
             icon: Icons.settings_outlined,
             title: 'App settings',
-            subtitle: 'Feature flags, announcement, maintenance',
+            subtitle: 'Feature flags, announcement, store links, maintenance',
             color: const Color(0xFF3AB0FF),
             onTap: () => Navigator.push(
               context,

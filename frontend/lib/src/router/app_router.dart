@@ -11,10 +11,13 @@ import '../features/screens/auth/otp_screen.dart';
 import '../features/screens/auth/signup_screen.dart';
 import '../features/screens/auth/splash_screen.dart';
 import '../providers/auth_providers.dart';
+import '../services/error_report_service.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
+    // Tracks the current screen so error reports record where a crash happened.
+    observers: [ErrorReportNavigatorObserver()],
     refreshListenable: _AuthListenable(ref),
     redirect: (context, state) {
       final authAsync = ref.read(authStateProvider);

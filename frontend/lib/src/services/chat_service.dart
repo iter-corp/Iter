@@ -37,8 +37,17 @@ class ChatMessage {
   /// which story the reply/reaction is about.
   final String? storyId;
   final String? storyImageUrl;
+
+  /// A shared location pin. When [locationLat] / [locationLng] are set the
+  /// bubble renders a mini map preview with a "Directions" action.
+  final double? locationLat;
+  final double? locationLng;
+  final String? locationLabel;
+
   final DateTime? createdAt;
   final List<String> seenBy;
+
+  bool get hasLocation => locationLat != null && locationLng != null;
 
   const ChatMessage({
     required this.id,
@@ -61,12 +70,17 @@ class ChatMessage {
     this.replyToSenderUid,
     this.storyId,
     this.storyImageUrl,
+    this.locationLat,
+    this.locationLng,
+    this.locationLabel,
     this.createdAt,
     required this.seenBy,
   });
 
   factory ChatMessage.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
+    final loc = d['location'];
+    final locMap = loc is Map ? loc : null;
     return ChatMessage(
       id: doc.id,
       senderUid: (d['senderUid'] as String?) ?? '',
@@ -88,6 +102,9 @@ class ChatMessage {
       replyToSenderUid: d['replyToSenderUid'] as String?,
       storyId: d['storyId'] as String?,
       storyImageUrl: d['storyImageUrl'] as String?,
+      locationLat: (locMap?['lat'] as num?)?.toDouble(),
+      locationLng: (locMap?['lng'] as num?)?.toDouble(),
+      locationLabel: d['locationLabel'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       seenBy: List<String>.from(d['seenBy'] as List? ?? []),
     );
@@ -271,6 +288,9 @@ class ChatService {
     if ((data['imageUrl'] as String?)?.trim().isNotEmpty == true) {
       return 'Sent a photo';
     }
+    if (data['location'] is Map) {
+      return '📍 Shared a location';
+    }
     return '';
   }
 
@@ -437,6 +457,9 @@ class ChatService {
     String? storyImageUrl,
     String? stickerUrl,
     String? stickerPackId,
+    double? locationLat,
+    double? locationLng,
+    String? locationLabel,
   }) async {
     final trimmedText = text.trim();
     final normalizedImageUrl = imageUrl?.trim();
@@ -463,6 +486,8 @@ class ChatService {
         normalizedStoryId != null && normalizedStoryId.isNotEmpty;
     final hasSticker =
         normalizedStickerUrl != null && normalizedStickerUrl.isNotEmpty;
+    final hasLocation = locationLat != null && locationLng != null;
+    final normalizedLocationLabel = locationLabel?.trim();
     if (trimmedText.isEmpty &&
         !hasImage &&
         !hasVideo &&
@@ -470,7 +495,8 @@ class ChatService {
         !hasSharedPost &&
         !hasVoice &&
         !hasStoryRef &&
-        !hasSticker) {
+        !hasSticker &&
+        !hasLocation) {
       return;
     }
 
@@ -512,7 +538,9 @@ class ChatService {
                             ? 'Sent a file'
                             : hasImage
                                 ? 'Sent a photo'
-                                : '';
+                                : hasLocation
+                                    ? '📍 Shared a location'
+                                    : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,
@@ -551,6 +579,11 @@ class ChatService {
           normalizedStickerPackId != null &&
           normalizedStickerPackId.isNotEmpty)
         'stickerPackId': normalizedStickerPackId,
+      if (hasLocation) 'location': {'lat': locationLat, 'lng': locationLng},
+      if (hasLocation &&
+          normalizedLocationLabel != null &&
+          normalizedLocationLabel.isNotEmpty)
+        'locationLabel': normalizedLocationLabel,
       'createdAt': FieldValue.serverTimestamp(),
       'seenBy': [senderUid],
     });

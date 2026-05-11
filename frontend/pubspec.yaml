@@ -1,7 +1,7 @@
 name: coil
 description: Coil — Social community app
 publish_to: "none"
-version: 1.0.0+1
+version: 1.1.1+2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -64,6 +64,7 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   url_launcher: ^6.3.1
+  share_plus: ^10.1.2
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.7
   shared_preferences: ^2.3.2

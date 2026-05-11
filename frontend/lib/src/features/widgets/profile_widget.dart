@@ -155,10 +155,11 @@ class ProfileStats extends StatelessWidget {
       Container(width: 1, height: 36, color: context.borderColor);
 }
 
-/// EDIT PROFILE + SETTING BUTTONS
+/// EDIT PROFILE + SETTING + INVITE BUTTONS
 class ProfileButtons extends StatelessWidget {
   final VoidCallback? onSettings;
-  const ProfileButtons({super.key, this.onSettings});
+  final VoidCallback? onInvite;
+  const ProfileButtons({super.key, this.onSettings, this.onInvite});
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +204,24 @@ class ProfileButtons extends StatelessWidget {
               ),
             ),
           ),
+          if (onInvite != null) ...[
+            const SizedBox(width: 10),
+            Tooltip(
+              message: 'Invite friends',
+              child: OutlinedButton(
+                onPressed: onInvite,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: context.borderColor),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 11, horizontal: 14),
+                ),
+                child: Icon(Icons.ios_share,
+                    size: 18, color: context.textPrimary),
+              ),
+            ),
+          ],
         ],
       ),
     );

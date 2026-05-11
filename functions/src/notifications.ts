@@ -60,6 +60,15 @@ export const sendPushOnNotificationCreate = onDocumentCreated(
         title = 'New message';
         body = `${actorName} sent you a message`;
         break;
+      case 'new_event': {
+        const eventTitle = String(data.title ?? '').trim();
+        const eventLoc = String(data.subtitle ?? '').trim();
+        title = 'New event';
+        body = eventTitle.length > 0
+          ? (eventLoc.length > 0 ? `${eventTitle} — ${eventLoc}` : eventTitle)
+          : 'A new event was just published';
+        break;
+      }
       default:
         title = 'COIL';
         body = `${actorName} interacted with you`;

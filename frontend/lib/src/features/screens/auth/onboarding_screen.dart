@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../providers/auth_providers.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/personalization_fields.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -19,6 +20,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _bioCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   String? _gender;
+
+  // Optional "About you" personalization — used to make Events / Connect
+  // surfaces more relevant. All skippable.
+  String? _profession;
+  String? _field;
+  String? _academicLevel;
+  List<String> _goals = const [];
+
   bool _loading = false;
   String? _error;
 
@@ -129,6 +138,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
 
       final city = _cityCtrl.text.trim();
+      final applicableLevel =
+          academicLevelAppliesTo(_profession) ? _academicLevel : null;
       final data = <String, dynamic>{
         'name': username,
         'username': username,
@@ -139,6 +150,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         if (city.isNotEmpty) 'city': city,
         if (_lat != null && _lng != null)
           'location': {'lat': _lat, 'lng': _lng},
+        // Optional personalization (kept separate from the RBAC `role` field).
+        if (_profession != null) 'profession': _profession,
+        if (_field != null) 'field': _field,
+        if (applicableLevel != null) 'academicLevel': applicableLevel,
+        if (_goals.isNotEmpty) 'goals': _goals,
       };
       await userService.updateUser(uid, data);
     } catch (e) {
@@ -194,6 +210,67 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   cityCtrl: _cityCtrl,
                   onUseGps: _useGps,
                   onClear: _clearLocation,
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: context.surfaceSoft,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: context.borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.tune_rounded,
+                              color: AppColors.purple, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'About you',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'Optional',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Helps us show events, scholarships and people that match '
+                        'your interests. You can skip and add this later.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textSecondary,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AboutYouEditor(
+                        profession: _profession,
+                        field: _field,
+                        academicLevel: _academicLevel,
+                        goals: _goals,
+                        onProfessionChanged: (v) =>
+                            setState(() => _profession = v),
+                        onFieldChanged: (v) => setState(() => _field = v),
+                        onAcademicLevelChanged: (v) =>
+                            setState(() => _academicLevel = v),
+                        onGoalsChanged: (v) => setState(() => _goals = v),
+                      ),
+                    ],
+                  ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),

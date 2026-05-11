@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_providers.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_feedback.dart';
+import '../widgets/personalization_fields.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -32,6 +34,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     'Other',
     'Prefer not to say',
   ];
+
+  // Optional "About you" personalization.
+  String? _profession;
+  String? _field;
+  String? _academicLevel;
+  List<String> _goals = const [];
 
   bool _initialized = false;
   bool _saving = false;
@@ -67,7 +75,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
     _avatarUrl = user['avatarUrl'] as String?;
     _coverUrl = user['coverUrl'] as String?;
+    _profession = _matchOption(user['profession'], kProfessionOptions);
+    _field = _matchOption(user['field'], kFieldOptions);
+    _academicLevel = _matchOption(user['academicLevel'], kAcademicLevelOptions);
+    _goals = ((user['goals'] as List?)?.cast<String>() ?? const [])
+        .where(kGoalOptions.contains)
+        .toList();
     _initialized = true;
+  }
+
+  /// Returns the option whose lower-cased text equals [raw], or null.
+  static String? _matchOption(dynamic raw, List<String> options) {
+    final s = (raw as String?)?.trim() ?? '';
+    if (s.isEmpty) return null;
+    for (final o in options) {
+      if (o.toLowerCase() == s.toLowerCase()) return o;
+    }
+    return null;
   }
 
   String _normalizeUsername(String raw) => raw.trim().toLowerCase();
@@ -152,6 +176,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       return;
     }
 
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
     try {
       final uid = ref.read(authServiceProvider).currentUser!.uid;
@@ -178,6 +203,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       // field exists in Firestore but doesn't surface anywhere.
       final genderToSave =
           (_gender == null || _gender == 'Prefer not to say') ? '' : _gender!;
+      final applicableLevel =
+          academicLevelAppliesTo(_profession) ? _academicLevel : null;
       await ref.read(userServiceProvider).updateUser(uid, {
         'name': nameToSave,
         'username': username,
@@ -185,6 +212,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'handle': '@$username',
         'bio': _bioController.text.trim(),
         'gender': genderToSave,
+        // Personalization (separate from RBAC `role`). Empty/cleared values are
+        // written so the fields stay in sync if the user removes a choice.
+        'profession': _profession ?? '',
+        'field': _field ?? '',
+        'academicLevel': applicableLevel ?? '',
+        'goals': _goals,
       });
 
       // Keep FirebaseAuth profile displayName aligned for legacy fallbacks.
@@ -193,12 +226,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           .currentUser
           ?.updateDisplayName(nameToSave);
 
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        Navigator.pop(context);
+        AppFeedback.showSuccessOn(messenger, 'Profile updated');
       }
+    } catch (e) {
+      AppFeedback.showErrorOn(messenger, 'Could not save profile: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -274,6 +307,48 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           options: _genderOptions,
                           onChanged: (v) => setState(() => _gender = v),
                           hint: 'Select gender',
+                        ),
+                        const SizedBox(height: 8),
+                        const _SectionLabel(text: 'Interests & goals'),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                          child: Text(
+                            'Helps us surface events, scholarships and people '
+                            'relevant to you. All optional.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: context.cardBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: context.borderColor
+                                    .withValues(alpha: 0.6),
+                                width: 1,
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(14),
+                            child: AboutYouEditor(
+                              profession: _profession,
+                              field: _field,
+                              academicLevel: _academicLevel,
+                              goals: _goals,
+                              onProfessionChanged: (v) =>
+                                  setState(() => _profession = v),
+                              onFieldChanged: (v) =>
+                                  setState(() => _field = v),
+                              onAcademicLevelChanged: (v) =>
+                                  setState(() => _academicLevel = v),
+                              onGoalsChanged: (v) =>
+                                  setState(() => _goals = v),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 8),
                       ],

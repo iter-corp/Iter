@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
+import 'event_screen.dart';
 import 'post_detail_screen.dart';
 import 'qa_thread_screen.dart';
 import 'user_screen.dart';
@@ -39,6 +40,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       case 'event_rejected':
       case 'event_invited':
       case 'event_removed':
+      case 'new_event':
         return _NotificationCategory.event;
       default:
         return _NotificationCategory.activity;
@@ -99,7 +101,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         return notification.type == 'event_approved' ||
             notification.type == 'event_rejected' ||
             notification.type == 'event_invited' ||
-            notification.type == 'event_removed';
+            notification.type == 'event_removed' ||
+            notification.type == 'new_event';
     }
   }
 
@@ -553,6 +556,17 @@ class _NotificationItem extends ConsumerWidget {
             subtitle = _timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
+          case 'new_event':
+            final eventName = (notif.title ?? '').trim();
+            title = eventName.isEmpty
+                ? 'A new event was published'
+                : 'New event: $eventName';
+            final loc = (notif.subtitle ?? '').trim();
+            subtitle = loc.isEmpty
+                ? _timeAgo(notif.createdAt)
+                : '$loc · ${_timeAgo(notif.createdAt)}';
+            trailingType = NotificationType.image;
+            break;
           case 'follow_accept':
             title = '$username accepted your follow request';
             subtitle = _timeAgo(notif.createdAt);
@@ -670,6 +684,13 @@ class _NotificationItem extends ConsumerWidget {
         if (notif.targetId != null) {
           _openEventChatFromNotification(context, notif);
         }
+        break;
+      case 'new_event':
+        // Open the Events tab so the user can browse / register.
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EventBody()),
+        );
         break;
       case 'event_rejected':
       case 'event_removed':

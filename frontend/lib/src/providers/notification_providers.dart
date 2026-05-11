@@ -2,10 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'follow_providers.dart';
 import '../services/notification_service.dart';
+import '../services/user_service.dart';
 import 'auth_providers.dart';
 
 final notificationServiceProvider =
     Provider<NotificationService>((_) => NotificationService());
+
+/// The current user's new-event notification preferences.
+final eventNotifPrefsProvider = StreamProvider<EventNotifPrefs>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(userServiceProvider).streamEventNotifPrefs(user.uid);
+});
 
 /// Live stream of the current user's notifications.
 final notificationsProvider = StreamProvider<List<AppNotification>>((ref) {

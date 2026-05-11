@@ -18,80 +18,93 @@ import 'src/providers/admin_providers.dart';
 import 'src/providers/auth_providers.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/router/app_router.dart';
+import 'src/services/error_report_service.dart';
 import 'src/services/fcm_service.dart';
 import 'src/theme/app_theme.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  final originalOnError = FlutterError.onError;
-  FlutterError.onError = (FlutterErrorDetails details) {
-    if (details.exceptionAsString().contains('EncodingError: The source image cannot be decoded') ||
-        details.library == 'image resource service') {
-      return;
-    }
-    if (originalOnError != null) {
-      originalOnError(details);
-    } else {
-      FlutterError.presentError(details);
-    }
-  };
+  // Run the *entire* startup inside a guarded zone so uncaught async errors are
+  // captured by the error reporter — and, crucially, so the binding is
+  // initialized in the same zone that later calls `runApp` (Flutter asserts
+  // these match). See https://docs.flutter.dev/testing/errors.
+  ErrorReportService.instance.runGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  debugPrint('[boot] WidgetsFlutterBinding ready');
-  await _configureSystemUi();
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      if (details.exceptionAsString().contains('EncodingError: The source image cannot be decoded') ||
+          details.library == 'image resource service') {
+        return;
+      }
+      if (originalOnError != null) {
+        originalOnError(details);
+      } else {
+        FlutterError.presentError(details);
+      }
+    };
 
-  try {
-    await dotenv.load(fileName: '.env');
-    debugPrint('[boot] dotenv loaded');
-  } catch (e) {
-    debugPrint('[boot] dotenv load failed (ignored): $e');
-  }
+    debugPrint('[boot] WidgetsFlutterBinding ready');
+    await _configureSystemUi();
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('[boot] Firebase initialized (fresh)');
-  } catch (e) {
-    debugPrint('[boot] Firebase init non-fatal: $e');
-  }
-  debugPrint('[boot] Firebase.apps=${Firebase.apps.length}');
-
-  // Connect to emulators only when explicitly enabled. On a real device,
-  // 'localhost' resolves to the phone itself, so leaving this on caused
-  // every callable/Firestore call to hang. Set USE_FIREBASE_EMULATOR=true
-  // in .env to re-enable, and set FIREBASE_EMULATOR_HOST to your PC's LAN
-  // IP (e.g. 192.168.1.42) when testing on a physical device.
-  final useEmulator =
-      (dotenv.maybeGet('USE_FIREBASE_EMULATOR') ?? '').toLowerCase() == 'true';
-  if (kDebugMode && useEmulator) {
-    final host = dotenv.maybeGet('FIREBASE_EMULATOR_HOST') ?? 'localhost';
     try {
-      await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-      FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-      FirebaseStorage.instance.useStorageEmulator(host, 9199);
-      FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
-      debugPrint('[boot] Connected to Firebase emulators @ $host');
+      await dotenv.load(fileName: '.env');
+      debugPrint('[boot] dotenv loaded');
     } catch (e) {
-      debugPrint('[boot] Emulator connection failed: $e');
+      debugPrint('[boot] dotenv load failed (ignored): $e');
     }
-  }
 
-  // Sanity-check that auth stream produces a first event.
-  FirebaseAuth.instance.authStateChanges().first.timeout(
-    const Duration(seconds: 5),
-    onTimeout: () {
-      debugPrint('[boot] authStateChanges timed out (no user / stuck)');
-      return null;
-    },
-  ).then((u) => debugPrint('[boot] first auth event: ${u?.uid ?? 'null'}'));
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      debugPrint('[boot] Firebase initialized (fresh)');
+    } catch (e) {
+      debugPrint('[boot] Firebase init non-fatal: $e');
+    }
+    debugPrint('[boot] Firebase.apps=${Firebase.apps.length}');
 
-  final prefs = await SharedPreferences.getInstance();
-  debugPrint('[boot] runApp');
-  runApp(ProviderScope(
-    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-    child: const MyApp(),
-  ));
+    // Wire up app-wide error logging now that Firebase is up. This chains onto
+    // the FlutterError.onError handler installed above and adds a platform-error
+    // hook, forwarding errors to the `errorReports` collection (rate-limited).
+    ErrorReportService.instance.install();
+
+    // Connect to emulators only when explicitly enabled. On a real device,
+    // 'localhost' resolves to the phone itself, so leaving this on caused
+    // every callable/Firestore call to hang. Set USE_FIREBASE_EMULATOR=true
+    // in .env to re-enable, and set FIREBASE_EMULATOR_HOST to your PC's LAN
+    // IP (e.g. 192.168.1.42) when testing on a physical device.
+    final useEmulator =
+        (dotenv.maybeGet('USE_FIREBASE_EMULATOR') ?? '').toLowerCase() ==
+            'true';
+    if (kDebugMode && useEmulator) {
+      final host = dotenv.maybeGet('FIREBASE_EMULATOR_HOST') ?? 'localhost';
+      try {
+        await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+        FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+        FirebaseStorage.instance.useStorageEmulator(host, 9199);
+        FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+        debugPrint('[boot] Connected to Firebase emulators @ $host');
+      } catch (e) {
+        debugPrint('[boot] Emulator connection failed: $e');
+      }
+    }
+
+    // Sanity-check that auth stream produces a first event.
+    FirebaseAuth.instance.authStateChanges().first.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('[boot] authStateChanges timed out (no user / stuck)');
+        return null;
+      },
+    ).then((u) => debugPrint('[boot] first auth event: ${u?.uid ?? 'null'}'));
+
+    final prefs = await SharedPreferences.getInstance();
+    debugPrint('[boot] runApp');
+    runApp(ProviderScope(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      child: const MyApp(),
+    ));
+  });
 }
 
 Future<void> _configureSystemUi() async {

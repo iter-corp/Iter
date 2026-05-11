@@ -34,6 +34,37 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Crash / handled-error reports written by the in-app error handler.
+    // Anyone (incl. not-yet-signed-in users hitting a boot crash) may create
+    // a report, but the document is shape- and size-validated so the
+    // open-create rule can't be abused to dump arbitrary data into Firestore.
+    // Only admins may read them or mark them resolved / delete.
+    function isValidErrorReport() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+              'message', 'stack', 'kind', 'context', 'screen',
+              'uid', 'platform', 'appVersion', 'resolved', 'createdAt'
+            ]) &&
+            d.message is string && d.message.size() > 0 && d.message.size() <= 2000 &&
+            d.stack is string && d.stack.size() <= 8000 &&
+            d.kind is string && d.kind.size() <= 40 &&
+            (!('context' in d) || (d.context is string && d.context.size() <= 1000)) &&
+            (!('screen' in d) || (d.screen is string && d.screen.size() <= 200)) &&
+            (!('uid' in d) || d.uid == null || (d.uid is string && d.uid.size() <= 128)) &&
+            d.platform is string && d.platform.size() <= 40 &&
+            d.appVersion is string && d.appVersion.size() <= 40 &&
+            d.resolved == false &&
+            d.createdAt == request.time;
+    }
+    match /errorReports/{reportId} {
+      allow create: if isValidErrorReport();
+      // Admins may only flip `resolved` (and we keep createdAt immutable).
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved']) &&
+        request.resource.data.resolved is bool;
+      allow read, delete: if isAdmin();
+    }
+
     // Blacklisted emails. Admins manage the full list; signed-in users may
     // also read and write their own entry so the client can (a) check on
     // login whether their account has been deleted and (b) write a

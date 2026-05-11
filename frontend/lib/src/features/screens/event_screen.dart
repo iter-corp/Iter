@@ -16,6 +16,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/admin_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/maps_links.dart';
 import '../widgets/event_detail.dart';
 import 'chat_screen.dart';
 
@@ -59,6 +60,44 @@ String _eventCity(AdminEvent e) {
   final loc = e.location.trim();
   if (loc.isEmpty) return '';
   return loc.split(',').first.trim();
+}
+
+/// Heuristic relevance of [e] to the signed-in [userDoc] (null = no profile).
+/// Higher = more relevant. Used to surface "For you" events and order the grid.
+int _eventRelevanceScore(AdminEvent e, Map<String, dynamic>? userDoc) {
+  if (userDoc == null) return 0;
+  var score = 0;
+
+  final field = (userDoc['field'] as String? ?? '').trim().toLowerCase();
+  final goals = ((userDoc['goals'] as List?)?.cast<String>() ?? const [])
+      .map((g) => g.toLowerCase())
+      .toList();
+  final userCity = (userDoc['city'] as String? ?? '').trim().toLowerCase();
+  final userLoc = userDoc['location'];
+  final userLat = userLoc is Map ? (userLoc['lat'] as num?)?.toDouble() : null;
+  final userLng = userLoc is Map ? (userLoc['lng'] as num?)?.toDouble() : null;
+
+  final haystack =
+      '${e.title} ${e.subtitle} ${e.description} ${e.eventType}'.toLowerCase();
+
+  if (field.isNotEmpty && haystack.contains(field)) score += 3;
+  for (final g in goals) {
+    if (g.isNotEmpty && haystack.contains(g)) score += 2;
+  }
+  // Goal → event-type affinity (e.g. "Conferences" goal ↔ Conference type).
+  final type = e.eventType.trim().toLowerCase();
+  if (type.isNotEmpty) {
+    if (goals.any((g) => type.contains(g) || g.contains(type))) score += 2;
+  }
+  if (userCity.isNotEmpty && _eventCity(e).toLowerCase() == userCity) score += 2;
+  if (userLat != null && userLng != null && e.lat != null && e.lng != null) {
+    final km = _distanceKm(
+      {'lat': userLat, 'lng': userLng},
+      {'lat': e.lat, 'lng': e.lng},
+    );
+    if (km != null && km <= 100) score += 1;
+  }
+  return score;
 }
 
 final _partnersStreamProvider =
@@ -1052,6 +1091,7 @@ class _EventsView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(adminEventsProvider);
+    final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
     return eventsAsync.when(
       loading: () => const _LoadingGrid(),
       error: (e, _) => _EmptyState(
@@ -1075,6 +1115,14 @@ class _EventsView extends ConsumerWidget {
           }
           return true;
         }).toList();
+
+        // Personalized ordering: events that match the user's field / goals /
+        // city / location bubble to the top with a "For you" badge. Stable
+        // within each score bucket so newest-first is preserved otherwise.
+        final scored = {
+          for (final e in filtered) e.id: _eventRelevanceScore(e, userDoc),
+        };
+        filtered.sort((a, b) => (scored[b.id] ?? 0).compareTo(scored[a.id] ?? 0));
 
         return Column(
           children: [
@@ -1128,8 +1176,11 @@ class _EventsView extends ConsumerWidget {
                                     childAspectRatio: 0.78,
                                   ),
                                   delegate: SliverChildBuilderDelegate(
-                                    (context, i) =>
-                                        _EventCard(event: filtered[i]),
+                                    (context, i) => _EventCard(
+                                      event: filtered[i],
+                                      recommended:
+                                          (scored[filtered[i].id] ?? 0) > 0,
+                                    ),
                                     childCount: filtered.length,
                                   ),
                                 ),
@@ -1462,7 +1513,8 @@ class _BecomeAdminBanner extends ConsumerWidget {
 
 class _EventCard extends StatefulWidget {
   final AdminEvent event;
-  const _EventCard({required this.event});
+  final bool recommended;
+  const _EventCard({required this.event, this.recommended = false});
 
   @override
   State<_EventCard> createState() => _EventCardState();
@@ -1591,6 +1643,60 @@ class _EventCardState extends State<_EventCard> {
                     ),
                   ),
                 ),
+                if (widget.recommended)
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_kBrandPurple, _kBrandDeep],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome_rounded,
+                              size: 11, color: Colors.white),
+                          SizedBox(width: 3),
+                          Text(
+                            'For you',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (e.eventType.trim().isNotEmpty)
+                  Positioned(
+                    bottom: 78,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        e.eventType.trim(),
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   left: 12,
                   right: 12,
@@ -2023,9 +2129,15 @@ class _EventsMapViewState extends State<_EventsMapView> {
     if (_resolving) return;
     _resolving = true;
     for (final e in widget.events) {
+      if (_resolved.containsKey(e.id)) continue;
+      // Prefer the admin-set pin coordinates when present — no geocoding needed.
+      if (e.lat != null && e.lng != null) {
+        _resolved[e.id] = LatLng(e.lat!, e.lng!);
+        if (mounted) setState(() {});
+        continue;
+      }
       final loc = e.location.trim();
       if (loc.isEmpty) continue;
-      if (_resolved.containsKey(e.id)) continue;
       final cached = _eventGeocodeCache[loc];
       if (_eventGeocodeCache.containsKey(loc)) {
         if (cached != null) {
@@ -2077,7 +2189,7 @@ class _EventsMapViewState extends State<_EventsMapView> {
           height: 44,
           alignment: Alignment.topCenter,
           child: GestureDetector(
-            onTap: () => _showEventSheet(context, e),
+            onTap: () => _showEventSheet(context, e, p),
             child: const _EventMapPin(),
           ),
         ),
@@ -2140,11 +2252,11 @@ class _EventsMapViewState extends State<_EventsMapView> {
     );
   }
 
-  void _showEventSheet(BuildContext context, AdminEvent e) {
+  void _showEventSheet(BuildContext context, AdminEvent e, LatLng point) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _EventMapSheet(event: e),
+      builder: (_) => _EventMapSheet(event: e, point: point),
     );
   }
 }
@@ -2176,11 +2288,13 @@ class _EventMapPin extends StatelessWidget {
 
 class _EventMapSheet extends StatelessWidget {
   final AdminEvent event;
-  const _EventMapSheet({required this.event});
+  final LatLng point;
+  const _EventMapSheet({required this.event, required this.point});
 
   @override
   Widget build(BuildContext context) {
     final cover = event.imageUrls.isNotEmpty ? event.imageUrls.first : null;
+    final type = event.eventType.trim();
     return Container(
       decoration: BoxDecoration(
         color: context.cardBg,
@@ -2261,43 +2375,85 @@ class _EventMapSheet extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (type.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _kBrandPurple.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          type,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _kBrandDeep,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => EventDetailScreen(
-                      eventId: event.id,
-                      title: event.title,
-                      subtitle: event.subtitle,
-                      location: event.location,
-                      imageUrls: event.imageUrls,
-                      description: event.description,
-                      phone: event.phone,
-                      email: event.email,
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => openDirectionsTo(
+                    context,
+                    lat: point.latitude,
+                    lng: point.longitude,
+                  ),
+                  icon: const Icon(Icons.directions_rounded, size: 16),
+                  label: const Text('Directions'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kBrandPurple,
+                    side: const BorderSide(color: _kBrandPurple),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                );
-              },
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-              label: const Text('View event'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kBrandPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EventDetailScreen(
+                          eventId: event.id,
+                          title: event.title,
+                          subtitle: event.subtitle,
+                          location: event.location,
+                          imageUrls: event.imageUrls,
+                          description: event.description,
+                          phone: event.phone,
+                          email: event.email,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                  label: const Text('View event'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kBrandPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

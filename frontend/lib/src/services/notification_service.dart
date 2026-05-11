@@ -7,16 +7,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Notification types written by Cloud Functions or client-side logic.
 /// type values: 'follow', 'like', 'comment', 'comment_like', 'reply',
 /// 'qa_answer', 'qa_reply', 'qa_answer_like', 'qa_answer_dislike',
-/// 'story_like', 'story_comment', 'story_reply'
+/// 'story_like', 'story_comment', 'story_reply', 'new_event'
 class AppNotification {
   final String id;
   final String type;
   final String actorUid;
-  final String? targetId; // postId for like / comment notifications
+  final String? targetId; // postId for like / comment, eventId for new_event
   final String? commentId; // for comment_like: the specific comment id
   final bool read;
   final String? status; // 'accepted', 'rejected', etc.
   final DateTime? createdAt;
+
+  /// Free-text title carried on the notification doc itself. Used by
+  /// system-generated notifications that have no actor user (e.g. `new_event`
+  /// stores the event title here).
+  final String? title;
+
+  /// Optional subtitle (e.g. the event's location for `new_event`).
+  final String? subtitle;
 
   const AppNotification({
     required this.id,
@@ -27,6 +35,8 @@ class AppNotification {
     required this.read,
     this.status,
     this.createdAt,
+    this.title,
+    this.subtitle,
   });
 
   factory AppNotification.fromDoc(
@@ -42,6 +52,8 @@ class AppNotification {
       read: (d['read'] as bool?) ?? false,
       status: d['status'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      title: d['title'] as String?,
+      subtitle: d['subtitle'] as String?,
     );
   }
 }

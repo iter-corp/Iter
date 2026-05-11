@@ -8,6 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart' as geo;
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -30,7 +32,10 @@ import '../../services/chat_service.dart';
 import '../../services/reaction_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/translate_service.dart';
+import '../../utils/app_feedback.dart';
+import '../../utils/maps_links.dart';
 import '../model/post_model.dart';
+import '../widgets/location_map.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
@@ -64,6 +69,10 @@ ui.TextDirection _detectTextDirection(String text) {
 /// Choices surfaced by [_MessageBubbleState._showAttachMenu]. Kept at
 /// top-level so it can be returned from the modal sheet.
 enum _AttachKind { image, video, file }
+
+/// What `_showAttachMenu` resolved to. Location is split out from
+/// [_AttachKind] because it has no file-upload / pending-bubble path.
+enum _AttachChoice { image, video, file, location }
 
 enum _PendingStatus { uploading, sending, failed }
 
@@ -407,7 +416,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// and arbitrary files.
   Future<void> _showAttachMenu() async {
     if (!_checkCanSendMedia()) return;
-    final choice = await showModalBottomSheet<_AttachKind>(
+    final choice = await showModalBottomSheet<_AttachChoice>(
       context: context,
       backgroundColor: context.cardBg,
       shape: const RoundedRectangleBorder(
@@ -431,13 +440,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               leading:
                   const Icon(Icons.image_outlined, color: Color(0xFFB05ECC)),
               title: const Text('Photo'),
-              onTap: () => Navigator.pop(sheet, _AttachKind.image),
+              onTap: () => Navigator.pop(sheet, _AttachChoice.image),
             ),
             ListTile(
               leading:
                   const Icon(Icons.videocam_outlined, color: Color(0xFFB05ECC)),
               title: const Text('Video'),
-              onTap: () => Navigator.pop(sheet, _AttachKind.video),
+              onTap: () => Navigator.pop(sheet, _AttachChoice.video),
             ),
             ListTile(
               leading: const Icon(Icons.insert_drive_file_outlined,
@@ -447,7 +456,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 'PDF, document, archive, …',
                 style: TextStyle(fontSize: 12),
               ),
-              onTap: () => Navigator.pop(sheet, _AttachKind.file),
+              onTap: () => Navigator.pop(sheet, _AttachChoice.file),
+            ),
+            ListTile(
+              leading: const Icon(Icons.location_on_outlined,
+                  color: Color(0xFFB05ECC)),
+              title: const Text('Location'),
+              subtitle: const Text(
+                'Share your current location',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () => Navigator.pop(sheet, _AttachChoice.location),
             ),
             const SizedBox(height: 8),
           ],
@@ -456,17 +475,82 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
 
     switch (choice) {
-      case _AttachKind.image:
+      case _AttachChoice.image:
         await _pickAndSendImage();
         break;
-      case _AttachKind.video:
+      case _AttachChoice.video:
         await _pickAndSendVideo();
         break;
-      case _AttachKind.file:
+      case _AttachChoice.file:
         await _pickAndSendFile();
+        break;
+      case _AttachChoice.location:
+        await _shareCurrentLocation();
         break;
       case null:
         return;
+    }
+  }
+
+  Future<void> _shareCurrentLocation() async {
+    final uid = _currentUid;
+    if (uid == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        AppFeedback.showErrorOn(
+          messenger,
+          'Location services are off. Enable them in device settings.',
+        );
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        AppFeedback.showErrorOn(messenger, 'Location permission denied.');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+
+      // Best-effort reverse geocode for a human-readable label.
+      String? label;
+      try {
+        final marks =
+            await geo.placemarkFromCoordinates(pos.latitude, pos.longitude);
+        if (marks.isNotEmpty) {
+          final p = marks.first;
+          final parts = <String>[
+            (p.name ?? '').trim(),
+            (p.locality ?? p.subAdministrativeArea ?? '').trim(),
+          ].where((s) => s.isNotEmpty).toList();
+          if (parts.isNotEmpty) label = parts.join(', ');
+        }
+      } catch (_) {}
+
+      final reply = _replyTarget;
+      setState(() => _replyTarget = null);
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: widget.chatId,
+            senderUid: uid,
+            receiverUid: widget.otherUid,
+            text: '',
+            locationLat: pos.latitude,
+            locationLng: pos.longitude,
+            locationLabel: label,
+            replyToId: reply?.id,
+            replyToText: reply == null ? null : _previewOf(reply),
+            replyToSenderUid: reply?.senderUid,
+          );
+      AppFeedback.showSuccessOn(messenger, 'Location shared');
+    } catch (e) {
+      AppFeedback.showErrorOn(messenger, 'Could not share location: $e');
     }
   }
 
@@ -2630,7 +2714,22 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     postId: msg.sharedPostId!,
                                     isMe: isMe,
                                   )
-                                else if (msg.imageUrl != null &&
+                                else if (msg.hasLocation) ...[
+                                  _LocationMessageBubble(
+                                    lat: msg.locationLat!,
+                                    lng: msg.locationLng!,
+                                    label: msg.locationLabel,
+                                    isMe: isMe,
+                                  ),
+                                  if (msg.text.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    _buildBody(
+                                      textColor: isMe
+                                          ? Colors.white
+                                          : context.textPrimary,
+                                    ),
+                                  ],
+                                ] else if (msg.imageUrl != null &&
                                     msg.imageUrl!.isNotEmpty) ...[
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
@@ -3740,6 +3839,78 @@ class _StoryReplyBanner extends StatelessWidget {
 // ─────────────────────────────────────────────
 // Video message bubble — inline thumbnail + tap-to-play sheet.
 // ─────────────────────────────────────────────
+
+/// Bubble for a shared location: a mini OSM map preview + "Directions" button
+/// that opens the device maps app routing from the user's current position.
+class _LocationMessageBubble extends StatelessWidget {
+  final double lat;
+  final double lng;
+  final String? label;
+  final bool isMe;
+
+  const _LocationMessageBubble({
+    required this.lat,
+    required this.lng,
+    required this.label,
+    required this.isMe,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isMe ? Colors.white : context.textPrimary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 230,
+          height: 130,
+          child: MapPreview(
+            lat: lat,
+            lng: lng,
+            height: 130,
+            label: (label ?? '').trim().isEmpty ? 'Shared location' : label,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(Icons.location_on_rounded, size: 14, color: fg),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                (label ?? '').trim().isEmpty ? 'Shared location' : label!.trim(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 230,
+          child: OutlinedButton.icon(
+            onPressed: () => openDirectionsTo(context, lat: lat, lng: lng),
+            icon: Icon(Icons.directions_rounded, size: 16, color: fg),
+            label: Text('Directions', style: TextStyle(color: fg)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: fg.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              minimumSize: const Size(0, 34),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _VideoMessageBubble extends StatefulWidget {
   final String url;

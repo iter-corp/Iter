@@ -1,5 +1,72 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// How a user wants to be notified about new events.
+enum EventNotifMode {
+  /// Every new event, anywhere.
+  all,
+
+  /// Only events whose city is in [EventNotifPrefs.cities].
+  cities,
+
+  /// No new-event notifications at all.
+  off,
+}
+
+class EventNotifPrefs {
+  final EventNotifMode mode;
+
+  /// Lower-cased city names the user wants alerts for (only used when
+  /// [mode] is [EventNotifMode.cities]).
+  final List<String> cities;
+
+  /// Event types (from `kEventTypes`) to limit alerts to. Empty = all types.
+  final List<String> types;
+
+  const EventNotifPrefs({
+    this.mode = EventNotifMode.all,
+    this.cities = const [],
+    this.types = const [],
+  });
+
+  factory EventNotifPrefs.fromMap(Map<String, dynamic>? d) {
+    final m = d ?? const {};
+    final modeStr = (m['mode'] as String?) ?? 'all';
+    return EventNotifPrefs(
+      mode: switch (modeStr) {
+        'cities' => EventNotifMode.cities,
+        'off' => EventNotifMode.off,
+        _ => EventNotifMode.all,
+      },
+      cities: ((m['cities'] as List?)?.cast<String>() ?? const [])
+          .map((c) => c.trim().toLowerCase())
+          .where((c) => c.isNotEmpty)
+          .toList(),
+      types: (m['types'] as List?)?.cast<String>() ?? const [],
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'mode': switch (mode) {
+          EventNotifMode.cities => 'cities',
+          EventNotifMode.off => 'off',
+          EventNotifMode.all => 'all',
+        },
+        'cities': cities,
+        'types': types,
+      };
+
+  EventNotifPrefs copyWith({
+    EventNotifMode? mode,
+    List<String>? cities,
+    List<String>? types,
+  }) =>
+      EventNotifPrefs(
+        mode: mode ?? this.mode,
+        cities: cities ?? this.cities,
+        types: types ?? this.types,
+      );
+}
+
 class UserService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -16,6 +83,14 @@ class UserService {
 
   Future<void> updateUser(String uid, Map<String, dynamic> data) =>
       _doc(uid).set(data, SetOptions(merge: true));
+
+  Stream<EventNotifPrefs> streamEventNotifPrefs(String uid) => _doc(uid)
+      .snapshots()
+      .map((s) => EventNotifPrefs.fromMap(
+          s.data()?['eventNotifPrefs'] as Map<String, dynamic>?));
+
+  Future<void> setEventNotifPrefs(String uid, EventNotifPrefs prefs) => _doc(uid)
+      .set({'eventNotifPrefs': prefs.toMap()}, SetOptions(merge: true));
 
   String normalizeUsername(String username) => username.trim().toLowerCase();
 

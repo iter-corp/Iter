@@ -11,6 +11,13 @@ class AdminConfig {
   final String minAppVersion;
   final String contactEmail;
 
+  /// Public store links used by the in-app "Invite friends" share sheet.
+  /// The app picks the right one for the running platform (iOS → App Store,
+  /// Android → Google Play). Empty values fall back to the other store link
+  /// or a generic message.
+  final String iosAppStoreUrl;
+  final String androidPlayStoreUrl;
+
   const AdminConfig({
     this.storiesEnabled = true,
     this.liveEnabled = true,
@@ -20,6 +27,8 @@ class AdminConfig {
     this.maintenanceMode = false,
     this.minAppVersion = '1.0.0',
     this.contactEmail = '',
+    this.iosAppStoreUrl = '',
+    this.androidPlayStoreUrl = '',
   });
 
   factory AdminConfig.fromMap(Map<String, dynamic>? d) {
@@ -33,6 +42,8 @@ class AdminConfig {
       maintenanceMode: (m['maintenanceMode'] as bool?) ?? false,
       minAppVersion: (m['minAppVersion'] as String?) ?? '1.0.0',
       contactEmail: (m['contactEmail'] as String?) ?? '',
+      iosAppStoreUrl: (m['iosAppStoreUrl'] as String?) ?? '',
+      androidPlayStoreUrl: (m['androidPlayStoreUrl'] as String?) ?? '',
     );
   }
 
@@ -45,6 +56,8 @@ class AdminConfig {
         'maintenanceMode': maintenanceMode,
         'minAppVersion': minAppVersion,
         'contactEmail': contactEmail,
+        'iosAppStoreUrl': iosAppStoreUrl,
+        'androidPlayStoreUrl': androidPlayStoreUrl,
       };
 
   AdminConfig copyWith({
@@ -56,6 +69,8 @@ class AdminConfig {
     bool? maintenanceMode,
     String? minAppVersion,
     String? contactEmail,
+    String? iosAppStoreUrl,
+    String? androidPlayStoreUrl,
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
@@ -66,9 +81,24 @@ class AdminConfig {
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
       minAppVersion: minAppVersion ?? this.minAppVersion,
       contactEmail: contactEmail ?? this.contactEmail,
+      iosAppStoreUrl: iosAppStoreUrl ?? this.iosAppStoreUrl,
+      androidPlayStoreUrl: androidPlayStoreUrl ?? this.androidPlayStoreUrl,
     );
   }
 }
+
+/// Canonical event-type options. Admins pick one when creating an event;
+/// users can filter event notifications by these.
+const List<String> kEventTypes = [
+  'Conference',
+  'Workshop',
+  'Networking',
+  'Cultural',
+  'Academic',
+  'Career fair',
+  'Webinar',
+  'Other',
+];
 
 class AdminEvent {
   final String id;
@@ -81,6 +111,13 @@ class AdminEvent {
   final List<String> imageUrls;
   final DateTime? createdAt;
 
+  /// One of [kEventTypes]; empty when the admin didn't set one (legacy events).
+  final String eventType;
+
+  /// Optional pin coordinates for the events map. Null when unknown.
+  final double? lat;
+  final double? lng;
+
   const AdminEvent({
     required this.id,
     required this.title,
@@ -91,10 +128,15 @@ class AdminEvent {
     required this.email,
     required this.imageUrls,
     required this.createdAt,
+    this.eventType = '',
+    this.lat,
+    this.lng,
   });
 
   factory AdminEvent.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
+    final loc = d['geo'];
+    final geoMap = loc is Map ? loc : null;
     return AdminEvent(
       id: doc.id,
       title: (d['title'] as String?) ?? '',
@@ -105,6 +147,9 @@ class AdminEvent {
       email: (d['email'] as String?) ?? '',
       imageUrls: (d['imageUrls'] as List?)?.cast<String>() ?? const [],
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      eventType: (d['eventType'] as String?) ?? '',
+      lat: (geoMap?['lat'] as num?)?.toDouble(),
+      lng: (geoMap?['lng'] as num?)?.toDouble(),
     );
   }
 }
@@ -341,6 +386,9 @@ class AdminService {
     required String phone,
     required String email,
     required List<String> imageUrls,
+    String eventType = '',
+    double? lat,
+    double? lng,
   }) async {
     final ref = await _db.collection('events').add({
       'title': title,
@@ -350,6 +398,11 @@ class AdminService {
       'phone': phone,
       'email': email,
       'imageUrls': imageUrls,
+      'eventType': eventType,
+      if (lat != null && lng != null) 'geo': {'lat': lat, 'lng': lng},
+      // Lower-cased first segment of the location, used by the event-notification
+      // fan-out to match against users' selected cities.
+      'locationCity': location.split(',').first.trim().toLowerCase(),
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -369,13 +422,19 @@ class AdminService {
   }
 
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {
-    await _db.collection('events').doc(id).update(data);
+    final payload = Map<String, dynamic>.from(data);
+    // Keep the city search key in sync whenever the location changes.
+    if (payload['location'] is String) {
+      payload['locationCity'] =
+          (payload['location'] as String).split(',').first.trim().toLowerCase();
+    }
+    await _db.collection('events').doc(id).update(payload);
     // Keep the chat doc's title mirrored when the admin renames the event.
-    if (data.containsKey('title')) {
+    if (payload.containsKey('title')) {
       await _db
           .collection('eventChats')
           .doc(id)
-          .set({'eventTitle': data['title']}, SetOptions(merge: true));
+          .set({'eventTitle': payload['title']}, SetOptions(merge: true));
     }
   }
 

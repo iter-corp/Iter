@@ -8,8 +8,11 @@ import '../../providers/auth_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../providers/profile_visitor_providers.dart';
 import '../../providers/theme_provider.dart';
+import '../../services/admin_service.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/share_app.dart';
+import 'event_notifications_settings_screen.dart';
 import 'profile_visitors_screen.dart';
 
 /// Full-screen profile settings page. Replaces the older bottom-sheet
@@ -122,6 +125,22 @@ class ProfileSettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const _SectionHeader(title: 'Notifications'),
+          ListTile(
+            leading: const Icon(Icons.event_available_outlined,
+                color: AppColors.purple),
+            title: const Text('Event notifications'),
+            subtitle: Text(
+              'Get notified about new events — all, by city, or off',
+              style: TextStyle(fontSize: 12, color: context.textSecondary),
+            ),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const EventNotificationsSettingsScreen(),
+              ),
+            ),
+          ),
           const _SectionHeader(title: 'Language'),
           ListTile(
             leading: const Icon(Icons.translate, color: AppColors.purple),
@@ -152,6 +171,21 @@ class ProfileSettingsScreen extends ConsumerWidget {
               onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
             ),
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
+          ),
+          const _SectionHeader(title: 'Invite'),
+          ListTile(
+            leading: const Icon(Icons.ios_share, color: AppColors.purple),
+            title: const Text('Invite friends'),
+            subtitle: Text(
+              'Share the COIL app link with your friends',
+              style: TextStyle(fontSize: 12, color: context.textSecondary),
+            ),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            onTap: () {
+              final cfg = ref.read(adminConfigProvider).valueOrNull ??
+                  const AdminConfig();
+              shareInviteLink(context, cfg);
+            },
           ),
           const _SectionHeader(title: 'Safety'),
           ListTile(

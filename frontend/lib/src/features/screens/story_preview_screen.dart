@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../services/storage_service.dart';
 import '../../services/story_service.dart';
+import '../../utils/app_feedback.dart';
 
 class StoryPreviewScreen extends StatefulWidget {
   final File file;
@@ -19,21 +20,20 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
   Future<void> _publish() async {
     if (_uploading) return;
+    // Capture the messenger up-front so the success toast survives popping
+    // back to the root route.
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _uploading = true);
     try {
       final url = await StorageService().uploadStoryImage(widget.file);
       await StoryService().createStory(imageUrl: url);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Story added')),
-      );
       Navigator.of(context).popUntil((route) => route.isFirst);
+      AppFeedback.showSuccessOn(messenger, 'Story published — content uploaded');
     } catch (e) {
       if (!mounted) return;
       setState(() => _uploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to publish: $e')),
-      );
+      AppFeedback.showErrorOn(messenger, 'Failed to publish story: $e');
     }
   }
 

@@ -17,6 +17,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   final _announcementCtrl = TextEditingController();
   final _minVersionCtrl = TextEditingController();
   final _contactEmailCtrl = TextEditingController();
+  final _iosUrlCtrl = TextEditingController();
+  final _androidUrlCtrl = TextEditingController();
   bool _hydrated = false;
   bool _saving = false;
   AdminConfig _cfg = const AdminConfig();
@@ -27,6 +29,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     _announcementCtrl.text = cfg.announcement;
     _minVersionCtrl.text = cfg.minAppVersion;
     _contactEmailCtrl.text = cfg.contactEmail;
+    _iosUrlCtrl.text = cfg.iosAppStoreUrl;
+    _androidUrlCtrl.text = cfg.androidPlayStoreUrl;
     _hydrated = true;
   }
 
@@ -35,6 +39,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     _announcementCtrl.dispose();
     _minVersionCtrl.dispose();
     _contactEmailCtrl.dispose();
+    _iosUrlCtrl.dispose();
+    _androidUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -45,6 +51,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         announcement: _announcementCtrl.text.trim(),
         minAppVersion: _minVersionCtrl.text.trim(),
         contactEmail: _contactEmailCtrl.text.trim(),
+        iosAppStoreUrl: _iosUrlCtrl.text.trim(),
+        androidPlayStoreUrl: _androidUrlCtrl.text.trim(),
       );
       await ref.read(adminServiceProvider).saveConfig(next);
       if (mounted) {
@@ -177,6 +185,50 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   decoration: const InputDecoration(
                     hintText:
                         'Email shown on "Become an event admin" mailto link',
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _section('App store links (Invite friends)'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Used by the "Invite friends" button in the profile. The app picks '
+                  'the right link for the user\'s platform.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: context.cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TextField(
+                  controller: _iosUrlCtrl,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    hintText: 'iOS App Store URL (https://apps.apple.com/...)',
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: context.cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TextField(
+                  controller: _androidUrlCtrl,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Google Play URL (https://play.google.com/store/apps/details?id=...)',
                     border: InputBorder.none,
                   ),
                 ),

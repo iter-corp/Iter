@@ -10,6 +10,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_feedback.dart';
 import '../widgets/location_map.dart';
 import 'camera_story_screen.dart';
 import 'live_screen.dart';
@@ -167,6 +168,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       );
       return;
     }
+    // Capture the messenger up-front so the success toast survives popping
+    // this route after the post is created.
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _posting = true);
     try {
       // If place name is entered but coordinates aren't set, geocode the place
@@ -204,11 +208,18 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 finalLat != null &&
                 finalLng != null,
           );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+        AppFeedback.showSuccessOn(
+          messenger,
+          urls.isNotEmpty
+              ? 'Post published — content uploaded'
+              : 'Post published',
+        );
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        AppFeedback.showError(context, 'Could not publish post: $e');
       }
     } finally {
       if (mounted) setState(() => _posting = false);

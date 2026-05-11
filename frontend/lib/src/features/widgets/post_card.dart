@@ -13,6 +13,7 @@ import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_feedback.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
@@ -69,6 +70,36 @@ class _PostCardState extends ConsumerState<PostCard> {
       await ref.read(postServiceProvider).toggleLike(widget.post.id);
     } finally {
       if (mounted) setState(() => _pendingLike = null);
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    final wasSaved =
+        ref.read(isSavedProvider(widget.post.id)).value ?? false;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(postServiceProvider).toggleSave(widget.post.id);
+      AppFeedback.showSuccessOn(
+        messenger,
+        wasSaved ? 'Removed from saved' : 'Saved to your profile',
+      );
+    } catch (e) {
+      AppFeedback.showErrorOn(messenger, 'Could not save post: $e');
+    }
+  }
+
+  Future<void> _toggleRepost() async {
+    final wasReposted =
+        ref.read(isRepostedProvider(widget.post.id)).value ?? false;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(postServiceProvider).toggleRepost(widget.post.id);
+      AppFeedback.showSuccessOn(
+        messenger,
+        wasReposted ? 'Repost removed' : 'Reposted to your profile',
+      );
+    } catch (e) {
+      AppFeedback.showErrorOn(messenger, 'Could not repost: $e');
     }
   }
 
@@ -354,14 +385,14 @@ class _PostCardState extends ConsumerState<PostCard> {
                                           const SizedBox(width: 14),
                                           GestureDetector(
                                             behavior: HitTestBehavior.opaque,
-                                            onTap: () => ref
-                                                .read(postServiceProvider)
-                                                .toggleRepost(post.id),
-                                            child: Icon(
-                                              Icons.repeat,
-                                              color: isReposted
-                                                  ? const Color(0xFFB05ECC)
-                                                  : Colors.white,
+                                            onTap: _toggleRepost,
+                                            child: PoppingActionIcon(
+                                              active: isReposted,
+                                              activeIcon: Icons.repeat,
+                                              inactiveIcon: Icons.repeat,
+                                              activeColor:
+                                                  const Color(0xFFB05ECC),
+                                              inactiveColor: Colors.white,
                                               size: 20,
                                             ),
                                           ),
@@ -377,16 +408,14 @@ class _PostCardState extends ConsumerState<PostCard> {
                                         const Spacer(),
                                         GestureDetector(
                                           behavior: HitTestBehavior.opaque,
-                                          onTap: () => ref
-                                              .read(postServiceProvider)
-                                              .toggleSave(post.id),
-                                          child: Icon(
-                                            isSaved
-                                                ? Icons.bookmark
-                                                : Icons.bookmark_border,
-                                            color: isSaved
-                                                ? const Color(0xFFB05ECC)
-                                                : Colors.white,
+                                          onTap: _toggleSave,
+                                          child: PoppingActionIcon(
+                                            active: isSaved,
+                                            activeIcon: Icons.bookmark,
+                                            inactiveIcon: Icons.bookmark_border,
+                                            activeColor:
+                                                const Color(0xFFB05ECC),
+                                            inactiveColor: Colors.white,
                                             size: 20,
                                           ),
                                         ),
@@ -429,8 +458,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                                         onTap: () {
                                           final lat = post.postLat;
                                           final lng = post.postLng;
-                                          if (lat == null || lng == null)
+                                          if (lat == null || lng == null) {
                                             return;
+                                          }
                                           Navigator.of(context).push(
                                             MaterialPageRoute(
                                               builder: (_) => LocationMapScreen(

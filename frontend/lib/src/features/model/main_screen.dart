@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/chat_service.dart';
+import '../../services/error_report_service.dart';
 import '../screens/home_screen.dart';
 import '../screens/event_screen.dart'; // ✅ Added
 import '../screens/message_screen.dart';
@@ -32,10 +33,27 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     "assets/icons/Profile.svg",
   ];
 
+  // Human-readable names for error-report "screen" tracking, parallel to the
+  // PageView children below.
+  static const List<String> _tabScreenNames = [
+    'Home',
+    'Events',
+    'Translate',
+    'Messages',
+    'Profile',
+  ];
+
+  void _trackTab(int index) {
+    if (index >= 0 && index < _tabScreenNames.length) {
+      ErrorReportService.instance.setCurrentScreen(_tabScreenNames[index]);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _selectedIndex);
+    _trackTab(_selectedIndex);
   }
 
   @override
@@ -61,6 +79,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     if (index == _selectedIndex) return;
 
     setState(() => _selectedIndex = index);
+    _trackTab(index);
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
     }
@@ -99,6 +118,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             onPageChanged: (index) {
               if (_selectedIndex != index) {
                 setState(() => _selectedIndex = index);
+                _trackTab(index);
               }
             },
             children: [

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../providers/admin_providers.dart';
@@ -206,6 +207,10 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   final List<String> _imageUrls = [];
   bool _saving = false;
   bool _uploadingImage = false;
+  String _eventType = '';
+  double? _lat;
+  double? _lng;
+  bool _geocoding = false;
 
   @override
   void initState() {
@@ -219,6 +224,47 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       _phoneCtrl.text = e.phone;
       _emailCtrl.text = e.email;
       _imageUrls.addAll(e.imageUrls);
+      _eventType = e.eventType;
+      _lat = e.lat;
+      _lng = e.lng;
+    }
+  }
+
+  Future<void> _locateOnMap() async {
+    final query = _locationCtrl.text.trim();
+    if (query.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a location first')),
+      );
+      return;
+    }
+    setState(() => _geocoding = true);
+    try {
+      final results = await geo.locationFromAddress(query);
+      if (results.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No coordinates found for "$query"')),
+          );
+        }
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _lat = results.first.latitude;
+          _lng = results.first.longitude;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location pinned for the events map')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Lookup failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _geocoding = false);
     }
   }
 
@@ -265,7 +311,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     setState(() => _saving = true);
     try {
       final admin = ref.read(adminServiceProvider);
-      final data = {
+      final data = <String, dynamic>{
         'title': _titleCtrl.text.trim(),
         'subtitle': _subtitleCtrl.text.trim(),
         'location': _locationCtrl.text.trim(),
@@ -273,6 +319,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         'phone': _phoneCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
         'imageUrls': _imageUrls,
+        'eventType': _eventType,
+        if (_lat != null && _lng != null) 'geo': {'lat': _lat, 'lng': _lng},
       };
       if (widget.existing == null) {
         await admin.createEvent(
@@ -283,6 +331,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           phone: data['phone']! as String,
           email: data['email']! as String,
           imageUrls: _imageUrls,
+          eventType: _eventType,
+          lat: _lat,
+          lng: _lng,
         );
       } else {
         await admin.updateEvent(widget.existing!.id, data);
@@ -327,6 +378,58 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           _field('Title', _titleCtrl),
           _field('Subtitle', _subtitleCtrl),
           _field('Location', _locationCtrl),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: _geocoding ? null : _locateOnMap,
+                  icon: _geocoding
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.map_outlined, size: 18),
+                  label: Text(
+                    (_lat != null && _lng != null)
+                        ? 'Map pin set — re-locate'
+                        : 'Locate on map (for the events map)',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              if (_lat != null && _lng != null)
+                IconButton(
+                  tooltip: 'Clear pin',
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => setState(() {
+                    _lat = null;
+                    _lng = null;
+                  }),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Container(
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            margin: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _eventType.isEmpty ? null : _eventType,
+                hint: const Text('Event type'),
+                items: kEventTypes
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .toList(),
+                onChanged: (v) => setState(() => _eventType = v ?? ''),
+              ),
+            ),
+          ),
           _field('Description', _descCtrl, maxLines: 4),
           _field('Phone', _phoneCtrl),
           _field('Email', _emailCtrl),

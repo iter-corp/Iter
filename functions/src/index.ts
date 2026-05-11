@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 
 import * as adminUsers from './adminUsers';
 import * as comments from './comments';
+import * as events from './events';
 import * as follows from './follows';
 import * as likes from './likes';
 import * as live from './live';
@@ -15,6 +16,7 @@ admin.initializeApp();
 export {
   adminUsers,
   comments,
+  events,
   follows,
   likes,
   live,
