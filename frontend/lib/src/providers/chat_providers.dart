@@ -33,7 +33,9 @@ final acceptedInboxProvider = StreamProvider<List<ChatConversation>>((ref) {
 /// Messages for a specific chat, oldest first.
 final messagesProvider =
     StreamProvider.autoDispose.family<List<ChatMessage>, String>((ref, chatId) {
-  return ref.watch(chatServiceProvider).streamMessages(chatId);
+  final uid = ref.watch(authStateProvider).value?.uid;
+  if (uid == null) return const Stream.empty();
+  return ref.watch(chatServiceProvider).streamMessages(chatId, uid: uid);
 });
 
 /// Raw chat doc stream — used by the chat screen to detect group vs

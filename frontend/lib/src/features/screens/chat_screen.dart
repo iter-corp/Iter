@@ -1767,10 +1767,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              setState(() => _showStickerPicker = !_showStickerPicker);
+                              setState(() =>
+                                  _showStickerPicker = !_showStickerPicker);
                             },
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 200),
                                 child: Icon(
@@ -2255,6 +2257,8 @@ class _MessageBubble extends ConsumerStatefulWidget {
   ConsumerState<_MessageBubble> createState() => _MessageBubbleState();
 }
 
+enum _DeleteMessageScope { mine, everyone }
+
 class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   // Translated body for this message, computed lazily once auto-translate
   // is on. Null until the request completes (or fails).
@@ -2418,7 +2422,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   /// (like Telegram) — stickers float as large emoji or images.
   Widget _buildStickerBubble(BuildContext context, bool hasReply) {
     final stickerUrl = msg.stickerUrl!;
-    final isEmoji = !stickerUrl.startsWith('http') && !stickerUrl.startsWith('asset:');
+    final isEmoji =
+        !stickerUrl.startsWith('http') && !stickerUrl.startsWith('asset:');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2535,124 +2540,130 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                   secondaryBackground: _replySwipeBg(context, alignLeft: false),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 260),
-                      child: hasSticker
-                          ? _buildStickerBubble(context, hasReply)
-                          : AnimatedContainer(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOut,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: widget.flashing
-                            ? const Color(0xFFB05ECC).withValues(alpha: 0.85)
-                            : (isMe
-                                ? const Color(0xFFB05ECC)
-                                : context.inputFill),
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(16),
-                          topRight: const Radius.circular(16),
-                          bottomLeft: Radius.circular(isMe ? 16 : 4),
-                          bottomRight: Radius.circular(isMe ? 4 : 16),
-                        ),
-                        boxShadow: widget.flashing
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFFB05ECC)
-                                      .withValues(alpha: 0.5),
-                                  blurRadius: 14,
-                                  spreadRadius: 1,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (hasReply)
-                            _RepliedQuote(
-                              isMe: isMe,
-                              senderUid: msg.replyToSenderUid ?? '',
-                              text: msg.replyToText ?? '',
-                              onTap: widget.onReplyQuoteTap == null
-                                  ? null
-                                  : () =>
-                                      widget.onReplyQuoteTap!(msg.replyToId!),
-                            ),
-                          if (msg.storyId != null && msg.storyId!.isNotEmpty)
-                            _StoryReplyBanner(
-                              isMe: isMe,
-                              storyImageUrl: msg.storyImageUrl,
-                            ),
-                          if (hasVoice)
-                            _VoiceMessageBubble(
-                              url: msg.voiceUrl!,
-                              durationMs: msg.voiceDurationMs,
-                              isMe: isMe,
-                            )
-                          else if (msg.videoUrl != null &&
-                              msg.videoUrl!.isNotEmpty) ...[
-                            _VideoMessageBubble(url: msg.videoUrl!),
-                            if (msg.text.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              _buildBody(
-                                textColor:
-                                    isMe ? Colors.white : context.textPrimary,
+                    child: hasSticker
+                        ? _buildStickerBubble(context, hasReply)
+                        : AnimatedContainer(
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeOut,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: widget.flashing
+                                  ? const Color(0xFFB05ECC)
+                                      .withValues(alpha: 0.85)
+                                  : (isMe
+                                      ? const Color(0xFFB05ECC)
+                                      : context.inputFill),
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(16),
+                                topRight: const Radius.circular(16),
+                                bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                bottomRight: Radius.circular(isMe ? 4 : 16),
                               ),
-                            ],
-                          ] else if (msg.fileUrl != null &&
-                              msg.fileUrl!.isNotEmpty) ...[
-                            _FileMessageBubble(
-                              url: msg.fileUrl!,
-                              fileName: msg.fileName ?? 'Attachment',
-                              mimeType: msg.fileMimeType,
-                              sizeBytes: msg.fileSizeBytes,
-                              isMe: isMe,
+                              boxShadow: widget.flashing
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFFB05ECC)
+                                            .withValues(alpha: 0.5),
+                                        blurRadius: 14,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                            if (msg.text.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              _buildBody(
-                                textColor:
-                                    isMe ? Colors.white : context.textPrimary,
-                              ),
-                            ],
-                          ] else if (msg.sharedPostId != null &&
-                              msg.sharedPostId!.isNotEmpty)
-                            _SharedPostPreview(
-                              postId: msg.sharedPostId!,
-                              isMe: isMe,
-                            )
-                          else if (msg.imageUrl != null &&
-                              msg.imageUrl!.isNotEmpty) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: CachedNetworkImage(
-                                imageUrl: msg.imageUrl!,
-                                width: 240,
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => const SizedBox(
-                                  height: 180,
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (hasReply)
+                                  _RepliedQuote(
+                                    isMe: isMe,
+                                    senderUid: msg.replyToSenderUid ?? '',
+                                    text: msg.replyToText ?? '',
+                                    onTap: widget.onReplyQuoteTap == null
+                                        ? null
+                                        : () => widget
+                                            .onReplyQuoteTap!(msg.replyToId!),
                                   ),
-                                ),
-                              ),
+                                if (msg.storyId != null &&
+                                    msg.storyId!.isNotEmpty)
+                                  _StoryReplyBanner(
+                                    isMe: isMe,
+                                    storyImageUrl: msg.storyImageUrl,
+                                  ),
+                                if (hasVoice)
+                                  _VoiceMessageBubble(
+                                    url: msg.voiceUrl!,
+                                    durationMs: msg.voiceDurationMs,
+                                    isMe: isMe,
+                                  )
+                                else if (msg.videoUrl != null &&
+                                    msg.videoUrl!.isNotEmpty) ...[
+                                  _VideoMessageBubble(url: msg.videoUrl!),
+                                  if (msg.text.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    _buildBody(
+                                      textColor: isMe
+                                          ? Colors.white
+                                          : context.textPrimary,
+                                    ),
+                                  ],
+                                ] else if (msg.fileUrl != null &&
+                                    msg.fileUrl!.isNotEmpty) ...[
+                                  _FileMessageBubble(
+                                    url: msg.fileUrl!,
+                                    fileName: msg.fileName ?? 'Attachment',
+                                    mimeType: msg.fileMimeType,
+                                    sizeBytes: msg.fileSizeBytes,
+                                    isMe: isMe,
+                                  ),
+                                  if (msg.text.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    _buildBody(
+                                      textColor: isMe
+                                          ? Colors.white
+                                          : context.textPrimary,
+                                    ),
+                                  ],
+                                ] else if (msg.sharedPostId != null &&
+                                    msg.sharedPostId!.isNotEmpty)
+                                  _SharedPostPreview(
+                                    postId: msg.sharedPostId!,
+                                    isMe: isMe,
+                                  )
+                                else if (msg.imageUrl != null &&
+                                    msg.imageUrl!.isNotEmpty) ...[
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: CachedNetworkImage(
+                                      imageUrl: msg.imageUrl!,
+                                      width: 240,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => const SizedBox(
+                                        height: 180,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (msg.text.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    _buildBody(
+                                      textColor: isMe
+                                          ? Colors.white
+                                          : context.textPrimary,
+                                    ),
+                                  ],
+                                ] else
+                                  _buildBody(
+                                    textColor: isMe
+                                        ? Colors.white
+                                        : context.textPrimary,
+                                  ),
+                              ],
                             ),
-                            if (msg.text.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              _buildBody(
-                                textColor:
-                                    isMe ? Colors.white : context.textPrimary,
-                              ),
-                            ],
-                          ] else
-                            _buildBody(
-                              textColor:
-                                  isMe ? Colors.white : context.textPrimary,
-                            ),
-                        ],
-                      ),
-                    ),
+                          ),
                   ),
                 ),
               ),
@@ -2851,10 +2862,130 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                   },
                 ),
             ],
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () {
+                Navigator.pop(sheet);
+                _showDeleteMessageOptions(context);
+              },
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _showDeleteMessageOptions(BuildContext context) async {
+    final currentUid = ref.read(authStateProvider).value?.uid;
+    if (currentUid == null) return;
+
+    final scope = await showModalBottomSheet<_DeleteMessageScope>(
+      context: context,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Delete for me'),
+              onTap: () => Navigator.pop(sheet, _DeleteMessageScope.mine),
+            ),
+            if (isMe)
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: Text(
+                  widget.isGroup
+                      ? 'Delete for everyone'
+                      : 'Delete for both people',
+                  style: const TextStyle(color: Colors.red),
+                ),
+                onTap: () => Navigator.pop(
+                  sheet,
+                  _DeleteMessageScope.everyone,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (scope == null || !mounted) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          scope == _DeleteMessageScope.everyone
+              ? (widget.isGroup
+                  ? 'Delete for everyone?'
+                  : 'Delete for both people?')
+              : 'Delete for me?',
+        ),
+        content: Text(
+          scope == _DeleteMessageScope.everyone
+              ? 'This message will be removed for everyone in this chat.'
+              : 'This message will only be removed from your chat history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color:
+                    scope == _DeleteMessageScope.everyone ? Colors.red : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    try {
+      final chatService = ref.read(chatServiceProvider);
+      if (scope == _DeleteMessageScope.everyone) {
+        await chatService.deleteMessageForEveryone(
+          chatId: widget.chatId,
+          messageId: msg.id,
+          uid: currentUid,
+        );
+      } else {
+        await chatService.deleteMessageForMe(
+          chatId: widget.chatId,
+          messageId: msg.id,
+          uid: currentUid,
+        );
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            scope == _DeleteMessageScope.everyone
+                ? 'Message deleted for everyone'
+                : 'Message deleted for you',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e')),
+      );
+    }
   }
 
   Future<void> _showTranslationSheet(

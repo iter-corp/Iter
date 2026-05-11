@@ -237,6 +237,112 @@ class ChatService {
   CollectionReference<Map<String, dynamic>> _messagesCol(String chatId) =>
       _chatDoc(chatId).collection('messages');
 
+  bool _isDeletedForEveryone(Map<String, dynamic> data) =>
+      data['deletedForEveryone'] == true;
+
+  bool _isDeletedForUser(Map<String, dynamic> data, String uid) {
+    final hidden = List<String>.from(
+      data['deletedForUids'] as List? ?? const [],
+    );
+    return hidden.contains(uid);
+  }
+
+  bool _isVisibleToUser(Map<String, dynamic> data, String uid) =>
+      !_isDeletedForEveryone(data) && !_isDeletedForUser(data, uid);
+
+  String _previewTextForMessage(Map<String, dynamic> data) {
+    final text = (data['text'] as String? ?? '').trim();
+    if (text.isNotEmpty) return text;
+    if ((data['stickerUrl'] as String?)?.trim().isNotEmpty == true) {
+      return 'Sent a sticker';
+    }
+    if ((data['sharedPostId'] as String?)?.trim().isNotEmpty == true) {
+      return 'Shared a post';
+    }
+    if ((data['voiceUrl'] as String?)?.trim().isNotEmpty == true) {
+      return 'Voice message';
+    }
+    if ((data['videoUrl'] as String?)?.trim().isNotEmpty == true) {
+      return 'Sent a video';
+    }
+    if ((data['fileUrl'] as String?)?.trim().isNotEmpty == true) {
+      return 'Sent a file';
+    }
+    if ((data['imageUrl'] as String?)?.trim().isNotEmpty == true) {
+      return 'Sent a photo';
+    }
+    return '';
+  }
+
+  Future<QueryDocumentSnapshot<Map<String, dynamic>>?>
+      _latestVisibleMessageDoc({
+    required String chatId,
+    required String uid,
+  }) async {
+    final recent = await _messagesCol(chatId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .get();
+    for (final doc in recent.docs) {
+      if (_isVisibleToUser(doc.data(), uid)) return doc;
+    }
+    return null;
+  }
+
+  Future<ChatConversation> _hydrateConversationForViewer({
+    required DocumentSnapshot<Map<String, dynamic>> doc,
+    required String uid,
+  }) async {
+    final conv = ChatConversation.fromDoc(doc, uid);
+    final latestVisible = await _latestVisibleMessageDoc(
+      chatId: doc.id,
+      uid: uid,
+    );
+    final unread = await _deriveUnreadFromMessages(chatId: doc.id, uid: uid);
+
+    if (latestVisible == null) {
+      return conv.copyWith(lastMessage: '', unreadCount: 0);
+    }
+
+    final data = latestVisible.data();
+    return conv.copyWith(
+      lastMessage: _previewTextForMessage(data),
+      lastTime: (data['createdAt'] as Timestamp?)?.toDate() ?? conv.lastTime,
+      unreadCount: unread,
+    );
+  }
+
+  Future<void> _refreshChatSummary(String chatId) async {
+    final chatSnap = await _chatDoc(chatId).get();
+    if (!chatSnap.exists) return;
+
+    final participants = List<String>.from(
+      chatSnap.data()?['participants'] as List? ?? const [],
+    );
+    final ownerForSummary = participants.isNotEmpty ? participants.first : '';
+    final latestVisible = ownerForSummary.isEmpty
+        ? null
+        : await _latestVisibleMessageDoc(
+            chatId: chatId,
+            uid: ownerForSummary,
+          );
+
+    if (latestVisible == null) {
+      await _chatDoc(chatId).set({
+        'lastMessage': '',
+        'lastMessageSenderUid': '',
+      }, SetOptions(merge: true));
+      return;
+    }
+
+    final data = latestVisible.data();
+    await _chatDoc(chatId).set({
+      'lastMessage': _previewTextForMessage(data),
+      'lastMessageSenderUid': (data['senderUid'] as String?) ?? '',
+      'lastTime': data['createdAt'] ?? FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// Deterministic chat ID from two user IDs.
   String buildChatId(String a, String b) {
     final sorted = [a, b]..sort();
@@ -513,11 +619,14 @@ class ChatService {
   }
 
   /// Real-time stream of messages, oldest first.
-  Stream<List<ChatMessage>> streamMessages(String chatId) {
-    return _messagesCol(chatId)
-        .orderBy('createdAt')
-        .snapshots()
-        .map((s) => s.docs.map(ChatMessage.fromDoc).toList());
+  Stream<List<ChatMessage>> streamMessages(String chatId,
+      {required String uid}) {
+    return _messagesCol(chatId).orderBy('createdAt').snapshots().map(
+          (s) => s.docs
+              .where((doc) => _isVisibleToUser(doc.data(), uid))
+              .map(ChatMessage.fromDoc)
+              .toList(),
+        );
   }
 
   /// Real-time stream of all conversations for [uid], sorted by latest message.
@@ -527,27 +636,9 @@ class ChatService {
         .where('participants', arrayContains: uid)
         .snapshots()
         .asyncMap((s) async {
-      final withUnread = await Future.wait(s.docs.map((doc) async {
-        var conv = ChatConversation.fromDoc(doc, uid);
-        final d = doc.data();
-
-        // If summary unread is zero/stale but latest message is from
-        // someone else, derive unread from message-level seenBy.
-        if (conv.unreadCount <= 0) {
-          final lastSender = (d['lastMessageSenderUid'] as String?) ?? '';
-          if (lastSender.isNotEmpty && lastSender != uid) {
-            final derived = await _deriveUnreadFromMessages(
-              chatId: doc.id,
-              uid: uid,
-            );
-            if (derived > 0) {
-              conv = conv.copyWith(unreadCount: derived);
-            }
-          }
-        }
-
-        return conv;
-      }));
+      final withUnread = await Future.wait(
+        s.docs.map((doc) => _hydrateConversationForViewer(doc: doc, uid: uid)),
+      );
 
       // Hide chats that have no messages yet. openChat creates the doc
       // as soon as you visit a profile and tap "Message"; without this
@@ -581,6 +672,7 @@ class ChatService {
       var count = 0;
       for (final doc in recent.docs) {
         final data = doc.data();
+        if (!_isVisibleToUser(data, uid)) continue;
         if (data['senderUid'] == uid) continue;
         final seenBy = List<String>.from(data['seenBy'] as List? ?? const []);
         if (!seenBy.contains(uid)) {
@@ -722,6 +814,39 @@ class ChatService {
     required String name,
   }) async {
     await _chatDoc(chatId).update({'groupName': name.trim()});
+  }
+
+  Future<void> deleteMessageForMe({
+    required String chatId,
+    required String messageId,
+    required String uid,
+  }) async {
+    await _messagesCol(chatId).doc(messageId).set({
+      'deletedForUids': FieldValue.arrayUnion([uid]),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> deleteMessageForEveryone({
+    required String chatId,
+    required String messageId,
+    required String uid,
+  }) async {
+    final msgRef = _messagesCol(chatId).doc(messageId);
+    final snap = await msgRef.get();
+    if (!snap.exists) return;
+
+    final data = snap.data() ?? const <String, dynamic>{};
+    if ((data['senderUid'] as String?) != uid) {
+      throw StateError('Only the sender can delete this message for everyone.');
+    }
+
+    await msgRef.set({
+      'deletedForEveryone': true,
+      'deletedByUid': uid,
+      'deletedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await _refreshChatSummary(chatId);
   }
 
   /// Permanently delete a 1:1 chat for BOTH participants — wipes every

@@ -377,11 +377,35 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isChatParticipant(chatId) || isAdmin();
         allow create: if isChatParticipant(chatId) && request.resource.data.senderUid == request.auth.uid;
-        // Chat participants may update ONLY the `seenBy` field — needed so
-        // the recipient can mark messages as seen and the sender's
-        // double-check indicator flips. Any other diff is rejected.
-        allow update: if isChatParticipant(chatId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy']);
+        // Chat participants may mark messages seen, hide a message for
+        // themselves, and the sender may delete a message for everyone.
+        allow update: if isChatParticipant(chatId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy']) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedForUids']) &&
+            request.resource.data.deletedForUids is list &&
+            request.resource.data.deletedForUids.size() ==
+              (resource.data.deletedForUids is list ? resource.data.deletedForUids.size() : 0) +
+                ((resource.data.deletedForUids is list &&
+                    resource.data.deletedForUids.hasAll([request.auth.uid]))
+                  ? 0
+                  : 1) &&
+            request.resource.data.deletedForUids.hasAll(
+              resource.data.deletedForUids is list ? resource.data.deletedForUids : []
+            ) &&
+            request.resource.data.deletedForUids.hasAll([request.auth.uid])
+          ) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'deletedForEveryone',
+              'deletedByUid',
+              'deletedAt'
+            ]) &&
+            resource.data.senderUid == request.auth.uid &&
+            request.resource.data.deletedForEveryone == true &&
+            request.resource.data.deletedByUid == request.auth.uid
+          )
+        );
         allow delete: if isAdmin();
 
         match /reactions/{reactorUid} {

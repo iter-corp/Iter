@@ -399,9 +399,6 @@ class _AnswerBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
-    final canDelete = currentUid != null && currentUid == answer.authorUid;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
@@ -421,25 +418,7 @@ class _AnswerBlock extends ConsumerWidget {
         children: [
           _AnswerRow(
             comment: answer,
-            trailingAction: canDelete
-                ? _DeleteMenuButton(
-                    compact: false,
-                    onDelete: () async {
-                      try {
-                        await ref.read(commentServiceProvider).deleteComment(
-                              postId: postId,
-                              commentId: answer.id,
-                            );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Could not delete answer: $e')),
-                        );
-                      }
-                    },
-                  )
-                : null,
+            trailingAction: null,
           ),
           const SizedBox(height: 6),
           _AnswerReactionBar(
@@ -467,31 +446,7 @@ class _AnswerBlock extends ConsumerWidget {
                               _AnswerRow(
                                 comment: r,
                                 compact: true,
-                                trailingAction: currentUid != null &&
-                                        currentUid == r.authorUid
-                                    ? _DeleteMenuButton(
-                                        compact: true,
-                                        onDelete: () async {
-                                          try {
-                                            await ref
-                                                .read(commentServiceProvider)
-                                                .deleteComment(
-                                                  postId: postId,
-                                                  commentId: r.id,
-                                                );
-                                          } catch (e) {
-                                            if (!context.mounted) return;
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                    'Could not delete reply: $e'),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                      )
-                                    : null,
+                                trailingAction: null,
                               ),
                               const SizedBox(height: 4),
                               _AnswerReactionBar(
@@ -530,7 +485,6 @@ class _AnswerReactionBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final service = ref.read(commentServiceProvider);
-    final canDelete = uid != null && uid == answer.authorUid;
 
     Future<void> setReaction(String type) async {
       if (uid == null) return;
@@ -571,23 +525,6 @@ class _AnswerReactionBar extends ConsumerWidget {
             onTap: () {},
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
-          if (canDelete)
-            _DeleteMenuButton(
-              compact: compact,
-              onDelete: () async {
-                try {
-                  await service.deleteComment(
-                    postId: postId,
-                    commentId: answer.id,
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not delete reply: $e')),
-                  );
-                }
-              },
-            ),
         ],
       );
     }
@@ -624,23 +561,6 @@ class _AnswerReactionBar extends ConsumerWidget {
               onTap: () => setReaction('broken'),
             ),
             _ReplyReactionChip(onTap: onReply, compact: compact),
-            if (canDelete)
-              _DeleteMenuButton(
-                compact: compact,
-                onDelete: () async {
-                  try {
-                    await service.deleteComment(
-                      postId: postId,
-                      commentId: answer.id,
-                    );
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Could not delete reply: $e')),
-                    );
-                  }
-                },
-              ),
           ],
         );
       },
@@ -665,23 +585,6 @@ class _AnswerReactionBar extends ConsumerWidget {
             onTap: () => setReaction('broken'),
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
-          if (canDelete)
-            _DeleteMenuButton(
-              compact: compact,
-              onDelete: () async {
-                try {
-                  await service.deleteComment(
-                    postId: postId,
-                    commentId: answer.id,
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not delete reply: $e')),
-                  );
-                }
-              },
-            ),
         ],
       ),
       error: (_, __) => Wrap(
@@ -705,67 +608,7 @@ class _AnswerReactionBar extends ConsumerWidget {
             onTap: () => setReaction('broken'),
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
-          if (canDelete)
-            _DeleteMenuButton(
-              compact: compact,
-              onDelete: () async {
-                try {
-                  await service.deleteComment(
-                    postId: postId,
-                    commentId: answer.id,
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not delete reply: $e')),
-                  );
-                }
-              },
-            ),
         ],
-      ),
-    );
-  }
-}
-
-class _DeleteMenuButton extends StatelessWidget {
-  final bool compact;
-  final Future<void> Function() onDelete;
-
-  const _DeleteMenuButton({
-    required this.compact,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'More actions',
-      onSelected: (value) async {
-        if (value != 'delete') return;
-        await onDelete();
-      },
-      itemBuilder: (_) => const [
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: Text('Delete'),
-        ),
-      ],
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 6 : 8,
-          vertical: compact ? 5 : 6,
-        ),
-        decoration: BoxDecoration(
-          color: context.inputFill,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Icon(
-          Icons.more_horiz,
-          size: compact ? 14 : 16,
-          color: context.textSecondary,
-        ),
       ),
     );
   }

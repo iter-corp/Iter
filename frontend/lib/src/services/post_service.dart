@@ -367,8 +367,12 @@ class PostService {
         .limit(360)
         .snapshots()
         .asyncMap((snap) async {
+      final topLevelComments = snap.docs
+          .where((doc) => doc.data()['parentCommentId'] == null)
+          .toList();
+
       final postIds = <String>{};
-      for (final c in snap.docs) {
+      for (final c in topLevelComments) {
         final postRef = c.reference.parent.parent;
         if (postRef != null) postIds.add(postRef.id);
       }
