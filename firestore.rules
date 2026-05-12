@@ -467,8 +467,13 @@ service cloud.firestore {
       allow read: if isSelf(uid) || isAdmin();
       allow update: if isSelf(uid);
       allow delete: if isSelf(uid) || isAdmin() || resource.data.actorUid == request.auth.uid;
-      allow create: if signedIn() &&
-        request.resource.data.actorUid == request.auth.uid;
+      // Normal notifications must name their author as the actor. Admins may
+      // additionally fan out system `new_event` notifications (actorUid '')
+      // to any user — this is the Spark-plan stand-in for the onEventCreate
+      // Cloud Function.
+      allow create: if (signedIn() &&
+          request.resource.data.actorUid == request.auth.uid)
+        || (isAdmin() && request.resource.data.type == 'new_event');
     }
 
     match /liveStreams/{streamId} {

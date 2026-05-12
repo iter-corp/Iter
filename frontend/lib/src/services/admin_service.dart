@@ -489,7 +489,89 @@ class AdminService {
       }, SetOptions(merge: true));
     }
 
+    // Spark-plan stand-in for the `onEventCreate` Cloud Function: fan the
+    // `new_event` notification out to matching users right here, from the
+    // admin's device. Best-effort — a failure here mustn't fail event
+    // creation. (On Blaze, the Cloud Function would also do this; the
+    // deterministic doc id `new_event_<eventId>` keeps it idempotent if both
+    // ever ran.)
+    try {
+      await _fanOutNewEventNotifications(
+        eventId: ref.id,
+        title: title.trim(),
+        subtitle: location.trim(),
+        eventType: eventType.trim(),
+        eventCountry: country.trim().toLowerCase(),
+      );
+    } catch (_) {
+      // Swallow — the event still exists; notifications just didn't go out.
+    }
+
     return ref.id;
+  }
+
+  /// Writes a `new_event` notification doc to every non-suspended user whose
+  /// `eventNotifPrefs` matches the event. Mirrors `functions/src/events.ts`.
+  Future<void> _fanOutNewEventNotifications({
+    required String eventId,
+    required String title,
+    required String subtitle,
+    required String eventType,
+    required String eventCountry,
+  }) async {
+    final usersSnap = await _db.collection('users').get();
+
+    bool wants(Map<String, dynamic> u) {
+      if (u['suspended'] == true) return false;
+      final prefs = (u['eventNotifPrefs'] as Map<String, dynamic>?) ?? const {};
+      // Legacy 'cities' mode counts as on; its city list is no longer used.
+      if ((prefs['mode'] as String?) == 'off') return false;
+      final types = ((prefs['types'] as List?)?.map((e) => e.toString()) ??
+              const <String>[])
+          .toList();
+      if (types.isNotEmpty) {
+        if (eventType.isEmpty) return false;
+        if (!types.contains(eventType)) return false;
+      }
+      final countries = ((prefs['countries'] as List?)
+                  ?.map((e) => e.toString().trim().toLowerCase()) ??
+              const <String>[])
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (countries.isNotEmpty) {
+        if (eventCountry.isEmpty) return false;
+        if (!countries.contains(eventCountry)) return false;
+      }
+      return true;
+    }
+
+    var batch = _db.batch();
+    var writes = 0;
+    for (final doc in usersSnap.docs) {
+      if (!wants(doc.data())) continue;
+      final notifRef = _db
+          .collection('notifications')
+          .doc(doc.id)
+          .collection('items')
+          .doc('new_event_$eventId');
+      batch.set(notifRef, {
+        'type': 'new_event',
+        'actorUid': '',
+        'targetId': eventId,
+        'title': title,
+        'subtitle': subtitle,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      writes++;
+      // Firestore batches cap at 500 writes.
+      if (writes >= 450) {
+        await batch.commit();
+        batch = _db.batch();
+        writes = 0;
+      }
+    }
+    if (writes > 0) await batch.commit();
   }
 
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {
