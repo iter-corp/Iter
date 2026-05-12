@@ -18,6 +18,16 @@ class AdminConfig {
   final String iosAppStoreUrl;
   final String androidPlayStoreUrl;
 
+  /// Event-type options admins choose from when creating an event and users
+  /// filter notifications by. Editable from the admin dashboard; falls back to
+  /// [kEventTypes] when unset/empty.
+  final List<String> eventTypes;
+
+  /// Country options admins tag events with and users filter notifications by.
+  /// Editable from the admin dashboard; falls back to [kEventCountries] when
+  /// unset/empty.
+  final List<String> eventCountries;
+
   const AdminConfig({
     this.storiesEnabled = true,
     this.liveEnabled = true,
@@ -29,10 +39,21 @@ class AdminConfig {
     this.contactEmail = '',
     this.iosAppStoreUrl = '',
     this.androidPlayStoreUrl = '',
+    this.eventTypes = kEventTypes,
+    this.eventCountries = kEventCountries,
   });
 
   factory AdminConfig.fromMap(Map<String, dynamic>? d) {
     final m = d ?? const {};
+    List<String> cleanList(dynamic raw, List<String> fallback) {
+      if (raw is! List) return fallback;
+      final out = raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      return out.isEmpty ? fallback : out;
+    }
+
     return AdminConfig(
       storiesEnabled: (m['storiesEnabled'] as bool?) ?? true,
       liveEnabled: (m['liveEnabled'] as bool?) ?? true,
@@ -44,6 +65,8 @@ class AdminConfig {
       contactEmail: (m['contactEmail'] as String?) ?? '',
       iosAppStoreUrl: (m['iosAppStoreUrl'] as String?) ?? '',
       androidPlayStoreUrl: (m['androidPlayStoreUrl'] as String?) ?? '',
+      eventTypes: cleanList(m['eventTypes'], kEventTypes),
+      eventCountries: cleanList(m['eventCountries'], kEventCountries),
     );
   }
 
@@ -58,6 +81,8 @@ class AdminConfig {
         'contactEmail': contactEmail,
         'iosAppStoreUrl': iosAppStoreUrl,
         'androidPlayStoreUrl': androidPlayStoreUrl,
+        'eventTypes': eventTypes,
+        'eventCountries': eventCountries,
       };
 
   AdminConfig copyWith({
@@ -71,6 +96,8 @@ class AdminConfig {
     String? contactEmail,
     String? iosAppStoreUrl,
     String? androidPlayStoreUrl,
+    List<String>? eventTypes,
+    List<String>? eventCountries,
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
@@ -83,6 +110,8 @@ class AdminConfig {
       contactEmail: contactEmail ?? this.contactEmail,
       iosAppStoreUrl: iosAppStoreUrl ?? this.iosAppStoreUrl,
       androidPlayStoreUrl: androidPlayStoreUrl ?? this.androidPlayStoreUrl,
+      eventTypes: eventTypes ?? this.eventTypes,
+      eventCountries: eventCountries ?? this.eventCountries,
     );
   }
 }
@@ -100,6 +129,33 @@ const List<String> kEventTypes = [
   'Other',
 ];
 
+/// Canonical country options. Admins tag an event with the country it takes
+/// place in; users filter event notifications by these. Keeping a curated
+/// list (instead of free text) means the user's picks always match what the
+/// admin chose. Stored lower-cased on the event doc as `locationCountry`.
+const List<String> kEventCountries = [
+  'Iraq',
+  'Kurdistan Region',
+  'Turkey',
+  'Jordan',
+  'Lebanon',
+  'Egypt',
+  'United Arab Emirates',
+  'Saudi Arabia',
+  'Qatar',
+  'United Kingdom',
+  'United States',
+  'Germany',
+  'France',
+  'Italy',
+  'Spain',
+  'Netherlands',
+  'Sweden',
+  'Canada',
+  'Australia',
+  'Online',
+];
+
 class AdminEvent {
   final String id;
   final String title;
@@ -113,6 +169,10 @@ class AdminEvent {
 
   /// One of [kEventTypes]; empty when the admin didn't set one (legacy events).
   final String eventType;
+
+  /// One of [kEventCountries]; empty when the admin didn't set one (legacy
+  /// events). Stored on the doc lower-cased as `locationCountry` for matching.
+  final String country;
 
   /// Optional pin coordinates for the events map. Null when unknown.
   final double? lat;
@@ -129,6 +189,7 @@ class AdminEvent {
     required this.imageUrls,
     required this.createdAt,
     this.eventType = '',
+    this.country = '',
     this.lat,
     this.lng,
   });
@@ -148,6 +209,11 @@ class AdminEvent {
       imageUrls: (d['imageUrls'] as List?)?.cast<String>() ?? const [],
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       eventType: (d['eventType'] as String?) ?? '',
+      // `country` keeps the admin's original casing for display/editing;
+      // `locationCountry` (lower-cased) is the matching key.
+      country: ((d['country'] as String?)?.trim().isNotEmpty ?? false)
+          ? (d['country'] as String).trim()
+          : ((d['locationCountry'] as String?) ?? '').trim(),
       lat: (geoMap?['lat'] as num?)?.toDouble(),
       lng: (geoMap?['lng'] as num?)?.toDouble(),
     );
@@ -387,6 +453,7 @@ class AdminService {
     required String email,
     required List<String> imageUrls,
     String eventType = '',
+    String country = '',
     double? lat,
     double? lng,
   }) async {
@@ -400,9 +467,13 @@ class AdminService {
       'imageUrls': imageUrls,
       'eventType': eventType,
       if (lat != null && lng != null) 'geo': {'lat': lat, 'lng': lng},
-      // Lower-cased first segment of the location, used by the event-notification
-      // fan-out to match against users' selected cities.
+      // Lower-cased first segment of the location, kept for legacy callers.
       'locationCity': location.split(',').first.trim().toLowerCase(),
+      // `country` is the admin's chosen label (original casing);
+      // `locationCountry` is its lower-cased form, used by the event-notification
+      // fan-out to match against users' selected countries.
+      'country': country.trim(),
+      'locationCountry': country.trim().toLowerCase(),
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -427,6 +498,12 @@ class AdminService {
     if (payload['location'] is String) {
       payload['locationCity'] =
           (payload['location'] as String).split(',').first.trim().toLowerCase();
+    }
+    // Keep the matching key in sync with the chosen country label.
+    if (payload['country'] is String) {
+      final c = (payload['country'] as String).trim();
+      payload['country'] = c;
+      payload['locationCountry'] = c.toLowerCase();
     }
     await _db.collection('events').doc(id).update(payload);
     // Keep the chat doc's title mirrored when the admin renames the event.

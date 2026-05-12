@@ -5,39 +5,44 @@ const db = admin.firestore();
 
 const MAX_BATCH_WRITES = 450;
 
-type NotifMode = 'all' | 'cities' | 'off';
+type NotifMode = 'all' | 'off';
 
 interface EventNotifPrefs {
   mode: NotifMode;
-  cities: string[];
   types: string[];
+  countries: string[];
 }
 
 function parsePrefs(raw: unknown): EventNotifPrefs {
   const m = (raw ?? {}) as Record<string, unknown>;
-  const modeStr = String(m.mode ?? 'all');
-  const mode: NotifMode =
-    modeStr === 'cities' ? 'cities' : modeStr === 'off' ? 'off' : 'all';
-  const cities = Array.isArray(m.cities)
-    ? (m.cities as unknown[]).map((c) => String(c).trim().toLowerCase()).filter((c) => c.length > 0)
-    : [];
+  // Legacy 'cities' mode counts as on; its city list is no longer used.
+  const mode: NotifMode = String(m.mode ?? 'all') === 'off' ? 'off' : 'all';
   const types = Array.isArray(m.types)
     ? (m.types as unknown[]).map((t) => String(t))
     : [];
-  return { mode, cities, types };
+  const countries = Array.isArray(m.countries)
+    ? (m.countries as unknown[]).map((c) => String(c).trim().toLowerCase()).filter((c) => c.length > 0)
+    : [];
+  return { mode, types, countries };
 }
 
-function wantsThisEvent(prefs: EventNotifPrefs, eventCity: string, eventType: string): boolean {
+function wantsThisEvent(
+  prefs: EventNotifPrefs,
+  eventType: string,
+  eventCountry: string,
+): boolean {
   if (prefs.mode === 'off') return false;
-  if (prefs.mode === 'cities') {
-    if (eventCity.length === 0) return false;
-    if (!prefs.cities.includes(eventCity)) return false;
-  }
+  // Empty type list = "All types"; otherwise the event must be tagged with a
+  // type the user picked.
   if (prefs.types.length > 0) {
-    // If the admin didn't tag a type, treat it as matching only when the user
-    // has no type filter (handled above) — here a missing type fails the filter.
     if (eventType.length === 0) return false;
     if (!prefs.types.includes(eventType)) return false;
+  }
+  // Empty country list = "All countries"; otherwise the event must be tagged
+  // with a country the user picked.
+  if (prefs.countries.length > 0) {
+    if (eventCountry.length === 0) return false;
+    if (!prefs.countries.includes(eventCountry)) return false;
   }
   return true;
 }
@@ -50,12 +55,12 @@ function wantsThisEvent(prefs: EventNotifPrefs, eventCity: string, eventType: st
  * TODO(scale): this reads the entire `users` collection per event and writes a
  *   notification doc per match (each of which triggers another function for the
  *   push). Fine for a small user base; at scale, query by
- *   `eventNotifPrefs.mode` / `eventNotifPrefs.cities` (needs a composite index)
- *   and/or chunk the work through a task queue.
- * NOTE(city matching): `eventCity` vs the user's chosen cities is a normalized
- *   string compare (lowercase, first comma segment). It won't match alternate
- *   spellings / languages (e.g. "Erbil" vs "Hawler"); users in `cities` mode
- *   may therefore miss events. The settings screen warns about this.
+ *   `eventNotifPrefs.countries` (needs a composite index) and/or chunk the work
+ *   through a task queue.
+ * NOTE(country matching): both sides come from the curated `kEventCountries`
+ *   list (stored lower-cased on the event as `locationCountry`, picked by the
+ *   user as `eventNotifPrefs.countries`), so they match exactly — no free-text
+ *   spelling mismatches.
  */
 export const onEventCreate = onDocumentCreated('events/{eventId}', async (event) => {
   const eventId = event.params.eventId;
@@ -64,10 +69,8 @@ export const onEventCreate = onDocumentCreated('events/{eventId}', async (event)
 
   const title = String(data.title ?? '').trim();
   const location = String(data.location ?? '').trim();
-  const eventCity = String(
-    data.locationCity ?? location.split(',')[0] ?? '',
-  ).trim().toLowerCase();
   const eventType = String(data.eventType ?? '').trim();
+  const eventCountry = String(data.locationCountry ?? '').trim().toLowerCase();
 
   const usersSnap = await db.collection('users').get();
 
@@ -79,7 +82,7 @@ export const onEventCreate = onDocumentCreated('events/{eventId}', async (event)
     const u = userDoc.data();
     if (u.suspended === true) continue;
     const prefs = parsePrefs(u.eventNotifPrefs);
-    if (!wantsThisEvent(prefs, eventCity, eventType)) continue;
+    if (!wantsThisEvent(prefs, eventType, eventCountry)) continue;
 
     const notifRef = db
       .collection('notifications')

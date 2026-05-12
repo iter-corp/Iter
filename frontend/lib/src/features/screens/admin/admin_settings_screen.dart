@@ -19,6 +19,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   final _contactEmailCtrl = TextEditingController();
   final _iosUrlCtrl = TextEditingController();
   final _androidUrlCtrl = TextEditingController();
+  final _newTypeCtrl = TextEditingController();
+  final _newCountryCtrl = TextEditingController();
   bool _hydrated = false;
   bool _saving = false;
   AdminConfig _cfg = const AdminConfig();
@@ -41,7 +43,47 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     _contactEmailCtrl.dispose();
     _iosUrlCtrl.dispose();
     _androidUrlCtrl.dispose();
+    _newTypeCtrl.dispose();
+    _newCountryCtrl.dispose();
     super.dispose();
+  }
+
+  void _addEventType() {
+    final v = _newTypeCtrl.text.trim();
+    if (v.isEmpty) return;
+    if (_cfg.eventTypes.any((t) => t.toLowerCase() == v.toLowerCase())) {
+      _newTypeCtrl.clear();
+      return;
+    }
+    setState(() {
+      _cfg = _cfg.copyWith(eventTypes: [..._cfg.eventTypes, v]);
+      _newTypeCtrl.clear();
+    });
+  }
+
+  void _removeEventType(String t) {
+    if (_cfg.eventTypes.length <= 1) return; // keep at least one
+    setState(() => _cfg = _cfg.copyWith(
+        eventTypes: _cfg.eventTypes.where((x) => x != t).toList()));
+  }
+
+  void _addCountry() {
+    final v = _newCountryCtrl.text.trim();
+    if (v.isEmpty) return;
+    if (_cfg.eventCountries.any((c) => c.toLowerCase() == v.toLowerCase())) {
+      _newCountryCtrl.clear();
+      return;
+    }
+    setState(() {
+      _cfg = _cfg.copyWith(eventCountries: [..._cfg.eventCountries, v]);
+      _newCountryCtrl.clear();
+    });
+  }
+
+  void _removeCountry(String c) {
+    if (_cfg.eventCountries.length <= 1) return;
+    setState(() => _cfg = _cfg.copyWith(
+        eventCountries: _cfg.eventCountries.where((x) => x != c).toList()));
   }
 
   Future<void> _save() async {
@@ -53,6 +95,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         contactEmail: _contactEmailCtrl.text.trim(),
         iosAppStoreUrl: _iosUrlCtrl.text.trim(),
         androidPlayStoreUrl: _androidUrlCtrl.text.trim(),
+        // _cfg already carries the edited eventTypes / eventCountries lists.
       );
       await ref.read(adminServiceProvider).saveConfig(next);
       if (mounted) {
@@ -233,11 +276,95 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              _section('Event types'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Options admins choose from when creating an event, and users '
+                  'filter notifications by.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              _editableList(
+                items: _cfg.eventTypes,
+                controller: _newTypeCtrl,
+                hint: 'Add an event type',
+                onAdd: _addEventType,
+                onRemove: _removeEventType,
+              ),
+              const SizedBox(height: 16),
+              _section('Event countries'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Countries admins tag events with, and users filter '
+                  'notifications by.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              _editableList(
+                items: _cfg.eventCountries,
+                controller: _newCountryCtrl,
+                hint: 'Add a country',
+                onAdd: _addCountry,
+                onRemove: _removeCountry,
+              ),
               const SizedBox(height: 24),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _editableList({
+    required List<String> items,
+    required TextEditingController controller,
+    required String hint,
+    required VoidCallback onAdd,
+    required ValueChanged<String> onRemove,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => onAdd(),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              TextButton(onPressed: onAdd, child: const Text('Add')),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: items
+              .map((it) => Chip(
+                    label: Text(it),
+                    onDeleted:
+                        items.length <= 1 ? null : () => onRemove(it),
+                  ))
+              .toList(),
+        ),
+      ],
     );
   }
 

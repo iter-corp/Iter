@@ -1,12 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// How a user wants to be notified about new events.
+/// Whether a user wants new-event notifications at all. The fine-grained
+/// filtering (which types / which countries) lives in [EventNotifPrefs].
 enum EventNotifMode {
-  /// Every new event, anywhere.
+  /// Receive new-event notifications (subject to the type/country filters).
   all,
-
-  /// Only events whose city is in [EventNotifPrefs.cities].
-  cities,
 
   /// No new-event notifications at all.
   off,
@@ -15,55 +13,53 @@ enum EventNotifMode {
 class EventNotifPrefs {
   final EventNotifMode mode;
 
-  /// Lower-cased city names the user wants alerts for (only used when
-  /// [mode] is [EventNotifMode.cities]).
-  final List<String> cities;
-
-  /// Event types (from `kEventTypes`) to limit alerts to. Empty = all types.
+  /// Event types (from `kEventTypes`) to limit alerts to. Empty = all types
+  /// ("All" is selected in the UI).
   final List<String> types;
+
+  /// Lower-cased country names (from `kEventCountries`) to limit alerts to.
+  /// Empty = all countries ("All" is selected in the UI).
+  final List<String> countries;
 
   const EventNotifPrefs({
     this.mode = EventNotifMode.all,
-    this.cities = const [],
     this.types = const [],
+    this.countries = const [],
   });
 
   factory EventNotifPrefs.fromMap(Map<String, dynamic>? d) {
     final m = d ?? const {};
     final modeStr = (m['mode'] as String?) ?? 'all';
     return EventNotifPrefs(
-      mode: switch (modeStr) {
-        'cities' => EventNotifMode.cities,
-        'off' => EventNotifMode.off,
-        _ => EventNotifMode.all,
-      },
-      cities: ((m['cities'] as List?)?.cast<String>() ?? const [])
+      // Legacy 'cities' mode is treated as on; its city list is discarded
+      // since the model now filters by country.
+      mode: modeStr == 'off' ? EventNotifMode.off : EventNotifMode.all,
+      types: (m['types'] as List?)?.cast<String>() ?? const [],
+      countries: ((m['countries'] as List?)?.cast<String>() ?? const [])
           .map((c) => c.trim().toLowerCase())
           .where((c) => c.isNotEmpty)
           .toList(),
-      types: (m['types'] as List?)?.cast<String>() ?? const [],
     );
   }
 
   Map<String, dynamic> toMap() => {
         'mode': switch (mode) {
-          EventNotifMode.cities => 'cities',
           EventNotifMode.off => 'off',
           EventNotifMode.all => 'all',
         },
-        'cities': cities,
         'types': types,
+        'countries': countries,
       };
 
   EventNotifPrefs copyWith({
     EventNotifMode? mode,
-    List<String>? cities,
     List<String>? types,
+    List<String>? countries,
   }) =>
       EventNotifPrefs(
         mode: mode ?? this.mode,
-        cities: cities ?? this.cities,
         types: types ?? this.types,
+        countries: countries ?? this.countries,
       );
 }
 

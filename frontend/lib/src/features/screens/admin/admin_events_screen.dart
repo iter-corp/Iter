@@ -208,6 +208,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   bool _saving = false;
   bool _uploadingImage = false;
   String _eventType = '';
+  String _country = '';
   double? _lat;
   double? _lng;
   bool _geocoding = false;
@@ -225,6 +226,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       _emailCtrl.text = e.email;
       _imageUrls.addAll(e.imageUrls);
       _eventType = e.eventType;
+      _country = e.country;
       _lat = e.lat;
       _lng = e.lng;
     }
@@ -320,6 +322,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         'email': _emailCtrl.text.trim(),
         'imageUrls': _imageUrls,
         'eventType': _eventType,
+        'country': _country,
         if (_lat != null && _lng != null) 'geo': {'lat': _lat, 'lng': _lng},
       };
       if (widget.existing == null) {
@@ -332,6 +335,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           email: data['email']! as String,
           imageUrls: _imageUrls,
           eventType: _eventType,
+          country: _country,
           lat: _lat,
           lng: _lng,
         );
@@ -352,6 +356,17 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final isNew = widget.existing == null;
+    final cfg = ref.watch(adminConfigProvider).value ?? const AdminConfig();
+    // Always include the currently-selected value so the dropdown doesn't
+    // assert if an admin removed that option from the config later.
+    final typeOptions = <String>{
+      ...cfg.eventTypes,
+      if (_eventType.isNotEmpty) _eventType,
+    }.toList();
+    final countryOptions = <String>{
+      ...cfg.eventCountries,
+      if (_country.isNotEmpty) _country,
+    }.toList();
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
@@ -423,10 +438,30 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                 isExpanded: true,
                 value: _eventType.isEmpty ? null : _eventType,
                 hint: const Text('Event type'),
-                items: kEventTypes
+                items: typeOptions
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) => setState(() => _eventType = v ?? ''),
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            margin: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _country.isEmpty ? null : _country,
+                hint: const Text('Country'),
+                items: countryOptions
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) => setState(() => _country = v ?? ''),
               ),
             ),
           ),
