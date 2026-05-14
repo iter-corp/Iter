@@ -1469,6 +1469,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   String _previewOf(ChatMessage m) {
+    if (m.encryptedUnreadable) return '🔒 Encrypted message';
     if (m.stickerUrl != null && m.stickerUrl!.isNotEmpty) return 'Sticker';
     if (m.voiceUrl != null && m.voiceUrl!.isNotEmpty) return 'Voice message';
     if (m.imageUrl != null && m.imageUrl!.isNotEmpty) return 'Photo';
@@ -1729,6 +1730,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
 
             Divider(height: 1, color: Theme.of(context).dividerColor),
+
+            // E2EE BANNER (1:1 + group chats; both are encrypted in v1)
+            const _E2EEBanner(),
 
             // MESSAGES
             Expanded(
@@ -2165,6 +2169,218 @@ class _AutoDeleteOption {
   final String label;
   final Duration? duration;
   const _AutoDeleteOption(this.label, this.duration);
+}
+
+// ─────────────────────────────────────────────
+// E2EE banner + info sheet
+//
+// Shown at the top of every 1:1 chat. Tapping opens a sheet that explains,
+// in honest detail, what's encrypted and what isn't — so users don't read
+// "🔒 Encrypted" and assume things we don't actually cover (media, lat/lng,
+// reply-to ids, etc.) are also secret.
+// ─────────────────────────────────────────────
+
+class _E2EEBanner extends StatelessWidget {
+  const _E2EEBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showE2EEInfoSheet(context),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: AppColors.purple.withValues(alpha: 0.08),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline,
+                  size: 14, color: AppColors.purple),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Messages are end-to-end encrypted. Tap for details.',
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showE2EEInfoSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.borderColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.lock_outline,
+                      size: 22, color: AppColors.purple),
+                  const SizedBox(width: 10),
+                  Text(
+                    'End-to-end encrypted',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Your messages are encrypted on this device using a key only '
+                'you and the other members of this chat hold. The Coil '
+                'servers and anyone with database access cannot read your '
+                'message text — only ciphertext. In group chats, the key '
+                'is rotated automatically when members are added or removed.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: context.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _E2EERow(
+                icon: Icons.check_circle_outline,
+                color: Colors.green,
+                title: 'Encrypted',
+                body: 'Message text, voice transcripts, reply-to text, '
+                    'location labels, and file names.',
+              ),
+              const SizedBox(height: 10),
+              _E2EERow(
+                icon: Icons.info_outline,
+                color: Colors.orange,
+                title: 'Not yet encrypted',
+                body: 'Photos, videos, voice recordings, file contents, '
+                    'shared posts, stickers, and exact location coordinates. '
+                    'These still upload via the same secure transport but '
+                    'are stored unencrypted on the server.',
+              ),
+              const SizedBox(height: 10),
+              _E2EERow(
+                icon: Icons.shield_outlined,
+                color: AppColors.purple,
+                title: 'Visible to the server',
+                body: 'Sender, recipient, timestamps, and message size. '
+                    'These are needed for delivery and notifications.',
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.surfaceSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Text(
+                  'Your private key never leaves this device. Signing in on '
+                  'a new device creates a fresh key, so old encrypted '
+                  'messages won\'t be readable there.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(sheetCtx),
+                  child: const Text('Got it'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _E2EERow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+  const _E2EERow({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: context.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────

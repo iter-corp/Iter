@@ -38,6 +38,7 @@ class EventChatSummary {
   final String lastMessage;
   final DateTime? lastTime;
   final int unreadCount;
+  final List<String> mutedFor;
 
   const EventChatSummary({
     required this.eventId,
@@ -46,10 +47,28 @@ class EventChatSummary {
     required this.lastMessage,
     required this.lastTime,
     required this.unreadCount,
+    this.mutedFor = const [],
   });
+
+  bool isMutedBy(String uid) => mutedFor.contains(uid);
 }
 
 class EventChatService {
+  /// Mute / unmute an event group chat for [uid]. Stored on the event chat
+  /// doc as `mutedFor: [uid, ...]`; the backend FCM dispatcher should skip
+  /// muted recipients.
+  Future<void> setMuted({
+    required String eventId,
+    required String uid,
+    required bool muted,
+  }) async {
+    await _chatDoc(eventId).set({
+      'mutedFor': muted
+          ? FieldValue.arrayUnion([uid])
+          : FieldValue.arrayRemove([uid]),
+    }, SetOptions(merge: true));
+  }
+
   /// Admin-only: Permanently delete the event group chat and all its messages/members.
   Future<void> deleteEventGroup(String eventId) async {
     final current = _auth.currentUser;
@@ -187,6 +206,7 @@ class EventChatService {
           lastMessage: (d['lastMessage'] as String?) ?? '',
           lastTime: lastTime,
           unreadCount: 0, // admin is always caught up on their own chat
+          mutedFor: List<String>.from(d['mutedFor'] as List? ?? const []),
         );
       }
 
@@ -216,6 +236,7 @@ class EventChatService {
           lastMessage: (d['lastMessage'] as String?) ?? '',
           lastTime: lastTime,
           unreadCount: unread,
+          mutedFor: List<String>.from(d['mutedFor'] as List? ?? const []),
         ));
       }
 

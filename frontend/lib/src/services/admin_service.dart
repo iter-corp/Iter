@@ -532,11 +532,17 @@ class AdminService {
       final prefs = (u['eventNotifPrefs'] as Map<String, dynamic>?) ?? const {};
       // Legacy 'cities' mode counts as on; its city list is no longer used.
       if ((prefs['mode'] as String?) == 'off') return false;
+
+      // Policy: when the admin doesn't pick a type or country, the event is
+      // treated as "general" and reaches every user whose notifications are
+      // on, regardless of their type/country filters. The previous strict
+      // matching silently filtered out everyone with a non-empty filter list
+      // whenever an admin forgot to set a type, which made the whole
+      // notification pipeline look broken from the user's side.
       final types = ((prefs['types'] as List?)?.map((e) => e.toString()) ??
               const <String>[])
           .toList();
-      if (types.isNotEmpty) {
-        if (eventType.isEmpty) return false;
+      if (types.isNotEmpty && eventType.isNotEmpty) {
         if (!types.contains(eventType)) return false;
       }
       final countries = ((prefs['countries'] as List?)
@@ -544,8 +550,7 @@ class AdminService {
               const <String>[])
           .where((c) => c.isNotEmpty)
           .toList();
-      if (countries.isNotEmpty) {
-        if (eventCountry.isEmpty) return false;
+      if (countries.isNotEmpty && eventCountry.isNotEmpty) {
         if (!countries.contains(eventCountry)) return false;
       }
       return true;

@@ -1615,48 +1615,86 @@ class _EventCardState extends State<_EventCard> {
                     ),
                   ),
                 ),
+                // Top-left stacked chips: city on top, then type ("Scholarship")
+                // and the "For you" badge if recommended. Stacking vertically
+                // gives each chip the full card width on the 2-column grid,
+                // so long labels stay fully readable instead of ellipsizing.
                 Positioned(
                   top: 10,
                   left: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: context.cardBg.withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.location_on_rounded,
-                          size: 12,
-                          color: _kBrandDeep,
+                  right: 10,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // City pill
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: context.cardBg.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.location_on_rounded,
+                                size: 12,
+                                color: _kBrandDeep,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  e.location.split(',').first,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          e.location.split(',').first,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: context.textPrimary,
+                      ),
+                      if (e.eventType.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.cardBg.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              e.eventType.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimary,
+                              ),
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-                if (widget.recommended || e.eventType.trim().isNotEmpty)
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (widget.recommended)
-                          Container(
+                      if (widget.recommended) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 9,
                               vertical: 5,
@@ -1684,30 +1722,11 @@ class _EventCardState extends State<_EventCard> {
                               ],
                             ),
                           ),
-                        if (widget.recommended && e.eventType.trim().isNotEmpty)
-                          const SizedBox(height: 6),
-                        if (e.eventType.trim().isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: context.cardBg.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              e.eventType.trim(),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: context.textPrimary,
-                              ),
-                            ),
-                          ),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
+                ),
                 Positioned(
                   left: 12,
                   right: 12,

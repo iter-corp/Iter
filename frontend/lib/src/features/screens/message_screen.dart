@@ -481,19 +481,30 @@ class _FollowedUserTile extends ConsumerWidget {
 // Private conversation tile
 // ─────────────────────────────────────────────
 
-class _ConvTile extends StatelessWidget {
+class _ConvTile extends ConsumerWidget {
   final ChatConversation conv;
   final VoidCallback onTap;
 
   const _ConvTile({required this.conv, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUid = ref.watch(authStateProvider).value?.uid;
     final displayName = conv.isGroup ? conv.groupName : conv.otherUsername;
     final displayAvatar =
         conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl;
+    final isMuted = currentUid != null && conv.isMutedBy(currentUid);
     return ListTile(
       onTap: onTap,
+      onLongPress: currentUid == null
+          ? null
+          : () => _showChatActions(
+                context: context,
+                ref: ref,
+                conv: conv,
+                currentUid: currentUid,
+                isMuted: isMuted,
+              ),
       leading: conv.isGroup
           ? CircleAvatar(
               radius: 26,
@@ -544,6 +555,14 @@ class _ConvTile extends StatelessWidget {
               ),
             ),
           ],
+          if (isMuted) ...[
+            const SizedBox(width: 6),
+            Icon(
+              Icons.notifications_off_outlined,
+              size: 14,
+              color: context.textSecondary,
+            ),
+          ],
         ],
       ),
       subtitle: Text(
@@ -562,20 +581,312 @@ class _ConvTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
+// Long-press action sheets
+// ─────────────────────────────────────────────
+
+Future<void> _showChatActions({
+  required BuildContext context,
+  required WidgetRef ref,
+  required ChatConversation conv,
+  required String currentUid,
+  required bool isMuted,
+}) async {
+  final svc = ref.read(chatServiceProvider);
+  final displayName =
+      conv.isGroup ? conv.groupName : conv.otherUsername;
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  displayName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              leading: Icon(
+                isMuted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
+                color: context.textPrimary,
+              ),
+              title: Text(
+                isMuted ? 'Unmute notifications' : 'Mute notifications',
+                style: TextStyle(color: context.textPrimary),
+              ),
+              onTap: () async {
+                Navigator.pop(sheetCtx);
+                try {
+                  await svc.setMuted(
+                    chatId: conv.chatId,
+                    uid: currentUid,
+                    muted: !isMuted,
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isMuted ? 'Notifications unmuted' : 'Notifications muted',
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed: $e')),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text(
+                'Delete chat',
+                style: TextStyle(color: Colors.red),
+              ),
+              subtitle: Text(
+                conv.isGroup
+                    ? 'Removes the group and all messages'
+                    : 'Removes the conversation for both of you',
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              onTap: () async {
+                Navigator.pop(sheetCtx);
+                final confirmed = await _confirmDestructive(
+                  context: context,
+                  title: 'Delete this chat?',
+                  body: conv.isGroup
+                      ? 'All messages in “$displayName” will be permanently deleted for every member. This cannot be undone.'
+                      : 'All messages with $displayName will be permanently deleted for both of you. This cannot be undone.',
+                );
+                if (confirmed != true) return;
+                try {
+                  if (conv.isGroup) {
+                    await svc.deleteGroup(conv.chatId);
+                  } else {
+                    await svc.deleteChat(conv.chatId);
+                  }
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Chat deleted')),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete: $e')),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _showEventChatActions({
+  required BuildContext context,
+  required WidgetRef ref,
+  required EventChatSummary chat,
+  required String currentUid,
+  required bool isMuted,
+}) async {
+  final svc = ref.read(eventChatServiceProvider);
+  final isAdmin = chat.adminUid == currentUid;
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  chat.eventTitle,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              leading: Icon(
+                isMuted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
+                color: context.textPrimary,
+              ),
+              title: Text(
+                isMuted ? 'Unmute notifications' : 'Mute notifications',
+                style: TextStyle(color: context.textPrimary),
+              ),
+              onTap: () async {
+                Navigator.pop(sheetCtx);
+                try {
+                  await svc.setMuted(
+                    eventId: chat.eventId,
+                    uid: currentUid,
+                    muted: !isMuted,
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isMuted ? 'Notifications unmuted' : 'Notifications muted',
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed: $e')),
+                  );
+                }
+              },
+            ),
+            if (isAdmin)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text(
+                  'Delete group',
+                  style: TextStyle(color: Colors.red),
+                ),
+                subtitle: Text(
+                  'Removes the group chat and all messages',
+                  style:
+                      TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+                onTap: () async {
+                  Navigator.pop(sheetCtx);
+                  final confirmed = await _confirmDestructive(
+                    context: context,
+                    title: 'Delete event group?',
+                    body:
+                        'All messages in “${chat.eventTitle}” will be permanently deleted for every member. This cannot be undone.',
+                  );
+                  if (confirmed != true) return;
+                  try {
+                    await svc.deleteEventGroup(chat.eventId);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Group deleted')),
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to delete: $e')),
+                    );
+                  }
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Future<bool?> _confirmDestructive({
+  required BuildContext context,
+  required String title,
+  required String body,
+}) {
+  return showDialog<bool>(
+    context: context,
+    builder: (dialogCtx) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogCtx, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogCtx, true),
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────
 // Event group chat tile
 // ─────────────────────────────────────────────
 
-class _EventConvTile extends StatelessWidget {
+class _EventConvTile extends ConsumerWidget {
   final EventChatSummary chat;
   final VoidCallback onTap;
 
   const _EventConvTile({required this.chat, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUid = ref.watch(authStateProvider).value?.uid;
     final preview = chat.lastMessage.isEmpty ? 'Event group' : chat.lastMessage;
+    final isMuted = currentUid != null && chat.isMutedBy(currentUid);
     return ListTile(
       onTap: onTap,
+      onLongPress: currentUid == null
+          ? null
+          : () => _showEventChatActions(
+                context: context,
+                ref: ref,
+                chat: chat,
+                currentUid: currentUid,
+                isMuted: isMuted,
+              ),
       leading: const CircleAvatar(
         radius: 26,
         backgroundColor: Color(0xFFB05ECC),
@@ -611,6 +922,14 @@ class _EventConvTile extends StatelessWidget {
               ),
             ),
           ),
+          if (isMuted) ...[
+            const SizedBox(width: 6),
+            Icon(
+              Icons.notifications_off_outlined,
+              size: 14,
+              color: context.textSecondary,
+            ),
+          ],
         ],
       ),
       subtitle: Text(

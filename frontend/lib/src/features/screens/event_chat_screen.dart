@@ -173,6 +173,11 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
 
             Divider(height: 1, color: Theme.of(context).dividerColor),
 
+            // Event group chats are NOT end-to-end encrypted in v1.
+            // Show a small notice so users don't assume the lock-icon
+            // banner from 1:1 chats also covers this surface.
+            const _EventChatNotEncryptedNotice(),
+
             // MESSAGES
             Expanded(
               child: msgsAsync.when(
@@ -408,6 +413,43 @@ class _EventMessageBubble extends ConsumerWidget {
                   style: TextStyle(color: context.textMuted, fontSize: 11),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Honest disclosure shown at the top of every event group chat: tells
+/// the user this surface is NOT end-to-end encrypted, unlike 1:1 and
+/// manually-created group chats. Avoids the false-security trap of
+/// users assuming the lock-icon banner from the other chat type also
+/// applies here.
+class _EventChatNotEncryptedNotice extends StatelessWidget {
+  const _EventChatNotEncryptedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.orange.withValues(alpha: 0.10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.info_outline, size: 14, color: Colors.orange),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Event group messages are not end-to-end encrypted.',
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: context.textSecondary,
+              ),
             ),
           ),
         ],

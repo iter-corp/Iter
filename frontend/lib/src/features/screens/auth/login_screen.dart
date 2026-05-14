@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/responsive.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -128,23 +129,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hPad = context.scaleW(16, 24);
+    final vPad = context.scaleW(20, 32);
+    final logoSize = context.scaleW(72, 84);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 30),
+                SizedBox(height: context.scaleW(16, 30)),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: Image.asset(
                     'assets/img/app_icon.png',
-                    width: 84,
-                    height: 84,
+                    width: logoSize,
+                    height: logoSize,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -152,7 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Text(
                   'Login',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: context.scaleW(20, 24),
                     fontWeight: FontWeight.bold,
                     color: context.textPrimary,
                   ),
@@ -290,8 +294,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
                 const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       "Don't have account? ",
@@ -310,6 +315,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
                 ),
+                SizedBox(height: context.bottomSafeInset),
               ],
             ),
           ),

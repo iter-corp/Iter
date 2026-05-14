@@ -17,10 +17,12 @@ import 'firebase_options.dart';
 import 'src/providers/admin_providers.dart';
 import 'src/providers/auth_providers.dart';
 import 'src/providers/theme_provider.dart';
+import 'src/providers/chat_providers.dart';
 import 'src/router/app_router.dart';
 import 'src/services/error_report_service.dart';
 import 'src/services/fcm_service.dart';
 import 'src/theme/app_theme.dart';
+import 'src/utils/responsive.dart';
 
 Future<void> main() async {
   // Run the *entire* startup inside a guarded zone so uncaught async errors are
@@ -162,6 +164,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
       if (nextUser != null) {
         unawaited(fcmService.init(nextUser.uid));
+        // Generate (or load) the user's E2EE keypair the first time they
+        // sign in on this device, and publish the public half to Firestore
+        // so other users can wrap session keys for them. Idempotent on
+        // subsequent sign-ins / app launches.
+        unawaited(
+          ref.read(keyManagerProvider).ensureKeyPair(nextUser.uid),
+        );
       } else if (previousUser != null) {
         unawaited(fcmService.removeToken(previousUser.uid));
       }
@@ -203,10 +212,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           systemNavigationBarIconBrightness:
               isDark ? Brightness.light : Brightness.dark,
         ));
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: _VersionGate(child: child ?? const SizedBox.shrink()),
+        return ResponsiveBootstrap(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: _VersionGate(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
     );

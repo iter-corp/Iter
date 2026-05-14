@@ -141,21 +141,18 @@ class _EventNotificationsSettingsScreenState
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ChoiceChip(
-                      label: const Text('All types'),
+                    _buildChoiceChip(
+                      label: 'All types',
                       selected: _allTypes,
                       onSelected: (_) => _selectAllTypes(),
-                      selectedColor: AppColors.purple.withValues(alpha: 0.18),
                     ),
                     ...eventTypes.map((t) {
                       final selected = !_allTypes && _prefs.types.contains(t);
-                      return FilterChip(
-                        label: Text(t),
+                      return _buildFilterChip(
+                        label: t,
                         selected: selected,
                         onSelected: (_) =>
                             _toggleType(t, eventTypes.length),
-                        selectedColor: AppColors.purple.withValues(alpha: 0.18),
-                        checkmarkColor: AppColors.purple,
                       );
                     }),
                   ],
@@ -173,22 +170,19 @@ class _EventNotificationsSettingsScreenState
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ChoiceChip(
-                      label: const Text('All countries'),
+                    _buildChoiceChip(
+                      label: 'All countries',
                       selected: _allCountries,
                       onSelected: (_) => _selectAllCountries(),
-                      selectedColor: AppColors.purple.withValues(alpha: 0.18),
                     ),
                     ...eventCountries.map((c) {
                       final selected = !_allCountries &&
                           _prefs.countries.contains(c.toLowerCase());
-                      return FilterChip(
-                        label: Text(c),
+                      return _buildFilterChip(
+                        label: c,
                         selected: selected,
                         onSelected: (_) =>
                             _toggleCountry(c, eventCountries.length),
-                        selectedColor: AppColors.purple.withValues(alpha: 0.18),
-                        checkmarkColor: AppColors.purple,
                       );
                     }),
                   ],
@@ -230,10 +224,73 @@ class _EventNotificationsSettingsScreenState
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.purple,
-        title: Text(title),
-        subtitle: Text(subtitle,
-            style: TextStyle(fontSize: 12, color: context.textSecondary)),
+        activeThumbColor: AppColors.purple,
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: context.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(fontSize: 12, color: context.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChoiceChip({
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+  }) {
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          color: selected ? AppColors.purple : context.textPrimary,
+        ),
+      ),
+      selected: selected,
+      onSelected: onSelected,
+      backgroundColor: context.cardBg,
+      selectedColor: AppColors.purple.withValues(alpha: 0.18),
+      side: BorderSide(
+        color: selected
+            ? AppColors.purple.withValues(alpha: 0.6)
+            : context.borderColor,
+      ),
+      showCheckmark: false,
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+  }) {
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          color: selected ? AppColors.purple : context.textPrimary,
+        ),
+      ),
+      selected: selected,
+      onSelected: onSelected,
+      backgroundColor: context.cardBg,
+      selectedColor: AppColors.purple.withValues(alpha: 0.18),
+      checkmarkColor: AppColors.purple,
+      side: BorderSide(
+        color: selected
+            ? AppColors.purple.withValues(alpha: 0.6)
+            : context.borderColor,
       ),
     );
   }

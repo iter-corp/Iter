@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../providers/auth_providers.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/responsive.dart';
 import '../../widgets/personalization_fields.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -166,11 +167,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pad = context.scaleW(16, 24);
     return Scaffold(
       appBar: AppBar(title: const Text('Set up profile')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(pad, pad, pad, pad + context.bottomSafeInset),
           child: Form(
             key: _formKey,
             child: Column(
@@ -227,15 +229,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           const Icon(Icons.tune_rounded,
                               color: AppColors.purple, size: 20),
                           const SizedBox(width: 8),
-                          Text(
-                            'About you',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: context.textPrimary,
+                          Expanded(
+                            child: Text(
+                              'About you',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Spacer(),
                           Text(
                             'Optional',
                             style: TextStyle(

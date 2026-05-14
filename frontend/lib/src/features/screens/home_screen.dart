@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,7 @@ import '../../providers/admin_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
 import '../../services/post_service.dart';
+import '../../utils/responsive.dart';
 import '../model/post_model.dart';
 import 'create_post_screen.dart';
 import 'qa_thread_screen.dart';
@@ -650,115 +650,103 @@ class _HomeModeToggle extends StatelessWidget {
             : 2;
     const flexes = [10.0, 12.0, 10.0];
     const totalFlex = 32.0;
+    final isXSmall = context.isXSmall;
+    final isCompact = context.isCompact;
+    // Hide icons on the tightest phones to give labels breathing room.
+    final showIcons = !isXSmall;
+    final gap = isXSmall ? 4.0 : 6.0;
+    final outerHPad = context.scaleW(10, 14);
+    final pillHeight = context.scaleW(42, 48);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color.fromARGB(255, 74, 73, 73)
-                      .withValues(alpha: 0.18),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      padding: EdgeInsets.fromLTRB(outerHPad, 0, outerHPad, 6),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: gap, vertical: gap),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 12,
+              offset: Offset(0, 4),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final available = constraints.maxWidth;
-                // Row: SizedBox(2) + Expanded*3 + SizedBox(6)*2 + SizedBox(2)
-                final flexWidth = available - 2 - 6 - 6 - 2;
-                final w = flexes.map((f) => flexWidth * f / totalFlex).toList();
-                final x = [
-                  2.0,
-                  2.0 + w[0] + 6,
-                  2.0 + w[0] + 6 + w[1] + 6,
-                ];
-                return SizedBox(
-                  height: 44,
-                  child: Stack(
+          ],
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final available = constraints.maxWidth;
+            // Row: gap + Expanded*3 + gap*2 (between items) + gap
+            final flexWidth = available - gap * 4;
+            final w = flexes.map((f) => flexWidth * f / totalFlex).toList();
+            final x = [
+              gap,
+              gap + w[0] + gap,
+              gap + w[0] + gap + w[1] + gap,
+            ];
+            return SizedBox(
+              height: pillHeight,
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOut,
+                    left: x[selectedIndex],
+                    width: w[selectedIndex],
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                    ),
+                  ),
+                  Row(
                     children: [
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeInOut,
-                        left: x[selectedIndex],
-                        width: w[selectedIndex],
-                        top: 0,
-                        bottom: 0,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.26),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.26),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                      SizedBox(width: gap),
+                      Expanded(
+                        flex: 10,
+                        child: _ModePillButton(
+                          label: 'Feed',
+                          icon: showIcons
+                              ? Icons.dynamic_feed_rounded
+                              : null,
+                          selected: mode == _HomeMode.feed,
+                          compact: isCompact,
+                          onTap: () => onChanged(_HomeMode.feed),
                         ),
                       ),
-                      Row(
-                        children: [
-                          const SizedBox(width: 2),
-                          Expanded(
-                            flex: 10,
-                            child: _ModePillButton(
-                              label: 'Feed',
-                              icon: Icons.dynamic_feed_rounded,
-                              selected: mode == _HomeMode.feed,
-                              onTap: () => onChanged(_HomeMode.feed),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            flex: 12,
-                            child: _ModePillButton(
-                              label: 'Travel Mode',
-                              icon: Icons.flight,
-                              selected: mode == _HomeMode.travel,
-                              selectedHorizontalPadding: 10,
-                              onTap: () => onChanged(_HomeMode.travel),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            flex: 10,
-                            child: _ModePillButton(
-                              label: 'Discuss',
-                              icon: Icons.forum_outlined,
-                              selected: mode == _HomeMode.qa,
-                              onTap: () => onChanged(_HomeMode.qa),
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                        ],
+                      SizedBox(width: gap),
+                      Expanded(
+                        flex: 12,
+                        child: _ModePillButton(
+                          label: isXSmall ? 'Travel' : 'Travel Mode',
+                          icon: showIcons ? Icons.flight : null,
+                          selected: mode == _HomeMode.travel,
+                          selectedHorizontalPadding: isXSmall ? 6 : 10,
+                          compact: isCompact,
+                          onTap: () => onChanged(_HomeMode.travel),
+                        ),
                       ),
+                      SizedBox(width: gap),
+                      Expanded(
+                        flex: 10,
+                        child: _ModePillButton(
+                          label: 'Discuss',
+                          icon: showIcons ? Icons.forum_outlined : null,
+                          selected: mode == _HomeMode.qa,
+                          compact: isCompact,
+                          onTap: () => onChanged(_HomeMode.qa),
+                        ),
+                      ),
+                      SizedBox(width: gap),
                     ],
                   ),
-                );
-              },
-            ),
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1361,6 +1349,7 @@ class _ModePillButton extends StatelessWidget {
   final IconData? icon;
   final bool selected;
   final double selectedHorizontalPadding;
+  final bool compact;
   final VoidCallback onTap;
 
   const _ModePillButton({
@@ -1368,47 +1357,40 @@ class _ModePillButton extends StatelessWidget {
     this.icon,
     required this.selected,
     this.selectedHorizontalPadding = 8,
+    this.compact = false,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hPad = compact ? selectedHorizontalPadding * 0.6 : selectedHorizontalPadding;
+    // Match BottomNav: selected = black-on-white, unselected = white-on-dark.
+    final color = selected ? Colors.black : Colors.white;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: EdgeInsets.symmetric(
-          vertical: 10,
-          horizontal: selectedHorizontalPadding,
-        ),
+        padding: EdgeInsets.symmetric(vertical: 10, horizontal: hPad),
         color: Colors.transparent,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(
-                icon,
-                size: 16,
-                color: selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.62),
-              ),
-              const SizedBox(width: 4),
+              Icon(icon, size: compact ? 14 : 16, color: color),
+              SizedBox(width: compact ? 3 : 4),
             ],
             Flexible(
-              child: Text(
+              child: FitText(
                 label,
-                maxLines: 1,
-                overflow: TextOverflow.fade,
-                softWrap: false,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.62),
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: color,
                 ),
+                minFontSize: 11,
               ),
             ),
           ],

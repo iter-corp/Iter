@@ -2,11 +2,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/chat_service.dart';
+import '../services/e2ee/e2ee_service.dart';
+import '../services/e2ee/key_manager.dart';
 import '../services/presence_service.dart';
 import '../services/typing_service.dart';
 import 'auth_providers.dart';
 
-final chatServiceProvider = Provider<ChatService>((_) => ChatService());
+final keyManagerProvider = Provider<KeyManager>((_) => KeyManager());
+
+final e2eeServiceProvider = Provider<E2EEService>((ref) {
+  return E2EEService(keyManager: ref.watch(keyManagerProvider));
+});
+
+final chatServiceProvider = Provider<ChatService>(
+  (ref) => ChatService(e2ee: ref.watch(e2eeServiceProvider)),
+);
 final presenceServiceProvider =
     Provider<PresenceService>((_) => PresenceService());
 final typingServiceProvider = Provider<TypingService>((_) => TypingService());

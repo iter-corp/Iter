@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../utils/responsive.dart';
+
 class BottomNav extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onTap;
@@ -21,9 +23,21 @@ class BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isXSmall = context.isXSmall;
+    final hMargin = context.scaleW(10, 20);
+    // Honor iOS home indicator / Android nav bar inset; never go below 8.
+    final double rawBottom = context.bottomSafeInset > 0
+        ? context.bottomSafeInset * 0.5 + 6
+        : 16.0;
+    final bottomMargin = rawBottom.clamp(8.0, 28.0);
+    final hPad = isXSmall ? 8.0 : 12.0;
+    final vPad = isXSmall ? 10.0 : 12.0;
+    final itemPad = isXSmall ? 6.0 : 8.0;
+    final iconSize = isXSmall ? 20.0 : 24.0;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16, left: 20, right: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      margin: EdgeInsets.only(bottom: bottomMargin, left: hMargin, right: hMargin),
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(40),
@@ -40,22 +54,27 @@ class BottomNav extends StatelessWidget {
         children: List.generate(_icons.length, (index) {
           final bool isSelected = selectedIndex == index;
 
-          return GestureDetector(
-            onTap: () => onTap(index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: SvgPicture.asset(
-                _icons[index],
-                width: 24,
-                height: 24,
-                colorFilter: ColorFilter.mode(
-                  isSelected ? Colors.black : Colors.white,
-                  BlendMode.srcIn,
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(index),
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: EdgeInsets.all(itemPad),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.white : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: SvgPicture.asset(
+                    _icons[index],
+                    width: iconSize,
+                    height: iconSize,
+                    colorFilter: ColorFilter.mode(
+                      isSelected ? Colors.black : Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
                 ),
               ),
             ),

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/responsive.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -95,35 +96,38 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hPad = context.scaleW(16, 24);
+    final vPad = context.scaleW(20, 32);
+    final iconCircle = context.scaleW(60, 72);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 30),
+                SizedBox(height: context.scaleW(16, 30)),
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: iconCircle,
+                  height: iconCircle,
                   decoration: BoxDecoration(
                     color: context.purpleSoft,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.send_rounded,
-                    color: Color(0xFFCE5DE5),
-                    size: 30,
+                    color: const Color(0xFFCE5DE5),
+                    size: context.scaleW(26, 30),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   'Sign Up',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: context.scaleW(20, 24),
                     fontWeight: FontWeight.bold,
                     color: context.textPrimary,
                   ),
@@ -247,9 +251,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   icon: _buildSocialBadge('f', const Color(0xFF1877F2)),
                   onTap: () {},
                 ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                SizedBox(height: context.scaleW(20, 30)),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       'Already have an account? ',
@@ -268,6 +273,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                   ],
                 ),
+                SizedBox(height: context.bottomSafeInset),
               ],
             ),
           ),

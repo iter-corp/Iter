@@ -8,8 +8,10 @@ import '../../providers/event_chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../model/post_model.dart';
+import '../../services/admin_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/event_detail.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
@@ -408,8 +410,15 @@ class _NotificationItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final actorStream =
-        ref.watch(userServiceProvider).streamUser(notif.actorUid);
+    // System notifications (e.g. `new_event`) carry an empty actorUid since
+    // they aren't attributable to a specific user. Calling streamUser('')
+    // throws "A document path must be a non-empty string". Skip the lookup
+    // entirely in that case — `new_event` renders title/subtitle from the
+    // notification doc itself and doesn't need actor info.
+    final hasActor = notif.actorUid.isNotEmpty;
+    final actorStream = hasActor
+        ? ref.watch(userServiceProvider).streamUser(notif.actorUid)
+        : Stream<Map<String, dynamic>?>.value(null);
     final currentUser = ref.watch(authStateProvider).value;
 
     return StreamBuilder<Map<String, dynamic>?>(
@@ -686,11 +695,16 @@ class _NotificationItem extends ConsumerWidget {
         }
         break;
       case 'new_event':
-        // Open the Events tab so the user can browse / register.
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EventBody()),
-        );
+        // Jump straight to the event detail. Falls back to the events list
+        // if the event was deleted/unpublished between fan-out and tap.
+        if (notif.targetId != null && notif.targetId!.isNotEmpty) {
+          _openEventDetailFromNotification(context, notif.targetId!);
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const EventBody()),
+          );
+        }
         break;
       case 'event_rejected':
       case 'event_removed':
@@ -744,6 +758,46 @@ class _NotificationItem extends ConsumerWidget {
         builder: (_) => PostDetailScreen(
           postId: postId,
           highlightCommentId: highlightCommentId,
+        ),
+      ),
+    );
+  }
+
+  /// Loads the event doc from Firestore and pushes [EventDetailScreen].
+  /// If the event is gone (deleted by the admin between fan-out and tap)
+  /// we fall back to the events list so the tap isn't a dead end.
+  Future<void> _openEventDetailFromNotification(
+    BuildContext context,
+    String eventId,
+  ) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('events')
+        .doc(eventId)
+        .get();
+    if (!context.mounted) return;
+    if (!snap.exists) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EventBody()),
+      );
+      return;
+    }
+    final e = AdminEvent.fromDoc(snap);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          eventId: e.id,
+          title: e.title,
+          subtitle: e.subtitle,
+          location: e.location,
+          eventType: e.eventType,
+          deadlineAt: e.deadlineAt,
+          imageUrls: e.imageUrls,
+          description: e.description,
+          link: e.link,
+          phone: e.phone,
+          email: e.email,
         ),
       ),
     );
