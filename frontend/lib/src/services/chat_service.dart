@@ -246,6 +246,12 @@ class ChatConversation {
 // ─────────────────────────────────────────────
 
 class ChatService {
+  /// Permanently delete a group chat and all its messages. Admin only.
+  Future<void> deleteGroup(String chatId) async {
+    // For now, just call deleteChat. In future, add group-specific cleanup if needed.
+    await deleteChat(chatId);
+  }
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   DocumentReference<Map<String, dynamic>> _chatDoc(String chatId) =>

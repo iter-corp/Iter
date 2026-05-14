@@ -45,6 +45,18 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
   final FocusNode _focusNode = FocusNode();
   bool _sending = false;
   _ReplyTarget? _replyTo;
+  final Set<String> _expandedAnswers = {};
+  bool _hasExpandedHighlight = false;
+
+  void _toggleAnswer(String answerId) {
+    setState(() {
+      if (_expandedAnswers.contains(answerId)) {
+        _expandedAnswers.remove(answerId);
+      } else {
+        _expandedAnswers.add(answerId);
+      }
+    });
+  }
 
   void _startReply(Comment target) {
     final parentId = target.parentCommentId ?? target.id;
@@ -196,11 +208,14 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                           final highlighted = (pinCommentId != null &&
                                   answer.id == pinCommentId) ||
                               (pinUid != null && answer.authorUid == pinUid);
+                          final expanded = _expandedAnswers.contains(answer.id);
                           return _AnswerBlock(
                             postId: post.id,
                             answer: answer,
                             replies: replies,
+                            expanded: expanded,
                             highlighted: highlighted,
+                            onToggleExpanded: () => _toggleAnswer(answer.id),
                             onReply: _startReply,
                           );
                         },
@@ -387,6 +402,8 @@ class _AnswerBlock extends ConsumerWidget {
   final Comment answer;
   final List<Comment> replies;
   final void Function(Comment target) onReply;
+  final VoidCallback onToggleExpanded;
+  final bool expanded;
   final bool highlighted;
 
   const _AnswerBlock({
@@ -394,13 +411,14 @@ class _AnswerBlock extends ConsumerWidget {
     required this.answer,
     required this.replies,
     required this.onReply,
+    required this.onToggleExpanded,
+    required this.expanded,
     this.highlighted = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
         color: highlighted
             ? const Color(0xFF7E3BE8).withValues(alpha: 0.08)
@@ -416,20 +434,50 @@ class _AnswerBlock extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AnswerRow(
-            comment: answer,
-            trailingAction: null,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _AnswerRow(
+                  comment: answer,
+                  onTap: replies.isNotEmpty ? onToggleExpanded : null,
+                  trailingAction: replies.isNotEmpty
+                      ? Icon(
+                          expanded
+                              ? Icons.keyboard_arrow_up_outlined
+                              : Icons.keyboard_arrow_down_outlined,
+                          color: context.textSecondary,
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 6),
+                _AnswerReactionBar(
+                  postId: postId,
+                  answer: answer,
+                  onReply: () => onReply(answer),
+                ),
+                if (replies.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      expanded
+                          ? '${replies.length} repl${replies.length == 1 ? 'y' : 'ies'} visible'
+                          : 'View ${replies.length} ${replies.length == 1 ? 'reply' : 'replies'}',
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          _AnswerReactionBar(
-            postId: postId,
-            answer: answer,
-            onReply: () => onReply(answer),
-          ),
-          if (replies.isNotEmpty) ...[
-            const SizedBox(height: 6),
+          if (expanded && replies.isNotEmpty) ...[
             Container(
-              margin: const EdgeInsets.only(left: 14),
+              margin: const EdgeInsets.only(
+                  left: 14, top: 6, right: 12, bottom: 10),
               padding: const EdgeInsets.only(left: 10),
               decoration: BoxDecoration(
                 border: Border(
@@ -724,17 +772,19 @@ class _AnswerRow extends StatelessWidget {
   final Comment comment;
   final bool compact;
   final Widget? trailingAction;
+  final VoidCallback? onTap;
 
   const _AnswerRow({
     required this.comment,
     this.compact = false,
     this.trailingAction,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => openUserProfile(context, uid: comment.authorUid),
+      onTap: onTap ?? () => openUserProfile(context, uid: comment.authorUid),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),

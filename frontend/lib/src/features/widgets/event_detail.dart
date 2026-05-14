@@ -12,8 +12,11 @@ class EventDetailScreen extends ConsumerStatefulWidget {
   final String title;
   final String subtitle;
   final String location;
+  final String eventType;
+  final DateTime? deadlineAt;
   final List<String> imageUrls;
   final String description;
+  final String link;
   final String phone;
   final String email;
 
@@ -23,8 +26,11 @@ class EventDetailScreen extends ConsumerStatefulWidget {
     required this.title,
     required this.subtitle,
     required this.location,
+    required this.eventType,
+    required this.deadlineAt,
     required this.imageUrls,
     required this.description,
+    required this.link,
     required this.phone,
     required this.email,
   });
@@ -36,6 +42,29 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   int _currentImage = 0;
   late final PageController _pageController;
+
+  Uri? _parsedEventLink() {
+    final raw = widget.link.trim();
+    if (raw.isEmpty) return null;
+    final withScheme = raw.contains('://') ? raw : 'https://$raw';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null) return null;
+    if (uri.host.trim().isEmpty) return null;
+    return uri;
+  }
+
+  Future<void> _openEventLink(Uri uri) async {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open event link')),
+      );
+    }
+  }
+
+  String _formatDate(BuildContext context, DateTime date) {
+    return MaterialLocalizations.of(context).formatMediumDate(date);
+  }
 
   @override
   void initState() {
@@ -69,6 +98,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final phone = widget.phone.trim();
+    final email = widget.email.trim();
+    final hasContact = phone.isNotEmpty || email.isNotEmpty;
     return Scaffold(
       backgroundColor: context.cardBg,
       body: SafeArea(
@@ -213,6 +245,40 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
               const SizedBox(height: 18),
 
+              if (widget.location.trim().isNotEmpty ||
+                  widget.eventType.trim().isNotEmpty ||
+                  widget.deadlineAt != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (widget.location.trim().isNotEmpty)
+                        _MetaChip(
+                          icon: Icons.location_on_outlined,
+                          label: widget.location.trim(),
+                        ),
+                      if (widget.eventType.trim().isNotEmpty)
+                        _MetaChip(
+                          icon: Icons.sell_outlined,
+                          label: widget.eventType.trim(),
+                        ),
+                      if (widget.deadlineAt != null)
+                        _MetaChip(
+                          icon: Icons.calendar_month_outlined,
+                          label:
+                              'Deadline ${_formatDate(context, widget.deadlineAt!)}',
+                        ),
+                    ],
+                  ),
+                ),
+
+              if (widget.location.trim().isNotEmpty ||
+                  widget.eventType.trim().isNotEmpty ||
+                  widget.deadlineAt != null)
+                const SizedBox(height: 14),
+
               // 📌 SECTION: Description text
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -228,15 +294,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
               const SizedBox(height: 24),
 
-              // 📌 SECTION: Plan your trip (booking placeholders)
-              if (widget.location.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _PlanTripSection(location: widget.location),
-                ),
-
-              const SizedBox(height: 24),
-
               // 📌 SECTION: Registration
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -244,7 +301,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'If you would like to become one of us, you\ncan register below:',
+                      _parsedEventLink() != null
+                          ? 'If you would like to join, you\ncan apply below:'
+                          : 'If you would like to become one of us, you\ncan register below:',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
@@ -256,6 +315,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     _RegistrationButton(
                       eventId: widget.eventId,
                       eventTitle: widget.title,
+                      applyUri: _parsedEventLink(),
                     ),
                   ],
                 ),
@@ -263,42 +323,46 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
               const SizedBox(height: 28),
 
-              // 📌 SECTION: Divider
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: context.borderColor,
-              ),
+              if (hasContact) ...[
+                // 📌 SECTION: Divider
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: context.borderColor,
+                ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // 📌 SECTION: Contact title
-              Center(
-                child: Text(
-                  'Contact',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.textPrimary,
+                // 📌 SECTION: Contact title
+                Center(
+                  child: Text(
+                    'Contact',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: context.textPrimary,
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // 📌 SECTION: Phone row
-              _ContactRow(
-                icon: Icons.phone,
-                iconColor: const Color(0xFF26A69A), // teal — matches design
-                label: widget.phone,
-              ),
+                // 📌 SECTION: Phone row
+                if (phone.isNotEmpty)
+                  _ContactRow(
+                    icon: Icons.phone,
+                    iconColor: const Color(0xFF26A69A), // teal — matches design
+                    label: phone,
+                  ),
 
-              // 📌 SECTION: Email row
-              _ContactRow(
-                icon: Icons.mail,
-                iconColor: context.textPrimary,
-                label: widget.email,
-              ),
+                // 📌 SECTION: Email row
+                if (email.isNotEmpty)
+                  _ContactRow(
+                    icon: Icons.mail,
+                    iconColor: context.textPrimary,
+                    label: email,
+                  ),
+              ],
 
               const SizedBox(height: 40),
             ],
@@ -366,15 +430,89 @@ class _ContactRow extends StatelessWidget {
   }
 }
 
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MetaChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: context.surfaceSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: context.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: context.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // 📌 SECTION: Registration Button (state-aware)
 class _RegistrationButton extends ConsumerWidget {
   final String eventId;
   final String eventTitle;
+  final Uri? applyUri;
 
-  const _RegistrationButton({required this.eventId, required this.eventTitle});
+  const _RegistrationButton({
+    required this.eventId,
+    required this.eventTitle,
+    this.applyUri,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (applyUri != null) {
+      return Align(
+        alignment: Alignment.center,
+        child: GestureDetector(
+          onTap: () async {
+            final ok = await launchUrl(
+              applyUri!,
+              mode: LaunchMode.externalApplication,
+            );
+            if (!ok && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Could not open application link')),
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFCE5DE5),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Text(
+              'Apply',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final regAsync = ref.watch(myRegistrationProvider(eventId));
     final reg = regAsync.value;
 
@@ -431,178 +569,6 @@ class _RegistrationButton extends ConsumerWidget {
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// 📌 SECTION: Plan-your-trip booking placeholders
-//
-// External-link shortcuts to Booking.com (hotels) and Google Flights
-// (flights). These are intentionally URL-based — no booking SDK is
-// integrated yet. The destination is parsed from the event's location
-// string, taking the first comma-separated segment as the city.
-class _PlanTripSection extends StatelessWidget {
-  final String location;
-  const _PlanTripSection({required this.location});
-
-  String get _destination {
-    final first = location.split(',').first.trim();
-    return first.isEmpty ? location.trim() : first;
-  }
-
-  Future<void> _openHotels(BuildContext context) async {
-    final uri = Uri.parse(
-      'https://www.booking.com/searchresults.html?ss=${Uri.encodeQueryComponent(_destination)}',
-    );
-    await _launch(context, uri, label: 'hotel search');
-  }
-
-  Future<void> _openFlights(BuildContext context) async {
-    final uri = Uri.parse(
-      'https://www.google.com/travel/flights?q=${Uri.encodeQueryComponent('Flights to $_destination')}',
-    );
-    await _launch(context, uri, label: 'flight search');
-  }
-
-  Future<void> _launch(BuildContext context, Uri uri,
-      {required String label}) async {
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open $label')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.travel_explore_rounded,
-                size: 18, color: Color(0xFFB05ECC)),
-            const SizedBox(width: 6),
-            Text(
-              'Plan your trip',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Heading to $_destination? Find a place to stay or a flight in.',
-          style: TextStyle(
-            fontSize: 12.5,
-            color: context.textSecondary,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _BookingTile(
-                icon: Icons.hotel_rounded,
-                label: 'Hotels',
-                subtitle: 'Find stays',
-                onTap: () => _openHotels(context),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _BookingTile(
-                icon: Icons.flight_takeoff_rounded,
-                label: 'Flights',
-                subtitle: 'Search routes',
-                onTap: () => _openFlights(context),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _BookingTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _BookingTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFB05ECC), Color(0xFF8A3FB8)],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_outward_rounded,
-                  size: 14, color: context.textSecondary),
-            ],
           ),
         ),
       ),

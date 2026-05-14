@@ -119,14 +119,15 @@ class AdminConfig {
 /// Canonical event-type options. Admins pick one when creating an event;
 /// users can filter event notifications by these.
 const List<String> kEventTypes = [
+  'Scholarship',
+  'Internship',
+  'Research',
   'Conference',
-  'Workshop',
-  'Networking',
-  'Cultural',
-  'Academic',
-  'Career fair',
-  'Webinar',
-  'Other',
+  'Summer Program',
+  'Competition',
+  'Leadership',
+  'Youth Summit',
+  'other',
 ];
 
 /// Canonical country options. Admins tag an event with the country it takes
@@ -162,10 +163,12 @@ class AdminEvent {
   final String subtitle;
   final String location;
   final String description;
+  final String link;
   final String phone;
   final String email;
   final List<String> imageUrls;
   final DateTime? createdAt;
+  final DateTime? deadlineAt;
 
   /// One of [kEventTypes]; empty when the admin didn't set one (legacy events).
   final String eventType;
@@ -184,10 +187,12 @@ class AdminEvent {
     required this.subtitle,
     required this.location,
     required this.description,
+    required this.link,
     required this.phone,
     required this.email,
     required this.imageUrls,
     required this.createdAt,
+    this.deadlineAt,
     this.eventType = '',
     this.country = '',
     this.lat,
@@ -204,10 +209,12 @@ class AdminEvent {
       subtitle: (d['subtitle'] as String?) ?? '',
       location: (d['location'] as String?) ?? '',
       description: (d['description'] as String?) ?? '',
+      link: (d['link'] as String?) ?? '',
       phone: (d['phone'] as String?) ?? '',
       email: (d['email'] as String?) ?? '',
       imageUrls: (d['imageUrls'] as List?)?.cast<String>() ?? const [],
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      deadlineAt: (d['deadline'] as Timestamp?)?.toDate(),
       eventType: (d['eventType'] as String?) ?? '',
       // `country` keeps the admin's original casing for display/editing;
       // `locationCountry` (lower-cased) is the matching key.
@@ -262,10 +269,8 @@ class AdminService {
     final userSnap = await _db.collection('users').doc(uid).get();
     final email = (userSnap.data()?['email'] as String?) ?? '';
 
-    final posts = await _db
-        .collection('posts')
-        .where('authorUid', isEqualTo: uid)
-        .get();
+    final posts =
+        await _db.collection('posts').where('authorUid', isEqualTo: uid).get();
     for (final post in posts.docs) {
       await _deleteSubcollection(post.reference, 'likes');
       await _deleteSubcollection(post.reference, 'comments');
@@ -364,10 +369,8 @@ class AdminService {
       }
     }
 
-    final posts = await _db
-        .collection('posts')
-        .where('authorUid', isEqualTo: uid)
-        .get();
+    final posts =
+        await _db.collection('posts').where('authorUid', isEqualTo: uid).get();
     for (final post in posts.docs) {
       await post.reference.delete();
     }
@@ -422,8 +425,7 @@ class AdminService {
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((s) =>
-            s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+        .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
   }
 
   Future<void> deletePost(String postId) =>
@@ -449,9 +451,11 @@ class AdminService {
     required String subtitle,
     required String location,
     required String description,
+    required String link,
     required String phone,
     required String email,
     required List<String> imageUrls,
+    DateTime? deadlineAt,
     String eventType = '',
     String country = '',
     double? lat,
@@ -462,9 +466,11 @@ class AdminService {
       'subtitle': subtitle,
       'location': location,
       'description': description,
+      'link': link,
       'phone': phone,
       'email': email,
       'imageUrls': imageUrls,
+      if (deadlineAt != null) 'deadline': Timestamp.fromDate(deadlineAt),
       'eventType': eventType,
       if (lat != null && lng != null) 'geo': {'lat': lat, 'lng': lng},
       // Lower-cased first segment of the location, kept for legacy callers.
@@ -586,6 +592,9 @@ class AdminService {
       final c = (payload['country'] as String).trim();
       payload['country'] = c;
       payload['locationCountry'] = c.toLowerCase();
+    }
+    if (payload['deadline'] is DateTime) {
+      payload['deadline'] = Timestamp.fromDate(payload['deadline'] as DateTime);
     }
     await _db.collection('events').doc(id).update(payload);
     // Keep the chat doc's title mirrored when the admin renames the event.

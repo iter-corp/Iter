@@ -27,6 +27,44 @@ class GroupSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
+  Future<void> _deleteGroup() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete group?'),
+        content: Text(
+          'This will permanently delete the group "${widget.groupName}" and all its messages for all members. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    try {
+      await ref.read(chatServiceProvider).deleteGroup(widget.chatId);
+      if (!mounted) return;
+      Navigator.of(context)
+        ..pop()
+        ..pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+    }
+  }
+
   bool _isSaving = false;
 
   Future<void> _savePermissions({
@@ -139,8 +177,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
               for (final uid in _sortMembers(participants, adminUid))
                 _MemberTile(
                   uid: uid,
-                  cachedData: (userData[uid] as Map<String, dynamic>?) ??
-                      const {},
+                  cachedData:
+                      (userData[uid] as Map<String, dynamic>?) ?? const {},
                   isAdmin: uid == adminUid,
                   isMe: uid == currentUid,
                 ),
@@ -168,6 +206,20 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                   mediaShare: mediaShare,
                   saving: _isSaving,
                   onSave: _savePermissions,
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: _deleteGroup,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete group'),
+                  ),
                 ),
               ],
               const SizedBox(height: 24),
@@ -393,8 +445,7 @@ class _PermissionsSectionState extends State<_PermissionsSection> {
           _PermissionCard(
             icon: Icons.image_outlined,
             title: 'Enable Media Sharing',
-            subtitle:
-                'Allow members to share images and send voice messages.',
+            subtitle: 'Allow members to share images and send voice messages.',
             value: _media,
             onChanged: (v) => setState(() => _media = v),
           ),
@@ -420,8 +471,7 @@ class _PermissionsSectionState extends State<_PermissionsSection> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Text(

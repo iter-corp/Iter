@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 /// pending registrations (to approve/reject), current members (with remove
 /// buttons), and an "Add user" button. For regular members, it's a read-only
 /// member list with a "Leave group" action.
+
 class EventGroupSettingsScreen extends ConsumerWidget {
   final String eventId;
   final String eventTitle;
@@ -26,6 +27,84 @@ class EventGroupSettingsScreen extends ConsumerWidget {
     required this.eventTitle,
     required this.adminUid,
   });
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete group?'),
+        content: const Text(
+            'This will permanently delete the group and all its messages for all members. This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete',
+                  style: TextStyle(color: Color(0xFFE04E5C)))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(eventChatServiceProvider).deleteEventGroup(eventId);
+      if (context.mounted) {
+        Navigator.pop(context); // pop settings
+        Navigator.pop(context); // pop chat
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+      }
+    }
+  }
+
+  Future<void> _openAddUserSheet(BuildContext context, WidgetRef ref) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AddUserSheet(eventId: eventId),
+    );
+  }
+
+  Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Leave group?'),
+        content: const Text(
+            'You\'ll stop receiving messages for this event. You can re-register later.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Leave',
+                  style: TextStyle(color: Color(0xFFE04E5C))))
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(eventChatServiceProvider).leaveGroup(eventId);
+      if (context.mounted) {
+        Navigator.pop(context); // pop settings
+        Navigator.pop(context); // pop chat
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,6 +138,22 @@ class EventGroupSettingsScreen extends ConsumerWidget {
               ),
             ),
             _MemberList(eventId: eventId, adminUid: adminUid, isAdmin: true),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmDelete(context, ref),
+                icon:
+                    const Icon(Icons.delete_outline, color: Color(0xFFE04E5C)),
+                label: const Text(
+                  'Delete group',
+                  style: TextStyle(color: Color(0xFFE04E5C)),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFE04E5C)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
           ] else ...[
             const _SectionTitle(title: 'Members'),
             _MemberList(eventId: eventId, adminUid: adminUid, isAdmin: false),
@@ -81,51 +176,6 @@ class EventGroupSettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _openAddUserSheet(BuildContext context, WidgetRef ref) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _AddUserSheet(eventId: eventId),
-    );
-  }
-
-  Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Leave group?'),
-        content: const Text(
-            'You\'ll stop receiving messages for this event. You can re-register later.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Leave',
-                  style: TextStyle(color: Color(0xFFE04E5C)))),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await ref.read(eventChatServiceProvider).leaveGroup(eventId);
-      if (context.mounted) {
-        Navigator.pop(context); // pop settings
-        Navigator.pop(context); // pop chat
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
-    }
   }
 }
 
@@ -233,8 +283,7 @@ class _PendingList extends ConsumerWidget {
         }
         return Column(
           children: [
-            for (final r in items)
-              _PendingCard(reg: r),
+            for (final r in items) _PendingCard(reg: r),
           ],
         );
       },
@@ -284,15 +333,14 @@ class _PendingCardState extends ConsumerState<_PendingCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(r.name,
-              style: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
           Text(r.email,
               style: TextStyle(fontSize: 12, color: context.textSecondary)),
           if (r.phone.isNotEmpty)
             Text('${r.countryCode} ${r.phone}',
-                style: TextStyle(
-                    fontSize: 12, color: context.textSecondary)),
+                style: TextStyle(fontSize: 12, color: context.textSecondary)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -443,8 +491,7 @@ class _MemberRow extends ConsumerWidget {
       ),
       trailing: isAdminViewer && !isTheAdmin
           ? IconButton(
-              icon: const Icon(Icons.person_remove_outlined,
-                  color: Colors.red),
+              icon: const Icon(Icons.person_remove_outlined, color: Colors.red),
               onPressed: () => _confirmRemove(context, ref, username),
             )
           : null,
@@ -465,8 +512,7 @@ class _MemberRow extends ConsumerWidget {
               child: const Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Remove',
-                  style: TextStyle(color: Colors.red))),
+              child: const Text('Remove', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -556,8 +602,7 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
             ),
             Expanded(
               child: followingAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (uids) {
                   if (uids.isEmpty) {
@@ -624,8 +669,7 @@ class _FollowedUserRow extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFB05ECC),
               foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             child: const Text('Add'),
           ),

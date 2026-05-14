@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geocoding/geocoding.dart' as geo;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../providers/admin_providers.dart';
@@ -17,6 +16,7 @@ class AdminEventsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(adminEventsProvider);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -46,6 +46,7 @@ class AdminEventsScreen extends ConsumerWidget {
             );
           }
           return ListView.separated(
+            padding: EdgeInsets.only(bottom: bottomInset + 12),
             itemCount: events.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
@@ -61,13 +62,13 @@ class AdminEventsScreen extends ConsumerWidget {
                         ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)
                         : Container(
                             color: context.inputFill,
-                            child: Icon(Icons.event,
-                                color: context.textSecondary),
+                            child:
+                                Icon(Icons.event, color: context.textSecondary),
                           ),
                   ),
                 ),
-                title: Text(e.title,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                title:
+                    Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   e.location,
                   maxLines: 1,
@@ -147,8 +148,7 @@ class _DeleteEventDialogState extends State<_DeleteEventDialog> {
           const SizedBox(height: 8),
           CheckboxListTile(
             value: _alsoDeleteChat,
-            onChanged: (v) =>
-                setState(() => _alsoDeleteChat = v ?? false),
+            onChanged: (v) => setState(() => _alsoDeleteChat = v ?? false),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
             title: const Text('Also delete the event group chat'),
@@ -193,25 +193,25 @@ class _EventEditorScreen extends ConsumerStatefulWidget {
   const _EventEditorScreen({this.existing});
 
   @override
-  ConsumerState<_EventEditorScreen> createState() =>
-      _EventEditorScreenState();
+  ConsumerState<_EventEditorScreen> createState() => _EventEditorScreenState();
 }
 
 class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   final _titleCtrl = TextEditingController();
   final _subtitleCtrl = TextEditingController();
-  final _locationCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _linkCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  String? _titleError;
+  String? _countryError;
   final List<String> _imageUrls = [];
   bool _saving = false;
   bool _uploadingImage = false;
   String _eventType = '';
   String _country = '';
-  double? _lat;
-  double? _lng;
-  bool _geocoding = false;
+  DateTime? _deadlineAt;
 
   @override
   void initState() {
@@ -220,53 +220,14 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     if (e != null) {
       _titleCtrl.text = e.title;
       _subtitleCtrl.text = e.subtitle;
-      _locationCtrl.text = e.location;
       _descCtrl.text = e.description;
+      _linkCtrl.text = e.link;
       _phoneCtrl.text = e.phone;
       _emailCtrl.text = e.email;
       _imageUrls.addAll(e.imageUrls);
       _eventType = e.eventType;
-      _country = e.country;
-      _lat = e.lat;
-      _lng = e.lng;
-    }
-  }
-
-  Future<void> _locateOnMap() async {
-    final query = _locationCtrl.text.trim();
-    if (query.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a location first')),
-      );
-      return;
-    }
-    setState(() => _geocoding = true);
-    try {
-      final results = await geo.locationFromAddress(query);
-      if (results.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No coordinates found for "$query"')),
-          );
-        }
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _lat = results.first.latitude;
-          _lng = results.first.longitude;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location pinned for the events map')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Lookup failed: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _geocoding = false);
+      _country = e.country.isNotEmpty ? e.country : e.location;
+      _deadlineAt = e.deadlineAt;
     }
   }
 
@@ -274,8 +235,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   void dispose() {
     _titleCtrl.dispose();
     _subtitleCtrl.dispose();
-    _locationCtrl.dispose();
     _descCtrl.dispose();
+    _linkCtrl.dispose();
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
@@ -303,11 +264,33 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     }
   }
 
+  Future<void> _pickDeadline() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initial = (_deadlineAt != null && _deadlineAt!.isAfter(today))
+        ? _deadlineAt!
+        : today;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: today,
+      lastDate: DateTime(now.year + 20),
+      helpText: 'Select deadline',
+    );
+    if (picked == null) return;
+    setState(() => _deadlineAt = picked);
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     if (_titleCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Title is required')));
+      return;
+    }
+    if (_country.trim().isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Country is required')));
       return;
     }
     setState(() => _saving = true);
@@ -316,14 +299,16 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       final data = <String, dynamic>{
         'title': _titleCtrl.text.trim(),
         'subtitle': _subtitleCtrl.text.trim(),
-        'location': _locationCtrl.text.trim(),
+        // Location now mirrors country so event cards/details keep one source.
+        'location': _country.trim(),
         'description': _descCtrl.text.trim(),
+        'link': _linkCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
         'imageUrls': _imageUrls,
+        'deadline': _deadlineAt,
         'eventType': _eventType,
         'country': _country,
-        if (_lat != null && _lng != null) 'geo': {'lat': _lat, 'lng': _lng},
       };
       if (widget.existing == null) {
         await admin.createEvent(
@@ -331,13 +316,13 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           subtitle: data['subtitle']! as String,
           location: data['location']! as String,
           description: data['description']! as String,
+          link: data['link']! as String,
           phone: data['phone']! as String,
           email: data['email']! as String,
           imageUrls: _imageUrls,
+          deadlineAt: _deadlineAt,
           eventType: _eventType,
           country: _country,
-          lat: _lat,
-          lng: _lng,
         );
       } else {
         await admin.updateEvent(widget.existing!.id, data);
@@ -356,11 +341,11 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final isNew = widget.existing == null;
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final cfg = ref.watch(adminConfigProvider).value ?? const AdminConfig();
-    // Always include the currently-selected value so the dropdown doesn't
-    // assert if an admin removed that option from the config later.
+    // Keep event types aligned with the canonical list requested by product.
     final typeOptions = <String>{
-      ...cfg.eventTypes,
+      ...kEventTypes,
       if (_eventType.isNotEmpty) _eventType,
     }.toList();
     final countryOptions = <String>{
@@ -376,7 +361,13 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         elevation: 0,
         actions: [
           TextButton(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving
+                ? null
+                : () {
+                    if (_formKey.currentState?.validate() ?? false) {
+                      _save();
+                    }
+                  },
             child: _saving
                 ? const SizedBox(
                     width: 16,
@@ -387,169 +378,458 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _field('Title', _titleCtrl),
-          _field('Subtitle', _subtitleCtrl),
-          _field('Location', _locationCtrl),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: _geocoding ? null : _locateOnMap,
-                  icon: _geocoding
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.map_outlined, size: 18),
-                  label: Text(
-                    (_lat != null && _lng != null)
-                        ? 'Map pin set — re-locate'
-                        : 'Locate on map (for the events map)',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              if (_lat != null && _lng != null)
-                IconButton(
-                  tooltip: 'Clear pin',
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => setState(() {
-                    _lat = null;
-                    _lng = null;
-                  }),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Container(
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: context.borderColor),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset + 12),
+          children: [
+            _refinedField(
+              label: 'Title',
+              controller: _titleCtrl,
+              hint: 'Enter event title',
+              required: true,
+              errorText: _titleError,
+              textInputAction: TextInputAction.next,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            margin: const EdgeInsets.only(bottom: 12),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _eventType.isEmpty ? null : _eventType,
-                hint: const Text('Event type'),
-                items: typeOptions
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
-                onChanged: (v) => setState(() => _eventType = v ?? ''),
-              ),
+            _refinedField(
+              label: 'Subtitle',
+              controller: _subtitleCtrl,
+              hint: 'Short subtitle (optional)',
+              textInputAction: TextInputAction.next,
             ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: context.borderColor),
+            _SearchablePickerField(
+              placeholder: 'Event type',
+              sheetTitle: 'Choose event type',
+              searchHint: 'Search event type...',
+              options: typeOptions,
+              selected: _eventType.isEmpty ? null : _eventType,
+              onChanged: (v) => setState(() => _eventType = v),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            margin: const EdgeInsets.only(bottom: 12),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _country.isEmpty ? null : _country,
-                hint: const Text('Country'),
-                items: countryOptions
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => setState(() => _country = v ?? ''),
-              ),
+            _SearchablePickerField(
+              placeholder: 'Country',
+              sheetTitle: 'Choose country',
+              searchHint: 'Search country...',
+              options: countryOptions,
+              selected: _country.isEmpty ? null : _country,
+              onChanged: (v) => setState(() => _country = v),
             ),
-          ),
-          _field('Description', _descCtrl, maxLines: 4),
-          _field('Phone', _phoneCtrl),
-          _field('Email', _emailCtrl),
-          const SizedBox(height: 8),
-          Text('Images',
-              style: TextStyle(
-                  color: context.textSecondary,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ..._imageUrls.map((u) => Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: CachedNetworkImage(
-                          imageUrl: u,
-                          width: 86,
-                          height: 86,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 2,
-                        right: 2,
-                        child: GestureDetector(
-                          onTap: () => setState(() => _imageUrls.remove(u)),
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
-                            ),
-                            padding: const EdgeInsets.all(3),
-                            child: const Icon(Icons.close,
-                                size: 14, color: Colors.white),
+            _DeadlineField(
+              deadlineAt: _deadlineAt,
+              onPick: _pickDeadline,
+              onClear: _deadlineAt == null
+                  ? null
+                  : () => setState(() => _deadlineAt = null),
+            ),
+            _refinedField(
+              label: 'Description',
+              controller: _descCtrl,
+              hint: 'Describe the event',
+              maxLines: 4,
+              textInputAction: TextInputAction.newline,
+            ),
+            _refinedField(
+              label: 'Link',
+              controller: _linkCtrl,
+              hint: 'Registration or info link',
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+            ),
+            _refinedField(
+              label: 'Phone',
+              controller: _phoneCtrl,
+              hint: 'Contact phone (optional)',
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            _refinedField(
+              label: 'Email',
+              controller: _emailCtrl,
+              hint: 'Contact email (optional)',
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+            ),
+            const SizedBox(height: 8),
+            Text('Images',
+                style: TextStyle(
+                    color: context.textSecondary, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._imageUrls.map((u) => Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: CachedNetworkImage(
+                            imageUrl: u,
+                            width: 86,
+                            height: 86,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      ),
-                    ],
-                  )),
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  width: 86,
-                  height: 86,
-                  decoration: BoxDecoration(
-                    color: context.cardBg,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: context.borderColor),
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _imageUrls.remove(u)),
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              padding: const EdgeInsets.all(3),
+                              child: const Icon(Icons.close,
+                                  size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )),
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: 86,
+                    height: 86,
+                    decoration: BoxDecoration(
+                      color: context.cardBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.borderColor),
+                    ),
+                    child: _uploadingImage
+                        ? const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.add_a_photo_outlined,
+                            color: context.textSecondary),
                   ),
-                  child: _uploadingImage
-                      ? const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(Icons.add_a_photo_outlined,
-                          color: context.textSecondary),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-        ],
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _field(String label, TextEditingController ctrl, {int maxLines = 1}) {
+  Widget _refinedField({
+    required String label,
+    required TextEditingController controller,
+    String? hint,
+    int maxLines = 1,
+    bool required = false,
+    String? errorText,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        elevation: 1,
+        borderRadius: BorderRadius.circular(12),
+        color: context.cardBg,
+        child: TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          style: TextStyle(fontSize: 15, color: context.textPrimary),
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hint ?? label,
+            filled: true,
+            fillColor: context.inputFill,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            errorText: errorText,
+          ),
+          validator: required
+              ? (v) =>
+                  (v == null || v.trim().isEmpty) ? '$label is required' : null
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _DeadlineField extends StatelessWidget {
+  final DateTime? deadlineAt;
+  final VoidCallback onPick;
+  final VoidCallback? onClear;
+
+  const _DeadlineField({
+    required this.deadlineAt,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = deadlineAt == null
+        ? 'Deadline'
+        : MaterialLocalizations.of(context).formatMediumDate(deadlineAt!);
+    return GestureDetector(
+      onTap: onPick,
       child: Container(
         decoration: BoxDecoration(
           color: context.cardBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: context.borderColor),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: TextField(
-          controller: ctrl,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: label,
-            border: InputBorder.none,
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: deadlineAt != null
+                      ? context.textPrimary
+                      : context.textSecondary,
+                ),
+              ),
+            ),
+            if (onClear != null)
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: onClear,
+                tooltip: 'Clear deadline',
+              ),
+            Icon(Icons.calendar_month, color: context.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Searchable picker field/sheet (5 visible rows + scroll) ───────────────
+
+class _SearchablePickerField extends StatelessWidget {
+  final String placeholder;
+  final String sheetTitle;
+  final String searchHint;
+  final List<String> options;
+  final String? selected;
+  final ValueChanged<String> onChanged;
+
+  const _SearchablePickerField({
+    required this.placeholder,
+    required this.sheetTitle,
+    required this.searchHint,
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  Future<void> _open(BuildContext context) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PickerSheet(
+        title: sheetTitle,
+        searchHint: searchHint,
+        options: options,
+        selected: selected,
+      ),
+    );
+    if (result != null) onChanged(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _open(context),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.borderColor),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                selected ?? placeholder,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: selected != null
+                      ? context.textPrimary
+                      : context.textSecondary,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_drop_down, color: context.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerSheet extends StatefulWidget {
+  final String title;
+  final String searchHint;
+  final List<String> options;
+  final String? selected;
+
+  const _PickerSheet({
+    required this.title,
+    required this.searchHint,
+    required this.options,
+    required this.selected,
+  });
+
+  @override
+  State<_PickerSheet> createState() => _PickerSheetState();
+}
+
+class _PickerSheetState extends State<_PickerSheet> {
+  final _searchCtrl = TextEditingController();
+  List<String> _filtered = [];
+
+  // Height for exactly 5 rows + search bar + handle
+  static const double _itemH = 52.0;
+  static const int _visibleRows = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = List.of(widget.options);
+    _searchCtrl.addListener(_onSearch);
+  }
+
+  void _onSearch() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? List.of(widget.options)
+          : widget.options.where((c) => c.toLowerCase().contains(q)).toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Cap visible height to _visibleRows items; shrink if fewer results.
+    final listH = (_filtered.length.clamp(1, _visibleRows)) * _itemH;
+    return SafeArea(
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // drag handle
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            // search bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: widget.searchHint,
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            FocusScope.of(context).unfocus();
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: context.surfaceSoft,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // scrollable list — fixed height = 5 items
+            SizedBox(
+              height: listH,
+              child: _filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No results',
+                        style: TextStyle(color: context.textSecondary),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _filtered.length,
+                      itemExtent: _itemH,
+                      itemBuilder: (_, i) {
+                        final c = _filtered[i];
+                        final isSelected = c == widget.selected;
+                        return ListTile(
+                          dense: true,
+                          title: Text(c),
+                          trailing: isSelected
+                              ? const Icon(Icons.check,
+                                  size: 18, color: Color(0xFF7E3BE8))
+                              : null,
+                          onTap: () => Navigator.pop(context, c),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
       ),
     );

@@ -17,6 +17,7 @@ import '../../utils/app_feedback.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
+import '../../navigation/user_profile_nav.dart';
 import 'location_map.dart';
 
 class PostCard extends ConsumerStatefulWidget {
@@ -74,8 +75,7 @@ class _PostCardState extends ConsumerState<PostCard> {
   }
 
   Future<void> _toggleSave() async {
-    final wasSaved =
-        ref.read(isSavedProvider(widget.post.id)).value ?? false;
+    final wasSaved = ref.read(isSavedProvider(widget.post.id)).value ?? false;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(postServiceProvider).toggleSave(widget.post.id);
@@ -259,9 +259,13 @@ class _PostCardState extends ConsumerState<PostCard> {
               Positioned(
                 top: 14,
                 left: 14,
-                child: _frostedChip(
-                  avatarUrl: avatarUrl,
-                  text: '$username • $postTime',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => openUserProfile(context, uid: post.authorUid),
+                  child: _frostedChip(
+                    avatarUrl: avatarUrl,
+                    text: '$username • $postTime',
+                  ),
                 ),
               ),
               if (isOwner)

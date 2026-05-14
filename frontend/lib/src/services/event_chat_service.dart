@@ -19,8 +19,7 @@ class EventChatMessage {
     this.createdAt,
   });
 
-  factory EventChatMessage.fromDoc(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory EventChatMessage.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
     return EventChatMessage(
       id: doc.id,
@@ -51,6 +50,41 @@ class EventChatSummary {
 }
 
 class EventChatService {
+  /// Admin-only: Permanently delete the event group chat and all its messages/members.
+  Future<void> deleteEventGroup(String eventId) async {
+    final current = _auth.currentUser;
+    if (current == null) throw Exception('Not signed in');
+    // Only admin can delete
+    final chatDoc = await _chatDoc(eventId).get();
+    if ((chatDoc.data()?['adminUid'] as String?) != current.uid) {
+      throw Exception('Only the admin can delete this group');
+    }
+    // Delete all messages
+    while (true) {
+      final msgs = await _messagesCol(eventId).limit(400).get();
+      if (msgs.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final d in msgs.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+      if (msgs.docs.length < 400) break;
+    }
+    // Delete all members
+    while (true) {
+      final members = await _membersCol(eventId).limit(400).get();
+      if (members.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final d in members.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+      if (members.docs.length < 400) break;
+    }
+    // Delete the chat doc
+    await _chatDoc(eventId).delete();
+  }
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notifications = NotificationService();
@@ -113,10 +147,8 @@ class EventChatService {
   ///   (b) chats where `adminUid == uid` (admin's own chats, shown as soon
   ///       as an event is created — before any members join).
   Stream<List<EventChatSummary>> streamMyEventChats(String uid) {
-    final memberEventsStream = _db
-        .collectionGroup('members')
-        .where('uid', isEqualTo: uid)
-        .snapshots();
+    final memberEventsStream =
+        _db.collectionGroup('members').where('uid', isEqualTo: uid).snapshots();
     final adminEventsStream = _db
         .collection('eventChats')
         .where('adminUid', isEqualTo: uid)
@@ -229,9 +261,8 @@ class EventChatService {
   Future<void> markSeen(String eventId) async {
     final user = _auth.currentUser;
     if (user == null) return;
-    await _membersCol(eventId)
-        .doc(user.uid)
-        .set({'lastSeenAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+    await _membersCol(eventId).doc(user.uid).set(
+        {'lastSeenAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
   }
 
   /// Stream the admin uid for an event chat (used by UI to toggle compose).

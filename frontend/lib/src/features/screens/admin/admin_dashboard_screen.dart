@@ -5,7 +5,6 @@ import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 import 'admin_blacklist_screen.dart';
 import 'admin_error_reports_screen.dart';
-import 'admin_event_registrations_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
 import 'admin_settings_screen.dart';
@@ -74,19 +73,6 @@ class AdminDashboardScreen extends ConsumerWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.how_to_reg_outlined,
-            title: 'Event registrations',
-            subtitle: 'Approve or reject pending registrations',
-            color: const Color(0xFF2EBD6B),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const AdminEventRegistrationsScreen(),
-              ),
             ),
           ),
           const SizedBox(height: 10),

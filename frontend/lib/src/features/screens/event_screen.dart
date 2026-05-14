@@ -89,7 +89,8 @@ int _eventRelevanceScore(AdminEvent e, Map<String, dynamic>? userDoc) {
   if (type.isNotEmpty) {
     if (goals.any((g) => type.contains(g) || g.contains(type))) score += 2;
   }
-  if (userCity.isNotEmpty && _eventCity(e).toLowerCase() == userCity) score += 2;
+  if (userCity.isNotEmpty && _eventCity(e).toLowerCase() == userCity)
+    score += 2;
   if (userLat != null && userLng != null && e.lat != null && e.lng != null) {
     final km = _distanceKm(
       {'lat': userLat, 'lng': userLng},
@@ -1122,7 +1123,8 @@ class _EventsView extends ConsumerWidget {
         final scored = {
           for (final e in filtered) e.id: _eventRelevanceScore(e, userDoc),
         };
-        filtered.sort((a, b) => (scored[b.id] ?? 0).compareTo(scored[a.id] ?? 0));
+        filtered
+            .sort((a, b) => (scored[b.id] ?? 0).compareTo(scored[a.id] ?? 0));
 
         return Column(
           children: [
@@ -1533,8 +1535,11 @@ class _EventCardState extends State<_EventCard> {
           title: e.title,
           subtitle: e.subtitle,
           location: e.location,
+          eventType: e.eventType,
+          deadlineAt: e.deadlineAt,
           imageUrls: e.imageUrls,
           description: e.description,
+          link: e.link,
           phone: e.phone,
           email: e.email,
         ),
@@ -1643,58 +1648,64 @@ class _EventCardState extends State<_EventCard> {
                     ),
                   ),
                 ),
-                if (widget.recommended)
+                if (widget.recommended || e.eventType.trim().isNotEmpty)
                   Positioned(
                     top: 10,
                     right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_kBrandPurple, _kBrandDeep],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.auto_awesome_rounded,
-                              size: 11, color: Colors.white),
-                          SizedBox(width: 3),
-                          Text(
-                            'For you',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (widget.recommended)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [_kBrandPurple, _kBrandDeep],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.auto_awesome_rounded,
+                                    size: 11, color: Colors.white),
+                                SizedBox(width: 3),
+                                Text(
+                                  'For you',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (e.eventType.trim().isNotEmpty)
-                  Positioned(
-                    bottom: 78,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        e.eventType.trim(),
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
+                        if (widget.recommended && e.eventType.trim().isNotEmpty)
+                          const SizedBox(height: 6),
+                        if (e.eventType.trim().isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.cardBg.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              e.eventType.trim(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 Positioned(
@@ -2433,8 +2444,11 @@ class _EventMapSheet extends StatelessWidget {
                           title: event.title,
                           subtitle: event.subtitle,
                           location: event.location,
+                          eventType: event.eventType,
+                          deadlineAt: event.deadlineAt,
                           imageUrls: event.imageUrls,
                           description: event.description,
+                          link: event.link,
                           phone: event.phone,
                           email: event.email,
                         ),
