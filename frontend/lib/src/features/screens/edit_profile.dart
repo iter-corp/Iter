@@ -328,8 +328,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               color: context.cardBg,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: context.borderColor
-                                    .withValues(alpha: 0.6),
+                                color:
+                                    context.borderColor.withValues(alpha: 0.6),
                                 width: 1,
                               ),
                             ),
@@ -341,12 +341,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               goals: _goals,
                               onProfessionChanged: (v) =>
                                   setState(() => _profession = v),
-                              onFieldChanged: (v) =>
-                                  setState(() => _field = v),
+                              onFieldChanged: (v) => setState(() => _field = v),
                               onAcademicLevelChanged: (v) =>
                                   setState(() => _academicLevel = v),
-                              onGoalsChanged: (v) =>
-                                  setState(() => _goals = v),
+                              onGoalsChanged: (v) => setState(() => _goals = v),
                             ),
                           ),
                         ),
@@ -655,9 +653,13 @@ class _LabeledInput extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: hint,
                 hintStyle: TextStyle(color: context.textMuted, fontSize: 14),
+                filled: false,
+                fillColor: Colors.transparent,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 6),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 counterText: '',
               ),
             ),
@@ -734,6 +736,8 @@ class _LabeledDropdown extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: hint,
                 hintStyle: TextStyle(color: context.textMuted, fontSize: 14),
+                filled: false,
+                fillColor: Colors.transparent,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 border: InputBorder.none,

@@ -4,40 +4,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../theme/app_theme.dart';
-import 'admin_blacklist_screen.dart';
-import 'admin_events_screen.dart';
-import 'admin_posts_screen.dart';
-import 'admin_reports_screen.dart';
-import 'admin_settings_screen.dart';
-import 'admin_users_screen.dart';
+import 'admin_error_reports_screen.dart';
+import 'admin_post_reports_screen.dart';
+import 'admin_user_reports_screen.dart';
 
-class AdminDashboardScreen extends ConsumerWidget {
-  const AdminDashboardScreen({super.key});
+class AdminReportsScreen extends ConsumerWidget {
+  const AdminReportsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAdmin = ref.watch(isAdminProvider);
-    final hasNewReports = ref.watch(hasAnyNewReportsProvider);
-
-    if (!isAdmin) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Admin')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'You do not have admin access.',
-              style: TextStyle(fontSize: 16, color: context.textSecondary),
-            ),
-          ),
-        ),
-      );
-    }
+    final hasNewPostReports = ref.watch(hasNewPostReportsProvider);
+    final hasNewProfileReports = ref.watch(hasNewProfileReportsProvider);
+    final hasNewErrorReports = ref.watch(hasNewErrorReportsProvider);
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Admin dashboard'),
+        title: const Text('Reports'),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -47,76 +30,57 @@ class AdminDashboardScreen extends ConsumerWidget {
           16,
           16,
           16,
-          28 + MediaQuery.paddingOf(context).bottom,
+          24 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          _AdminTile(
-            icon: Icons.people_alt_outlined,
-            title: 'Users',
-            subtitle: 'Search, suspend, promote',
-            color: const Color(0xFF7E3BE8),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminUsersScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.feed_outlined,
-            title: 'Posts',
-            subtitle: 'Review and delete posts',
-            color: const Color(0xFFD044E8),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminPostsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.assessment_outlined,
-            title: 'Reports',
-            subtitle: 'Post, profile, and error reports',
+          _ReportsTile(
+            icon: Icons.flag_outlined,
+            title: 'Post reports',
+            subtitle: 'Review user-submitted reports on posts',
             color: const Color(0xFFE04E5C),
-            showNotificationDot: hasNewReports,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminReportsScreen()),
-            ),
+            showNotificationDot: hasNewPostReports,
+            onTap: () {
+              ref.read(adminReportSeenProvider.notifier).markPostReportsSeen();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminPostReportsScreen()),
+              );
+            },
           ),
           const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.event_outlined,
-            title: 'Events',
-            subtitle: 'Create / edit / delete events',
-            color: const Color(0xFFFF6B35),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
-            ),
+          _ReportsTile(
+            icon: Icons.person_search_outlined,
+            title: 'Profile reports',
+            subtitle: 'Review user profile abuse reports',
+            color: const Color(0xFFDE5D83),
+            showNotificationDot: hasNewProfileReports,
+            onTap: () {
+              ref
+                  .read(adminReportSeenProvider.notifier)
+                  .markProfileReportsSeen();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminUserReportsScreen()),
+              );
+            },
           ),
           const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.block_outlined,
-            title: 'Blacklisted emails',
-            subtitle: 'Deleted users who cannot re-register',
-            color: Colors.red,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const AdminBlacklistScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.settings_outlined,
-            title: 'App settings',
-            subtitle: 'Feature flags, announcement, store links, maintenance',
-            color: const Color(0xFF3AB0FF),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
-            ),
+          _ReportsTile(
+            icon: Icons.bug_report_outlined,
+            title: 'Error reports',
+            subtitle: 'App-wide errors and crash diagnostics',
+            color: const Color(0xFFE04E5C),
+            showNotificationDot: hasNewErrorReports,
+            onTap: () {
+              ref.read(adminReportSeenProvider.notifier).markErrorReportsSeen();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminErrorReportsScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -124,7 +88,7 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 }
 
-class _AdminTile extends StatelessWidget {
+class _ReportsTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
@@ -132,7 +96,7 @@ class _AdminTile extends StatelessWidget {
   final bool showNotificationDot;
   final VoidCallback onTap;
 
-  const _AdminTile({
+  const _ReportsTile({
     required this.icon,
     required this.title,
     required this.subtitle,

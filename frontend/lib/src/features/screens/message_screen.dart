@@ -178,7 +178,11 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                         hintText: 'Search...',
                         hintStyle:
                             TextStyle(color: context.textMuted, fontSize: 14),
+                        filled: false,
+                        fillColor: Colors.transparent,
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                         icon: Icon(Icons.search, color: context.textSecondary),
                       ),
                     ),
@@ -592,8 +596,7 @@ Future<void> _showChatActions({
   required bool isMuted,
 }) async {
   final svc = ref.read(chatServiceProvider);
-  final displayName =
-      conv.isGroup ? conv.groupName : conv.otherUsername;
+  final displayName = conv.isGroup ? conv.groupName : conv.otherUsername;
   await showModalBottomSheet<void>(
     context: context,
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -653,7 +656,9 @@ Future<void> _showChatActions({
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        isMuted ? 'Notifications unmuted' : 'Notifications muted',
+                        isMuted
+                            ? 'Notifications unmuted'
+                            : 'Notifications muted',
                       ),
                     ),
                   );
@@ -781,7 +786,9 @@ Future<void> _showEventChatActions({
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        isMuted ? 'Notifications unmuted' : 'Notifications muted',
+                        isMuted
+                            ? 'Notifications unmuted'
+                            : 'Notifications muted',
                       ),
                     ),
                   );
@@ -802,8 +809,7 @@ Future<void> _showEventChatActions({
                 ),
                 subtitle: Text(
                   'Removes the group chat and all messages',
-                  style:
-                      TextStyle(fontSize: 12, color: context.textSecondary),
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
                 onTap: () async {
                   Navigator.pop(sheetCtx);

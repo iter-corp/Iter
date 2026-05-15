@@ -159,7 +159,13 @@ class ProfileStats extends StatelessWidget {
 class ProfileButtons extends StatelessWidget {
   final VoidCallback? onSettings;
   final VoidCallback? onInvite;
-  const ProfileButtons({super.key, this.onSettings, this.onInvite});
+  final bool showSettingsNotificationDot;
+  const ProfileButtons({
+    super.key,
+    this.onSettings,
+    this.onInvite,
+    this.showSettingsNotificationDot = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +198,26 @@ class ProfileButtons extends StatelessWidget {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: onSettings,
-              icon: Icon(Icons.settings, size: 16, color: context.textPrimary),
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(Icons.settings, size: 16, color: context.textPrimary),
+                  if (showSettingsNotificationDot)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE04E5C),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: context.cardBg, width: 1),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               label: Text("Setting",
                   style: TextStyle(
                       color: context.textPrimary, fontWeight: FontWeight.w600)),
@@ -214,11 +239,11 @@ class ProfileButtons extends StatelessWidget {
                   side: BorderSide(color: context.borderColor),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20)),
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 11, horizontal: 14),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
                 ),
-                child: Icon(Icons.ios_share,
-                    size: 18, color: context.textPrimary),
+                child:
+                    Icon(Icons.ios_share, size: 18, color: context.textPrimary),
               ),
             ),
           ],

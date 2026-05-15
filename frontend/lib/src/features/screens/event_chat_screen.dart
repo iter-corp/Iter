@@ -181,8 +181,7 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
             // MESSAGES
             Expanded(
               child: msgsAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (msgs) {
                   if (msgs.isEmpty) {
@@ -234,9 +233,13 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                           controller: _controller,
                           decoration: InputDecoration(
                             hintText: 'Broadcast a message...',
-                            hintStyle:
-                                TextStyle(color: context.textMuted, fontSize: 14),
+                            hintStyle: TextStyle(
+                                color: context.textMuted, fontSize: 14),
+                            filled: false,
+                            fillColor: Colors.transparent,
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
                           ),
                           onSubmitted: (_) => _sendMessage(),
                         ),
@@ -300,8 +303,8 @@ class _EventMessageBubble extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final senderLive = ref.watch(userByUidProvider(msg.senderUid)).valueOrNull;
-    final senderName =
-        (senderLive?['username'] as String?) ?? (isFromAdmin ? 'Admin' : 'User');
+    final senderName = (senderLive?['username'] as String?) ??
+        (isFromAdmin ? 'Admin' : 'User');
     final senderAvatar = (senderLive?['avatarUrl'] as String?) ?? '';
 
     return Padding(
@@ -358,9 +361,8 @@ class _EventMessageBubble extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: isMe
-                            ? const Color(0xFFB05ECC)
-                            : context.inputFill,
+                        color:
+                            isMe ? const Color(0xFFB05ECC) : context.inputFill,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(16),
                           topRight: const Radius.circular(16),
@@ -385,8 +387,9 @@ class _EventMessageBubble extends ConsumerWidget {
                                   Text(
                                     msg.text,
                                     style: TextStyle(
-                                      color:
-                                          isMe ? Colors.white : context.textPrimary,
+                                      color: isMe
+                                          ? Colors.white
+                                          : context.textPrimary,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -396,7 +399,8 @@ class _EventMessageBubble extends ConsumerWidget {
                           : Text(
                               msg.text,
                               style: TextStyle(
-                                color: isMe ? Colors.white : context.textPrimary,
+                                color:
+                                    isMe ? Colors.white : context.textPrimary,
                                 fontSize: 14,
                               ),
                             ),

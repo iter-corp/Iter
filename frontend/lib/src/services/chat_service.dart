@@ -679,8 +679,7 @@ class ChatService {
       if (normalizedVoiceTranscript != null &&
           normalizedVoiceTranscript.isNotEmpty)
         'vt': normalizedVoiceTranscript,
-      if (normalizedLocationLabel != null &&
-          normalizedLocationLabel.isNotEmpty)
+      if (normalizedLocationLabel != null && normalizedLocationLabel.isNotEmpty)
         'll': normalizedLocationLabel,
       if (normalizedFileName != null && normalizedFileName.isNotEmpty)
         'fn': normalizedFileName,
@@ -720,17 +719,17 @@ class ChatService {
                 ? 'Sent a sticker'
                 : hasSharedPost
                     ? 'Shared a post'
-                : hasVoice
-                    ? 'Voice message'
-                    : hasVideo
-                        ? 'Sent a video'
-                        : hasFile
-                            ? 'Sent a file'
-                            : hasImage
-                                ? 'Sent a photo'
-                                : hasLocation
-                                    ? '📍 Shared a location'
-                                    : '';
+                    : hasVoice
+                        ? 'Voice message'
+                        : hasVideo
+                            ? 'Sent a video'
+                            : hasFile
+                                ? 'Sent a file'
+                                : hasImage
+                                    ? 'Sent a photo'
+                                    : hasLocation
+                                        ? '📍 Shared a location'
+                                        : '';
 
     final encrypted = envelope != null;
     batch.set(msgRef, {
@@ -861,9 +860,18 @@ class ChatService {
   /// padlock placeholder instead of an empty bubble.
   Stream<List<ChatMessage>> streamMessages(String chatId,
       {required String uid}) {
+    // Fire-and-forget: patch any wrappedKeys entries that are missing for
+    // current participants. This lets messages become readable when a
+    // participant was absent when the key was first created. The patch is
+    // idempotent — if everything is already wrapped it's a no-op. The
+    // stream will re-emit on the Firestore update, making previously
+    // locked messages decrypt successfully.
+    unawaited(_patchWrappingsForChat(chatId: chatId, uid: uid));
+
     return _messagesCol(chatId).orderBy('createdAt').snapshots().asyncMap(
       (s) async {
-        final visible = s.docs.where((doc) => _isVisibleToUser(doc.data(), uid));
+        final visible =
+            s.docs.where((doc) => _isVisibleToUser(doc.data(), uid));
         final out = <ChatMessage>[];
         for (final doc in visible) {
           out.add(await _decryptDoc(chatId: chatId, uid: uid, doc: doc));
@@ -871,6 +879,28 @@ class ChatService {
         return out;
       },
     );
+  }
+
+  Future<void> _patchWrappingsForChat({
+    required String chatId,
+    required String uid,
+  }) async {
+    try {
+      final chatSnap = await _chatDoc(chatId).get();
+      final data = chatSnap.data() ?? {};
+      final participants =
+          ((data['participants'] as List?)?.cast<String>() ?? const [])
+              .where((u) => u.isNotEmpty)
+              .toList();
+      if (participants.length < 2) return;
+      await _e2ee.patchMissingWrappings(
+        chatId: chatId,
+        meUid: uid,
+        participantUids: participants,
+      );
+    } catch (e) {
+      debugPrint('[chat-patch] key patch failed for $chatId: $e');
+    }
   }
 
   Future<ChatMessage> _decryptDoc({
@@ -888,16 +918,12 @@ class ChatService {
         envelope: Map<String, dynamic>.from(env),
       );
       if (clear == null) {
-        debugPrint(
-          '[e2ee-read] decrypt returned null  chat=$chatId msg=${doc.id} uid=$uid kv=${env['kv']}',
-        );
         return ChatMessage.fromDoc(doc, decryptionFailed: true);
       }
       final payload = jsonDecode(clear);
       return ChatMessage.fromDoc(
         doc,
-        decrypted:
-            payload is Map ? Map<String, dynamic>.from(payload) : null,
+        decrypted: payload is Map ? Map<String, dynamic>.from(payload) : null,
       );
     } catch (_) {
       return ChatMessage.fromDoc(doc, decryptionFailed: true);
@@ -1179,9 +1205,8 @@ class ChatService {
     required bool muted,
   }) async {
     await _chatDoc(chatId).set({
-      'mutedFor': muted
-          ? FieldValue.arrayUnion([uid])
-          : FieldValue.arrayRemove([uid]),
+      'mutedFor':
+          muted ? FieldValue.arrayUnion([uid]) : FieldValue.arrayRemove([uid]),
     }, SetOptions(merge: true));
   }
 

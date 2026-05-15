@@ -273,6 +273,12 @@ class _PostCardState extends ConsumerState<PostCard> {
                   top: 12,
                   right: 12,
                   child: _OwnerMenu(post: post, ref: ref),
+                )
+              else
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: _ViewerMenu(post: post, ref: ref),
                 ),
               Positioned(
                 left: 12,
@@ -1018,6 +1024,185 @@ class _OwnerMenu extends StatelessWidget {
               .showSnackBar(SnackBar(content: Text('Failed: $e')));
         }
       }
+    }
+  }
+}
+
+class _ViewerMenu extends StatelessWidget {
+  final Post post;
+  final WidgetRef ref;
+
+  const _ViewerMenu({required this.post, required this.ref});
+
+  static const List<String> _reportReasons = [
+    'Spam or scam',
+    'Harassment or bullying',
+    'Hate speech',
+    'Violence or threats',
+    'Nudity or sexual content',
+    'Misinformation',
+    'Something else',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        shape: BoxShape.circle,
+      ),
+      child: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_horiz, color: Colors.white, size: 20),
+        padding: EdgeInsets.zero,
+        onSelected: (action) async {
+          if (action == 'report') {
+            await _report(context);
+          }
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 'report',
+            child: Row(children: [
+              Icon(Icons.flag_outlined, size: 18, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Report', style: TextStyle(color: Colors.red)),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _report(BuildContext context) async {
+    final detailsCtrl = TextEditingController();
+    var selectedReason = _reportReasons.first;
+
+    try {
+      final submitted = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: context.cardBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetContext) {
+          return StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Report post',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimary,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  Navigator.pop(sheetContext, false),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Pick the reason that best fits this post.',
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._reportReasons.map(
+                          (reason) => RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: reason,
+                            groupValue: selectedReason,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setSheetState(() => selectedReason = value);
+                            },
+                            title: Text(
+                              reason,
+                              style: TextStyle(color: context.textPrimary),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: detailsCtrl,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            hintText: 'Extra details (optional)',
+                            filled: true,
+                            fillColor: context.inputFill,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide:
+                                  BorderSide(color: context.borderColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, true),
+                                child: const Text('Send report'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      if (submitted != true) return;
+
+      final messenger = ScaffoldMessenger.of(context);
+      await ref.read(postServiceProvider).reportPost(
+            post: post,
+            reason: selectedReason,
+            details: detailsCtrl.text,
+          );
+      if (context.mounted) {
+        AppFeedback.showInfoOn(messenger, 'Report sent to admins');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppFeedback.showErrorOn(ScaffoldMessenger.of(context), '$e');
+      }
+    } finally {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => detailsCtrl.dispose());
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Whether a user wants new-event notifications at all. The fine-grained
 /// filtering (which types / which countries) lives in [EventNotifPrefs].
@@ -65,6 +66,7 @@ class EventNotifPrefs {
 
 class UserService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   DocumentReference<Map<String, dynamic>> _doc(String uid) =>
       _db.collection('users').doc(uid);
@@ -80,13 +82,51 @@ class UserService {
   Future<void> updateUser(String uid, Map<String, dynamic> data) =>
       _doc(uid).set(data, SetOptions(merge: true));
 
-  Stream<EventNotifPrefs> streamEventNotifPrefs(String uid) => _doc(uid)
-      .snapshots()
-      .map((s) => EventNotifPrefs.fromMap(
+  Stream<EventNotifPrefs> streamEventNotifPrefs(String uid) =>
+      _doc(uid).snapshots().map((s) => EventNotifPrefs.fromMap(
           s.data()?['eventNotifPrefs'] as Map<String, dynamic>?));
 
-  Future<void> setEventNotifPrefs(String uid, EventNotifPrefs prefs) => _doc(uid)
-      .set({'eventNotifPrefs': prefs.toMap()}, SetOptions(merge: true));
+  Future<void> setEventNotifPrefs(String uid, EventNotifPrefs prefs) =>
+      _doc(uid)
+          .set({'eventNotifPrefs': prefs.toMap()}, SetOptions(merge: true));
+
+  Future<void> reportUserProfile({
+    required String targetUid,
+    required String targetUsername,
+    String? targetAvatar,
+    required String reason,
+    String details = '',
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    if (targetUid == user.uid) {
+      throw Exception('You cannot report your own profile');
+    }
+
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final reporterUsername = userDoc.data()?['username'] as String? ?? 'user';
+
+    final reportId = '${targetUid}_${user.uid}';
+    final reportRef = _db.collection('userReports').doc(reportId);
+    final existing = await reportRef.get();
+    if (existing.exists) {
+      throw Exception('You already reported this profile');
+    }
+
+    final cleanedDetails = details.trim();
+    await reportRef.set({
+      'targetUid': targetUid,
+      'targetUsername': targetUsername.trim(),
+      'targetAvatar': targetAvatar,
+      'reporterUid': user.uid,
+      'reporterUsername': reporterUsername,
+      'reason': reason.trim(),
+      'details': cleanedDetails.isEmpty ? null : cleanedDetails,
+      'resolved': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'resolvedAt': null,
+    });
+  }
 
   String normalizeUsername(String username) => username.trim().toLowerCase();
 

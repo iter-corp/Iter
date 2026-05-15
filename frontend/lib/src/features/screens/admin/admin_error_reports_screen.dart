@@ -8,14 +8,6 @@ import '../../../services/error_report_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
 
-final errorReportAdminProvider =
-    Provider<ErrorReportAdmin>((_) => ErrorReportAdmin());
-
-final errorReportsProvider = StreamProvider<List<ErrorReport>>((ref) {
-  if (!ref.watch(isAdminProvider)) return const Stream.empty();
-  return ref.watch(errorReportAdminProvider).stream();
-});
-
 /// Admin view of app-wide errors captured by [ErrorReportService] — uncaught
 /// Flutter / zone / platform errors plus anything reported manually. Lets the
 /// admin scan failures, mark them resolved, and clear the list.
@@ -81,16 +73,14 @@ class _AdminErrorReportsScreenState
             children: [
               _ReportsList(
                 reports: unsolved,
-                emptyTitle: all.isEmpty
-                    ? 'No error reports'
-                    : 'No unsolved errors 🎉',
+                emptyTitle:
+                    all.isEmpty ? 'No error reports' : 'No unsolved errors 🎉',
                 emptySubtitle: 'Captured app errors will appear here.',
               ),
               _ReportsList(
                 reports: solved,
                 emptyTitle: 'Nothing solved yet',
-                emptySubtitle:
-                    'Reports you mark as solved move here.',
+                emptySubtitle: 'Reports you mark as solved move here.',
               ),
             ],
           ),
@@ -221,8 +211,8 @@ class _RollupCard extends StatelessWidget {
                       e.key,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 12.5, color: context.textPrimary),
+                      style:
+                          TextStyle(fontSize: 12.5, color: context.textPrimary),
                     ),
                   ),
                 ],
@@ -295,8 +285,7 @@ class _ReportTile extends ConsumerWidget {
               fontSize: 13.5,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              decoration:
-                  report.resolved ? TextDecoration.lineThrough : null,
+              decoration: report.resolved ? TextDecoration.lineThrough : null,
             ),
           ),
           subtitle: Padding(
@@ -307,9 +296,8 @@ class _ReportTile extends ConsumerWidget {
               children: [
                 _pill(context, Icons.layers_outlined, screen),
                 _pill(context, Icons.schedule, _shortTime(report.createdAt)),
-                _pill(context, Icons.devices_other, report.platform.isEmpty
-                    ? '?'
-                    : report.platform),
+                _pill(context, Icons.devices_other,
+                    report.platform.isEmpty ? '?' : report.platform),
               ],
             ),
           ),
@@ -318,12 +306,16 @@ class _ReportTile extends ConsumerWidget {
             _kv(context, 'When', _fullTime(report.createdAt)),
             _kv(context, 'Page / screen', screen),
             _kv(context, 'Type', report.kind),
-            _kv(context, 'Platform', report.platform.isEmpty ? '—' : report.platform),
+            _kv(context, 'Platform',
+                report.platform.isEmpty ? '—' : report.platform),
             _kv(context, 'App version',
                 report.appVersion.isEmpty ? '—' : report.appVersion),
-            _kv(context, 'User', (report.uid ?? '').trim().isEmpty
-                ? 'not signed in'
-                : report.uid!.trim()),
+            _kv(
+                context,
+                'User',
+                (report.uid ?? '').trim().isEmpty
+                    ? 'not signed in'
+                    : report.uid!.trim()),
             if (report.context != null && report.context!.trim().isNotEmpty)
               _kv(context, 'Context', report.context!.trim()),
             const SizedBox(height: 10),

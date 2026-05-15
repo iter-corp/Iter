@@ -125,6 +125,140 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     }
   }
 
+  Future<void> _reportProfile({
+    required String targetUid,
+    required String targetUsername,
+    String? targetAvatar,
+  }) async {
+    const reasons = <String>[
+      'Spam or scam profile',
+      'Impersonation',
+      'Harassment or bullying',
+      'Hate speech',
+      'Nudity or sexual content',
+      'Violence or threats',
+      'Something else',
+    ];
+
+    final detailsCtrl = TextEditingController();
+    String selectedReason = reasons.first;
+    bool sending = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                MediaQuery.of(ctx).viewInsets.bottom +
+                    MediaQuery.of(ctx).padding.bottom +
+                    16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Report profile',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    for (final reason in reasons)
+                      RadioListTile<String>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: reason,
+                        groupValue: selectedReason,
+                        onChanged: sending
+                            ? null
+                            : (v) {
+                                if (v == null) return;
+                                setModalState(() => selectedReason = v);
+                              },
+                        title: Text(reason),
+                      ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: detailsCtrl,
+                      maxLines: 3,
+                      maxLength: 2000,
+                      enabled: !sending,
+                      decoration: const InputDecoration(
+                        labelText: 'Details (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                sending ? null : () => Navigator.pop(ctx),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: sending
+                                ? null
+                                : () async {
+                                    setModalState(() => sending = true);
+                                    try {
+                                      await ref
+                                          .read(userServiceProvider)
+                                          .reportUserProfile(
+                                            targetUid: targetUid,
+                                            targetUsername: targetUsername,
+                                            targetAvatar: targetAvatar,
+                                            reason: selectedReason,
+                                            details: detailsCtrl.text,
+                                          );
+                                      if (!ctx.mounted) return;
+                                      Navigator.pop(ctx);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content:
+                                                Text('Report sent to admins')),
+                                      );
+                                    } catch (e) {
+                                      if (!ctx.mounted) return;
+                                      setModalState(() => sending = false);
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(content: Text(e.toString())),
+                                      );
+                                    }
+                                  },
+                            child: const Text('Send report'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    // Defer disposal until after the sheet's widgets have fully unmounted;
+    // disposing synchronously while the TextField is still tearing down its
+    // listeners triggers the _dependents.isEmpty assertion in ChangeNotifier.
+    WidgetsBinding.instance.addPostFrameCallback((_) => detailsCtrl.dispose());
+  }
+
   Future<void> _openMessage(String otherName, String otherAvatar) async {
     final currentUser = ref.read(authStateProvider).value ??
         ref.read(authServiceProvider).currentUser;
@@ -321,6 +455,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   isPrivate: isPrivate,
                   onBack: () => Navigator.pop(context),
                   showMenu: !isOwnProfile,
+                  onReportTap: () => _reportProfile(
+                    targetUid: widget.uid,
+                    targetUsername: username,
+                    targetAvatar: avatarUrl,
+                  ),
                   onBlockTap: () async {
                     if (currentUser == null) return;
                     try {

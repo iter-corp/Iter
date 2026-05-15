@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../providers/profile_visitor_providers.dart';
@@ -26,6 +27,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = ref.watch(isAdminProvider);
+    final hasNewReports = ref.watch(hasAnyNewReportsProvider);
     final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
     final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
@@ -206,6 +208,23 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasNewReports)
+                    Container(
+                      width: 9,
+                      height: 9,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE04E5C),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: context.cardBg, width: 1),
+                      ),
+                    ),
+                  Icon(Icons.chevron_right, color: context.textSecondary),
+                ],
+              ),
               onTap: () => context.push('/admin'),
             ),
           ],
@@ -310,6 +329,10 @@ class ProfileSettingsScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          backgroundColor: context.cardBg,
+          surfaceTintColor: Colors.transparent,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           title: const Text('Set a password'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -317,14 +340,15 @@ class ProfileSettingsScreen extends ConsumerWidget {
             children: [
               Text(
                 'Add a password to your account so you can also sign in with your email.',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 13, color: context.textSecondary),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: newPassCtrl,
                 obscureText: obscureNew,
-                decoration: InputDecoration(
-                  labelText: 'New password',
+                decoration: _settingsInputDecoration(
+                  context,
+                  label: 'New password',
                   suffixIcon: IconButton(
                     icon: Icon(
                         obscureNew ? Icons.visibility_off : Icons.visibility),
@@ -336,8 +360,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
               TextField(
                 controller: confirmPassCtrl,
                 obscureText: obscureConfirm,
-                decoration: InputDecoration(
-                  labelText: 'Confirm password',
+                decoration: _settingsInputDecoration(
+                  context,
+                  label: 'Confirm password',
                   suffixIcon: IconButton(
                     icon: Icon(obscureConfirm
                         ? Icons.visibility_off
@@ -643,6 +668,32 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+InputDecoration _settingsInputDecoration(
+  BuildContext context, {
+  required String label,
+  Widget? suffixIcon,
+}) {
+  final baseBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: context.borderColor),
+  );
+
+  return InputDecoration(
+    labelText: label,
+    labelStyle: TextStyle(color: context.textSecondary),
+    filled: false,
+    fillColor: Colors.transparent,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    enabledBorder: baseBorder,
+    border: baseBorder,
+    focusedBorder: baseBorder.copyWith(
+      borderSide: const BorderSide(color: AppColors.purple, width: 1.5),
+    ),
+    suffixIcon: suffixIcon,
+    suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+  );
+}
+
 class _ChangeEmailDialog extends StatefulWidget {
   const _ChangeEmailDialog();
 
@@ -744,6 +795,9 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      backgroundColor: context.cardBg,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       title: const Text('Change email'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -751,14 +805,15 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'New email'),
+            decoration: _settingsInputDecoration(context, label: 'New email'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _passCtrl,
             obscureText: _obscure,
-            decoration: InputDecoration(
-              labelText: 'Current password',
+            decoration: _settingsInputDecoration(
+              context,
+              label: 'Current password',
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscure = !_obscure),
@@ -941,6 +996,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      backgroundColor: context.cardBg,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       title: const Text('Change password'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -948,8 +1006,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           TextField(
             controller: _currentPassCtrl,
             obscureText: _obscureCurrent,
-            decoration: InputDecoration(
-              labelText: 'Current password',
+            decoration: _settingsInputDecoration(
+              context,
+              label: 'Current password',
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureCurrent ? Icons.visibility_off : Icons.visibility,
@@ -963,8 +1022,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           TextField(
             controller: _newPassCtrl,
             obscureText: _obscureNew,
-            decoration: InputDecoration(
-              labelText: 'New password',
+            decoration: _settingsInputDecoration(
+              context,
+              label: 'New password',
               suffixIcon: IconButton(
                 icon:
                     Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
@@ -976,8 +1036,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           TextField(
             controller: _confirmPassCtrl,
             obscureText: _obscureConfirm,
-            decoration: InputDecoration(
-              labelText: 'Confirm new password',
+            decoration: _settingsInputDecoration(
+              context,
+              label: 'Confirm new password',
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureConfirm ? Icons.visibility_off : Icons.visibility,

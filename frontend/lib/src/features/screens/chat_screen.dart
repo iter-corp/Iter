@@ -1933,7 +1933,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
+                                      filled: false,
+                                      fillColor: Colors.transparent,
                                       border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
                                       isDense: true,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
@@ -2196,8 +2200,7 @@ class _E2EEBanner extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.lock_outline,
-                  size: 14, color: AppColors.purple),
+              Icon(Icons.lock_outline, size: 14, color: AppColors.purple),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -2248,8 +2251,7 @@ void _showE2EEInfoSheet(BuildContext context) {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Icon(Icons.lock_outline,
-                      size: 22, color: AppColors.purple),
+                  Icon(Icons.lock_outline, size: 22, color: AppColors.purple),
                   const SizedBox(width: 10),
                   Text(
                     'End-to-end encrypted',
@@ -2588,6 +2590,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   bool get _shouldTranslate =>
       widget.autoTranslate &&
       !isMe &&
+      !msg.encryptedUnreadable &&
       msg.text.trim().isNotEmpty &&
       !_showOriginal;
 
@@ -2646,6 +2649,12 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   /// trailing "Show original" / "Show translation" / loading indicator.
   Widget _buildBody({required Color textColor}) {
     final originalStyle = TextStyle(color: textColor, fontSize: 14);
+    if (msg.encryptedUnreadable) {
+      return Text(
+        '🔒 Encrypted message (can\'t decrypt on this device)',
+        style: originalStyle,
+      );
+    }
     if (!widget.autoTranslate || isMe || msg.text.trim().isEmpty) {
       return Text(msg.text, style: originalStyle);
     }
@@ -4094,7 +4103,9 @@ class _LocationMessageBubble extends StatelessWidget {
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                (label ?? '').trim().isEmpty ? 'Shared location' : label!.trim(),
+                (label ?? '').trim().isEmpty
+                    ? 'Shared location'
+                    : label!.trim(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

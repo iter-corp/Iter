@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'post_service.dart';
+
 class AdminConfig {
   final bool storiesEnabled;
   final bool liveEnabled;
@@ -227,6 +229,103 @@ class AdminEvent {
   }
 }
 
+class PostReport {
+  final String id;
+  final String postId;
+  final String postAuthorUid;
+  final String postAuthorUsername;
+  final String? postAuthorAvatar;
+  final String postCaption;
+  final String reporterUid;
+  final String reporterUsername;
+  final String reason;
+  final String? details;
+  final bool resolved;
+  final DateTime? createdAt;
+  final DateTime? resolvedAt;
+
+  const PostReport({
+    required this.id,
+    required this.postId,
+    required this.postAuthorUid,
+    required this.postAuthorUsername,
+    required this.postAuthorAvatar,
+    required this.postCaption,
+    required this.reporterUid,
+    required this.reporterUsername,
+    required this.reason,
+    required this.details,
+    required this.resolved,
+    required this.createdAt,
+    required this.resolvedAt,
+  });
+
+  factory PostReport.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? {};
+    return PostReport(
+      id: doc.id,
+      postId: (d['postId'] as String?) ?? '',
+      postAuthorUid: (d['postAuthorUid'] as String?) ?? '',
+      postAuthorUsername: (d['postAuthorUsername'] as String?) ?? '',
+      postAuthorAvatar: d['postAuthorAvatar'] as String?,
+      postCaption: (d['postCaption'] as String?) ?? '',
+      reporterUid: (d['reporterUid'] as String?) ?? '',
+      reporterUsername: (d['reporterUsername'] as String?) ?? '',
+      reason: (d['reason'] as String?) ?? '',
+      details: d['details'] as String?,
+      resolved: (d['resolved'] as bool?) ?? false,
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      resolvedAt: (d['resolvedAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+class UserProfileReport {
+  final String id;
+  final String targetUid;
+  final String targetUsername;
+  final String? targetAvatar;
+  final String reporterUid;
+  final String reporterUsername;
+  final String reason;
+  final String? details;
+  final bool resolved;
+  final DateTime? createdAt;
+  final DateTime? resolvedAt;
+
+  const UserProfileReport({
+    required this.id,
+    required this.targetUid,
+    required this.targetUsername,
+    required this.targetAvatar,
+    required this.reporterUid,
+    required this.reporterUsername,
+    required this.reason,
+    required this.details,
+    required this.resolved,
+    required this.createdAt,
+    required this.resolvedAt,
+  });
+
+  factory UserProfileReport.fromDoc(
+      DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? {};
+    return UserProfileReport(
+      id: doc.id,
+      targetUid: (d['targetUid'] as String?) ?? '',
+      targetUsername: (d['targetUsername'] as String?) ?? '',
+      targetAvatar: d['targetAvatar'] as String?,
+      reporterUid: (d['reporterUid'] as String?) ?? '',
+      reporterUsername: (d['reporterUsername'] as String?) ?? '',
+      reason: (d['reason'] as String?) ?? '',
+      details: d['details'] as String?,
+      resolved: (d['resolved'] as bool?) ?? false,
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      resolvedAt: (d['resolvedAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
 class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -428,8 +527,45 @@ class AdminService {
         .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
   }
 
+  /// Delete a post as admin, properly updating author's postsCount.
   Future<void> deletePost(String postId) =>
-      _db.collection('posts').doc(postId).delete();
+      PostService().deletePostAsAdmin(postId);
+
+  Stream<List<PostReport>> streamPostReports({int limit = 200}) {
+    return _db
+        .collection('postReports')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((s) => s.docs.map(PostReport.fromDoc).toList());
+  }
+
+  Future<void> setPostReportResolved(String id, bool resolved) =>
+      _db.collection('postReports').doc(id).update({
+        'resolved': resolved,
+        'resolvedAt': resolved ? FieldValue.serverTimestamp() : null,
+      });
+
+  Future<void> deletePostReport(String id) =>
+      _db.collection('postReports').doc(id).delete();
+
+  Stream<List<UserProfileReport>> streamUserProfileReports({int limit = 200}) {
+    return _db
+        .collection('userReports')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((s) => s.docs.map(UserProfileReport.fromDoc).toList());
+  }
+
+  Future<void> setUserProfileReportResolved(String id, bool resolved) =>
+      _db.collection('userReports').doc(id).update({
+        'resolved': resolved,
+        'resolvedAt': resolved ? FieldValue.serverTimestamp() : null,
+      });
+
+  Future<void> deleteUserProfileReport(String id) =>
+      _db.collection('userReports').doc(id).delete();
 
   // -------- Events --------
   Stream<List<AdminEvent>> streamEvents() {
@@ -611,17 +747,10 @@ class AdminService {
     }
   }
 
-  /// Delete an event and, optionally, its linked group chat. The chat
-  /// doc lives at `eventChats/{eventId}`; deleting it stops it from
-  /// surfacing in members' inboxes. We delete the doc itself; pending
-  /// messages cleanup is left to a backend trigger / TTL since
-  /// recursive subcollection deletes aren't supported client-side.
-  Future<void> deleteEvent(String id, {bool deleteChat = false}) async {
+  /// Delete an event.
+  Future<void> deleteEvent(String id) async {
     final batch = _db.batch();
     batch.delete(_db.collection('events').doc(id));
-    if (deleteChat) {
-      batch.delete(_db.collection('eventChats').doc(id));
-    }
     await batch.commit();
   }
 }

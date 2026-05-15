@@ -13,6 +13,7 @@ class UserCoverAvatar extends StatelessWidget {
   final VoidCallback onBack;
   final bool showMenu;
   final VoidCallback? onBlockTap;
+  final VoidCallback? onReportTap;
   final bool isBlocked;
 
   const UserCoverAvatar({
@@ -23,6 +24,7 @@ class UserCoverAvatar extends StatelessWidget {
     required this.onBack,
     this.showMenu = false,
     this.onBlockTap,
+    this.onReportTap,
     this.isBlocked = false,
   });
 
@@ -57,6 +59,8 @@ class UserCoverAvatar extends StatelessWidget {
               onSelected: (value) {
                 if (value == 'block') {
                   onBlockTap?.call();
+                } else if (value == 'report') {
+                  onReportTap?.call();
                 }
               },
               icon: Container(
@@ -69,6 +73,10 @@ class UserCoverAvatar extends StatelessWidget {
                     const Icon(Icons.more_vert, color: Colors.white, size: 20),
               ),
               itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'report',
+                  child: Text('Report', style: TextStyle(color: Colors.red)),
+                ),
                 PopupMenuItem(
                   value: 'block',
                   child: Text(

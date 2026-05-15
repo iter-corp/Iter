@@ -78,6 +78,44 @@ class PostService {
     return ref.id;
   }
 
+  Future<void> reportPost({
+    required Post post,
+    required String reason,
+    String details = '',
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    if (user.uid == post.authorUid) {
+      throw Exception('You cannot report your own post');
+    }
+
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final username = userDoc.data()?['username'] as String? ?? 'user';
+    final reportId = '${post.id}_${user.uid}';
+    final reportRef = _db.collection('postReports').doc(reportId);
+    final existing = await reportRef.get();
+    if (existing.exists) {
+      throw Exception('You already reported this post');
+    }
+
+    final trimmedReason = reason.trim();
+    final trimmedDetails = details.trim();
+
+    await reportRef.set({
+      'postId': post.id,
+      'postAuthorUid': post.authorUid,
+      'postAuthorUsername': post.authorUsername,
+      'postAuthorAvatar': post.authorAvatar,
+      'postCaption': post.caption,
+      'reporterUid': user.uid,
+      'reporterUsername': username,
+      'reason': trimmedReason,
+      if (trimmedDetails.isNotEmpty) 'details': trimmedDetails,
+      'resolved': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Stream<List<Post>> streamFeed({int limit = 50}) {
     return _posts
         .orderBy('createdAt', descending: true)
@@ -410,6 +448,28 @@ class PostService {
 
     if (!isQa) {
       await _db.collection('users').doc(uid).update({
+        'postsCount': FieldValue.increment(-1),
+      });
+    }
+  }
+
+  /// Admin delete of a post. Properly decrements the post author's postsCount.
+  Future<void> deletePostAsAdmin(String postId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('Not signed in');
+
+    final postRef = _posts.doc(postId);
+    final snap = await postRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final authorUid = data['authorUid'] as String?;
+    final isQa = (data['postType'] as String?) == 'qa';
+
+    await postRef.delete();
+
+    if (authorUid != null && !isQa) {
+      await _db.collection('users').doc(authorUid).update({
         'postsCount': FieldValue.increment(-1),
       });
     }

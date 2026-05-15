@@ -12,6 +12,7 @@ import '../../services/admin_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/event_detail.dart';
+import '../widgets/event_unavailable_screen.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
@@ -765,7 +766,7 @@ class _NotificationItem extends ConsumerWidget {
 
   /// Loads the event doc from Firestore and pushes [EventDetailScreen].
   /// If the event is gone (deleted by the admin between fan-out and tap)
-  /// we fall back to the events list so the tap isn't a dead end.
+  /// we show a dedicated unavailable screen.
   Future<void> _openEventDetailFromNotification(
     BuildContext context,
     String eventId,
@@ -778,7 +779,7 @@ class _NotificationItem extends ConsumerWidget {
     if (!snap.exists) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const EventBody()),
+        MaterialPageRoute(builder: (_) => const EventUnavailableScreen()),
       );
       return;
     }

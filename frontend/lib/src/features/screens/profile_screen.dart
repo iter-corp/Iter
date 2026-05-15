@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/block_providers.dart';
 import '../../providers/follow_providers.dart';
@@ -123,6 +124,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserDocProvider);
     final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+    final isAdmin = ref.watch(isAdminProvider);
+    final hasNewReports = ref.watch(hasAnyNewReportsProvider);
     final followersAsync = currentUid == null
         ? const AsyncValue<List<String>>.data([])
         : ref.watch(followersProvider(currentUid));
@@ -181,6 +184,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 ProfileButtons(
                   onSettings: () => _showSettings(context),
+                  showSettingsNotificationDot: isAdmin && hasNewReports,
                   onInvite: () {
                     final cfg = ref.read(adminConfigProvider).valueOrNull ??
                         const AdminConfig();

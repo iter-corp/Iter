@@ -14,11 +14,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
+import 'src/features/screens/event_screen.dart';
+import 'src/features/widgets/event_detail.dart';
+import 'src/features/widgets/event_unavailable_screen.dart';
 import 'src/providers/admin_providers.dart';
 import 'src/providers/auth_providers.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/providers/chat_providers.dart';
 import 'src/router/app_router.dart';
+import 'src/services/admin_service.dart';
 import 'src/services/error_report_service.dart';
 import 'src/services/fcm_service.dart';
 import 'src/theme/app_theme.dart';
@@ -34,7 +38,9 @@ Future<void> main() async {
 
     final originalOnError = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails details) {
-      if (details.exceptionAsString().contains('EncodingError: The source image cannot be decoded') ||
+      if (details
+              .exceptionAsString()
+              .contains('EncodingError: The source image cannot be decoded') ||
           details.library == 'image resource service') {
         return;
       }
@@ -136,14 +142,19 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  late final StreamSubscription<FcmMessageEvent> _fcmTapSubscription;
+  final Set<String> _handledFcmMessageIds = <String>{};
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _fcmTapSubscription = FcmService().events.listen(_handleFcmEvent);
   }
 
   @override
   void dispose() {
+    _fcmTapSubscription.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -153,6 +164,56 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(_configureSystemUi());
     }
+  }
+
+  void _handleFcmEvent(FcmMessageEvent event) {
+    if (!event.openedApp || !mounted) return;
+
+    final messageId = event.message.messageId;
+    if (messageId != null && !_handledFcmMessageIds.add(messageId)) {
+      return;
+    }
+
+    final data = event.message.data;
+    final type = data['type']?.trim();
+    final targetId = data['targetId']?.trim();
+    if (type == 'new_event' && targetId != null && targetId.isNotEmpty) {
+      unawaited(_openEventDetailFromPush(targetId));
+    }
+  }
+
+  Future<void> _openEventDetailFromPush(String eventId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('events')
+        .doc(eventId)
+        .get();
+    if (!mounted) return;
+
+    if (!snap.exists) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const EventUnavailableScreen()),
+      );
+      return;
+    }
+
+    final event = AdminEvent.fromDoc(snap);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          eventId: event.id,
+          title: event.title,
+          subtitle: event.subtitle,
+          location: event.location,
+          eventType: event.eventType,
+          deadlineAt: event.deadlineAt,
+          imageUrls: event.imageUrls,
+          description: event.description,
+          link: event.link,
+          phone: event.phone,
+          email: event.email,
+        ),
+      ),
+    );
   }
 
   @override
@@ -170,6 +231,25 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // subsequent sign-ins / app launches.
         unawaited(
           ref.read(keyManagerProvider).ensureKeyPair(nextUser.uid),
+        );
+        // Generate (or load) the user's recovery key for cross-device decryption.
+        // For MVP, use a simple password derived from user ID. In production,
+        // this would be user-configured in settings or a onboarding flow.
+        unawaited(
+          ref
+              .read(keyManagerProvider)
+              .ensureRecoveryKey(
+                uid: nextUser.uid,
+                password: 'coil-recovery-${nextUser.uid.substring(0, 8)}',
+              )
+              .then((_) {
+            // Auto-unlock recovery key on login so messages decrypt seamlessly.
+            // The recovery key is cached in E2EE service for the session.
+            return ref.read(e2eeServiceProvider).unlockRecoveryKey(
+                  nextUser.uid,
+                  'coil-recovery-${nextUser.uid.substring(0, 8)}',
+                );
+          }),
         );
       } else if (previousUser != null) {
         unawaited(fcmService.removeToken(previousUser.uid));
@@ -195,6 +275,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final minVersion =
+        ref.watch(adminConfigProvider).valueOrNull?.minAppVersion ?? '';
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
@@ -216,7 +298,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: _VersionGate(child: child ?? const SizedBox.shrink()),
+            child: _VersionGate(
+              minVersion: minVersion,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },
@@ -232,15 +317,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 // loaded yet, or the version string can't be parsed, the app runs normally.
 // ─────────────────────────────────────────────
 
-class _VersionGate extends ConsumerStatefulWidget {
+class _VersionGate extends StatefulWidget {
+  final String minVersion;
   final Widget child;
-  const _VersionGate({required this.child});
+  const _VersionGate({required this.minVersion, required this.child});
 
   @override
-  ConsumerState<_VersionGate> createState() => _VersionGateState();
+  State<_VersionGate> createState() => _VersionGateState();
 }
 
-class _VersionGateState extends ConsumerState<_VersionGate> {
+class _VersionGateState extends State<_VersionGate> {
   String? _currentVersion;
 
   @override
@@ -271,15 +357,23 @@ class _VersionGateState extends ConsumerState<_VersionGate> {
 
   @override
   Widget build(BuildContext context) {
-    final cfg = ref.watch(adminConfigProvider).valueOrNull;
-    final minVersion = cfg?.minAppVersion ?? '';
+    final minVersion = widget.minVersion;
     final current = _currentVersion;
-    if (current != null &&
+    final requiresUpdate = current != null &&
         minVersion.isNotEmpty &&
-        _compareVersions(current, minVersion) < 0) {
-      return _UpdateRequiredScreen(current: current, required: minVersion);
-    }
-    return widget.child;
+        _compareVersions(current, minVersion) < 0;
+
+    if (!requiresUpdate) return widget.child;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        Positioned.fill(
+          child: _UpdateRequiredScreen(current: current!, required: minVersion),
+        ),
+      ],
+    );
   }
 }
 

@@ -65,6 +65,63 @@ service cloud.firestore {
       allow read, delete: if isAdmin();
     }
 
+    function isValidPostReport() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+              'postId', 'postAuthorUid', 'postAuthorUsername',
+              'postAuthorAvatar', 'postCaption', 'reporterUid',
+              'reporterUsername', 'reason', 'details', 'resolved',
+              'createdAt', 'resolvedAt'
+            ]) &&
+            d.postId is string && d.postId.size() > 0 && d.postId.size() <= 150 &&
+            d.postAuthorUid is string && d.postAuthorUid.size() > 0 && d.postAuthorUid.size() <= 128 &&
+            d.postAuthorUsername is string && d.postAuthorUsername.size() > 0 && d.postAuthorUsername.size() <= 80 &&
+            (!('postAuthorAvatar' in d) || d.postAuthorAvatar == null || (d.postAuthorAvatar is string && d.postAuthorAvatar.size() <= 1000)) &&
+            d.postCaption is string && d.postCaption.size() <= 6000 &&
+            d.reporterUid == request.auth.uid &&
+            d.reporterUsername is string && d.reporterUsername.size() > 0 && d.reporterUsername.size() <= 80 &&
+            d.reason is string && d.reason.size() > 0 && d.reason.size() <= 80 &&
+            (!('details' in d) || d.details == null || (d.details is string && d.details.size() <= 2000)) &&
+            d.resolved == false &&
+            d.createdAt == request.time &&
+            (!('resolvedAt' in d) || d.resolvedAt == null);
+    }
+
+              function isValidUserProfileReport() {
+                let d = request.resource.data;
+                return d.keys().hasOnly([
+                  'targetUid', 'targetUsername', 'targetAvatar',
+                  'reporterUid', 'reporterUsername',
+                  'reason', 'details', 'resolved', 'createdAt', 'resolvedAt'
+                ]) &&
+                d.targetUid is string && d.targetUid.size() > 0 && d.targetUid.size() <= 128 &&
+                d.targetUsername is string && d.targetUsername.size() > 0 && d.targetUsername.size() <= 80 &&
+                (!('targetAvatar' in d) || d.targetAvatar == null || (d.targetAvatar is string && d.targetAvatar.size() <= 1000)) &&
+                d.reporterUid == request.auth.uid &&
+                d.reporterUsername is string && d.reporterUsername.size() > 0 && d.reporterUsername.size() <= 80 &&
+                d.reason is string && d.reason.size() > 0 && d.reason.size() <= 80 &&
+                (!('details' in d) || d.details == null || (d.details is string && d.details.size() <= 2000)) &&
+                d.resolved == false &&
+                d.createdAt == request.time &&
+                (!('resolvedAt' in d) || d.resolvedAt == null);
+              }
+
+    match /postReports/{reportId} {
+      allow create: if signedIn() && isValidPostReport();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
+        request.resource.data.resolved is bool;
+      allow read, delete: if isAdmin();
+    }
+
+    match /userReports/{reportId} {
+      allow create: if signedIn() && isValidUserProfileReport();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
+        request.resource.data.resolved is bool;
+      allow read, delete: if isAdmin();
+    }
+
     // Blacklisted emails. Admins manage the full list; signed-in users may
     // also read and write their own entry so the client can (a) check on
     // login whether their account has been deleted and (b) write a
