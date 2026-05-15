@@ -888,6 +888,9 @@ class ChatService {
         envelope: Map<String, dynamic>.from(env),
       );
       if (clear == null) {
+        debugPrint(
+          '[e2ee-read] decrypt returned null  chat=$chatId msg=${doc.id} uid=$uid kv=${env['kv']}',
+        );
         return ChatMessage.fromDoc(doc, decryptionFailed: true);
       }
       final payload = jsonDecode(clear);

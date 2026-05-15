@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 
 import 'key_manager.dart';
 
@@ -122,7 +122,10 @@ class E2EEService {
     final ct = envelope['ct'];
     final n = envelope['n'];
     final kv = envelope['kv'];
-    if (ct is! String || n is! String) return null;
+    if (ct is! String || n is! String) {
+      debugPrint('[e2ee-decrypt] bad envelope shape chat=$chatId');
+      return null;
+    }
     if (ct.isEmpty) return '';
     try {
       final version = (kv is int) ? kv : 1;
@@ -131,14 +134,20 @@ class E2EEService {
         meUid: meUid,
         version: version,
       );
-      if (key == null) return null;
+      if (key == null) {
+        debugPrint(
+          '[e2ee-decrypt] no chat key available chat=$chatId me=$meUid kv=$version',
+        );
+        return null;
+      }
       final clear = await _aesDecrypt(
         key,
         ciphertext: base64Decode(ct),
         nonce: base64Decode(n),
       );
       return utf8.decode(clear);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[e2ee-decrypt] threw chat=$chatId me=$meUid: $e\n$st');
       return null;
     }
   }
@@ -299,13 +308,24 @@ class E2EEService {
       if (entry is Map) wrappedSet = Map<String, dynamic>.from(entry);
     }
     final mine = wrappedSet?[meUid];
-    if (mine is! Map) return null;
+    if (mine is! Map) {
+      debugPrint(
+        '[e2ee-load] no wrapped entry for me  chat=$chatId me=$meUid v=$version curr=$currentVersion wrappedFor=${wrappedSet?.keys.toList()}',
+      );
+      return null;
+    }
 
     final key = await _unwrapMyKey(
       meUid: meUid,
       wrappedFromMe: Map<String, dynamic>.from(mine),
     );
-    if (key != null) _cacheKey(chatId, version, key);
+    if (key == null) {
+      debugPrint(
+        '[e2ee-load] _unwrapMyKey returned null  chat=$chatId me=$meUid v=$version',
+      );
+    } else {
+      _cacheKey(chatId, version, key);
+    }
     return key;
   }
 
