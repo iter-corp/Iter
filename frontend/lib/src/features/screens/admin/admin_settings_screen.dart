@@ -142,14 +142,19 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         data: (cfg) {
           _hydrate(cfg);
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.of(context).padding.bottom + 8,
+            ),
             children: [
               _section('Feature flags'),
               _flag(
                 title: 'Stories enabled',
                 value: _cfg.storiesEnabled,
-                onChanged: (v) => setState(() => _cfg =
-                    _cfg.copyWith(storiesEnabled: v)),
+                onChanged: (v) =>
+                    setState(() => _cfg = _cfg.copyWith(storiesEnabled: v)),
               ),
               _flag(
                 title: 'Live streaming enabled',
@@ -171,66 +176,32 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               ),
               const SizedBox(height: 16),
               _section('Announcement'),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: _announcementCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText:
-                        'Shown at the top of the home screen. Leave empty to hide.',
-                    border: InputBorder.none,
-                  ),
-                ),
+              _textInputCard(
+                controller: _announcementCtrl,
+                hintText:
+                    'Shown at the top of the home screen. Leave empty to hide.',
+                maxLines: 3,
               ),
               const SizedBox(height: 16),
               _section('Maintenance'),
               _flag(
                 title: 'Maintenance mode (read-only banner)',
                 value: _cfg.maintenanceMode,
-                onChanged: (v) => setState(() => _cfg =
-                    _cfg.copyWith(maintenanceMode: v)),
+                onChanged: (v) =>
+                    setState(() => _cfg = _cfg.copyWith(maintenanceMode: v)),
               ),
               const SizedBox(height: 16),
               _section('Minimum app version'),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: _minVersionCtrl,
-                  decoration: const InputDecoration(
-                    hintText: 'e.g. 1.0.0',
-                    border: InputBorder.none,
-                  ),
-                ),
+              _textInputCard(
+                controller: _minVersionCtrl,
+                hintText: 'e.g. 1.0.0',
               ),
               const SizedBox(height: 16),
               _section('Contact email'),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: _contactEmailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    hintText:
-                        'Email shown on "Become an event admin" mailto link',
-                    border: InputBorder.none,
-                  ),
-                ),
+              _textInputCard(
+                controller: _contactEmailCtrl,
+                hintText: 'Email shown on "Become an event admin" mailto link',
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
               _section('App store links (Invite friends)'),
@@ -242,39 +213,17 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: _iosUrlCtrl,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    hintText: 'iOS App Store URL (https://apps.apple.com/...)',
-                    border: InputBorder.none,
-                  ),
-                ),
+              _textInputCard(
+                controller: _iosUrlCtrl,
+                hintText: 'iOS App Store URL (https://apps.apple.com/...)',
+                keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: _androidUrlCtrl,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    hintText:
-                        'Google Play URL (https://play.google.com/store/apps/details?id=...)',
-                    border: InputBorder.none,
-                  ),
-                ),
+              _textInputCard(
+                controller: _androidUrlCtrl,
+                hintText:
+                    'Google Play URL (https://play.google.com/store/apps/details?id=...)',
+                keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 16),
               _section('Event types'),
@@ -328,29 +277,11 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.borderColor),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => onAdd(),
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-              TextButton(onPressed: onAdd, child: const Text('Add')),
-            ],
-          ),
+        _FocusInputRow(
+          controller: controller,
+          hintText: hint,
+          onAdd: onAdd,
+          decoration: _inputDecoration(hint),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -359,12 +290,45 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
           children: items
               .map((it) => Chip(
                     label: Text(it),
-                    onDeleted:
-                        items.length <= 1 ? null : () => onRemove(it),
+                    onDeleted: items.length <= 1 ? null : () => onRemove(it),
                   ))
               .toList(),
         ),
       ],
+    );
+  }
+
+  Widget _textInputCard({
+    required TextEditingController controller,
+    required String hintText,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+  }) {
+    return _FocusInputCard(
+      controller: controller,
+      hintText: hintText,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      decoration: _inputDecoration(hintText),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: TextStyle(
+        fontSize: 13,
+        color: context.textSecondary,
+      ),
+      filled: false,
+      fillColor: Colors.transparent,
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      errorBorder: InputBorder.none,
+      disabledBorder: InputBorder.none,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(vertical: 14),
     );
   }
 
@@ -399,6 +363,143 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         title: Text(title),
         value: value,
         onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _FocusInputCard extends StatefulWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final InputDecoration decoration;
+
+  const _FocusInputCard({
+    required this.controller,
+    required this.hintText,
+    required this.decoration,
+    this.maxLines = 1,
+    this.keyboardType,
+  });
+
+  @override
+  State<_FocusInputCard> createState() => _FocusInputCardState();
+}
+
+class _FocusInputCardState extends State<_FocusInputCard> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: context.inputFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _focusNode.hasFocus
+              ? AppColors.purple.withValues(alpha: 0.55)
+              : context.borderColor,
+          width: _focusNode.hasFocus ? 1.4 : 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: widget.controller,
+        keyboardType: widget.keyboardType,
+        maxLines: widget.maxLines,
+        decoration: widget.decoration,
+      ),
+    );
+  }
+}
+
+class _FocusInputRow extends StatefulWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final VoidCallback onAdd;
+  final InputDecoration decoration;
+
+  const _FocusInputRow({
+    required this.controller,
+    required this.hintText,
+    required this.onAdd,
+    required this.decoration,
+  });
+
+  @override
+  State<_FocusInputRow> createState() => _FocusInputRowState();
+}
+
+class _FocusInputRowState extends State<_FocusInputRow> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: context.inputFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _focusNode.hasFocus
+              ? AppColors.purple.withValues(alpha: 0.55)
+              : context.borderColor,
+          width: _focusNode.hasFocus ? 1.4 : 1,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 2, 10, 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              focusNode: _focusNode,
+              controller: widget.controller,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => widget.onAdd(),
+              decoration: widget.decoration,
+            ),
+          ),
+          TextButton(onPressed: widget.onAdd, child: const Text('Add')),
+        ],
       ),
     );
   }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../providers/admin_providers.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../theme/app_theme.dart';
+import 'admin_discuss_reports_screen.dart';
 import 'admin_error_reports_screen.dart';
 import 'admin_post_reports_screen.dart';
 import 'admin_user_reports_screen.dart';
@@ -14,6 +14,7 @@ class AdminReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasNewPostReports = ref.watch(hasNewPostReportsProvider);
+    final hasNewDiscussReports = ref.watch(hasNewDiscussReportsProvider);
     final hasNewProfileReports = ref.watch(hasNewProfileReportsProvider);
     final hasNewErrorReports = ref.watch(hasNewErrorReportsProvider);
 
@@ -45,6 +46,24 @@ class AdminReportsScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(
                     builder: (_) => const AdminPostReportsScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _ReportsTile(
+            icon: Icons.forum_outlined,
+            title: 'Discuss reports',
+            subtitle: 'Review reports on Discuss threads',
+            color: const Color(0xFFD044E8),
+            showNotificationDot: hasNewDiscussReports,
+            onTap: () {
+              ref
+                  .read(adminReportSeenProvider.notifier)
+                  .markDiscussReportsSeen();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminDiscussReportsScreen()),
               );
             },
           ),

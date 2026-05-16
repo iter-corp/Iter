@@ -116,6 +116,44 @@ class PostService {
     });
   }
 
+  Future<void> reportQaPost({
+    required Post post,
+    required String reason,
+    String details = '',
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+    if (user.uid == post.authorUid) {
+      throw Exception('You cannot report your own question');
+    }
+
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final username = userDoc.data()?['username'] as String? ?? 'user';
+    final reportId = '${post.id}_${user.uid}';
+    final reportRef = _db.collection('discussReports').doc(reportId);
+    final existing = await reportRef.get();
+    if (existing.exists) {
+      throw Exception('You already reported this question');
+    }
+
+    final trimmedReason = reason.trim();
+    final trimmedDetails = details.trim();
+
+    await reportRef.set({
+      'postId': post.id,
+      'postAuthorUid': post.authorUid,
+      'postAuthorUsername': post.authorUsername,
+      'postAuthorAvatar': post.authorAvatar,
+      'postCaption': post.caption,
+      'reporterUid': user.uid,
+      'reporterUsername': username,
+      'reason': trimmedReason,
+      if (trimmedDetails.isNotEmpty) 'details': trimmedDetails,
+      'resolved': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Stream<List<Post>> streamFeed({int limit = 50}) {
     return _posts
         .orderBy('createdAt', descending: true)

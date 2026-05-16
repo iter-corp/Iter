@@ -12,9 +12,8 @@ import '../../providers/block_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../providers/theme_provider.dart';
-import '../../services/admin_service.dart';
+
 import '../../theme/app_theme.dart';
-import '../../utils/share_app.dart';
 import '../model/post_model.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
@@ -162,6 +161,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ? '@${user['username']}'
                           : ''),
                   bio: (user['bio'] as String?) ?? '',
+                  profession: (user['profession'] as String?) ?? '',
+                  educationLevel: (user['academicLevel'] as String?) ?? '',
+                  fieldOfStudy: (user['field'] as String?) ?? '',
                 ),
                 ProfileStats(
                   followers: followersAsync.valueOrNull?.length ??
@@ -185,11 +187,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ProfileButtons(
                   onSettings: () => _showSettings(context),
                   showSettingsNotificationDot: isAdmin && hasNewReports,
-                  onInvite: () {
-                    final cfg = ref.read(adminConfigProvider).valueOrNull ??
-                        const AdminConfig();
-                    shareInviteLink(context, cfg);
-                  },
                 ),
                 ProfileTabBar(
                   selectedTab: selectedTab,

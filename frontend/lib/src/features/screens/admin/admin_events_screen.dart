@@ -166,7 +166,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   final _emailCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _titleError;
-  String? _countryError;
+
   final List<String> _imageUrls = [];
   bool _saving = false;
   bool _uploadingImage = false;

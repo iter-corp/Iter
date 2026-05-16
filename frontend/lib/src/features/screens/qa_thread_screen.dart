@@ -46,7 +46,6 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
   bool _sending = false;
   _ReplyTarget? _replyTo;
   final Set<String> _expandedAnswers = {};
-  bool _hasExpandedHighlight = false;
 
   void _toggleAnswer(String answerId) {
     setState(() {

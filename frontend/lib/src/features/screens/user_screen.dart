@@ -502,6 +502,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   username: displayName,
                   handle: handle,
                   bio: (user['bio'] as String?) ?? '',
+                  profession: (user['profession'] as String?) ?? '',
+                  educationLevel: (user['academicLevel'] as String?) ?? '',
+                  fieldOfStudy: (user['field'] as String?) ?? '',
                   isPrivate: isPrivate,
                 ),
                 if (!hideContent) ...[

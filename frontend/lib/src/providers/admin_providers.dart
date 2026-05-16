@@ -37,6 +37,13 @@ final postReportsProvider = StreamProvider<List<PostReport>>((ref) {
   return ref.watch(adminServiceProvider).streamPostReports();
 });
 
+final discussReportsProvider = StreamProvider<List<PostReport>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  if (!ref.watch(isAdminProvider)) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamDiscussReports();
+});
+
 final userProfileReportsProvider =
     StreamProvider<List<UserProfileReport>>((ref) {
   final user = ref.watch(authStateProvider).value;

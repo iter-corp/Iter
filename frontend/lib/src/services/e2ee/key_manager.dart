@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -129,10 +130,35 @@ class KeyManager {
     if (stored != null) {
       try {
         final decoded = jsonDecode(stored);
-        return decoded['pub'] as String? ?? '';
+        final pub = decoded['pub'] as String? ?? '';
+        final ct = decoded['ct'] as String?;
+        final n = decoded['n'] as String?;
+        final salt = decoded['salt'] as String?;
+        // Best-effort: keep Firestore backup in sync for restore on new devices.
+        if (pub.isNotEmpty && ct != null && n != null && salt != null) {
+          unawaited(_publishRecoveryKeyBackup(
+            uid: uid,
+            pubB64: pub,
+            ct: ct,
+            n: n,
+            salt: salt,
+          ));
+        }
+        return pub;
       } catch (_) {
         // Corrupt, regenerate
       }
+    }
+
+    // No local copy — try restoring the encrypted backup from Firestore.
+    final restored = await _readRecoveryBackupFromFirestore(uid);
+    if (restored != null) {
+      await _storage.write(
+        key: _recoveryKeyStorageKey(uid),
+        value: jsonEncode(restored),
+      );
+      debugPrint('[e2ee-recovery] restored encrypted recovery key from cloud');
+      return restored['pub']!;
     }
 
     // Generate new recovery keypair
@@ -156,17 +182,13 @@ class KeyManager {
       }),
     );
 
-    // Also publish to Firestore so other devices can retrieve it
-    try {
-      await _db.collection('users').doc(uid).set({
-        'recoveryPublicKey': pubB64,
-        'recoveryPublicKeyAlg': 'x25519',
-        'recoveryPublicKeyUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    } catch (e, st) {
-      debugPrint('[e2ee-recovery] publish to Firestore FAILED: $e\n$st');
-      // Don't rethrow — the key is still stored locally
-    }
+    await _publishRecoveryKeyBackup(
+      uid: uid,
+      pubB64: pubB64,
+      ct: encrypted['ct']!,
+      n: encrypted['n']!,
+      salt: encrypted['salt']!,
+    );
 
     return pubB64;
   }
@@ -174,8 +196,17 @@ class KeyManager {
   /// Attempts to decrypt and load the recovery private key using [password].
   /// Returns null if the key doesn't exist, password is wrong, or decryption fails.
   Future<Uint8List?> loadRecoveryKey(String uid, String password) async {
-    final stored = await _storage.read(key: _recoveryKeyStorageKey(uid));
-    if (stored == null) return null;
+    var stored = await _storage.read(key: _recoveryKeyStorageKey(uid));
+    if (stored == null) {
+      final restored = await _readRecoveryBackupFromFirestore(uid);
+      if (restored == null) return null;
+      stored = jsonEncode(restored);
+      await _storage.write(
+        key: _recoveryKeyStorageKey(uid),
+        value: stored,
+      );
+      debugPrint('[e2ee-recovery] downloaded encrypted recovery key backup');
+    }
 
     try {
       final decoded = jsonDecode(stored);
@@ -209,6 +240,60 @@ class KeyManager {
       final bytes = base64Decode(raw);
       if (bytes.length != 32) return null;
       return SimplePublicKey(bytes, type: KeyPairType.x25519);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _publishRecoveryKeyBackup({
+    required String uid,
+    required String pubB64,
+    required String ct,
+    required String n,
+    required String salt,
+  }) async {
+    try {
+      await _db.collection('users').doc(uid).set({
+        'recoveryPublicKey': pubB64,
+        'recoveryPublicKeyAlg': 'x25519',
+        'recoveryPublicKeyUpdatedAt': FieldValue.serverTimestamp(),
+        'recoveryKeyBackup': {
+          'v': 1,
+          'ct': ct,
+          'n': n,
+          'salt': salt,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      }, SetOptions(merge: true));
+    } catch (e, st) {
+      debugPrint('[e2ee-recovery] publish to Firestore FAILED: $e\n$st');
+      // Don't rethrow — the key is still stored locally.
+    }
+  }
+
+  Future<Map<String, String>?> _readRecoveryBackupFromFirestore(
+      String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      final data = doc.data();
+      final pub = data?['recoveryPublicKey'];
+      final alg = data?['recoveryPublicKeyAlg'];
+      final backupRaw = data?['recoveryKeyBackup'];
+      if (pub is! String || pub.isEmpty || alg != 'x25519') return null;
+      if (backupRaw is! Map) return null;
+      final backup = Map<String, dynamic>.from(backupRaw);
+      final ct = backup['ct'];
+      final n = backup['n'];
+      final salt = backup['salt'];
+      if (ct is! String || ct.isEmpty) return null;
+      if (n is! String || n.isEmpty) return null;
+      if (salt is! String || salt.isEmpty) return null;
+      return {
+        'pub': pub,
+        'ct': ct,
+        'n': n,
+        'salt': salt,
+      };
     } catch (_) {
       return null;
     }

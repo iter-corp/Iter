@@ -53,14 +53,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return uri;
   }
 
-  Future<void> _openEventLink(Uri uri) async {
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open event link')),
-      );
-    }
-  }
+  // Future<void> _openEventLink(Uri uri) async {
+  //   // TODO: Implement event link opening when needed
+  // }
 
   String _formatDate(BuildContext context, DateTime date) {
     return MaterialLocalizations.of(context).formatMediumDate(date);

@@ -709,9 +709,7 @@ class _HomeModeToggle extends StatelessWidget {
                         flex: 10,
                         child: _ModePillButton(
                           label: 'Feed',
-                          icon: showIcons
-                              ? Icons.dynamic_feed_rounded
-                              : null,
+                          icon: showIcons ? Icons.dynamic_feed_rounded : null,
                           selected: mode == _HomeMode.feed,
                           compact: isCompact,
                           onTap: () => onChanged(_HomeMode.feed),
@@ -758,11 +756,22 @@ class _QaThreadCard extends ConsumerWidget {
 
   const _QaThreadCard({required this.post});
 
+  static const List<String> _reportReasons = [
+    'Spam or scam',
+    'Harassment or bullying',
+    'Hate speech',
+    'Violence or threats',
+    'Nudity or sexual content',
+    'Misinformation',
+    'Something else',
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final isLiked = ref.watch(isLikedProvider(post.id)).value ?? false;
     final canDelete = currentUid != null && currentUid == post.authorUid;
+    final canReport = currentUid != null && currentUid != post.authorUid;
     final caption = post.caption.trim();
     final lines = caption
         .split('\n')
@@ -868,13 +877,17 @@ class _QaThreadCard extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    if (canDelete) ...[
+                    if (canDelete || canReport) ...[
                       const SizedBox(width: 4),
                       PopupMenuButton<String>(
                         tooltip: 'Question actions',
                         icon: Icon(Icons.more_horiz,
                             color: context.textSecondary),
                         onSelected: (value) async {
+                          if (value == 'report') {
+                            await _reportQuestion(context, ref);
+                            return;
+                          }
                           if (value != 'delete') return;
                           final confirm = await showDialog<bool>(
                             context: context,
@@ -914,11 +927,17 @@ class _QaThreadCard extends ConsumerWidget {
                             );
                           }
                         },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem<String>(
-                            value: 'delete',
-                            child: Text('Delete question'),
-                          ),
+                        itemBuilder: (_) => [
+                          if (canReport)
+                            const PopupMenuItem<String>(
+                              value: 'report',
+                              child: Text('Report question'),
+                            ),
+                          if (canDelete)
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Delete question'),
+                            ),
                         ],
                       ),
                     ],
@@ -988,6 +1007,140 @@ class _QaThreadCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _reportQuestion(BuildContext context, WidgetRef ref) async {
+    final detailsCtrl = TextEditingController();
+    var selectedReason = _reportReasons.first;
+
+    try {
+      final submitted = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: context.cardBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetContext) {
+          return StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Report question',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimary,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  Navigator.pop(sheetContext, false),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Pick the reason that best fits this question.',
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._reportReasons.map(
+                          (reason) => RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: reason,
+                            groupValue: selectedReason,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setSheetState(() => selectedReason = value);
+                            },
+                            title: Text(
+                              reason,
+                              style: TextStyle(color: context.textPrimary),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: detailsCtrl,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            hintText: 'Extra details (optional)',
+                            filled: true,
+                            fillColor: context.inputFill,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide:
+                                  BorderSide(color: context.borderColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, true),
+                                child: const Text('Send report'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      if (submitted != true) return;
+
+      await ref.read(postServiceProvider).reportQaPost(
+            post: post,
+            reason: selectedReason,
+            details: detailsCtrl.text,
+          );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Report sent to admins')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not report question: $e')),
+      );
+    } finally {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => detailsCtrl.dispose());
+    }
   }
 }
 
@@ -1261,6 +1414,8 @@ class _QaSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? Colors.transparent : const Color(0xFFD5D7DF);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: TextField(
@@ -1269,6 +1424,23 @@ class _QaSearchBar extends StatelessWidget {
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: 'Search questions or users...',
+          hintStyle: TextStyle(color: context.textSecondary),
+          filled: true,
+          fillColor: isDark ? context.inputFill : Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF7E3BE8), width: 1.2),
+          ),
           prefixIcon: Icon(Icons.search, color: context.textSecondary),
           suffixIcon: controller.text.isEmpty
               ? null
@@ -1363,7 +1535,8 @@ class _ModePillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hPad = compact ? selectedHorizontalPadding * 0.6 : selectedHorizontalPadding;
+    final hPad =
+        compact ? selectedHorizontalPadding * 0.6 : selectedHorizontalPadding;
     // Match BottomNav: selected = black-on-white, unselected = white-on-dark.
     final color = selected ? Colors.black : Colors.white;
     return GestureDetector(

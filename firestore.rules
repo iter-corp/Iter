@@ -114,6 +114,14 @@ service cloud.firestore {
       allow read, delete: if isAdmin();
     }
 
+    match /discussReports/{reportId} {
+      allow create: if signedIn() && isValidPostReport();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
+        request.resource.data.resolved is bool;
+      allow read, delete: if isAdmin();
+    }
+
     match /userReports/{reportId} {
       allow create: if signedIn() && isValidUserProfileReport();
       allow update: if isAdmin() &&

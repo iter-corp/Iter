@@ -530,7 +530,7 @@ class E2EEService {
     // the current session key for them before archiving. This lets newly added
     // members decrypt messages that were encrypted with the old key version.
     Map<String, dynamic>? wrappedToArchive = wrapped;
-    if (!isFirstKey && wrapped != null) {
+    if (!isFirstKey) {
       final wrappedKeyset = wrapped.keys.toSet();
       final newParticipants = desired.difference(wrappedKeyset);
       if (newParticipants.isNotEmpty) {
@@ -591,7 +591,7 @@ class E2EEService {
 
     // Backfill older archive versions for newly added participants.
     // This lets User B decrypt messages from before they had a public key.
-    if (!isFirstKey && wrapped != null && archiveData != null) {
+    if (!isFirstKey && archiveData != null) {
       final wrappedKeyset = wrapped.keys.toSet();
       final newParticipants = desired.difference(wrappedKeyset);
       if (newParticipants.isNotEmpty) {

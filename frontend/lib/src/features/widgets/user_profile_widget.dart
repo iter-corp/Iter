@@ -182,6 +182,9 @@ class UserNameBio extends StatelessWidget {
   final String username;
   final String handle;
   final String bio;
+  final String profession;
+  final String educationLevel;
+  final String fieldOfStudy;
   final bool isPrivate;
 
   const UserNameBio({
@@ -189,10 +192,68 @@ class UserNameBio extends StatelessWidget {
     required this.username,
     required this.handle,
     this.bio = '',
+    this.profession = '',
+    this.educationLevel = '',
+    this.fieldOfStudy = '',
     this.isPrivate = false,
   });
   @override
   Widget build(BuildContext context) {
+    final prof = profession.trim();
+    final edu = educationLevel.trim();
+    final field = fieldOfStudy.trim();
+    final badges = <Map<String, String>>[
+      if (prof.isNotEmpty) {'label': prof, 'kind': 'profession'},
+      if (edu.isNotEmpty) {'label': edu, 'kind': 'academic'},
+      if (field.isNotEmpty) {'label': field, 'kind': 'field'},
+    ];
+
+    const nonPurpleFallbackPalette = <Color>[
+      Color(0xFF2D6DD6), // navy-blue
+      Color(0xFF1F8A45), // green
+      Color(0xFFA95F14), // orange
+      Color(0xFFC62828), // red
+      Color(0xFFB7791F), // yellow-amber
+      Color(0xFF00897B), // teal
+    ];
+
+    const academicColorMap = <String, Color>{
+      'undergraduate': Color(0xFF7CB342),
+      'masters': Color(0xFFA95F14),
+      'phd': Color(0xFFC62828),
+      'faculty': Color(0xFF00897B),
+    };
+
+    const fieldColorMap = <String, Color>{
+      'tech': Color(0xFF2D6DD6),
+      'medicine': Color(0xFF1F8A45),
+      'law': Color(0xFF9A4A2B),
+      'business': Color(0xFFB7791F),
+      'arts': Color(0xFFC0567B),
+      'engineering': Color(0xFF1E88E5),
+      'science': Color(0xFF00897B),
+      'education': Color(0xFF6D4C41),
+      'social sciences': Color(0xFF7B5E57),
+      'other': Color(0xFF5C6B73),
+    };
+
+    Color badgeColorFor({
+      required String label,
+      required String kind,
+      required int idx,
+    }) {
+      if (kind == 'profession') return AppColors.purpleDeep;
+      if (kind == 'academic') {
+        return academicColorMap[label.toLowerCase()] ??
+            nonPurpleFallbackPalette[idx % nonPurpleFallbackPalette.length];
+      }
+      if (kind == 'field') {
+        return fieldColorMap[label.toLowerCase()] ??
+            nonPurpleFallbackPalette[idx % nonPurpleFallbackPalette.length];
+      }
+      return nonPurpleFallbackPalette[idx % nonPurpleFallbackPalette.length];
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: 52, bottom: 8),
       child: Column(
@@ -235,6 +296,42 @@ class UserNameBio extends StatelessWidget {
                   color: context.textPrimary,
                   height: 1.35,
                 ),
+              ),
+            ),
+          ],
+          if (badges.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: badges.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final label = entry.value['label']!;
+                  final kind = entry.value['kind']!;
+                  final fg = badgeColorFor(label: label, kind: kind, idx: idx);
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: fg.withValues(alpha: 0.55)),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ],

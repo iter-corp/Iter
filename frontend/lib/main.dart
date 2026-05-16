@@ -14,7 +14,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
-import 'src/features/screens/event_screen.dart';
+
 import 'src/features/widgets/event_detail.dart';
 import 'src/features/widgets/event_unavailable_screen.dart';
 import 'src/providers/admin_providers.dart';
@@ -370,7 +370,7 @@ class _VersionGateState extends State<_VersionGate> {
       children: [
         widget.child,
         Positioned.fill(
-          child: _UpdateRequiredScreen(current: current!, required: minVersion),
+          child: _UpdateRequiredScreen(current: current, required: minVersion),
         ),
       ],
     );

@@ -549,6 +549,24 @@ class AdminService {
   Future<void> deletePostReport(String id) =>
       _db.collection('postReports').doc(id).delete();
 
+  Stream<List<PostReport>> streamDiscussReports({int limit = 200}) {
+    return _db
+        .collection('discussReports')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((s) => s.docs.map(PostReport.fromDoc).toList());
+  }
+
+  Future<void> setDiscussReportResolved(String id, bool resolved) =>
+      _db.collection('discussReports').doc(id).update({
+        'resolved': resolved,
+        'resolvedAt': resolved ? FieldValue.serverTimestamp() : null,
+      });
+
+  Future<void> deleteDiscussReport(String id) =>
+      _db.collection('discussReports').doc(id).delete();
+
   Stream<List<UserProfileReport>> streamUserProfileReports({int limit = 200}) {
     return _db
         .collection('userReports')

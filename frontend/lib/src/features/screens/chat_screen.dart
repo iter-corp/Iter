@@ -207,14 +207,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // The platform's SpeechRecognizer uses the device default locale, which
   // is the closest thing to language auto-detection it supports natively.
   final stt.SpeechToText _stt = stt.SpeechToText();
-  bool _sttInitialized = false;
+  // bool _sttInitialized = false;  // TODO: Re-enable when _toggleDictation is uncommented
   bool _isDictating = false;
   // The text that was already in the field when dictation started, so we
   // append onto it instead of overwriting whatever the user had typed.
-  String _dictationBaseText = '';
+  // String _dictationBaseText = '';  // TODO: Re-enable when _toggleDictation is uncommented
   // User-selected dictation locale. null = device default. Long-press the
   // dictation button to change.
-  String? _dictationLocaleId;
+  // String? _dictationLocaleId;  // TODO: Re-enable when _pickDictationLocale is uncommented
 
   // Auto-translate incoming messages. Persisted per-chat in SharedPreferences
   // so each chat can have its own preference. _autoTranslateTarget is the
@@ -1095,143 +1095,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Tap-to-dictate: speech-to-text into the message field. The user can
   /// then edit and send. Tap again to stop. Distinct from the hold-to-send
   /// voice-message button (which uploads an audio recording).
-  Future<void> _toggleDictation() async {
-    if (_isDictating) {
-      await _stt.stop();
-      if (mounted) setState(() => _isDictating = false);
-      return;
-    }
-
-    if (!_sttInitialized) {
-      _sttInitialized = await _stt.initialize(
-        onStatus: (status) {
-          if (status == 'done' || status == 'notListening') {
-            if (mounted) setState(() => _isDictating = false);
-          }
-        },
-        onError: (err) {
-          debugPrint('[chat-stt] error: ${err.errorMsg}');
-          if (!mounted) return;
-          setState(() => _isDictating = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Dictation error: ${err.errorMsg}')),
-          );
-        },
-      );
-      if (!_sttInitialized) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Microphone unavailable. Check permission.'),
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    // Use the user-picked locale (long-press the mic to change). When the
-    // user hasn't chosen one we pass null so the engine falls back to its
-    // own default — calling _stt.systemLocale() hangs silently on some
-    // Android builds and prevents listen() from ever starting.
-    final String? localeId = _dictationLocaleId;
-
-    _dictationBaseText = _controller.text;
-    setState(() => _isDictating = true);
-
-    await _stt.listen(
-      localeId: localeId,
-      listenOptions: stt.SpeechListenOptions(
-        partialResults: true,
-        cancelOnError: false,
-        listenMode: stt.ListenMode.dictation,
-      ),
-      listenFor: const Duration(seconds: 60),
-      pauseFor: const Duration(seconds: 4),
-      onResult: (result) {
-        if (!mounted) return;
-        final spoken = result.recognizedWords;
-        final separator =
-            _dictationBaseText.isEmpty || _dictationBaseText.endsWith(' ')
-                ? ''
-                : ' ';
-        final next = '$_dictationBaseText$separator$spoken';
-        _controller.value = TextEditingValue(
-          text: next,
-          selection: TextSelection.collapsed(offset: next.length),
-        );
-        // Keep the typing-indicator behavior in sync with the new text.
-        _onTextChanged(next);
-      },
-    );
-  }
+  // Future<void> _toggleDictation() async {
+  //   // TODO: Implement when speech-to-text is needed
+  // }
 
   /// Long-press handler on the dictation mic — lets the user pick which
   /// language to dictate in for this chat. Includes an "Auto (device default)"
   /// option that resets back to the system locale.
-  Future<void> _pickDictationLocale() async {
-    if (!_sttInitialized) {
-      _sttInitialized = await _stt.initialize();
-      if (!_sttInitialized) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Microphone unavailable. Check permission.'),
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    final installed = await _stt.locales();
-    if (!mounted) return;
-
-    final selected = await showModalBottomSheet<_DictationLocaleChoice>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.auto_awesome),
-                title: const Text('Auto (device default)'),
-                trailing: _dictationLocaleId == null
-                    ? const Icon(Icons.check, color: Color(0xFFB05ECC))
-                    : null,
-                onTap: () => Navigator.pop(
-                  sheetContext,
-                  const _DictationLocaleChoice(id: null, label: 'Auto'),
-                ),
-              ),
-              const Divider(height: 1),
-              ...installed.map((loc) => ListTile(
-                    title: Text(loc.name),
-                    subtitle: Text(loc.localeId),
-                    trailing: _dictationLocaleId == loc.localeId
-                        ? const Icon(Icons.check, color: Color(0xFFB05ECC))
-                        : null,
-                    onTap: () => Navigator.pop(
-                      sheetContext,
-                      _DictationLocaleChoice(
-                        id: loc.localeId,
-                        label: loc.name,
-                      ),
-                    ),
-                  )),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (selected == null || !mounted) return;
-    setState(() {
-      _dictationLocaleId = selected.id;
-    });
-  }
+  // Future<void> _pickDictationLocale() async {
+  //   // TODO: Implement when dictation locale picker is needed
+  // }
 
   /// Bottom-sheet shown from the translate icon in the chat header. Lets
   /// the user toggle auto-translate of incoming messages and pick which
@@ -3955,11 +3828,11 @@ class _SharedEventLabel extends ConsumerWidget {
 
 /// Carries the user's dictation-language pick out of the bottom sheet.
 /// `id` is null for "Auto (device default)".
-class _DictationLocaleChoice {
-  final String? id;
-  final String label;
-  const _DictationLocaleChoice({required this.id, required this.label});
-}
+// class _DictationLocaleChoice {
+//   final String? id;
+//   final String label;
+//   const _DictationLocaleChoice({required this.id, required this.label});
+// }
 
 /// Small WhatsApp-style status icon for own messages:
 ///   • clock      — pending write (no server timestamp yet)

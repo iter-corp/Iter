@@ -75,7 +75,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           _AdminTile(
             icon: Icons.assessment_outlined,
             title: 'Reports',
-            subtitle: 'Post, profile, and error reports',
+            subtitle: 'Post, discuss, profile, and error reports',
             color: const Color(0xFFE04E5C),
             showNotificationDot: hasNewReports,
             onTap: () => Navigator.push(
