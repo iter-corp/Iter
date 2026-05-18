@@ -29,6 +29,7 @@ import '../../providers/event_chat_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../providers/reaction_providers.dart';
 import '../../services/chat_service.dart';
+import '../../services/e2ee/key_manager.dart';
 import '../../services/reaction_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/translate_service.dart';
@@ -41,6 +42,7 @@ import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
+import 'security_verification_screen.dart';
 import '../widgets/sticker_picker_sheet.dart';
 
 // Pick a text direction from the first strong-directional codepoint in
@@ -150,6 +152,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _markingSeen = false;
   bool _showStickerPicker = false;
   DateTime? _lastMarkSeenAt;
+
+  // In-flight guard for text/sticker/location sends. The UI for media
+  // sends already gates on the pending-attachment list, so this flag is
+  // only consulted by paths that don't add a [_PendingAttachment].
+  bool _sendInFlight = false;
 
   void _addPending(_PendingAttachment p) {
     setState(() => _pending.add(p));
@@ -303,6 +310,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (text.isNotEmpty) {
       ref.read(typingServiceProvider).setTyping(widget.chatId, uid, true);
       _typingTimer = Timer(const Duration(seconds: 2), () {
+        // Guard against the user navigating away during the 2s window —
+        // ref.read on a torn-down widget throws.
+        if (!mounted) return;
         ref.read(typingServiceProvider).setTyping(widget.chatId, uid, false);
       });
     } else {
@@ -311,47 +321,51 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
+    if (_sendInFlight) return;
     final text = _controller.text.trim();
     final uid = _currentUid;
     if (text.isEmpty || uid == null) return;
+
+    // Permission check happens BEFORE we touch the input so a blocked
+    // user doesn't lose what they typed.
+    final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
+    if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
+      final restrictMessaging =
+          chatDoc['restrictMessaging'] as bool? ?? false;
+      final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
+      final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
+      final isAdmin = admins.contains(uid);
+
+      if (restrictMessaging && !isAdmin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Messaging is restricted in this group')),
+          );
+        }
+        return;
+      }
+      if (adminOnly && !isAdmin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Only admins can message in this group')),
+          );
+        }
+        return;
+      }
+    }
+
     _typingTimer?.cancel();
     ref.read(typingServiceProvider).setTyping(widget.chatId, uid, false);
     _controller.clear();
     final reply = _replyTarget;
-    setState(() => _replyTarget = null);
+    setState(() {
+      _replyTarget = null;
+      _sendInFlight = true;
+    });
 
     try {
-      // Check group permissions if this is a group chat
-      final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
-      if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
-        // Check if messaging is restricted
-        final restrictMessaging =
-            chatDoc['restrictMessaging'] as bool? ?? false;
-        final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
-        final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
-        final isAdmin = admins.contains(uid);
-
-        if (restrictMessaging && !isAdmin) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Messaging is restricted in this group')),
-            );
-          }
-          return;
-        }
-
-        if (adminOnly && !isAdmin) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Only admins can message in this group')),
-            );
-          }
-          return;
-        }
-      }
-
       await ref.read(chatServiceProvider).sendMessage(
             chatId: widget.chatId,
             senderUid: uid,
@@ -362,11 +376,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             replyToSenderUid: reply?.senderUid,
           );
     } catch (e) {
+      // Restore what the user typed + their reply context so they can
+      // retry without re-typing or re-quoting.
       if (mounted) {
+        _controller.text = text;
+        _controller.selection =
+            TextSelection.collapsed(offset: _controller.text.length);
+        setState(() => _replyTarget = reply);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send message: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _sendInFlight = false);
     }
   }
 
@@ -535,20 +557,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       } catch (_) {}
 
       final reply = _replyTarget;
-      setState(() => _replyTarget = null);
-      await ref.read(chatServiceProvider).sendMessage(
-            chatId: widget.chatId,
-            senderUid: uid,
-            receiverUid: widget.otherUid,
-            text: '',
-            locationLat: pos.latitude,
-            locationLng: pos.longitude,
-            locationLabel: label,
-            replyToId: reply?.id,
-            replyToText: reply == null ? null : _previewOf(reply),
-            replyToSenderUid: reply?.senderUid,
-          );
-      AppFeedback.showSuccessOn(messenger, 'Location shared');
+      try {
+        await ref.read(chatServiceProvider).sendMessage(
+              chatId: widget.chatId,
+              senderUid: uid,
+              receiverUid: widget.otherUid,
+              text: '',
+              locationLat: pos.latitude,
+              locationLng: pos.longitude,
+              locationLabel: label,
+              replyToId: reply?.id,
+              replyToText: reply == null ? null : _previewOf(reply),
+              replyToSenderUid: reply?.senderUid,
+            );
+        if (mounted) setState(() => _replyTarget = null);
+        AppFeedback.showSuccessOn(messenger, 'Location shared');
+      } catch (e) {
+        // Reply context is intentionally preserved so the user can retry
+        // the location share with the same quote.
+        AppFeedback.showErrorOn(messenger, 'Could not share location: $e');
+      }
     } catch (e) {
       AppFeedback.showErrorOn(messenger, 'Could not share location: $e');
     }
@@ -1357,7 +1385,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (uid == null) return;
     setState(() => _showStickerPicker = false);
     final reply = _replyTarget;
-    setState(() => _replyTarget = null);
 
     try {
       await ref.read(chatServiceProvider).sendMessage(
@@ -1371,7 +1398,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             replyToText: reply == null ? null : _previewOf(reply),
             replyToSenderUid: reply?.senderUid,
           );
+      if (mounted) setState(() => _replyTarget = null);
     } catch (e) {
+      // Keep reply context so the user can retry without re-quoting.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send sticker: $e')),
@@ -1387,6 +1416,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isGroup = (chatDoc['kind'] as String?) == 'group';
     final groupName = (chatDoc['groupName'] as String?) ?? widget.otherName;
     final participantCount = ((chatDoc['participants'] as List?)?.length ?? 0);
+    // Secret-chat flag — drives the header lock badge. Mirrors the rule
+    // in ChatService._isSecretChat so we don't show "Encrypted" on a
+    // chat that's actually plaintext on the server. Default-true for
+    // legacy chats (those with the older `e2ee: true` marker but no
+    // explicit `secret` field) keeps existing conversations marked.
+    final isSecret = (chatDoc['secret'] is bool)
+        ? chatDoc['secret'] as bool
+        : chatDoc['e2ee'] == true;
 
     final presenceAsync =
         isGroup ? null : ref.watch(presenceWatchProvider(widget.otherUid));
@@ -1478,10 +1515,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            isGroup ? groupName : widget.otherName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 15),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  isGroup ? groupName : widget.otherName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600, fontSize: 15),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isSecret) ...[
+                                const SizedBox(width: 6),
+                                // Lock badge: this chat is end-to-end
+                                // encrypted. Tap (for 1:1) to open the
+                                // security-code verification screen so
+                                // both parties can confirm there's no
+                                // MITM.
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: (isGroup ||
+                                          widget.otherUid.isEmpty)
+                                      ? null
+                                      : () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  SecurityVerificationScreen(
+                                                peerUid: widget.otherUid,
+                                                peerName: widget.otherName,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                  child: const Icon(
+                                    Icons.lock,
+                                    size: 13,
+                                    color: AppColors.purple,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           Text(
                             isGroup
@@ -1604,8 +1679,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
             Divider(height: 1, color: Theme.of(context).dividerColor),
 
-            // E2EE BANNER (1:1 + group chats; both are encrypted in v1)
-            const _E2EEBanner(),
+            // E2EE BANNER — only shown for secret chats. Normal chats
+            // would mislead the user if we said "messages are encrypted"
+            // while the server still holds plaintext.
+            if (isSecret) const _E2EEBanner(),
+            // Security-code-changed banner: only meaningful for 1:1
+            // secret chats where we can compare a specific peer key.
+            // Group chats would need per-member tracking; skip for now.
+            if (isSecret && !isGroup && widget.otherUid.isNotEmpty)
+              _SecurityCodeChangedBanner(
+                peerUid: widget.otherUid,
+                peerName: widget.otherName,
+              ),
 
             // MESSAGES
             Expanded(
@@ -1679,6 +1764,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 target: _replyTarget!,
                 previewText: _previewOf(_replyTarget!),
                 onCancel: () => setState(() => _replyTarget = null),
+              ),
+
+            // MISSING-KEY WARNING: in secret group chats, flag any
+            // members who haven't published a public key yet. Without
+            // this they'd silently miss every encrypted message you
+            // send (E2EE silently drops them from the wrapping set).
+            if (isSecret && isGroup)
+              _MissingKeyWarning(
+                chatDoc: chatDoc,
               ),
 
             // INPUT (or block banner)
@@ -1787,8 +1881,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     controller: _controller,
                                     focusNode: _messageFocusNode,
                                     onChanged: _onTextChanged,
-                                    onTapOutside: (_) =>
-                                        _messageFocusNode.unfocus(),
                                     minLines: 1,
                                     maxLines: 6,
                                     keyboardType: TextInputType.multiline,
@@ -2057,6 +2149,136 @@ class _AutoDeleteOption {
 // reply-to ids, etc.) are also secret.
 // ─────────────────────────────────────────────
 
+/// For secret group chats, surfaces members who haven't published a
+/// public key yet. The E2EE layer silently drops those members from
+/// the wrapping set (otherwise every send would rotate the chat key
+/// endlessly), which means they'd never see the sender's messages.
+/// Without this warning the sender would have no idea anyone was
+/// missing out.
+class _MissingKeyWarning extends ConsumerWidget {
+  final Map<String, dynamic> chatDoc;
+
+  const _MissingKeyWarning({required this.chatDoc});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final meUid = ref.watch(authStateProvider).value?.uid;
+    final participants =
+        ((chatDoc['participants'] as List?)?.cast<String>() ?? const <String>[])
+            .where((u) => u.isNotEmpty && u != meUid)
+            .toList()
+          ..sort();
+    if (participants.isEmpty) return const SizedBox.shrink();
+    final key = participants.join(',');
+    final asyncMissing = ref.watch(missingPubKeyMembersProvider(key));
+    final missing = asyncMissing.valueOrNull ?? const <String>[];
+    if (missing.isEmpty) return const SizedBox.shrink();
+    final userData = chatDoc['userData'] as Map<String, dynamic>?;
+    String labelFor(String uid) {
+      final entry = userData?[uid];
+      if (entry is Map) {
+        final name = entry['username'];
+        if (name is String && name.isNotEmpty) return name;
+      }
+      // Fallback to a short uid prefix so the user still gets some
+      // signal even if username denormalization is missing.
+      return uid.length > 6 ? '${uid.substring(0, 6)}…' : uid;
+    }
+
+    final names = missing.map(labelFor).toList();
+    final preview = names.length <= 3
+        ? names.join(', ')
+        : '${names.take(2).join(', ')} and ${names.length - 2} others';
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.withValues(alpha: 0.18),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline,
+              size: 18, color: Color(0xFFB36A00)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$preview won\'t be able to read this message until they '
+              'open the app on a device with encryption set up.',
+              style: const TextStyle(
+                color: Color(0xFFB36A00),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown above the message list in a 1:1 secret chat when the peer's
+/// published pub-key fingerprint has changed since the last time this
+/// device saw it. Could mean the peer reinstalled / switched device —
+/// or, less commonly, a MITM. Tapping opens the verification screen
+/// where the user can compare codes and acknowledge the new key.
+class _SecurityCodeChangedBanner extends ConsumerWidget {
+  final String peerUid;
+  final String peerName;
+
+  const _SecurityCodeChangedBanner({
+    required this.peerUid,
+    required this.peerName,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final meUid = ref.watch(authStateProvider).value?.uid;
+    if (meUid == null) return const SizedBox.shrink();
+    final stateAsync =
+        ref.watch(peerKeyStateProvider('$meUid|$peerUid'));
+    final state = stateAsync.valueOrNull;
+    if (state != PeerKeyState.changed) return const SizedBox.shrink();
+    return Material(
+      color: Colors.amber.withValues(alpha: 0.18),
+      child: InkWell(
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SecurityVerificationScreen(
+                peerUid: peerUid,
+                peerName: peerName,
+              ),
+            ),
+          );
+          ref.invalidate(peerKeyStateProvider('$meUid|$peerUid'));
+        },
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.shield_outlined,
+                  size: 18, color: Color(0xFFB36A00)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$peerName\'s security code changed. Tap to verify.',
+                  style: const TextStyle(
+                    color: Color(0xFFB36A00),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  size: 18, color: Color(0xFFB36A00)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _E2EEBanner extends StatelessWidget {
   const _E2EEBanner();
 
@@ -2093,6 +2315,123 @@ class _E2EEBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Bottom sheet shown when the user taps a 🔒 "couldn't decrypt" bubble.
+/// Explains the cause based on [keySyncStateProvider] and (in a future
+/// session) will offer a "restore from recovery backup" action.
+void _showUndecryptableSheet(BuildContext context, WidgetRef ref) {
+  final syncState = ref.read(keySyncStateProvider);
+
+  // Map the sync state to a human explanation. The point is to tell the
+  // user WHY a message looks locked instead of leaving them stuck on a
+  // padlock with no context.
+  String title;
+  String body;
+  switch (syncState) {
+    case KeySyncState.replacedByOtherDevice:
+      title = 'Encryption key was replaced';
+      body =
+          'You signed in to Coil on another device, which created a new '
+          'encryption key. Messages sent before that switch were locked '
+          'to the previous device and can\'t be read here yet.\n\n'
+          'New messages will start decrypting automatically once the '
+          'other person opens this chat again.';
+      break;
+    case KeySyncState.missingLocal:
+      title = 'No encryption key on this device';
+      body =
+          'This device doesn\'t have an encryption key for your account '
+          'yet — usually because Coil was just reinstalled, or you\'re '
+          'signing in on a new device.\n\n'
+          'Old encrypted messages can be restored from your recovery '
+          'backup. We\'ll add that flow in an upcoming update.';
+      break;
+    case KeySyncState.synced:
+      title = 'Couldn\'t decrypt this message';
+      body =
+          'This message was encrypted with a key your device doesn\'t '
+          'hold. The most common cause is that the sender re-installed '
+          'the app before you opened this chat, so the key never made it '
+          'to you.\n\n'
+          'New messages they send will arrive decrypted once they open '
+          'this chat again.';
+      break;
+    case KeySyncState.unknown:
+      title = 'Couldn\'t decrypt this message';
+      body =
+          'Coil couldn\'t check your encryption key status — usually a '
+          'network issue. Try again once you\'re back online; if the '
+          'lock stays, the message was encrypted with a key this device '
+          'doesn\'t hold.';
+      break;
+  }
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.borderColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 22, color: AppColors.purple),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                body,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: context.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(sheetCtx),
+                  child: const Text('Got it'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 void _showE2EEInfoSheet(BuildContext context) {
@@ -2523,9 +2862,16 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   Widget _buildBody({required Color textColor}) {
     final originalStyle = TextStyle(color: textColor, fontSize: 14);
     if (msg.encryptedUnreadable) {
-      return Text(
-        '🔒 Encrypted message (can\'t decrypt on this device)',
-        style: originalStyle,
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _showUndecryptableSheet(context, ref),
+        child: Text(
+          '🔒 Encrypted message — tap to learn why',
+          style: originalStyle.copyWith(
+            decoration: TextDecoration.underline,
+            decorationStyle: TextDecorationStyle.dotted,
+          ),
+        ),
       );
     }
     if (!widget.autoTranslate || isMe || msg.text.trim().isEmpty) {

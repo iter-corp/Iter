@@ -14,6 +14,7 @@ import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/share_app.dart';
 import 'event_notifications_settings_screen.dart';
+import 'recovery_password_screens.dart';
 import 'profile_visitors_screen.dart';
 
 /// Full-screen profile settings page. Replaces the older bottom-sheet
@@ -188,6 +189,21 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   const AdminConfig();
               shareInviteLink(context, cfg);
             },
+          ),
+          const _SectionHeader(title: 'Encryption'),
+          ListTile(
+            leading: const Icon(Icons.lock_outline, color: AppColors.purple),
+            title: const Text('Secret-chat recovery password'),
+            subtitle: Text(
+              'Used to restore secret-chat history on a new device',
+              style: TextStyle(fontSize: 12, color: context.textSecondary),
+            ),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const SetRecoveryPasswordScreen(),
+              ),
+            ),
           ),
           const _SectionHeader(title: 'Safety'),
           ListTile(

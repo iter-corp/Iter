@@ -41,6 +41,229 @@ class KeyManager {
   String _privKeyStorageKey(String uid) => 'e2ee.privkey.$uid';
   String _recoveryKeyStorageKey(String uid) => 'e2ee.recovery.$uid';
 
+  /// Local flag stored in secure storage that tells us whether the user
+  /// has chosen their own recovery password. Until they do, the app uses
+  /// the legacy uid-derived password so existing chats stay readable —
+  /// see RECOVERY_PASSWORD_MIGRATION in main.dart.
+  String _userChosePasswordKey(String uid) => 'e2ee.recovery.userset.$uid';
+
+  /// Legacy uid-derived password kept around so existing users who
+  /// haven't migrated yet stay decryptable. Burn this after the
+  /// migration deadline.
+  static String legacyPasswordFor(String uid) =>
+      'coil-recovery-${uid.substring(0, 8)}';
+
+  /// Whether the user has set their own recovery password via the
+  /// onboarding/settings flow. False for legacy installs.
+  Future<bool> hasUserChosenRecoveryPassword(String uid) async {
+    final v = await _storage.read(key: _userChosePasswordKey(uid));
+    return v == 'true';
+  }
+
+  /// Stash the locally-derived recovery password so the rest of the app
+  /// can unlock the recovery key without re-prompting on every cold
+  /// start. The string stored is the *password itself* — protected only
+  /// by Keychain/Keystore — so it's no weaker than the underlying KEK.
+  /// Returns the password back to the caller for chaining.
+  String _stashedPasswordKey(String uid) => 'e2ee.recovery.password.$uid';
+
+  Future<void> _stashPassword(String uid, String password) async {
+    await _storage.write(key: _stashedPasswordKey(uid), value: password);
+  }
+
+  /// Reads the user-chosen recovery password from secure storage. Falls
+  /// back to the legacy password if the user hasn't migrated yet.
+  Future<String> resolveRecoveryPassword(String uid) async {
+    final stashed = await _storage.read(key: _stashedPasswordKey(uid));
+    if (stashed != null && stashed.isNotEmpty) return stashed;
+    return legacyPasswordFor(uid);
+  }
+
+  /// True iff Firestore advertises a recovery backup for [uid]. Lets the
+  /// startup flow detect "fresh device but cloud backup exists" so it
+  /// can prompt for the password instead of leaving the user stuck.
+  Future<bool> hasRecoveryBackup(String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      final data = doc.data();
+      final backup = data?['recoveryKeyBackup'];
+      return backup is Map && backup['ct'] is String;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Sets (or rotates) the user's recovery password. When the user has
+  /// never chosen one (legacy install), [oldPassword] should be
+  /// [legacyPasswordFor]`(uid)`; otherwise pass the previous user-chosen
+  /// one. Re-encrypts the recovery PRIVATE key with the new
+  /// password-derived KEK, republishes the backup, and stashes the new
+  /// password locally so subsequent cold starts unlock automatically.
+  ///
+  /// Returns true on success, false if the old password didn't decrypt
+  /// the existing backup (so the caller can show "wrong password").
+  Future<bool> setRecoveryPassword({
+    required String uid,
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    if (newPassword.isEmpty) return false;
+
+    // Load the current recovery PRIV using the old password. If there's
+    // no recovery key yet (e.g. ensureRecoveryKey never ran), bail —
+    // caller should ensureRecoveryKey first.
+    final priv = await loadRecoveryKey(uid, oldPassword);
+    if (priv == null) return false;
+
+    // Re-encrypt with the new password.
+    final reencrypted = await _encryptRecoveryKey(priv, newPassword);
+
+    // Read pub from the existing local blob (we don't change it).
+    final stored = await _storage.read(key: _recoveryKeyStorageKey(uid));
+    String pubB64 = '';
+    if (stored != null) {
+      try {
+        final decoded = jsonDecode(stored);
+        pubB64 = (decoded['pub'] as String?) ?? '';
+      } catch (_) {}
+    }
+    if (pubB64.isEmpty) {
+      // Should never happen if loadRecoveryKey succeeded, but be safe.
+      return false;
+    }
+
+    await _storage.write(
+      key: _recoveryKeyStorageKey(uid),
+      value: jsonEncode({
+        'pub': pubB64,
+        'ct': reencrypted['ct'],
+        'n': reencrypted['n'],
+        'salt': reencrypted['salt'],
+      }),
+    );
+    await _publishRecoveryKeyBackup(
+      uid: uid,
+      pubB64: pubB64,
+      ct: reencrypted['ct']!,
+      n: reencrypted['n']!,
+      salt: reencrypted['salt']!,
+    );
+    await _stashPassword(uid, newPassword);
+    await _storage.write(key: _userChosePasswordKey(uid), value: 'true');
+    return true;
+  }
+
+  // ─────────────────────────────────────────────
+  // Peer key fingerprinting (security-code-changed detection)
+  // ─────────────────────────────────────────────
+
+  String _peerFingerprintKey(String meUid, String peerUid) =>
+      'e2ee.peerfp.$meUid.$peerUid';
+
+  /// Returns a short, human-comparable fingerprint of [pubKeyBytes].
+  /// Format mirrors WhatsApp's "security code": twelve 5-digit groups
+  /// derived from the SHA-256 of the public key. Two parties can read
+  /// these out loud to confirm they hold each other's actual keys
+  /// (no MITM).
+  static Future<String> fingerprintOf(List<int> pubKeyBytes) async {
+    final hash =
+        await Sha256().hash(pubKeyBytes).then((h) => h.bytes);
+    final digits = StringBuffer();
+    for (final b in hash) {
+      digits.write(b.toString().padLeft(3, '0'));
+    }
+    // SHA-256 → 32 bytes → 96 decimal digits. Truncate to the
+    // canonical 60-digit ("12 × 5") security code.
+    final flat = digits.toString();
+    final code = flat.substring(0, 60);
+    final groups = <String>[];
+    for (var i = 0; i < 60; i += 5) {
+      groups.add(code.substring(i, i + 5));
+    }
+    return groups.join(' ');
+  }
+
+  /// Fingerprint of the user's own published public key. Used by the
+  /// verification screen so the local side can show their code next to
+  /// the remote side's.
+  Future<String?> fingerprintForSelf(String uid) async {
+    final priv = await readPrivateKeyBytes(uid);
+    if (priv == null) return null;
+    try {
+      final kp = await _x25519.newKeyPairFromSeed(priv);
+      final pub = await kp.extractPublicKey();
+      return await fingerprintOf(pub.bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fingerprint of the live published pub key for [peerUid], or null
+  /// if they haven't published one (or Firestore is unreachable).
+  Future<String?> fingerprintForPeer(String peerUid) async {
+    final pub = await fetchPublicKey(peerUid);
+    if (pub == null) return null;
+    return await fingerprintOf(pub.bytes);
+  }
+
+  /// State of [peerUid]'s key from the perspective of [meUid]. Used to
+  /// drive the "security code changed" banner in chat.
+  Future<PeerKeyState> checkPeerKey({
+    required String meUid,
+    required String peerUid,
+  }) async {
+    final liveFp = await fingerprintForPeer(peerUid);
+    if (liveFp == null) return PeerKeyState.unknown;
+    final stored =
+        await _storage.read(key: _peerFingerprintKey(meUid, peerUid));
+    if (stored == null || stored.isEmpty) {
+      // First time we've ever observed this peer — trust on first use
+      // and remember the fingerprint for future comparisons.
+      await _storage.write(
+        key: _peerFingerprintKey(meUid, peerUid),
+        value: liveFp,
+      );
+      return PeerKeyState.firstSeen;
+    }
+    if (stored == liveFp) return PeerKeyState.unchanged;
+    return PeerKeyState.changed;
+  }
+
+  /// Records [peerUid]'s current fingerprint as the new trusted value.
+  /// Called when the user acknowledges a security-code-changed warning
+  /// (either by tapping "Got it" or by verifying the new code on the
+  /// verification screen).
+  Future<void> acknowledgePeerKey({
+    required String meUid,
+    required String peerUid,
+  }) async {
+    final liveFp = await fingerprintForPeer(peerUid);
+    if (liveFp == null) return;
+    await _storage.write(
+      key: _peerFingerprintKey(meUid, peerUid),
+      value: liveFp,
+    );
+  }
+
+  /// Discards the local keypair and the locally-cached recovery
+  /// password, then regenerates a fresh X25519 keypair via
+  /// [ensureKeyPair]. Old encrypted history wrapped against the
+  /// previous pub becomes unreadable on every device. Use this only
+  /// when the user has confirmed they accept losing secret-chat
+  /// history (e.g. they forgot their recovery password).
+  ///
+  /// The recovery backup blob on the server is left intact so any
+  /// other device that still has the old keypair can keep reading
+  /// history. If you want a full wipe, call [deleteLocal] and then
+  /// publish a new recovery key separately.
+  Future<void> resetEncryptionIdentity(String uid) async {
+    await deleteLocal(uid);
+    await _storage.delete(key: _stashedPasswordKey(uid));
+    await _storage.delete(key: _userChosePasswordKey(uid));
+    // ensureKeyPair will regenerate + publish on next access.
+    await ensureKeyPair(uid);
+  }
+
   /// Returns the user's keypair, generating + publishing one on first use.
   ///
   /// Idempotent — safe to call from multiple call sites; the keypair is
@@ -117,6 +340,52 @@ class KeyManager {
   /// undecryptable on this device.
   Future<void> deleteLocal(String uid) =>
       _storage.delete(key: _privKeyStorageKey(uid));
+
+  /// State of the local keypair relative to what's published in Firestore.
+  /// Used by the UI to surface multi-device collisions ("another device
+  /// signed in and replaced your encryption key") so the user knows new
+  /// messages won't be readable here until the other device re-syncs.
+  ///
+  ///   * [KeySyncState.synced] — local pub == published pub. Normal.
+  ///   * [KeySyncState.replacedByOtherDevice] — local key exists but the
+  ///     published pub differs, i.e. another sign-in overwrote it.
+  ///   * [KeySyncState.missingLocal] — no private key on this device yet;
+  ///     either first launch or a fresh reinstall. Recovery key needed.
+  ///   * [KeySyncState.unknown] — Firestore read failed (offline).
+  Future<KeySyncState> checkKeyPairSync(String uid) async {
+    final localPriv = await readPrivateKeyBytes(uid);
+    if (localPriv == null) return KeySyncState.missingLocal;
+
+    SimplePublicKey localPub;
+    try {
+      final kp = await _x25519.newKeyPairFromSeed(localPriv);
+      localPub = await kp.extractPublicKey();
+    } catch (_) {
+      // Stored key is corrupt — treat as missing so the UI prompts a
+      // recovery / regenerate flow rather than silently breaking sends.
+      return KeySyncState.missingLocal;
+    }
+
+    SimplePublicKey? publishedPub;
+    try {
+      publishedPub = await fetchPublicKey(uid);
+    } catch (_) {
+      return KeySyncState.unknown;
+    }
+    if (publishedPub == null) {
+      // Local key exists but nothing is published. The publish RPC
+      // probably failed on first launch; ensureKeyPair on the next cold
+      // start will retry, but until then the device behaves correctly
+      // for sending and only fails for receivers. Treat as synced.
+      return KeySyncState.synced;
+    }
+
+    final localB64 = base64Encode(localPub.bytes);
+    final publishedB64 = base64Encode(publishedPub.bytes);
+    return localB64 == publishedB64
+        ? KeySyncState.synced
+        : KeySyncState.replacedByOtherDevice;
+  }
 
   /// Generates and stores a password-protected recovery keypair for cross-device
   /// decryption. Call this once on account creation or first app launch.
@@ -352,6 +621,10 @@ class KeyManager {
     return Uint8List.fromList(await _aes.decrypt(secretBox, secretKey: kek));
   }
 
+  /// State of the local E2EE keypair relative to what Firestore advertises.
+  /// See [checkKeyPairSync].
+  // (enum defined at file scope below — kept here as a doc anchor.)
+
   /// PBKDF2-SHA256 key derivation (100k iterations, 32-byte output).
   Future<SecretKey> _pbkdf2(String password, List<int> salt) async {
     // Flutter's cryptography package doesn't expose PBKDF2 directly,
@@ -369,4 +642,47 @@ class KeyManager {
 
     return SecretKey(key.sublist(0, 32));
   }
+}
+
+/// Result of [KeyManager.checkKeyPairSync]. The UI uses this to decide
+/// whether to show a "another device replaced your encryption key" banner
+/// or a "restore from recovery backup" prompt.
+enum KeySyncState {
+  /// Local pub matches what Firestore advertises. Normal operation.
+  synced,
+
+  /// Local key exists, but the published pub differs — another device
+  /// signed in and overwrote `users/{uid}.publicKey`. New messages from
+  /// other people will be wrapped for the other device, so they won't
+  /// decrypt here until we either republish OR the other device patches
+  /// the missing wrappings.
+  replacedByOtherDevice,
+
+  /// No private key on this device. First launch or fresh reinstall.
+  /// The recovery flow should kick in.
+  missingLocal,
+
+  /// Couldn't reach Firestore to check. Treat as transient — retry later.
+  unknown,
+}
+
+/// State of a peer's published public key relative to the fingerprint
+/// we last saw for them. Drives the "security code changed" banner in
+/// 1:1 secret chats.
+enum PeerKeyState {
+  /// Peer's key matches the fingerprint we recorded. Normal operation.
+  unchanged,
+
+  /// Peer has published a key for the first time as far as this device
+  /// knows — trust-on-first-use, the fingerprint is now stored.
+  firstSeen,
+
+  /// Peer's key differs from the fingerprint we recorded. Could be a
+  /// legitimate reinstall, a new device — or a MITM. The UI must
+  /// surface this to the user and only re-trust on acknowledgement.
+  changed,
+
+  /// Couldn't fetch the peer's published key (offline, peer never
+  /// published one). Treat as transient.
+  unknown,
 }

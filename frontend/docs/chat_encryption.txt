@@ -1,0 +1,313 @@
+================================================================
+COIL — CHAT MESSAGE ENCRYPTION
+================================================================
+
+This document explains the algorithm used to encrypt chat messages
+in COIL, how it works step by step, and why these specific
+algorithms were chosen.
+
+Source of truth:
+  frontend/lib/src/services/e2ee/e2ee_service.dart
+  frontend/lib/src/services/e2ee/key_manager.dart
+
+
+================================================================
+1. THE ALGORITHM AT A GLANCE
+================================================================
+
+COIL uses HYBRID end-to-end encryption labeled in code as:
+
+    X25519 + AES-GCM-256
+
+(see e2ee_service.dart:646 — `'e2eeAlg': 'X25519+AES-GCM-256'`)
+
+Three primitives are combined:
+
+  1. X25519       — Elliptic-Curve Diffie-Hellman key agreement
+                    (Curve25519). Used between two users' long-term
+                    keypairs to derive a shared secret without
+                    ever transmitting a key.
+
+  2. HKDF-SHA256  — HMAC-based Key Derivation Function. Turns the
+                    raw X25519 shared secret into a uniformly
+                    random 32-byte "key-encryption key" (KEK).
+
+  3. AES-GCM-256  — Symmetric authenticated encryption. Encrypts
+                    BOTH the message bodies AND the wrapped
+                    session keys, with built-in integrity
+                    (a 16-byte GCM tag rejects any tampering).
+
+The actual message bytes are encrypted with a fast symmetric
+cipher (AES-GCM). The slow asymmetric crypto (X25519) is only
+used ONCE per chat, to safely deliver a shared symmetric session
+key to every participant. This is the standard "hybrid encryption"
+pattern used by Signal, WhatsApp, TLS 1.3, age, etc.
+
+
+================================================================
+2. KEY HIERARCHY (3 LAYERS)
+================================================================
+
+    ┌──────────────────────────────────────────────────────┐
+    │  Layer 1 — Identity keys (per user, per device)      │
+    │  X25519 keypair.                                      │
+    │    • private key: in Android Keystore /              │
+    │                   iOS Keychain (never leaves device) │
+    │    • public key : Firestore  users/{uid}.publicKey   │
+    └──────────────────────────────────────────────────────┘
+                          │
+                          ▼  X25519(myPriv, otherPub)
+                             → HKDF-SHA256
+                             → 32-byte KEK
+    ┌──────────────────────────────────────────────────────┐
+    │  Layer 2 — Per-chat session key (32 bytes, AES-GCM)  │
+    │  Generated client-side the first time anyone sends   │
+    │  in the chat. Wrapped once per participant and       │
+    │  stored at chats/{chatId}.wrappedKeys.{uid} = {ct,n} │
+    └──────────────────────────────────────────────────────┘
+                          │
+                          ▼  AES-GCM-256(sessionKey, plaintext)
+    ┌──────────────────────────────────────────────────────┐
+    │  Layer 3 — Message envelope (per message)            │
+    │  Stored on the message doc under the `enc` field:    │
+    │    { v:1, alg:'AES-GCM-256', ct:..., n:..., kv:1 }   │
+    └──────────────────────────────────────────────────────┘
+
+
+================================================================
+3. HOW SENDING A MESSAGE WORKS (step by step)
+================================================================
+
+Function: E2EEService.encryptForChat
+File:     e2ee_service.dart:324
+
+Step 1 — Ensure a chat session key exists
+  • Read chats/{chatId}: keyVersion, wrappedKeys, participants.
+  • If wrappedKeys covers exactly the current wrappable members
+    (i.e. everyone who has published a public key) AND I am in
+    that set, unwrap my entry and reuse the existing session
+    key (path 1 in _ensureChatKey, e2ee_service.dart:389).
+  • Otherwise, rotate: generate a fresh 32-byte AES key, wrap
+    it for every member, archive the previous wrapping, bump
+    `keyVersion` (path 2 → _forceRotate, e2ee_service.dart:446).
+
+Step 2 — Wrap the session key per participant (only on rotation)
+  For each member `otherUid`:
+      myPriv  = local X25519 private key (Keystore/Keychain)
+      otherPub = Firestore users/{otherUid}.publicKey
+      shared  = X25519(myPriv, otherPub)
+      KEK     = HKDF-SHA256(shared, info="coil-e2ee-kek-v1")
+      ctWrap  = AES-GCM-256(KEK, sessionKey)
+  Store at chats/{chatId}.wrappedKeys[otherUid] =
+      { ct, n, kPub: myPubB64, rPub: otherPubB64,
+        alg: 'X25519+AES-GCM-256' }
+  (_wrapKeyFor, e2ee_service.dart:800)
+
+Step 3 — Encrypt the message body
+  nonce      = 12 random bytes (fresh per message)
+  cipherText = AES-GCM-256.encrypt(sessionKey, nonce, plaintext)
+  ct         = cipherText || 16-byte GCM tag
+  envelope   = { v:1, alg:'AES-GCM-256',
+                 ct: base64(ct), n: base64(nonce),
+                 kv: currentKeyVersion }
+  Store this `enc` field on the message doc.
+  (_aesEncryptRaw, e2ee_service.dart:886)
+
+
+================================================================
+4. HOW READING A MESSAGE WORKS
+================================================================
+
+Function: E2EEService.decryptForChat
+File:     e2ee_service.dart:352
+
+Step 1 — Pick the right key version
+  • Pull `kv` from the message envelope.
+  • If `kv == currentVersion` → use chats/{chatId}.wrappedKeys.
+  • Else → use chats/{chatId}.wrappedKeysArchive.{kv}.
+  This is what lets old messages stay readable AFTER a member is
+  removed and the chat key has rotated.
+
+Step 2 — Unwrap MY copy of the session key
+      myPriv  = Keystore/Keychain
+      wrapperPub = base64-decode(wrappedKeys[me].kPub)
+      shared  = X25519(myPriv, wrapperPub)
+      KEK     = HKDF-SHA256(shared, info="coil-e2ee-kek-v1")
+      sessionKey = AES-GCM-256.decrypt(KEK, ct, n)
+  Cached in memory in _chatKeyCache so subsequent messages skip
+  this step (e2ee_service.dart:47).
+
+Step 3 — Decrypt the message
+      plaintextBytes = AES-GCM-256.decrypt(sessionKey, n, ct)
+      plaintext      = UTF-8 decode
+
+If the GCM tag check fails → the function returns null and the
+UI shows the "🔒 Couldn't decrypt on this device" placeholder
+(ChatMessage.encryptedUnreadable, chat_service.dart:91).
+
+
+================================================================
+5. KEY ROTATION (groups + membership changes)
+================================================================
+
+The session key isn't permanent. Every chat doc carries a
+`keyVersion` integer, and every encrypted message stamps the
+version it was encrypted with into its envelope (`kv` field,
+e2ee_service.dart:345).
+
+When a member is added or removed, _forceRotate runs
+(e2ee_service.dart:446):
+  1. Generate a brand-new 32-byte AES session key.
+  2. Wrap it for every CURRENT member (using their published
+     public key).
+  3. ARCHIVE the previous wrapping under
+       wrappedKeysArchive.{prevVersion}
+     so existing members can still decrypt history.
+  4. Bump `keyVersion`.
+  5. The removed member's private key no longer matches any
+     wrapping → they can read what they already could read,
+     but nothing sent after the rotation.
+
+Side benefit: lazy rotation also kicks in when a member who
+never had a published key finally publishes one
+(_ensureChatKey path 2, e2ee_service.dart:426).
+
+
+================================================================
+6. RECOVERY KEY (cross-device decryption)
+================================================================
+
+Identity private keys live ONLY on the device that generated
+them. Without a backup, switching phones would mean losing the
+ability to read older chat history.
+
+To fix this, when a user opts in we also generate a separate
+RECOVERY X25519 keypair:
+  • The recovery PRIVATE key is encrypted with a
+    password-derived key (PBKDF2) and uploaded.
+  • The recovery PUBLIC key is published alongside the regular
+    public key.
+  • On every key rotation, the session key is ALSO wrapped for
+    each participant's recovery public key
+    (_wrapKeyForRecovery, e2ee_service.dart:841), and stored at
+        wrappedKeys[uid].recoveryWrapped = { ct, n, kPub }
+  • On a new device the user enters their password →
+    unlockRecoveryKey (e2ee_service.dart:63) → the recovery
+    private key is decrypted and cached → _unwrapMyKey
+    transparently falls through to the recovery wrapping when
+    the device wrapping fails (e2ee_service.dart:737).
+
+A different HKDF `info` string is used for recovery wrappings
+("coil-e2ee-recovery-kek-v1" vs "coil-e2ee-kek-v1") so the two
+KEKs are domain-separated and cannot be confused even though
+they're derived from the same shared secret.
+
+
+================================================================
+7. WHY THIS SPECIFIC ALGORITHM?
+================================================================
+
+  X25519
+  ──────
+  • Designed by Daniel J. Bernstein. The de-facto standard for
+    modern ECDH (Signal, WhatsApp, TLS 1.3, WireGuard, age, SSH).
+  • Constant-time: resistant to timing side-channels even in
+    pure-Dart implementations.
+  • 32-byte keys, no point-validation footguns (unlike NIST
+    curves). Hard to misuse.
+  • Fast on phones — a key agreement is under a millisecond on
+    a modern Android device.
+
+  AES-GCM-256
+  ───────────
+  • Authenticated encryption (AEAD): one primitive gives
+    confidentiality AND integrity. Without AEAD, you have to
+    bolt on a MAC and risk getting "encrypt-then-MAC" wrong.
+  • Hardware acceleration on every shipped phone (ARMv8 AES
+    instructions, x86 AES-NI). Hundreds of MB/s throughput,
+    so the cost of opening a chat is dominated by I/O and JSON
+    parsing, not crypto.
+  • 256-bit key is comfortably post-quantum-resistant for the
+    SYMMETRIC layer (Grover's algorithm only halves the
+    effective key strength → 128-bit security floor).
+  • 12-byte random nonces (the GCM-recommended size) with
+    fresh randomness per message — no nonce-reuse risk at
+    realistic message volumes.
+
+  HKDF-SHA256
+  ───────────
+  • Standard "extract-then-expand" KDF (RFC 5869). Turns the
+    non-uniformly-distributed raw ECDH output into a clean
+    uniformly random key suitable for AES.
+  • The `info` parameter ("coil-e2ee-kek-v1",
+    "coil-e2ee-recovery-kek-v1") gives DOMAIN SEPARATION: even
+    if two different uses share inputs, the derived keys are
+    independent. This is why device wrappings and recovery
+    wrappings can both ride on the same X25519 shared secret
+    without cross-contamination.
+
+  Hybrid construction (asymmetric wrap + symmetric body)
+  ──────────────────────────────────────────────────────
+  • Asymmetric crypto is hundreds of times slower than
+    symmetric. Encrypting every chat message directly with
+    X25519 would make sending unusable.
+  • By using X25519 ONCE per chat-key-rotation to deliver a
+    symmetric session key, all subsequent messages get
+    near-free symmetric encryption.
+  • Per-participant wrapping (vs a group MLS tree) keeps the
+    code simple and works well for direct chats and small
+    groups, which is COIL's current use case.
+
+  Private keys in Keystore / Keychain
+  ───────────────────────────────────
+  • The X25519 private key never appears in app memory longer
+    than necessary and never leaves the OS-managed secure
+    storage at rest. Even a full Firestore breach or stolen
+    backup file cannot recover plaintext without compromising
+    a participant's device.
+
+
+================================================================
+8. THREAT MODEL (what this DOES and DOES NOT protect)
+================================================================
+
+PROTECTED (server cannot read):
+  • Message text bodies
+  • Voice-message transcripts (vt field)
+  • File names (fn field)
+  • Reply-quote text (rt field)
+  • Location labels (ll field)
+
+NOT protected (visible to the server / anyone with Firestore
+read access):
+  • Sender uid, recipient uid, chat membership
+  • Message timestamps
+  • Approximate message size
+  • Media URLs (images, video, voice audio, file blobs) —
+    they sit in Firebase Storage, not inside the envelope.
+  • Reply-to id, sticker id, location lat/lng numbers
+  • Read receipts (seenBy)
+
+If a participant's DEVICE is compromised, all chats that
+device can read are exposed — same as any E2EE system.
+
+
+================================================================
+9. CODE LOCATIONS QUICK REFERENCE
+================================================================
+
+  Encrypt one message       e2ee_service.dart:324  encryptForChat
+  Decrypt one message       e2ee_service.dart:352  decryptForChat
+  Ensure / rotate key       e2ee_service.dart:389  _ensureChatKey
+                            e2ee_service.dart:446  _forceRotate
+  Wrap session key for X    e2ee_service.dart:800  _wrapKeyFor
+  Unwrap MY session key     e2ee_service.dart:713  _unwrapMyKey
+  AES-GCM low level         e2ee_service.dart:875  _aesEncrypt
+                            e2ee_service.dart:907  _aesDecrypt
+  Identity keypair mgmt     key_manager.dart       KeyManager
+  Recovery-key flow         e2ee_service.dart:63   unlockRecoveryKey
+                            e2ee_service.dart:841  _wrapKeyForRecovery
+  Per-chat in-mem key cache e2ee_service.dart:47   _chatKeyCache
+  Local plaintext cache     services/message_cache.dart  MessageCache
+                            (added 2026-05-17 — skips re-decrypt
+                             for already-seen messages)

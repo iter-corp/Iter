@@ -14,6 +14,7 @@ import '../widgets/create_group_sheet.dart';
 import '../widgets/message_widget.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
+import 'recovery_password_screens.dart';
 import 'request_screen.dart';
 
 /// Unified row in the chat list — either a 1:1 chat or an event group chat.
@@ -363,6 +364,7 @@ class _SearchableConvList extends ConsumerWidget {
 
     return CustomScrollView(
       slivers: [
+        const SliverToBoxAdapter(child: _LegacyRecoveryPromptBanner()),
         SliverList.builder(
           itemCount: merged.length,
           itemBuilder: (_, i) {
@@ -614,6 +616,17 @@ class _ConvTile extends ConsumerWidget {
                 Icons.notifications_off_outlined,
                 size: 14,
                 color: context.textSecondary,
+              ),
+            ],
+            if (conv.secret) ...[
+              const SizedBox(width: 6),
+              // Lock icon marks Telegram-style secret chats so users can
+              // tell at a glance which conversations live only on their
+              // device (no full history on reinstall).
+              const Icon(
+                Icons.lock_outline,
+                size: 14,
+                color: AppColors.purple,
               ),
             ],
           ],
@@ -1139,6 +1152,103 @@ class _UnreadCountBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 11,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// One-time-per-session prompt for users who haven't picked their own
+/// recovery password yet. Sits at the top of the inbox sliver list, is
+/// dismissible for the session, and routes to
+/// [SetRecoveryPasswordScreen] on the primary action. Renders nothing
+/// once the user has chosen a password.
+class _LegacyRecoveryPromptBanner extends ConsumerWidget {
+  const _LegacyRecoveryPromptBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final shouldShow = ref.watch(shouldPromptLegacyRecoveryProvider);
+    if (shouldShow.valueOrNull != true) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      decoration: BoxDecoration(
+        color: AppColors.purple.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.purple.withValues(alpha: 0.30)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.lock_outline,
+                size: 20, color: AppColors.purple),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Protect your secret chats',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Set a recovery password so you can restore secret-chat '
+                    'history if you reinstall or switch devices.',
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.purple,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const SetRecoveryPasswordScreen(),
+                          ),
+                        ),
+                        child: const Text('Set password'),
+                      ),
+                      const SizedBox(width: 4),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: context.textSecondary,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => ref
+                            .read(legacyRecoveryPromptDismissedProvider
+                                .notifier)
+                            .state = true,
+                        child: const Text('Not now'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

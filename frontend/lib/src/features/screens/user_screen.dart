@@ -15,6 +15,7 @@ import '../widgets/user_profile_widget.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart' show PostDetailScreen;
 import 'qa_thread_screen.dart';
+import 'recovery_password_screens.dart';
 
 final _otherUserProvider =
     StreamProvider.family<Map<String, dynamic>?, String>((ref, uid) {
@@ -259,7 +260,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => detailsCtrl.dispose());
   }
 
-  Future<void> _openMessage(String otherName, String otherAvatar) async {
+  Future<void> _openMessage(
+    String otherName,
+    String otherAvatar, {
+    bool secret = false,
+  }) async {
     final currentUser = ref.read(authStateProvider).value ??
         ref.read(authServiceProvider).currentUser;
     if (currentUser == null || _messageBusy) return;
@@ -268,6 +273,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       final chatId = await ref.read(chatServiceProvider).openChat(
             currentUid: currentUser.uid,
             otherUid: widget.uid,
+            secret: secret,
           );
       if (!mounted) return;
       Navigator.push(
@@ -289,6 +295,108 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     } finally {
       if (mounted) setState(() => _messageBusy = false);
     }
+  }
+
+  /// Long-press on the Message button: lets the user pick between a
+  /// normal chat (history readable on every device after sign-in) and a
+  /// Telegram-style secret chat (end-to-end encrypted; history only
+  /// readable on this device, lost on reinstall unless restored from
+  /// the recovery backup).
+  Future<void> _showMessageModeSheet(
+    String otherName,
+    String otherAvatar,
+  ) async {
+    final selection = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.borderColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'How do you want to message $otherName?',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.chat_bubble_outline,
+                      color: context.textPrimary),
+                  title: Text('Normal chat',
+                      style: TextStyle(color: context.textPrimary)),
+                  subtitle: Text(
+                    'Messages are stored on the server. Full history syncs '
+                    'across all your devices.',
+                    style: TextStyle(
+                        color: context.textSecondary, fontSize: 12),
+                  ),
+                  onTap: () => Navigator.pop(sheetCtx, false),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.lock_outline,
+                      color: AppColors.purple),
+                  title: Text('Secret chat',
+                      style: TextStyle(color: context.textPrimary)),
+                  subtitle: Text(
+                    'End-to-end encrypted. Only readable on this device — '
+                    'history is lost on reinstall unless restored from your '
+                    'recovery backup.',
+                    style: TextStyle(
+                        color: context.textSecondary, fontSize: 12),
+                  ),
+                  onTap: () => Navigator.pop(sheetCtx, true),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selection == null) return;
+    if (selection) {
+      // First-time secret chat: make sure the user has chosen their own
+      // recovery password before any ciphertext is written. Otherwise
+      // the cloud recovery backup is encrypted with the legacy
+      // uid-derived password (anyone with a uid can decrypt it).
+      final uid = ref.read(authStateProvider).value?.uid;
+      if (uid != null) {
+        final km = ref.read(keyManagerProvider);
+        if (!await km.hasUserChosenRecoveryPassword(uid)) {
+          if (!mounted) return;
+          final set = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => const SetRecoveryPasswordScreen(),
+            ),
+          );
+          if (set != true) return;
+        }
+      }
+    }
+    await _openMessage(otherName, otherAvatar, secret: selection);
   }
 
   void _showUserListSheet({required String title, required List<String> uids}) {
@@ -534,6 +642,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       onMessageTap: _messageBusy
                           ? null
                           : () => _openMessage(username, avatarUrl ?? ''),
+                      onMessageLongPress: _messageBusy
+                          ? null
+                          : () =>
+                              _showMessageModeSheet(username, avatarUrl ?? ''),
                     ),
                   if (enforcePrivacy)
                     const UserPrivateMessage()
