@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -905,6 +906,9 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   late VideoPlayerController _controller;
   bool _muted = true;
   bool _showControls = true;
+  bool _scrubbing = false;
+  Duration _scrubPosition = Duration.zero;
+  Timer? _hideTimer;
 
   @override
   void initState() {
@@ -912,22 +916,43 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
       ..setVolume(0)
+      ..addListener(_onTick)
       ..initialize().then((_) {
         if (!mounted) return;
         setState(() {});
         _controller.play();
-        // Auto-hide the play/mute hint after a moment so it doesn't obstruct
-        // the video while it's playing.
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (mounted) setState(() => _showControls = false);
-        });
+        _scheduleHide();
       });
+  }
+
+  void _onTick() {
+    if (!mounted) return;
+    // Cheap rebuild so the seek bar / time labels track playback. setState
+    // here is fine — the controller fires roughly once per frame while
+    // playing and not at all when paused.
+    if (!_scrubbing) setState(() {});
   }
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
+    _controller.removeListener(_onTick);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (mounted && _controller.value.isPlaying && !_scrubbing) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _showControlsThenAutoHide() {
+    setState(() => _showControls = true);
+    _scheduleHide();
   }
 
   void _togglePlay() {
@@ -936,14 +961,10 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
       if (_controller.value.isPlaying) {
         _controller.pause();
         _showControls = true;
+        _hideTimer?.cancel();
       } else {
         _controller.play();
-        _showControls = true;
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (mounted && _controller.value.isPlaying) {
-            setState(() => _showControls = false);
-          }
-        });
+        _showControlsThenAutoHide();
       }
     });
   }
@@ -953,24 +974,34 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
       _muted = !_muted;
       _controller.setVolume(_muted ? 0 : 1);
     });
+    _showControlsThenAutoHide();
+  }
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = d.inHours;
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
     final ready = _controller.value.isInitialized;
     final isPlaying = ready && _controller.value.isPlaying;
+    final duration = ready ? _controller.value.duration : Duration.zero;
+    final position = _scrubbing
+        ? _scrubPosition
+        : (ready ? _controller.value.position : Duration.zero);
+    final maxMs = duration.inMilliseconds.toDouble();
+    final posMs =
+        position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (_showControls) {
           _togglePlay();
         } else {
-          setState(() => _showControls = true);
-          Future.delayed(const Duration(milliseconds: 1500), () {
-            if (mounted && _controller.value.isPlaying) {
-              setState(() => _showControls = false);
-            }
-          });
+          _showControlsThenAutoHide();
         }
       },
       child: Stack(
@@ -995,25 +1026,31 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                     strokeWidth: 2.5, color: Colors.white),
               ),
             ),
+          // Center play/pause hint
           if (ready && _showControls)
             Center(
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
                 opacity: _showControls ? 1 : 0,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha: 0.45),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                    size: 36,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _togglePlay,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.45),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 36,
+                    ),
                   ),
                 ),
               ),
             ),
+          // Top-right mute toggle
           if (ready)
             Positioned(
               top: 12,
@@ -1031,6 +1068,121 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                     _muted ? Icons.volume_off : Icons.volume_up,
                     color: Colors.white,
                     size: 18,
+                  ),
+                ),
+              ),
+            ),
+          // Bottom control bar (scrub + times). Sits above the post's own
+          // action panel by being placed higher off the bottom edge.
+          if (ready)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 130,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _showControls ? 1 : 0,
+                child: IgnorePointer(
+                  ignoring: !_showControls,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18)),
+                        ),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _togglePlay,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _fmt(position),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            Expanded(
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2.5,
+                                  activeTrackColor: Colors.white,
+                                  inactiveTrackColor:
+                                      Colors.white.withValues(alpha: 0.3),
+                                  thumbColor: Colors.white,
+                                  overlayColor:
+                                      Colors.white.withValues(alpha: 0.15),
+                                  thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(
+                                      overlayRadius: 14),
+                                ),
+                                child: Slider(
+                                  min: 0,
+                                  max: maxMs <= 0 ? 1 : maxMs,
+                                  value: posMs.clamp(0, maxMs <= 0 ? 1 : maxMs),
+                                  onChangeStart: (_) {
+                                    _scrubbing = true;
+                                    _hideTimer?.cancel();
+                                  },
+                                  onChanged: (v) {
+                                    setState(() {
+                                      _scrubPosition =
+                                          Duration(milliseconds: v.toInt());
+                                    });
+                                  },
+                                  onChangeEnd: (v) async {
+                                    await _controller.seekTo(
+                                        Duration(milliseconds: v.toInt()));
+                                    _scrubbing = false;
+                                    _scheduleHide();
+                                  },
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _fmt(duration),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _toggleMute,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  _muted ? Icons.volume_off : Icons.volume_up,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
