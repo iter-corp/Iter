@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/post_providers.dart';
@@ -27,6 +28,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _placeNameCtrl = TextEditingController();
   final _placeCityCtrl = TextEditingController();
   final List<File> _pickedImages = [];
+  final List<File> _pickedVideos = [];
   bool _isPrivate = false;
   bool _posting = false;
   double? _placeLat;
@@ -154,17 +156,41 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     setState(() => _pickedImages.add(File(picked.path)));
   }
 
+  Future<void> _pickVideoFromGallery() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 2),
+    );
+    if (picked == null) return;
+    setState(() => _pickedVideos.add(File(picked.path)));
+  }
+
+  Future<void> _pickVideoFromCamera() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(
+      source: ImageSource.camera,
+      maxDuration: const Duration(minutes: 2),
+    );
+    if (picked == null) return;
+    setState(() => _pickedVideos.add(File(picked.path)));
+  }
+
   void _removeImage(int i) {
     setState(() => _pickedImages.removeAt(i));
+  }
+
+  void _removeVideo(int i) {
+    setState(() => _pickedVideos.removeAt(i));
   }
 
   Future<void> _submit() async {
     final caption = _captionCtrl.text.trim();
     final placeName = _placeNameCtrl.text.trim();
     final placeCity = _placeCityCtrl.text.trim();
-    if (caption.isEmpty && _pickedImages.isEmpty) {
+    if (caption.isEmpty && _pickedImages.isEmpty && _pickedVideos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add a caption or image')),
+        const SnackBar(content: Text('Add a caption, image, or video')),
       );
       return;
     }
@@ -195,10 +221,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       for (final file in _pickedImages) {
         urls.add(await storage.uploadPostImage(file));
       }
+      final videoUrls = <String>[];
+      for (final file in _pickedVideos) {
+        videoUrls.add(await storage.uploadPostVideo(file));
+      }
 
       await ref.read(postServiceProvider).createPost(
             caption: caption,
             imageUrls: urls,
+            videoUrls: videoUrls,
             isPrivate: _isPrivate,
             postPlaceName: placeName,
             postPlaceCity: placeCity,
@@ -212,7 +243,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         Navigator.pop(context);
         AppFeedback.showSuccessOn(
           messenger,
-          urls.isNotEmpty
+          (urls.isNotEmpty || videoUrls.isNotEmpty)
               ? 'Post published — content uploaded'
               : 'Post published',
         );
@@ -433,6 +464,14 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                         ),
                       if (_pickedImages.isNotEmpty) const SizedBox(height: 16),
 
+                      // VIDEO GRID
+                      if (_pickedVideos.isNotEmpty)
+                        _VideoGrid(
+                          files: _pickedVideos,
+                          onRemove: _removeVideo,
+                        ),
+                      if (_pickedVideos.isNotEmpty) const SizedBox(height: 16),
+
                       // ACTION TILES
                       _ActionTile(
                         icon: Icons.photo_library_outlined,
@@ -444,6 +483,18 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                         icon: Icons.camera_alt_outlined,
                         label: 'Take a photo',
                         onTap: _pickFromCamera,
+                      ),
+                      const SizedBox(height: 8),
+                      _ActionTile(
+                        icon: Icons.video_library_outlined,
+                        label: 'Video from gallery',
+                        onTap: _pickVideoFromGallery,
+                      ),
+                      const SizedBox(height: 8),
+                      _ActionTile(
+                        icon: Icons.videocam_outlined,
+                        label: 'Record a video',
+                        onTap: _pickVideoFromCamera,
                       ),
                     ],
                   ),
@@ -696,6 +747,121 @@ class _ImageGrid extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VideoGrid extends StatelessWidget {
+  final List<File> files;
+  final ValueChanged<int> onRemove;
+  const _VideoGrid({required this.files, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
+        childAspectRatio: 16 / 11,
+      ),
+      itemCount: files.length,
+      itemBuilder: (_, i) => _VideoThumb(
+        file: files[i],
+        onRemove: () => onRemove(i),
+      ),
+    );
+  }
+}
+
+class _VideoThumb extends StatefulWidget {
+  final File file;
+  final VoidCallback onRemove;
+  const _VideoThumb({required this.file, required this.onRemove});
+
+  @override
+  State<_VideoThumb> createState() => _VideoThumbState();
+}
+
+class _VideoThumbState extends State<_VideoThumb> {
+  VideoPlayerController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(widget.file)
+      ..setVolume(0)
+      ..initialize().then((_) {
+        if (mounted) setState(() {});
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _controller;
+    final ready = c != null && c.value.isInitialized;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              color: Colors.black,
+              child: ready
+                  ? FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: c.value.size.width,
+                        height: c.value.size.height,
+                        child: VideoPlayer(c),
+                      ),
+                    )
+                  : const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: Center(
+              child: Icon(
+                Icons.play_circle_fill,
+                color: Colors.white70,
+                size: 42,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: widget.onRemove,
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(3),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

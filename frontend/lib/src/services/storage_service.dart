@@ -30,6 +30,10 @@ class StorageService {
     return _uploadViaEdge(bucket: 'posts', file: file, kind: 'post');
   }
 
+  Future<String> uploadPostVideo(File file) {
+    return _uploadViaEdge(bucket: 'posts', file: file, kind: 'post-video');
+  }
+
   Future<String> uploadChatImage(File file, String chatId) {
     return _uploadViaEdge(bucket: 'posts', file: file, kind: 'chat', subPath: chatId);
   }

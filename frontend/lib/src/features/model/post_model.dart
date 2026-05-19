@@ -7,6 +7,7 @@ class Post {
   final String? authorAvatar;
   final String caption;
   final List<String> imageUrls;
+  final List<String> videoUrls;
   final int likesCount;
   final int commentsCount;
   final bool isPrivate;
@@ -26,6 +27,7 @@ class Post {
     required this.authorAvatar,
     required this.caption,
     required this.imageUrls,
+    this.videoUrls = const [],
     required this.likesCount,
     required this.commentsCount,
     required this.isPrivate,
@@ -50,6 +52,7 @@ class Post {
       authorAvatar: data['authorAvatar'] as String?,
       caption: data['caption'] as String? ?? '',
       imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? const [],
+      videoUrls: (data['videoUrls'] as List?)?.cast<String>() ?? const [],
       likesCount: (data['likesCount'] as int?) ?? 0,
       commentsCount: (data['commentsCount'] as int?) ?? 0,
       isPrivate: (data['isPrivate'] as bool?) ?? false,
@@ -85,6 +88,7 @@ class Post {
       authorAvatar: data['authorAvatar'] as String?,
       caption: data['caption'] as String? ?? '',
       imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? const [],
+      videoUrls: (data['videoUrls'] as List?)?.cast<String>() ?? const [],
       likesCount: (data['likesCount'] as num?)?.toInt() ?? 0,
       commentsCount: (data['commentsCount'] as num?)?.toInt() ?? 0,
       isPrivate: (data['isPrivate'] as bool?) ?? false,

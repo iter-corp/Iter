@@ -2,7 +2,7 @@
 // Verifies a Firebase ID token and returns a signed Supabase Storage upload URL
 // scoped to the user's own folder inside the requested bucket.
 //
-// Request body: { bucket: 'avatars' | 'posts', kind: 'avatar'|'cover'|'post'|'story'|'chat'|'chat-video'|'chat-file'|'audio', ext: string, subPath?: string }
+// Request body: { bucket: 'avatars' | 'posts', kind: 'avatar'|'cover'|'post'|'post-video'|'story'|'chat'|'chat-video'|'chat-file'|'audio', ext: string, subPath?: string }
 // Response:     { uploadUrl, token, path, publicUrl }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -98,6 +98,11 @@ Deno.serve(async (req) => {
     path = `${uid}/cover_${ts}.${ext}`;
   } else if (kind === "post") {
     path = `${uid}/posts/${ts}_${rand}.${ext}`;
+  } else if (kind === "post-video") {
+    if (!VIDEO_EXTS.has(ext)) {
+      return json(400, { error: "post-video kind requires video ext" });
+    }
+    path = `${uid}/posts/videos/${ts}_${rand}.${ext}`;
   } else if (kind === "story") {
     path = `${uid}/stories/${ts}_${rand}.${ext}`;
   } else if (kind === "chat" && subPath) {

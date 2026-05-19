@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
@@ -129,12 +130,14 @@ class _PostCardState extends ConsumerState<PostCard> {
     final isSaved = ref.watch(isSavedProvider(post.id)).value ?? false;
     final repostsEnabled =
         ref.watch(adminConfigProvider).valueOrNull?.repostsEnabled ?? true;
+    final hasVideo = post.videoUrls.isNotEmpty;
     final hasImage = post.imageUrls.isNotEmpty;
+    final hasMedia = hasVideo || hasImage;
     final currentUid = ref.watch(authStateProvider).value?.uid;
     final isOwner = currentUid != null && currentUid == post.authorUid;
 
     final imageCount = post.imageUrls.length;
-    final isMulti = imageCount > 1;
+    final isMulti = !hasVideo && imageCount > 1;
     final hasCaption = post.caption.trim().isNotEmpty;
     final hasTravelPlace =
         widget.travelMode && travelPlace != null && travelPlace.isNotEmpty;
@@ -169,11 +172,13 @@ class _PostCardState extends ConsumerState<PostCard> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
         child: SizedBox(
-          height: hasImage ? 480 : 430,
+          height: hasMedia ? 480 : 430,
           child: Stack(
             children: [
               Positioned.fill(
-                child: hasImage
+                child: hasVideo
+                    ? _PostVideoPlayer(url: post.videoUrls.first)
+                    : hasImage
                     ? (isMulti
                         ? PageView.builder(
                             controller: _pageController,
@@ -884,6 +889,154 @@ class _PostCardState extends ConsumerState<PostCard> {
           Text(text, style: const TextStyle(color: Colors.white)),
         ],
       ],
+    );
+  }
+}
+
+class _PostVideoPlayer extends StatefulWidget {
+  final String url;
+  const _PostVideoPlayer({required this.url});
+
+  @override
+  State<_PostVideoPlayer> createState() => _PostVideoPlayerState();
+}
+
+class _PostVideoPlayerState extends State<_PostVideoPlayer> {
+  late VideoPlayerController _controller;
+  bool _muted = true;
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..setLooping(true)
+      ..setVolume(0)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {});
+        _controller.play();
+        // Auto-hide the play/mute hint after a moment so it doesn't obstruct
+        // the video while it's playing.
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted) setState(() => _showControls = false);
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (!_controller.value.isInitialized) return;
+    setState(() {
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+        _showControls = true;
+      } else {
+        _controller.play();
+        _showControls = true;
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted && _controller.value.isPlaying) {
+            setState(() => _showControls = false);
+          }
+        });
+      }
+    });
+  }
+
+  void _toggleMute() {
+    setState(() {
+      _muted = !_muted;
+      _controller.setVolume(_muted ? 0 : 1);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _controller.value.isInitialized;
+    final isPlaying = ready && _controller.value.isPlaying;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (_showControls) {
+          _togglePlay();
+        } else {
+          setState(() => _showControls = true);
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (mounted && _controller.value.isPlaying) {
+              setState(() => _showControls = false);
+            }
+          });
+        }
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(color: Colors.black),
+          if (ready)
+            FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _controller.value.size.width,
+                height: _controller.value.size.height,
+                child: VideoPlayer(_controller),
+              ),
+            )
+          else
+            const Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.white),
+              ),
+            ),
+          if (ready && _showControls)
+            Center(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _showControls ? 1 : 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.45),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+              ),
+            ),
+          if (ready)
+            Positioned(
+              top: 12,
+              right: 60,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _toggleMute,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.4),
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    _muted ? Icons.volume_off : Icons.volume_up,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

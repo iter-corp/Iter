@@ -31,6 +31,7 @@ class PostService {
   Future<String> createPost({
     required String caption,
     List<String> imageUrls = const [],
+    List<String> videoUrls = const [],
     bool isPrivate = false,
     String? postPlaceName,
     String? postPlaceCity,
@@ -55,6 +56,7 @@ class PostService {
       'authorAvatar': avatar,
       'caption': caption,
       'imageUrls': imageUrls,
+      'videoUrls': videoUrls,
       'likesCount': 0,
       'commentsCount': 0,
       'isPrivate': isPrivate,
