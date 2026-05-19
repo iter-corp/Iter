@@ -52,7 +52,13 @@ class PostCard extends ConsumerStatefulWidget {
 class _PostCardState extends ConsumerState<PostCard> {
   // Optimistic UI: non-null while a like toggle is in-flight.
   bool? _pendingLike;
-  bool _captionBoxLowered = false;
+  // null = follow the default (lowered for video posts so the caption/actions
+  // panel doesn't sit on top of the video, raised for everything else).
+  // Once the user taps the chevron we honor their choice via this override.
+  bool? _captionBoxLoweredOverride;
+
+  bool get _captionBoxLowered =>
+      _captionBoxLoweredOverride ?? widget.post.videoUrls.isNotEmpty;
 
   // Carousel state for multi-image posts.
   final PageController _pageController = PageController();
@@ -178,70 +184,73 @@ class _PostCardState extends ConsumerState<PostCard> {
             children: [
               Positioned.fill(
                 child: hasVideo
-                    ? _PostVideoPlayer(url: post.videoUrls.first)
+                    ? _PostVideoPlayer(
+                        url: post.videoUrls.first,
+                        captionPanelLowered: _captionBoxLowered,
+                      )
                     : hasImage
-                    ? (isMulti
-                        ? PageView.builder(
-                            controller: _pageController,
-                            itemCount: imageCount,
-                            onPageChanged: (i) =>
-                                setState(() => _currentPage = i),
-                            itemBuilder: (_, i) => GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ImageViewerScreen(
-                                    urls: post.imageUrls,
-                                    initialIndex: i,
+                        ? (isMulti
+                            ? PageView.builder(
+                                controller: _pageController,
+                                itemCount: imageCount,
+                                onPageChanged: (i) =>
+                                    setState(() => _currentPage = i),
+                                itemBuilder: (_, i) => GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ImageViewerScreen(
+                                        urls: post.imageUrls,
+                                        initialIndex: i,
+                                      ),
+                                    ),
+                                  ),
+                                  child: CachedNetworkImage(
+                                    imageUrl: post.imageUrls[i],
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
-                              ),
-                              child: CachedNetworkImage(
-                                imageUrl: post.imageUrls[i],
-                                fit: BoxFit.cover,
+                              )
+                            : GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ImageViewerScreen(
+                                      urls: post.imageUrls,
+                                    ),
+                                  ),
+                                ),
+                                child: CachedNetworkImage(
+                                  imageUrl: post.imageUrls.first,
+                                  fit: BoxFit.cover,
+                                ),
+                              ))
+                        : Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF4A3A68), Color(0xFF1F1D30)],
                               ),
                             ),
-                          )
-                        : GestureDetector(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ImageViewerScreen(
-                                  urls: post.imageUrls,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(28),
+                                child: _ExpandableCaption(
+                                  text: post.caption,
+                                  collapsedMaxLines: 4,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                  toggleColor: Colors.white,
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),
-                            child: CachedNetworkImage(
-                              imageUrl: post.imageUrls.first,
-                              fit: BoxFit.cover,
-                            ),
-                          ))
-                    : Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF4A3A68), Color(0xFF1F1D30)],
                           ),
-                        ),
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(28),
-                            child: _ExpandableCaption(
-                              text: post.caption,
-                              collapsedMaxLines: 4,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                height: 1.3,
-                              ),
-                              toggleColor: Colors.white,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
               ),
               Positioned.fill(
                 child: IgnorePointer(
@@ -439,7 +448,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                                         GestureDetector(
                                           behavior: HitTestBehavior.opaque,
                                           onTap: () => setState(() {
-                                            _captionBoxLowered =
+                                            _captionBoxLoweredOverride =
                                                 !_captionBoxLowered;
                                           }),
                                           child: Container(
@@ -550,7 +559,8 @@ class _PostCardState extends ConsumerState<PostCard> {
                   right: 20,
                   bottom: 14,
                   child: GestureDetector(
-                    onTap: () => setState(() => _captionBoxLowered = false),
+                    onTap: () =>
+                        setState(() => _captionBoxLoweredOverride = false),
                     child: ClipOval(
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -896,7 +906,14 @@ class _PostCardState extends ConsumerState<PostCard> {
 
 class _PostVideoPlayer extends StatefulWidget {
   final String url;
-  const _PostVideoPlayer({required this.url});
+  // When the caption/action panel is raised, the inline control bar slides
+  // up to clear it. When the panel is lowered, the controls sit near the
+  // bottom edge of the card.
+  final bool captionPanelLowered;
+  const _PostVideoPlayer({
+    required this.url,
+    required this.captionPanelLowered,
+  });
 
   @override
   State<_PostVideoPlayer> createState() => _PostVideoPlayerState();
@@ -1050,35 +1067,17 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                 ),
               ),
             ),
-          // Top-right mute toggle
+          // Bottom control bar (scrub + times). For video posts the
+          // caption/action panel is collapsed by default, so the controls
+          // sit near the bottom edge of the card. When the user raises the
+          // panel via the chevron, this bar slides up to clear it.
           if (ready)
-            Positioned(
-              top: 12,
-              right: 60,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _toggleMute,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha: 0.4),
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  child: Icon(
-                    _muted ? Icons.volume_off : Icons.volume_up,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
-          // Bottom control bar (scrub + times). Sits above the post's own
-          // action panel by being placed higher off the bottom edge.
-          if (ready)
-            Positioned(
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
               left: 12,
               right: 12,
-              bottom: 130,
+              bottom: widget.captionPanelLowered ? 48 : 105,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
                 opacity: _showControls ? 1 : 0,
@@ -1179,6 +1178,19 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 2),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _openFullscreen,
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.fullscreen,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1190,6 +1202,443 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
         ],
       ),
     );
+  }
+
+  Future<void> _openFullscreen() async {
+    if (!_controller.value.isInitialized) return;
+    final wasPlaying = _controller.value.isPlaying;
+    final startAt = _controller.value.position;
+    _controller.pause();
+    _hideTimer?.cancel();
+
+    final result = await Navigator.of(context).push<_FullscreenResult>(
+      PageRouteBuilder(
+        opaque: true,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (_, __, ___) => _FullscreenVideoScreen(
+          url: widget.url,
+          startAt: startAt,
+          muted: _muted,
+          autoPlay: wasPlaying,
+        ),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
+
+    if (!mounted) return;
+    if (result != null) {
+      await _controller.seekTo(result.position);
+      if (result.muted != _muted) {
+        setState(() {
+          _muted = result.muted;
+          _controller.setVolume(_muted ? 0 : 1);
+        });
+      }
+      if (result.wasPlaying) {
+        _controller.play();
+      }
+    } else if (wasPlaying) {
+      _controller.play();
+    }
+    _showControlsThenAutoHide();
+  }
+}
+
+class _FullscreenResult {
+  final Duration position;
+  final bool wasPlaying;
+  final bool muted;
+  const _FullscreenResult({
+    required this.position,
+    required this.wasPlaying,
+    required this.muted,
+  });
+}
+
+class _FullscreenVideoScreen extends StatefulWidget {
+  final String url;
+  final Duration startAt;
+  final bool muted;
+  final bool autoPlay;
+  const _FullscreenVideoScreen({
+    required this.url,
+    required this.startAt,
+    required this.muted,
+    required this.autoPlay,
+  });
+
+  @override
+  State<_FullscreenVideoScreen> createState() => _FullscreenVideoScreenState();
+}
+
+class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
+  late VideoPlayerController _controller;
+  bool _muted = true;
+  bool _showControls = true;
+  bool _scrubbing = false;
+  bool _isLandscape = false;
+  Duration _scrubPosition = Duration.zero;
+  Timer? _hideTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _muted = widget.muted;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..setLooping(true)
+      ..setVolume(_muted ? 0 : 1)
+      ..addListener(_onTick)
+      ..initialize().then((_) async {
+        if (!mounted) return;
+        if (widget.startAt > Duration.zero) {
+          await _controller.seekTo(widget.startAt);
+        }
+        if (widget.autoPlay) _controller.play();
+        setState(() {});
+        _scheduleHide();
+      });
+  }
+
+  void _onTick() {
+    if (!mounted) return;
+    if (!_scrubbing) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _controller.removeListener(_onTick);
+    _controller.dispose();
+    // Restore orientations + system UI for the rest of the app.
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted && _controller.value.isPlaying && !_scrubbing) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _showControlsThenAutoHide() {
+    setState(() => _showControls = true);
+    _scheduleHide();
+  }
+
+  void _togglePlay() {
+    if (!_controller.value.isInitialized) return;
+    setState(() {
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+        _showControls = true;
+        _hideTimer?.cancel();
+      } else {
+        _controller.play();
+        _showControlsThenAutoHide();
+      }
+    });
+  }
+
+  void _toggleMute() {
+    setState(() {
+      _muted = !_muted;
+      _controller.setVolume(_muted ? 0 : 1);
+    });
+    _showControlsThenAutoHide();
+  }
+
+  Future<void> _toggleLandscape() async {
+    if (_isLandscape) {
+      await SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    } else {
+      await SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+    if (!mounted) return;
+    setState(() => _isLandscape = !_isLandscape);
+    _showControlsThenAutoHide();
+  }
+
+  void _exit() {
+    Navigator.of(context).pop(_FullscreenResult(
+      position: _controller.value.isInitialized
+          ? _controller.value.position
+          : Duration.zero,
+      wasPlaying: _controller.value.isPlaying,
+      muted: _muted,
+    ));
+  }
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = d.inHours;
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _controller.value.isInitialized;
+    final isPlaying = ready && _controller.value.isPlaying;
+    final duration = ready ? _controller.value.duration : Duration.zero;
+    final position = _scrubbing
+        ? _scrubPosition
+        : (ready ? _controller.value.position : Duration.zero);
+    final maxMs = duration.inMilliseconds.toDouble();
+    final posMs =
+        position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exit();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (_showControls) {
+              _togglePlay();
+            } else {
+              _showControlsThenAutoHide();
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(color: Colors.black),
+              if (ready)
+                Center(
+                  child: AspectRatio(
+                    aspectRatio: _controller.value.aspectRatio,
+                    child: VideoPlayer(_controller),
+                  ),
+                )
+              else
+                const Center(
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.5, color: Colors.white),
+                  ),
+                ),
+              // Top bar: close + landscape toggle
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: 8,
+                right: 8,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 180),
+                  opacity: _showControls ? 1 : 0,
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: Row(
+                      children: [
+                        _circleButton(
+                          icon: Icons.close,
+                          onTap: _exit,
+                        ),
+                        const Spacer(),
+                        _circleButton(
+                          icon: _isLandscape
+                              ? Icons.screen_lock_portrait
+                              : Icons.screen_rotation,
+                          onTap: _toggleLandscape,
+                          tooltip: _isLandscape
+                              ? 'Switch to portrait'
+                              : 'Switch to landscape',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Center play/pause
+              if (ready && _showControls)
+                Center(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _togglePlay,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.45),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                ),
+              // Bottom control bar
+              if (ready)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 180),
+                    opacity: _showControls ? 1 : 0,
+                    child: IgnorePointer(
+                      ignoring: !_showControls,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.18)),
+                            ),
+                            child: Row(
+                              children: [
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _togglePlay,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Icon(
+                                      isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 26,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _fmt(position),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 3,
+                                      activeTrackColor: Colors.white,
+                                      inactiveTrackColor:
+                                          Colors.white.withValues(alpha: 0.3),
+                                      thumbColor: Colors.white,
+                                      overlayColor:
+                                          Colors.white.withValues(alpha: 0.15),
+                                      thumbShape: const RoundSliderThumbShape(
+                                          enabledThumbRadius: 7),
+                                      overlayShape:
+                                          const RoundSliderOverlayShape(
+                                              overlayRadius: 16),
+                                    ),
+                                    child: Slider(
+                                      min: 0,
+                                      max: maxMs <= 0 ? 1 : maxMs,
+                                      value: posMs.clamp(
+                                          0, maxMs <= 0 ? 1 : maxMs),
+                                      onChangeStart: (_) {
+                                        _scrubbing = true;
+                                        _hideTimer?.cancel();
+                                      },
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _scrubPosition =
+                                              Duration(milliseconds: v.toInt());
+                                        });
+                                      },
+                                      onChangeEnd: (v) async {
+                                        await _controller.seekTo(
+                                            Duration(milliseconds: v.toInt()));
+                                        _scrubbing = false;
+                                        _scheduleHide();
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  _fmt(duration),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _toggleMute,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Icon(
+                                      _muted
+                                          ? Icons.volume_off
+                                          : Icons.volume_up,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _circleButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    String? tooltip,
+  }) {
+    final btn = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: 0.45),
+        ),
+        padding: const EdgeInsets.all(10),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+    return tooltip == null ? btn : Tooltip(message: tooltip, child: btn);
   }
 }
 

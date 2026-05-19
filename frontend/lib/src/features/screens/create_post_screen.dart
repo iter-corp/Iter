@@ -23,6 +23,9 @@ class CreatePostScreen extends ConsumerStatefulWidget {
   ConsumerState<CreatePostScreen> createState() => _CreatePostScreenState();
 }
 
+// Max upload size per video. Keep in sync with backend storage rules.
+const int _maxVideoBytes = 30 * 1024 * 1024;
+
 class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _captionCtrl = TextEditingController();
   final _placeNameCtrl = TextEditingController();
@@ -157,23 +160,63 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   }
 
   Future<void> _pickVideoFromGallery() async {
+    debugPrint('[CreatePost] _pickVideoFromGallery start');
     final picker = ImagePicker();
     final picked = await picker.pickVideo(
       source: ImageSource.gallery,
       maxDuration: const Duration(minutes: 2),
     );
-    if (picked == null) return;
-    setState(() => _pickedVideos.add(File(picked.path)));
+    if (picked == null) {
+      debugPrint('[CreatePost] gallery pick cancelled (null)');
+      return;
+    }
+    final f = File(picked.path);
+    if (!await _ensureVideoUnderLimit(f, 'gallery')) return;
+    setState(() => _pickedVideos.add(f));
   }
 
   Future<void> _pickVideoFromCamera() async {
+    debugPrint('[CreatePost] _pickVideoFromCamera start');
     final picker = ImagePicker();
     final picked = await picker.pickVideo(
       source: ImageSource.camera,
       maxDuration: const Duration(minutes: 2),
     );
-    if (picked == null) return;
-    setState(() => _pickedVideos.add(File(picked.path)));
+    if (picked == null) {
+      debugPrint('[CreatePost] camera pick cancelled (null)');
+      return;
+    }
+    final f = File(picked.path);
+    if (!await _ensureVideoUnderLimit(f, 'camera')) return;
+    setState(() => _pickedVideos.add(f));
+  }
+
+  /// Rejects video files larger than [_maxVideoBytes] and shows the user
+  /// a clear message. Returns true when the file is OK to add.
+  Future<bool> _ensureVideoUnderLimit(File f, String source) async {
+    final exists = await f.exists();
+    final size = exists ? await f.length() : -1;
+    debugPrint('[CreatePost] $source picked path=${f.path} '
+        'exists=$exists size=$size');
+    if (!exists || size <= 0) {
+      if (mounted) {
+        AppFeedback.showError(context, 'Could not read the selected video.');
+      }
+      return false;
+    }
+    if (size > _maxVideoBytes) {
+      final mb = (size / (1024 * 1024)).toStringAsFixed(1);
+      debugPrint('[CreatePost] rejected oversize video: ${mb}MB > 30MB');
+      if (mounted) {
+        AppFeedback.showError(
+          context,
+          'Video is too large (${mb}MB). The limit is 30MB — '
+          'pick a shorter clip or compress it first.',
+        );
+      }
+      return false;
+    }
+    return true;
   }
 
   void _removeImage(int i) {
@@ -216,16 +259,36 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         }
       }
 
+      debugPrint('[CreatePost] _submit start '
+          'images=${_pickedImages.length} videos=${_pickedVideos.length} '
+          'captionLen=${caption.length} isPrivate=$_isPrivate');
+
       final storage = StorageService();
       final urls = <String>[];
       for (final file in _pickedImages) {
+        debugPrint('[CreatePost] uploading image path=${file.path}');
         urls.add(await storage.uploadPostImage(file));
       }
-      final videoUrls = <String>[];
-      for (final file in _pickedVideos) {
-        videoUrls.add(await storage.uploadPostVideo(file));
-      }
+      debugPrint('[CreatePost] image upload phase done, count=${urls.length}');
 
+      final videoUrls = <String>[];
+      for (var i = 0; i < _pickedVideos.length; i++) {
+        final file = _pickedVideos[i];
+        debugPrint('[CreatePost] uploading video '
+            '${i + 1}/${_pickedVideos.length} path=${file.path}');
+        try {
+          final url = await storage.uploadPostVideo(file);
+          debugPrint('[CreatePost] video ${i + 1} uploaded url=$url');
+          videoUrls.add(url);
+        } catch (e, st) {
+          debugPrint('[CreatePost] video ${i + 1} upload FAILED: $e\n$st');
+          rethrow;
+        }
+      }
+      debugPrint('[CreatePost] video upload phase done, '
+          'count=${videoUrls.length}');
+
+      debugPrint('[CreatePost] calling createPost…');
       await ref.read(postServiceProvider).createPost(
             caption: caption,
             imageUrls: urls,
@@ -239,6 +302,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 finalLat != null &&
                 finalLng != null,
           );
+      debugPrint('[CreatePost] createPost OK');
       if (mounted) {
         Navigator.pop(context);
         AppFeedback.showSuccessOn(
@@ -248,7 +312,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               : 'Post published',
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[CreatePost] _submit FAILED: $e\n$st');
       if (mounted) {
         AppFeedback.showError(context, 'Could not publish post: $e');
       }
@@ -495,6 +560,29 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                         icon: Icons.videocam_outlined,
                         label: 'Record a video',
                         onTap: _pickVideoFromCamera,
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 13,
+                              color: context.textMuted,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Videos must be 30MB or less.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

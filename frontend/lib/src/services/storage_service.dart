@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
@@ -65,39 +66,75 @@ class StorageService {
     required String kind,
     String? subPath,
   }) async {
+    debugPrint('[StorageService] _uploadViaEdge start '
+        'bucket=$bucket kind=$kind subPath=$subPath path=${file.path}');
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw StorageException('Not signed in');
+    if (user == null) {
+      debugPrint('[StorageService] ABORT: no Firebase user');
+      throw StorageException('Not signed in');
+    }
+    debugPrint('[StorageService] firebase uid=${user.uid}');
 
     final idToken = await user.getIdToken();
-    if (idToken == null) throw StorageException('Could not get Firebase ID token');
+    if (idToken == null) {
+      debugPrint('[StorageService] ABORT: getIdToken returned null');
+      throw StorageException('Could not get Firebase ID token');
+    }
+    debugPrint('[StorageService] got Firebase ID token (len=${idToken.length})');
+
+    final exists = await file.exists();
+    final size = exists ? await file.length() : -1;
+    debugPrint('[StorageService] file exists=$exists size=$size bytes');
+    if (!exists) {
+      throw StorageException('File not found at ${file.path}');
+    }
+    if (size == 0) {
+      throw StorageException('File is empty: ${file.path}');
+    }
 
     var ext = _extensionOf(file.path);
     final contentType = _contentTypeOf(ext);
+    debugPrint('[StorageService] ext=$ext contentType=$contentType');
     // The Supabase edge function (issue-upload-url) rejects `m4a` with
     // {"error":"bad ext"} even though the file is plain AAC audio inside an
     // MP4 container. Re-label as `aac` for the upload-URL request — the
     // bytes are still valid AAC so playback is unaffected.
     if (kind == 'audio' && ext == 'm4a') {
       ext = 'aac';
+      debugPrint('[StorageService] relabeled m4a -> aac for edge function');
     }
 
     final edgeUri = Uri.parse('$_supabaseUrl/functions/v1/issue-upload-url');
+    debugPrint('[StorageService] POST $edgeUri');
 
-    final req = await http.post(
-      edgeUri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_anonKey',
-        'apikey': _anonKey,
-        'X-Firebase-Token': idToken,
-      },
-      body: jsonEncode({
-        'bucket': bucket,
-        'kind': kind,
-        'ext': ext,
-        if (subPath != null) 'subPath': subPath,
-      }),
-    );
+    final reqBody = jsonEncode({
+      'bucket': bucket,
+      'kind': kind,
+      'ext': ext,
+      if (subPath != null) 'subPath': subPath,
+    });
+    debugPrint('[StorageService] request body=$reqBody');
+
+    http.Response req;
+    try {
+      req = await http.post(
+        edgeUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_anonKey',
+          'apikey': _anonKey,
+          'X-Firebase-Token': idToken,
+        },
+        body: reqBody,
+      );
+    } catch (e, st) {
+      debugPrint('[StorageService] issue-upload-url network error: $e\n$st');
+      rethrow;
+    }
+
+    debugPrint('[StorageService] issue-upload-url status=${req.statusCode} '
+        'body=${req.body}');
 
     if (req.statusCode != 200) {
       throw StorageException('issue-upload-url failed: ${req.statusCode} ${req.body}');
@@ -107,22 +144,38 @@ class StorageService {
     final uploadUrl = data['uploadUrl'] as String;
     final publicUrl = data['publicUrl'] as String;
     final token = data['token'] as String?;
+    debugPrint('[StorageService] uploadUrl=$uploadUrl');
+    debugPrint('[StorageService] publicUrl=$publicUrl');
+    debugPrint('[StorageService] token present=${token != null}');
 
+    debugPrint('[StorageService] reading file bytes…');
     final bytes = await file.readAsBytes();
-    final upload = await http.put(
-      Uri.parse(uploadUrl),
-      headers: {
-        'Content-Type': contentType,
-        if (token != null) 'Authorization': 'Bearer $token',
-        'x-upsert': 'true',
-      },
-      body: bytes,
-    );
+    debugPrint('[StorageService] read ${bytes.length} bytes; PUT to storage');
+
+    http.Response upload;
+    try {
+      upload = await http.put(
+        Uri.parse(uploadUrl),
+        headers: {
+          'Content-Type': contentType,
+          if (token != null) 'Authorization': 'Bearer $token',
+          'x-upsert': 'true',
+        },
+        body: bytes,
+      );
+    } catch (e, st) {
+      debugPrint('[StorageService] PUT upload network error: $e\n$st');
+      rethrow;
+    }
+
+    debugPrint('[StorageService] PUT upload status=${upload.statusCode} '
+        'body=${upload.body}');
 
     if (upload.statusCode != 200 && upload.statusCode != 201) {
       throw StorageException('upload failed: ${upload.statusCode} ${upload.body}');
     }
 
+    debugPrint('[StorageService] SUCCESS publicUrl=$publicUrl');
     return publicUrl;
   }
 

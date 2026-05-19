@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../features/model/post_model.dart';
 import 'notification_service.dart';
@@ -39,45 +40,64 @@ class PostService {
     double? postLng,
     bool postLocationExact = false,
   }) async {
+    debugPrint('[PostService] createPost start '
+        'images=${imageUrls.length} videos=${videoUrls.length} '
+        'captionLen=${caption.length} isPrivate=$isPrivate '
+        'hasLoc=${postLat != null && postLng != null}');
+    if (videoUrls.isNotEmpty) {
+      debugPrint('[PostService] videoUrls=$videoUrls');
+    }
+
     final user = _auth.currentUser;
-    if (user == null) throw Exception('Not signed in');
+    if (user == null) {
+      debugPrint('[PostService] ABORT: no Firebase user');
+      throw Exception('Not signed in');
+    }
 
     final userDoc = await _db.collection('users').doc(user.uid).get();
     final username = userDoc.data()?['username'] as String? ?? 'user';
     final avatar = userDoc.data()?['avatarUrl'] as String?;
+    debugPrint('[PostService] author uid=${user.uid} username=$username');
 
     final placeName = (postPlaceName ?? '').trim();
     final placeCity = (postPlaceCity ?? '').trim();
     final hasLocation = postLat != null && postLng != null;
 
-    final ref = await _posts.add({
-      'authorUid': user.uid,
-      'authorUsername': username,
-      'authorAvatar': avatar,
-      'caption': caption,
-      'imageUrls': imageUrls,
-      'videoUrls': videoUrls,
-      'likesCount': 0,
-      'commentsCount': 0,
-      'isPrivate': isPrivate,
-      'createdAt': FieldValue.serverTimestamp(),
-      if (placeName.isNotEmpty) 'postPlaceName': placeName,
-      if (placeCity.isNotEmpty) 'postPlaceCity': placeCity,
-      if (hasLocation)
-        'postLocation': {
-          'lat': postLat,
-          'lng': postLng,
-        },
-      if (hasLocation) 'postLocationExact': postLocationExact,
-      if (placeName.isNotEmpty || placeCity.isNotEmpty)
-        'placeSearchKey': '$placeName $placeCity'.trim().toLowerCase(),
-    });
+    try {
+      final ref = await _posts.add({
+        'authorUid': user.uid,
+        'authorUsername': username,
+        'authorAvatar': avatar,
+        'caption': caption,
+        'imageUrls': imageUrls,
+        'videoUrls': videoUrls,
+        'likesCount': 0,
+        'commentsCount': 0,
+        'isPrivate': isPrivate,
+        'createdAt': FieldValue.serverTimestamp(),
+        if (placeName.isNotEmpty) 'postPlaceName': placeName,
+        if (placeCity.isNotEmpty) 'postPlaceCity': placeCity,
+        if (hasLocation)
+          'postLocation': {
+            'lat': postLat,
+            'lng': postLng,
+          },
+        if (hasLocation) 'postLocationExact': postLocationExact,
+        if (placeName.isNotEmpty || placeCity.isNotEmpty)
+          'placeSearchKey': '$placeName $placeCity'.trim().toLowerCase(),
+      });
+      debugPrint('[PostService] post doc created id=${ref.id}');
 
-    await _db.collection('users').doc(user.uid).update({
-      'postsCount': FieldValue.increment(1),
-    });
+      await _db.collection('users').doc(user.uid).update({
+        'postsCount': FieldValue.increment(1),
+      });
+      debugPrint('[PostService] postsCount incremented for ${user.uid}');
 
-    return ref.id;
+      return ref.id;
+    } catch (e, st) {
+      debugPrint('[PostService] createPost FAILED: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> reportPost({
