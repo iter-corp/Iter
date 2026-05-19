@@ -129,6 +129,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             title: 'App settings',
             subtitle: 'Feature flags, announcement, store links, maintenance',
             color: const Color(0xFF3AB0FF),
+            showNotificationDot: hasUnreadContact,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),

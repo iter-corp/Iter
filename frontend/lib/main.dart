@@ -202,6 +202,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           subtitle: event.subtitle,
           location: event.location,
           eventType: event.eventType,
+          funds: event.funds,
           deadlineAt: event.deadlineAt,
           imageUrls: event.imageUrls,
           description: event.description,

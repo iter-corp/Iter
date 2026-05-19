@@ -175,6 +175,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   String? _titleError;
   String? _eventTypeError;
   String? _countryError;
+  String? _fundsError;
   String? _descError;
   String? _imagesError;
 
@@ -183,6 +184,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   bool _uploadingImage = false;
   String _eventType = '';
   String _country = '';
+  String _funds = '';
   DateTime? _deadlineAt;
 
   @override
@@ -199,6 +201,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       _imageUrls.addAll(e.imageUrls);
       _eventType = e.eventType;
       _country = e.country.isNotEmpty ? e.country : e.location;
+      _funds = e.funds;
       _deadlineAt = e.deadlineAt;
     }
   }
@@ -264,23 +267,23 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         _titleCtrl.text.trim().isEmpty ? 'Title is required' : null;
     final eventTypeError =
         _eventType.trim().isEmpty ? 'Pick an event type' : null;
-    final countryError =
-        _country.trim().isEmpty ? 'Country is required' : null;
-    final descError = _descCtrl.text.trim().isEmpty
-        ? 'Description is required'
-        : null;
-    final imagesError =
-        _imageUrls.isEmpty ? 'Add at least one image' : null;
+    final countryError = _country.trim().isEmpty ? 'Country is required' : null;
+    final fundsError = _funds.trim().isEmpty ? 'Pick funding status' : null;
+    final descError =
+        _descCtrl.text.trim().isEmpty ? 'Description is required' : null;
+    final imagesError = _imageUrls.isEmpty ? 'Add at least one image' : null;
     setState(() {
       _titleError = titleError;
       _eventTypeError = eventTypeError;
       _countryError = countryError;
+      _fundsError = fundsError;
       _descError = descError;
       _imagesError = imagesError;
     });
     if (titleError != null ||
         eventTypeError != null ||
         countryError != null ||
+        fundsError != null ||
         descError != null ||
         imagesError != null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -304,6 +307,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         'deadline': _deadlineAt,
         'eventType': _eventType,
         'country': _country,
+        'funds': _funds,
       };
       if (widget.existing == null) {
         await admin.createEvent(
@@ -318,6 +322,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           deadlineAt: _deadlineAt,
           eventType: _eventType,
           country: _country,
+          funds: _funds,
         );
       } else {
         await admin.updateEvent(widget.existing!.id, data);
@@ -346,6 +351,10 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     final countryOptions = <String>{
       ...cfg.eventCountries,
       if (_country.isNotEmpty) _country,
+    }.toList();
+    final fundsOptions = <String>{
+      ...kEventFundingStatuses,
+      if (_funds.isNotEmpty) _funds,
     }.toList();
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -410,8 +419,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                 });
               },
             ),
-            if (_eventTypeError != null)
-              _FieldError(text: _eventTypeError!),
+            if (_eventTypeError != null) _FieldError(text: _eventTypeError!),
             _SearchablePickerField(
               placeholder: 'Country',
               sheetTitle: 'Choose country',
@@ -426,6 +434,21 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               },
             ),
             if (_countryError != null) _FieldError(text: _countryError!),
+            _SearchablePickerField(
+              placeholder: 'Funds',
+              sheetTitle: 'Choose funding status',
+              searchHint: 'Search funding status...',
+              options: fundsOptions,
+              selected: _funds.isEmpty ? null : _funds,
+              enableSearch: false,
+              onChanged: (v) {
+                setState(() {
+                  _funds = v;
+                  _fundsError = null;
+                });
+              },
+            ),
+            if (_fundsError != null) _FieldError(text: _fundsError!),
             _DeadlineField(
               deadlineAt: _deadlineAt,
               onPick: _pickDeadline,
@@ -477,8 +500,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                         fontWeight: FontWeight.w600)),
                 const Text(' *',
                     style: TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.w700)),
+                        color: Colors.redAccent, fontWeight: FontWeight.w700)),
               ],
             ),
             if (_imagesError != null) _FieldError(text: _imagesError!),
@@ -677,6 +699,7 @@ class _SearchablePickerField extends StatelessWidget {
   final List<String> options;
   final String? selected;
   final ValueChanged<String> onChanged;
+  final bool enableSearch;
 
   const _SearchablePickerField({
     required this.placeholder,
@@ -685,6 +708,7 @@ class _SearchablePickerField extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onChanged,
+    this.enableSearch = true,
   });
 
   Future<void> _open(BuildContext context) async {
@@ -697,6 +721,7 @@ class _SearchablePickerField extends StatelessWidget {
         searchHint: searchHint,
         options: options,
         selected: selected,
+        enableSearch: enableSearch,
       ),
     );
     if (result != null) onChanged(result);
@@ -740,12 +765,14 @@ class _PickerSheet extends StatefulWidget {
   final String searchHint;
   final List<String> options;
   final String? selected;
+  final bool enableSearch;
 
   const _PickerSheet({
     required this.title,
     required this.searchHint,
     required this.options,
     required this.selected,
+    this.enableSearch = true,
   });
 
   @override
@@ -764,7 +791,9 @@ class _PickerSheetState extends State<_PickerSheet> {
   void initState() {
     super.initState();
     _filtered = List.of(widget.options);
-    _searchCtrl.addListener(_onSearch);
+    if (widget.enableSearch) {
+      _searchCtrl.addListener(_onSearch);
+    }
   }
 
   void _onSearch() {
@@ -827,35 +856,35 @@ class _PickerSheetState extends State<_PickerSheet> {
               ),
             ),
             const SizedBox(height: 10),
-            // search bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _searchCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: widget.searchHint,
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchCtrl.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            FocusScope.of(context).unfocus();
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: context.surfaceSoft,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+            if (widget.enableSearch)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _searchCtrl,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: widget.searchHint,
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchCtrl.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              FocusScope.of(context).unfocus();
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: context.surfaceSoft,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
+            SizedBox(height: widget.enableSearch ? 8 : 4),
             // scrollable list — fixed height = 5 items
             SizedBox(
               height: listH,

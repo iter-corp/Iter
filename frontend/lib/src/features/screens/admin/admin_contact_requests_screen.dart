@@ -8,10 +8,8 @@ import '../../../services/contact_request_service.dart';
 import '../../../theme/app_theme.dart';
 import '../contact_us_screen.dart';
 
-/// Admin-side list of every contact-us thread. Filterable by type +
-/// status. Tapping a row opens [ContactThreadScreen], which the
-/// admin uses to reply and (for organization requests) approve the
-/// user as an event-posting org_admin.
+/// Admin-side list of every contact-us thread. Tapping a row opens [ContactThreadScreen], which the
+/// admin uses to reply and approve the user as an event manager when needed.
 class AdminContactRequestsScreen extends ConsumerStatefulWidget {
   const AdminContactRequestsScreen({super.key});
 
@@ -22,9 +20,6 @@ class AdminContactRequestsScreen extends ConsumerStatefulWidget {
 
 class _AdminContactRequestsScreenState
     extends ConsumerState<AdminContactRequestsScreen> {
-  /// `null` = all, otherwise filter to a specific type.
-  ContactRequestType? _typeFilter;
-
   /// Show only threads still awaiting an admin reply.
   bool _onlyUnread = false;
 
@@ -53,22 +48,15 @@ class _AdminContactRequestsScreenState
         child: Column(
           children: [
             _FilterBar(
-              typeFilter: _typeFilter,
-              onTypeChanged: (v) => setState(() => _typeFilter = v),
               onlyUnread: _onlyUnread,
               onUnreadChanged: (v) => setState(() => _onlyUnread = v),
             ),
             Expanded(
               child: async.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text('Could not load: $e')),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Could not load: $e')),
                 data: (all) {
                   final filtered = all.where((r) {
-                    if (_typeFilter != null && r.type != _typeFilter) {
-                      return false;
-                    }
                     if (_onlyUnread && !r.unreadByAdmin) return false;
                     return true;
                   }).toList();
@@ -79,8 +67,7 @@ class _AdminContactRequestsScreenState
                     );
                   }
                   return ListView.separated(
-                    padding:
-                        const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) => _AdminRequestTile(
@@ -104,14 +91,10 @@ class _AdminContactRequestsScreenState
 }
 
 class _FilterBar extends StatelessWidget {
-  final ContactRequestType? typeFilter;
-  final ValueChanged<ContactRequestType?> onTypeChanged;
   final bool onlyUnread;
   final ValueChanged<bool> onUnreadChanged;
 
   const _FilterBar({
-    required this.typeFilter,
-    required this.onTypeChanged,
     required this.onlyUnread,
     required this.onUnreadChanged,
   });
@@ -150,30 +133,10 @@ class _FilterBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
       child: Row(
         children: [
-          chip('All', typeFilter == null && !onlyUnread, () {
-            onTypeChanged(null);
-            onUnreadChanged(false);
-          }),
-          const SizedBox(width: 6),
+          chip('All conversations', !onlyUnread, () => onUnreadChanged(false)),
+          const SizedBox(width: 8),
           chip(
-            'Messages',
-            typeFilter == ContactRequestType.message,
-            () => onTypeChanged(typeFilter == ContactRequestType.message
-                ? null
-                : ContactRequestType.message),
-          ),
-          const SizedBox(width: 6),
-          chip(
-            'Organization',
-            typeFilter == ContactRequestType.organization,
-            () => onTypeChanged(
-                typeFilter == ContactRequestType.organization
-                    ? null
-                    : ContactRequestType.organization),
-          ),
-          const SizedBox(width: 16),
-          chip('Awaiting reply', onlyUnread,
-              () => onUnreadChanged(!onlyUnread)),
+              'Awaiting reply', onlyUnread, () => onUnreadChanged(!onlyUnread)),
         ],
       ),
     );
@@ -222,14 +185,12 @@ class _AdminRequestTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      isOrg ? 'ORGANIZATION' : 'MESSAGE',
+                      isOrg ? 'EVENT MANAGER' : 'MESSAGE',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.6,
-                        color: isOrg
-                            ? AppColors.purple
-                            : context.textSecondary,
+                        color: isOrg ? AppColors.purple : context.textSecondary,
                       ),
                     ),
                   ),
@@ -237,8 +198,7 @@ class _AdminRequestTile extends StatelessWidget {
                   _StatusPill(status: request.status),
                   const Spacer(),
                   Text(
-                    _formatRelative(
-                        request.lastMessageAt ?? request.createdAt),
+                    _formatRelative(request.lastMessageAt ?? request.createdAt),
                     style: TextStyle(
                       fontSize: 11,
                       color: context.textSecondary,
@@ -310,6 +270,7 @@ class _StatusPill extends StatelessWidget {
       ContactRequestStatus.open => ('OPEN', Colors.orange),
       ContactRequestStatus.answered => ('ANSWERED', Colors.green),
       ContactRequestStatus.promoted => ('APPROVED', AppColors.purple),
+      ContactRequestStatus.revoked => ('REVOKED', Colors.red),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

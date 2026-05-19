@@ -13,6 +13,7 @@ class EventDetailScreen extends ConsumerStatefulWidget {
   final String subtitle;
   final String location;
   final String eventType;
+  final String funds;
   final DateTime? deadlineAt;
   final List<String> imageUrls;
   final String description;
@@ -27,6 +28,7 @@ class EventDetailScreen extends ConsumerStatefulWidget {
     required this.subtitle,
     required this.location,
     required this.eventType,
+    required this.funds,
     required this.deadlineAt,
     required this.imageUrls,
     required this.description,
@@ -242,6 +244,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
               if (widget.location.trim().isNotEmpty ||
                   widget.eventType.trim().isNotEmpty ||
+                  widget.funds.trim().isNotEmpty ||
                   widget.deadlineAt != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -259,6 +262,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           icon: Icons.sell_outlined,
                           label: widget.eventType.trim(),
                         ),
+                      if (widget.funds.trim().isNotEmpty)
+                        _MetaChip(
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: widget.funds.trim(),
+                        ),
                       if (widget.deadlineAt != null)
                         _MetaChip(
                           icon: Icons.calendar_month_outlined,
@@ -271,6 +279,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
               if (widget.location.trim().isNotEmpty ||
                   widget.eventType.trim().isNotEmpty ||
+                  widget.funds.trim().isNotEmpty ||
                   widget.deadlineAt != null)
                 const SizedBox(height: 14),
 

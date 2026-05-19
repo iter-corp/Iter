@@ -32,6 +32,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final isAdmin = ref.watch(isAdminProvider);
     final isOrgAdmin = ref.watch(isOrgAdminProvider);
     final hasNewReports = ref.watch(hasAnyNewReportsProvider);
+    final hasUnreadContact = ref.watch(hasUnreadContactRequestsProvider);
     final hasUnreadReply = ref.watch(hasUnreadAdminReplyProvider);
     final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
     final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
@@ -196,8 +197,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
           ),
           const _SectionHeader(title: 'Support'),
           ListTile(
-            leading:
-                const Icon(Icons.support_agent_outlined, color: AppColors.purple),
+            leading: const Icon(Icons.support_agent_outlined,
+                color: AppColors.purple),
             title: const Text('Contact us'),
             subtitle: Text(
               'Send the Iter team a message or apply to publish events',
@@ -231,25 +232,23 @@ class ProfileSettingsScreen extends ConsumerWidget {
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _showBlockedUsers(context),
           ),
-          // Approved organizations land here with event-posting rights
+          // Approved event managers land here with event-posting rights
           // but no other admin tooling. Full admins see the broader
           // "Admin panel" entry below; this tile is for the limited
           // org_admin role granted via Contact us.
           if (isOrgAdmin && !isAdmin) ...[
-            const _SectionHeader(title: 'Organization'),
+            const _SectionHeader(title: 'Event manager'),
             ListTile(
-              leading: const Icon(Icons.event_outlined,
-                  color: AppColors.purple),
+              leading:
+                  const Icon(Icons.event_outlined, color: AppColors.purple),
               title: const Text('Manage events',
                   style: TextStyle(
-                      color: AppColors.purple,
-                      fontWeight: FontWeight.w600)),
+                      color: AppColors.purple, fontWeight: FontWeight.w600)),
               subtitle: Text(
-                'Create and edit events on behalf of your organization',
+                'Create and edit events as an approved event manager',
                 style: TextStyle(fontSize: 12, color: context.textSecondary),
               ),
-              trailing:
-                  Icon(Icons.chevron_right, color: context.textSecondary),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
               ),
@@ -270,7 +269,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (hasNewReports)
+                  if (hasNewReports || hasUnreadContact)
                     Container(
                       width: 9,
                       height: 9,

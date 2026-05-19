@@ -44,6 +44,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       case 'event_invited':
       case 'event_removed':
       case 'new_event':
+      case 'role_update':
         return _NotificationCategory.event;
       default:
         return _NotificationCategory.activity;
@@ -105,7 +106,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             notification.type == 'event_rejected' ||
             notification.type == 'event_invited' ||
             notification.type == 'event_removed' ||
-            notification.type == 'new_event';
+            notification.type == 'new_event' ||
+            notification.type == 'role_update';
     }
   }
 
@@ -577,6 +579,16 @@ class _NotificationItem extends ConsumerWidget {
                 : '$loc · ${_timeAgo(notif.createdAt)}';
             trailingType = NotificationType.image;
             break;
+          case 'role_update':
+            title = (notif.title ?? '').trim().isEmpty
+                ? 'Your role was updated'
+                : notif.title!.trim();
+            final details = (notif.subtitle ?? '').trim();
+            subtitle = details.isEmpty
+                ? _timeAgo(notif.createdAt)
+                : '$details · ${_timeAgo(notif.createdAt)}';
+            trailingType = NotificationType.image;
+            break;
           case 'follow_accept':
             title = '$username accepted your follow request';
             subtitle = _timeAgo(notif.createdAt);
@@ -709,6 +721,7 @@ class _NotificationItem extends ConsumerWidget {
         break;
       case 'event_rejected':
       case 'event_removed':
+      case 'role_update':
         // Nothing to navigate to — the user is no longer in the group.
         break;
     }
@@ -793,6 +806,7 @@ class _NotificationItem extends ConsumerWidget {
           subtitle: e.subtitle,
           location: e.location,
           eventType: e.eventType,
+          funds: e.funds,
           deadlineAt: e.deadlineAt,
           imageUrls: e.imageUrls,
           description: e.description,

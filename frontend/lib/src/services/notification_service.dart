@@ -120,6 +120,28 @@ class NotificationService {
     });
   }
 
+  /// Writes a system notification that doesn't belong to a specific actor
+  /// user. Used for event/news style updates that should still appear in the
+  /// Notifications screen with custom copy.
+  Future<void> createSystemNotification({
+    required String targetUid,
+    required String type,
+    required String title,
+    String? subtitle,
+    String? targetId,
+  }) async {
+    await _items(targetUid).add({
+      'type': type,
+      'actorUid': '',
+      if (targetId != null) 'targetId': targetId,
+      'title': title,
+      if (subtitle != null && subtitle.trim().isNotEmpty)
+        'subtitle': subtitle.trim(),
+      'read': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// Upserts a notification using a deterministic document ID so repeated
   /// identical actions (e.g. like → unlike → like) never create duplicates.
   /// The [docId] must be globally unique per actor+type+target combination.

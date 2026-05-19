@@ -9,6 +9,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/block_providers.dart';
+import '../../providers/contact_request_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../providers/theme_provider.dart';
@@ -125,6 +126,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final isAdmin = ref.watch(isAdminProvider);
     final hasNewReports = ref.watch(hasAnyNewReportsProvider);
+    final hasUnreadContact = ref.watch(hasUnreadContactRequestsProvider);
     final followersAsync = currentUid == null
         ? const AsyncValue<List<String>>.data([])
         : ref.watch(followersProvider(currentUid));
@@ -186,7 +188,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 ProfileButtons(
                   onSettings: () => _showSettings(context),
-                  showSettingsNotificationDot: isAdmin && hasNewReports,
+                  showSettingsNotificationDot:
+                      isAdmin && (hasNewReports || hasUnreadContact),
                 ),
                 ProfileTabBar(
                   selectedTab: selectedTab,

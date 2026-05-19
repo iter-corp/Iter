@@ -1,5 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'notification_service.dart';
+
+class ContactRequestDailyLimitException implements Exception {
+  final String message;
+  const ContactRequestDailyLimitException([
+    this.message = 'You can open only one new request per day.',
+  ]);
+
+  @override
+  String toString() => message;
+}
+
 /// What kind of contact-us submission this is. Drives the badge/icon
 /// in the admin list and unlocks the "Promote to org admin" action.
 enum ContactRequestType {
@@ -26,12 +38,14 @@ String _typeToRaw(ContactRequestType t) =>
 ///   * `answered` — admin has replied at least once
 ///   * `promoted` — applies only to organization requests that were
 ///                  accepted: admin clicked "Promote to org admin"
-enum ContactRequestStatus { open, answered, promoted }
+///   * `revoked`  — organization access was removed after approval
+enum ContactRequestStatus { open, answered, promoted, revoked }
 
 ContactRequestStatus _statusFromRaw(Object? raw) {
   if (raw is String) {
     if (raw == 'answered') return ContactRequestStatus.answered;
     if (raw == 'promoted') return ContactRequestStatus.promoted;
+    if (raw == 'revoked') return ContactRequestStatus.revoked;
   }
   return ContactRequestStatus.open;
 }
@@ -42,6 +56,8 @@ String _statusToRaw(ContactRequestStatus s) {
       return 'answered';
     case ContactRequestStatus.promoted:
       return 'promoted';
+    case ContactRequestStatus.revoked:
+      return 'revoked';
     case ContactRequestStatus.open:
       return 'open';
   }
@@ -133,6 +149,7 @@ class ContactRequestService {
       : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
+  final NotificationService _notifications = NotificationService();
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('contactRequests');
@@ -145,6 +162,61 @@ class ContactRequestService {
     final t = text.trim();
     if (t.length <= _previewLimit) return t;
     return '${t.substring(0, _previewLimit - 1)}…';
+  }
+
+  String _dayKeyUtc(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  Future<void> _deleteCollectionDocs(
+    CollectionReference<Map<String, dynamic>> col,
+  ) async {
+    while (true) {
+      final snap = await col.limit(400).get();
+      if (snap.docs.isEmpty) return;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < 400) return;
+    }
+  }
+
+  Future<void> _deleteEventArtifacts(String eventId) async {
+    final chatRef = _db.collection('eventChats').doc(eventId);
+    await _deleteCollectionDocs(chatRef.collection('messages'));
+    await _deleteCollectionDocs(chatRef.collection('members'));
+
+    final regs = await _db
+        .collection('eventRegistrations')
+        .where('eventId', isEqualTo: eventId)
+        .get();
+    if (regs.docs.isNotEmpty) {
+      final batch = _db.batch();
+      for (final reg in regs.docs) {
+        batch.delete(reg.reference);
+      }
+      await batch.commit();
+    }
+
+    final batch = _db.batch();
+    batch.delete(chatRef);
+    batch.delete(_db.collection('events').doc(eventId));
+    await batch.commit();
+  }
+
+  Future<void> _deleteEventsCreatedBy(String userUid) async {
+    final events = await _db
+        .collection('events')
+        .where('createdByUid', isEqualTo: userUid)
+        .get();
+    for (final event in events.docs) {
+      await _deleteEventArtifacts(event.id);
+    }
   }
 
   /// Creates a new contact thread and posts the user's first message.
@@ -160,27 +232,65 @@ class ContactRequestService {
     if (body.isEmpty) {
       throw ArgumentError('Message cannot be empty');
     }
-    final now = FieldValue.serverTimestamp();
-    final docRef = _col.doc();
-    final subject = body.length > 60 ? '${body.substring(0, 59)}…' : body;
-    await docRef.set({
-      'userUid': userUid,
-      'userEmail': userEmail.trim(),
-      'userName': userName.trim(),
-      'type': _typeToRaw(type),
-      'subject': subject,
-      'status': _statusToRaw(ContactRequestStatus.open),
-      'createdAt': now,
-      'lastMessageAt': now,
-      'lastMessagePreview': _trimPreview(body),
-      'unreadByUser': false,
-      'unreadByAdmin': true,
+
+    // Backward-compatible guard for users created before the daily lock field
+    // existed: if they already opened one request today, block immediately.
+    final nowUtc = DateTime.now().toUtc();
+    final startOfDayUtc = DateTime.utc(nowUtc.year, nowUtc.month, nowUtc.day);
+    final endOfDayUtc = startOfDayUtc.add(const Duration(days: 1));
+    final existing = await _col.where('userUid', isEqualTo: userUid).get();
+    final alreadyOpenedToday = existing.docs.any((d) {
+      final createdAt = (d.data()['createdAt'] as Timestamp?)?.toDate();
+      if (createdAt == null) return false;
+      final c = createdAt.toUtc();
+      return !c.isBefore(startOfDayUtc) && c.isBefore(endOfDayUtc);
     });
-    await docRef.collection('messages').add({
-      'senderUid': userUid,
-      'senderRole': 'user',
-      'body': body,
-      'createdAt': now,
+    if (alreadyOpenedToday) {
+      throw const ContactRequestDailyLimitException();
+    }
+
+    final now = FieldValue.serverTimestamp();
+    final todayKey = _dayKeyUtc(nowUtc);
+    final docRef = _col.doc();
+    final userRef = _db.collection('users').doc(userUid);
+    final msgRef = docRef.collection('messages').doc();
+    final subject = body.length > 60 ? '${body.substring(0, 59)}…' : body;
+    await _db.runTransaction((tx) async {
+      final userSnap = await tx.get(userRef);
+      final lastDay =
+          (userSnap.data()?['lastContactRequestDay'] as String?) ?? '';
+      if (lastDay == todayKey) {
+        throw const ContactRequestDailyLimitException();
+      }
+
+      tx.set(
+          userRef,
+          {
+            'lastContactRequestDay': todayKey,
+            'lastContactRequestAt': now,
+          },
+          SetOptions(merge: true));
+
+      tx.set(docRef, {
+        'userUid': userUid,
+        'userEmail': userEmail.trim(),
+        'userName': userName.trim(),
+        'type': _typeToRaw(type),
+        'subject': subject,
+        'status': _statusToRaw(ContactRequestStatus.open),
+        'createdAt': now,
+        'lastMessageAt': now,
+        'lastMessagePreview': _trimPreview(body),
+        'unreadByUser': false,
+        'unreadByAdmin': true,
+      });
+
+      tx.set(msgRef, {
+        'senderUid': userUid,
+        'senderRole': 'user',
+        'body': body,
+        'createdAt': now,
+      });
     });
     return docRef.id;
   }
@@ -197,6 +307,8 @@ class ContactRequestService {
     if (trimmed.isEmpty) return;
     final now = FieldValue.serverTimestamp();
     final docRef = _col.doc(requestId);
+    final parentSnap = await docRef.get();
+    final currentStatus = _statusFromRaw(parentSnap.data()?['status']);
     await docRef.collection('messages').add({
       'senderUid': senderUid,
       'senderRole': senderIsAdmin ? 'admin' : 'user',
@@ -212,19 +324,27 @@ class ContactRequestService {
       'unreadByAdmin': senderIsAdmin ? false : true,
     };
     if (senderIsAdmin) {
-      // First admin reply transitions the thread to answered. Don't
-      // downgrade a promoted thread.
-      update['status'] = _statusToRaw(ContactRequestStatus.answered);
+      if (currentStatus != ContactRequestStatus.promoted &&
+          currentStatus != ContactRequestStatus.revoked) {
+        update['status'] = _statusToRaw(ContactRequestStatus.answered);
+      }
     }
     await docRef.set(update, SetOptions(merge: true));
   }
 
+  Future<void> setType({
+    required String requestId,
+    required ContactRequestType type,
+  }) {
+    return _col.doc(requestId).set(
+      {'type': _typeToRaw(type)},
+      SetOptions(merge: true),
+    );
+  }
+
   /// Stream of the signed-in user's own contact threads, newest first.
   Stream<List<ContactRequest>> streamMyRequests(String userUid) {
-    return _col
-        .where('userUid', isEqualTo: userUid)
-        .snapshots()
-        .map((s) {
+    return _col.where('userUid', isEqualTo: userUid).snapshots().map((s) {
       final out = s.docs.map(ContactRequest.fromDoc).toList()
         ..sort((a, b) {
           final at = a.lastMessageAt;
@@ -300,5 +420,40 @@ class ContactRequestService {
       SetOptions(merge: true),
     );
     await batch.commit();
+    await _notifications.createSystemNotification(
+      targetUid: userUid,
+      type: 'role_update',
+      title: 'Event manager access granted',
+      subtitle: 'Iter Team approved you as an event manager.',
+    );
+  }
+
+  /// Removes organization event-posting access by restoring `role: user`.
+  /// Marks the request as `revoked` so both admin and user can see that the
+  /// previous approval was explicitly rolled back.
+  Future<void> revokeOrgAdmin({
+    required String requestId,
+    required String userUid,
+  }) async {
+    await _deleteEventsCreatedBy(userUid);
+
+    final batch = _db.batch();
+    batch.update(_db.collection('users').doc(userUid), {
+      'role': 'user',
+      'orgAdminRevokedAt': FieldValue.serverTimestamp(),
+      'orgAdminGrantedAt': FieldValue.delete(),
+    });
+    batch.set(
+      _col.doc(requestId),
+      {'status': _statusToRaw(ContactRequestStatus.revoked)},
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+    await _notifications.createSystemNotification(
+      targetUid: userUid,
+      type: 'role_update',
+      title: 'Event manager access removed',
+      subtitle: 'Iter Team revoked your event manager access.',
+    );
   }
 }

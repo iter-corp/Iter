@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'notification_service.dart';
 import 'post_service.dart';
 
 class AdminConfig {
@@ -160,6 +161,13 @@ const List<String> kEventCountries = [
   'Online',
 ];
 
+/// Canonical funding-status options admins choose from when creating events.
+const List<String> kEventFundingStatuses = [
+  'Fully Funded',
+  'Partially Funded',
+  'Self Funded',
+];
+
 class AdminEvent {
   final String id;
   final String title;
@@ -180,6 +188,9 @@ class AdminEvent {
   /// events). Stored on the doc lower-cased as `locationCountry` for matching.
   final String country;
 
+  /// Funding status label chosen by admin (empty on legacy events).
+  final String funds;
+
   /// Optional pin coordinates for the events map. Null when unknown.
   final double? lat;
   final double? lng;
@@ -198,6 +209,7 @@ class AdminEvent {
     this.deadlineAt,
     this.eventType = '',
     this.country = '',
+    this.funds = '',
     this.lat,
     this.lng,
   });
@@ -224,6 +236,7 @@ class AdminEvent {
       country: ((d['country'] as String?)?.trim().isNotEmpty ?? false)
           ? (d['country'] as String).trim()
           : ((d['locationCountry'] as String?) ?? '').trim(),
+      funds: (d['funds'] as String?) ?? '',
       lat: (geoMap?['lat'] as num?)?.toDouble(),
       lng: (geoMap?['lng'] as num?)?.toDouble(),
     );
@@ -329,6 +342,7 @@ class UserProfileReport {
 
 class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final NotificationService _notifications = NotificationService();
 
   DocumentReference<Map<String, dynamic>> get _configRef =>
       _db.collection('adminConfig').doc('app');
@@ -347,7 +361,7 @@ class AdminService {
   Stream<List<Map<String, dynamic>>> streamUsers({String query = ''}) {
     return _db.collection('users').snapshots().map((snap) {
       final q = query.trim().toLowerCase();
-      return snap.docs.map((d) => d.data()).where((u) {
+      return snap.docs.map((d) => {'uid': d.id, ...d.data()}).where((u) {
         if (q.isEmpty) return true;
         final name = (u['username'] as String? ?? '').toLowerCase();
         final email = (u['email'] as String? ?? '').toLowerCase();
@@ -359,8 +373,39 @@ class AdminService {
   Future<void> suspendUser(String uid, bool suspended) =>
       _db.collection('users').doc(uid).update({'suspended': suspended});
 
-  Future<void> setRole(String uid, String role) =>
-      _db.collection('users').doc(uid).update({'role': role});
+  Future<void> setRole(String uid, String role) async {
+    final userRef = _db.collection('users').doc(uid);
+    final before = await userRef.get();
+    final previousRole = (before.data()?['role'] as String?) ?? 'user';
+    if (previousRole == role) return;
+
+    await userRef.update({'role': role});
+
+    String? title;
+    String? subtitle;
+    if (role == 'admin') {
+      title = 'Admin access granted';
+      subtitle = 'Iter Team made you an admin.';
+    } else if (previousRole == 'admin' && role == 'user') {
+      title = 'Admin access removed';
+      subtitle = 'Iter Team removed your admin role.';
+    } else if (role == 'org_admin') {
+      title = 'Event manager access granted';
+      subtitle = 'Iter Team approved you as an event manager.';
+    } else if (previousRole == 'org_admin' && role == 'user') {
+      title = 'Event manager access removed';
+      subtitle = 'Iter Team revoked your event manager access.';
+    }
+
+    if (title != null) {
+      await _notifications.createSystemNotification(
+        targetUid: uid,
+        type: 'role_update',
+        title: title,
+        subtitle: subtitle,
+      );
+    }
+  }
 
   /// Cascade-deletes ALL user data and adds their email to the blacklist.
   /// Runs client-side — relies on Firestore rules that grant admin delete
@@ -631,6 +676,7 @@ class AdminService {
     DateTime? deadlineAt,
     String eventType = '',
     String country = '',
+    String funds = '',
     double? lat,
     double? lng,
   }) async {
@@ -658,6 +704,7 @@ class AdminService {
       // fan-out to match against users' selected countries.
       'country': country.trim(),
       'locationCountry': country.trim().toLowerCase(),
+      'funds': funds.trim(),
       'createdAt': FieldValue.serverTimestamp(),
       'createdByUid': creatorUid,
     });
@@ -726,19 +773,22 @@ class AdminService {
       // notification pipeline look broken from the user's side.
       final types = ((prefs['types'] as List?)?.map((e) => e.toString()) ??
               const <String>[])
+          .where((t) => t.trim().isNotEmpty)
           .toList();
-      if (types.isNotEmpty && eventType.isNotEmpty) {
-        if (!types.contains(eventType)) return false;
-      }
       final countries = ((prefs['countries'] as List?)
                   ?.map((e) => e.toString().trim().toLowerCase()) ??
               const <String>[])
           .where((c) => c.isNotEmpty)
           .toList();
-      if (countries.isNotEmpty && eventCountry.isNotEmpty) {
-        if (!countries.contains(eventCountry)) return false;
-      }
-      return true;
+
+      // Matching policy: notify if the event matches the selected type OR
+      // the selected country. Empty list means "all" for that dimension.
+      final typePass =
+          types.isEmpty || eventType.isEmpty || types.contains(eventType);
+      final countryPass = countries.isEmpty ||
+          eventCountry.isEmpty ||
+          countries.contains(eventCountry);
+      return typePass || countryPass;
     }
 
     var batch = _db.batch();

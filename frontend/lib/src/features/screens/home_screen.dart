@@ -29,12 +29,17 @@ enum _LocationStatus {
   unknown,
 }
 
+const _kTravelFilterPurple = Color(0xFFB05ECC);
+const _kTravelAllOption = '__all_places__';
+const _kTravelCurrentOption = '__current_location__';
+
 class _PlaceSuggestion {
   final String name;
   final String city;
   final double? lat;
   final double? lng;
   final bool useCurrentLocation;
+  final String? queryText;
 
   const _PlaceSuggestion({
     required this.name,
@@ -42,6 +47,7 @@ class _PlaceSuggestion {
     this.lat,
     this.lng,
     this.useCurrentLocation = false,
+    this.queryText,
   });
 }
 
@@ -69,7 +75,6 @@ class HomeBody extends ConsumerStatefulWidget {
 class _HomeBodyState extends ConsumerState<HomeBody> {
   _HomeMode _mode = _HomeMode.feed;
   _PlaceSuggestion? _selectedPlace;
-  final List<_PlaceSuggestion> _recentPlaces = [];
   final TextEditingController _qaSearchCtrl = TextEditingController();
   String _qaSearch = '';
   double? _viewerLat;
@@ -100,17 +105,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
 
   Future<void> _refresh(WidgetRef ref) async {
     if (_mode == _HomeMode.travel) {
-      if (mounted) {
-        setState(() {
-          _selectedPlace = null;
-        });
-      }
-      final query = TravelFeedQuery(
-        placeQuery: _defaultCityQuery(),
-        lat: _viewerLat,
-        lng: _viewerLng,
-        limit: 80,
-      );
+      final query = _buildTravelQuery();
       ref.invalidate(travelFeedProvider(query));
       await ref.read(travelFeedProvider(query).future);
       return;
@@ -196,8 +191,6 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       if (!mounted) {
         _resolvingLocation = false;
       } else {
-        // Always try the saved profile location as a silent fallback so the
-        // travel feed has *something* to render even when GPS is unavailable.
         if (_viewerLat == null || _viewerLng == null) {
           final profile = ref.read(currentUserDocProvider).valueOrNull;
           final profileLoc = profile?['location'];
@@ -221,9 +214,6 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     }
   }
 
-  /// Show a user-facing message when location couldn't be resolved during a
-  /// user-initiated action (e.g. switching to Travel Mode). Includes an
-  /// action button that opens the relevant system settings page.
   void _showLocationStatusMessage(_LocationStatus status) {
     if (!mounted) return;
     String message;
@@ -279,40 +269,72 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
   }
 
   Future<void> _openPlaceSearch() async {
-    final selected = await Navigator.push<_PlaceSuggestion>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _PlaceSearchScreen(
-          currentPlace: _selectedPlace,
-          recents: _recentPlaces,
-          currentLat: _viewerLat,
-          currentLng: _viewerLng,
-          currentLocationLabel: _viewerCity,
-        ),
+    final data = await ref.read(postServiceProvider).searchTravelPlaces(
+          query: '',
+          limit: 200,
+        );
+    if (!mounted) return;
+
+    final options = data
+        .map((p) => p.city.trim().isEmpty ? p.name.trim() : p.city.trim())
+        .where((v) => v.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    final selected = _selectedPlace == null
+        ? _kTravelAllOption
+        : _selectedPlace!.useCurrentLocation
+            ? _kTravelCurrentOption
+            : ((_selectedPlace!.queryText ?? '').trim().isNotEmpty
+                ? _selectedPlace!.queryText!.trim()
+                : _selectedPlace!.name.trim());
+
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _TravelFilterSheet(
+        title: 'Filter by city/country',
+        options: options,
+        selected: selected,
+        currentLocationLabel: _viewerCity,
+        showCurrentLocation: _viewerLat != null && _viewerLng != null,
       ),
     );
+    if (chosen == null || !mounted) return;
 
-    if (selected == null || !mounted) return;
     setState(() {
-      _selectedPlace = selected;
-      _recentPlaces.removeWhere((p) => p.name == selected.name);
-      _recentPlaces.insert(0, selected);
-      if (_recentPlaces.length > 5) {
-        _recentPlaces.removeRange(5, _recentPlaces.length);
+      if (chosen == _kTravelAllOption || chosen.isEmpty) {
+        _selectedPlace = null;
+        return;
       }
+      if (chosen == _kTravelCurrentOption) {
+        _selectedPlace = _PlaceSuggestion(
+          name: _viewerCity.isEmpty ? 'Current location' : _viewerCity,
+          city: '',
+          lat: _viewerLat,
+          lng: _viewerLng,
+          useCurrentLocation: true,
+        );
+        return;
+      }
+      _selectedPlace = _PlaceSuggestion(
+        name: chosen,
+        city: '',
+        queryText: chosen,
+      );
     });
   }
 
   TravelFeedQuery _buildTravelQuery() {
-    // "All places" (no chip selected) MUST send an empty placeQuery so the
-    // service skips its name-match filter and returns travel posts from
-    // every location. Falling back to the user's city here would silently
-    // turn "All places" into "Nearby" — which was the previous bug.
     String placeQuery;
     if (_selectedPlace == null) {
       placeQuery = '';
     } else if (_selectedPlace!.useCurrentLocation) {
       placeQuery = _defaultCityQuery();
+    } else if ((_selectedPlace!.queryText ?? '').trim().isNotEmpty) {
+      placeQuery = _selectedPlace!.queryText!.trim();
     } else {
       placeQuery = _selectedPlace!.city.isEmpty
           ? _selectedPlace!.name
@@ -339,9 +361,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       ref.invalidate(travelFeedProvider(query));
       try {
         await ref.read(travelFeedProvider(query).future);
-      } catch (_) {
-        // Let the UI render the provider error state.
-      }
+      } catch (_) {}
       return;
     }
 
@@ -349,18 +369,14 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       ref.invalidate(qaFeedProvider);
       try {
         await ref.read(qaFeedProvider.future);
-      } catch (_) {
-        // Let the UI render the provider error state.
-      }
+      } catch (_) {}
       return;
     }
 
     ref.invalidate(feedProvider);
     try {
       await ref.read(feedProvider.future);
-    } catch (_) {
-      // Let the UI render the provider error state.
-    }
+    } catch (_) {}
   }
 
   List<Widget> _topContent({
@@ -374,38 +390,14 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
       if (maintenance) const _MaintenanceBanner(),
       if (showStories) const StoriesList(),
       const SizedBox(height: 8),
-      _HomeModeToggle(
-        mode: _mode,
-        onChanged: _switchMode,
-      ),
+      _HomeModeToggle(mode: _mode, onChanged: _switchMode),
       if (_mode == _HomeMode.travel) ...[
         _TravelPromptStrip(onPost: () => _openCreatePost(context)),
         _TravelLocationRow(
           selectedPlace: _selectedPlace,
           onSearchPressed: _openPlaceSearch,
+          onClearFilter: () => setState(() => _selectedPlace = null),
           viewerCity: _viewerCity,
-        ),
-        _TravelQuickFilters(
-          selectedPlace: _selectedPlace,
-          recents: _recentPlaces,
-          viewerCity: _viewerCity,
-          onSelectAll: () {
-            setState(() => _selectedPlace = null);
-          },
-          onSelectNearby: _viewerLat == null || _viewerLng == null
-              ? null
-              : () {
-                  setState(() {
-                    _selectedPlace = _PlaceSuggestion(
-                      name: _viewerCity.isNotEmpty ? _viewerCity : 'Nearby',
-                      city: '',
-                      lat: _viewerLat,
-                      lng: _viewerLng,
-                      useCurrentLocation: true,
-                    );
-                  });
-                },
-          onSelectRecent: (place) => setState(() => _selectedPlace = place),
         ),
       ] else if (_mode == _HomeMode.qa) ...[
         _QaPromptStrip(onAsk: () => _showAskSheet(context)),
@@ -457,8 +449,6 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
             ? ref.watch(qaFeedProvider)
             : ref.watch(feedProvider);
 
-    // Tolerate the adminConfig doc being missing or the rules not yet
-    // deployed — both should fail silently (no banner shown).
     final cfg = ref.watch(adminConfigProvider).valueOrNull;
     final announcement = cfg?.announcement ?? '';
     final maintenance = cfg?.maintenanceMode ?? false;
@@ -471,80 +461,55 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => _refresh(ref),
-              child: postsAsync.when(
-                skipLoadingOnReload: true,
-                skipLoadingOnRefresh: true,
-                loading: () => ListView(
-                  controller: widget.scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 100),
-                  children: [
-                    ..._topContent(
-                      announcement: announcement,
-                      maintenance: maintenance,
-                      showStories: showStories,
-                    ),
-                    const SizedBox(height: 24),
-                    const Center(child: CircularProgressIndicator()),
-                  ],
-                ),
-                error: (e, _) => ListView(
-                  controller: widget.scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 100),
-                  children: [
-                    ..._topContent(
-                      announcement: announcement,
-                      maintenance: maintenance,
-                      showStories: showStories,
-                    ),
-                    const SizedBox(height: 24),
-                    Center(child: Text('Error: $e')),
-                  ],
-                ),
-                data: (posts) {
-                  final visiblePosts = _mode == _HomeMode.qa
-                      ? _filterQaPosts(posts, _qaSearch)
-                      : posts;
-
-                  if (visiblePosts.isEmpty) {
-                    final emptyText = _mode == _HomeMode.qa
-                        ? (_qaSearch.isEmpty
-                            ? 'No Discuss threads yet. Ask the first question!'
-                            : 'No matching questions found.')
-                        : 'No posts yet. Create the first one!';
-                    return ListView(
-                      controller: widget.scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 100),
-                      children: [
-                        ..._topContent(
-                          announcement: announcement,
-                          maintenance: maintenance,
-                          showStories: showStories,
-                        ),
-                        const SizedBox(height: 24),
-                        Center(
-                          child: Text(emptyText),
-                        ),
-                      ],
-                    );
-                  }
-                  return CustomScrollView(
-                    controller: widget.scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Column(
-                          children: _topContent(
-                            announcement: announcement,
-                            maintenance: maintenance,
-                            showStories: showStories,
-                          ),
-                        ),
+              child: CustomScrollView(
+                controller: widget.scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: _topContent(
+                        announcement: announcement,
+                        maintenance: maintenance,
+                        showStories: showStories,
                       ),
-                      SliverPadding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 100),
+                    ),
+                  ),
+                  postsAsync.when<Widget>(
+                    skipLoadingOnReload: true,
+                    skipLoadingOnRefresh: true,
+                    loading: () => const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                    error: (e, _) => SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: Center(child: Text('Error: $e')),
+                      ),
+                    ),
+                    data: (posts) {
+                      final visiblePosts = _mode == _HomeMode.qa
+                          ? _filterQaPosts(posts, _qaSearch)
+                          : posts;
+
+                      if (visiblePosts.isEmpty) {
+                        final emptyText = _mode == _HomeMode.qa
+                            ? (_qaSearch.isEmpty
+                                ? 'No Discuss threads yet. Ask the first question!'
+                                : 'No matching questions found.')
+                            : 'No posts yet. Create the first one!';
+                        return SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 24),
+                            child: Center(child: Text(emptyText)),
+                          ),
+                        );
+                      }
+
+                      return SliverPadding(
+                        padding: const EdgeInsets.only(top: 8),
                         sliver: SliverList.builder(
                           itemCount: visiblePosts.length,
                           itemBuilder: (context, index) {
@@ -580,10 +545,11 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                             );
                           },
                         ),
-                      ),
-                    ],
-                  );
-                },
+                      );
+                    },
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                ],
               ),
             ),
           ),
@@ -621,6 +587,240 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     if (name.isEmpty) return city;
     if (city.isEmpty) return name;
     return '$name, $city';
+  }
+}
+
+class _TravelFilterSheet extends StatefulWidget {
+  final String title;
+  final List<String> options;
+  final String selected;
+  final bool showCurrentLocation;
+  final String currentLocationLabel;
+
+  const _TravelFilterSheet({
+    required this.title,
+    required this.options,
+    required this.selected,
+    required this.showCurrentLocation,
+    required this.currentLocationLabel,
+  });
+
+  @override
+  State<_TravelFilterSheet> createState() => _TravelFilterSheetState();
+}
+
+class _TravelFilterSheetState extends State<_TravelFilterSheet> {
+  final TextEditingController _search = TextEditingController();
+  String _q = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() {
+      final v = _search.text.trim().toLowerCase();
+      if (v != _q) setState(() => _q = v);
+    });
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final options = <String>[
+      _kTravelAllOption,
+      if (widget.showCurrentLocation) _kTravelCurrentOption,
+      ...widget.options,
+    ];
+    final filtered = _q.isEmpty
+        ? options
+        : options.where((o) {
+            final label = o == _kTravelAllOption
+                ? 'All places'
+                : o == _kTravelCurrentOption
+                    ? 'Current location · ${widget.currentLocationLabel}'
+                    : o;
+            return label.toLowerCase().contains(_q);
+          }).toList();
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.borderColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (widget.selected != _kTravelAllOption)
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, ''),
+                          style: TextButton.styleFrom(
+                            foregroundColor: _kTravelFilterPurple,
+                          ),
+                          child: const Text('Clear'),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+                  child: TextField(
+                    controller: _search,
+                    style: TextStyle(fontSize: 14, color: context.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Search city',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: context.textSecondary,
+                      ),
+                      filled: true,
+                      fillColor: context.surfaceSoft.withOpacity(0.45),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(left: 10, right: 6),
+                        child: Icon(
+                          Icons.search_rounded,
+                          size: 20,
+                          color: _kTravelFilterPurple,
+                        ),
+                      ),
+                      prefixIconConstraints:
+                          const BoxConstraints(minWidth: 40, minHeight: 40),
+                      suffixIcon: _q.isNotEmpty
+                          ? IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                _search.clear();
+                                FocusScope.of(context).unfocus();
+                              },
+                              icon: Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: context.textSecondary,
+                              ),
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.06),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide(
+                          color: _kTravelFilterPurple.withOpacity(0.55),
+                          width: 1.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'No matches',
+                              style: TextStyle(color: context.textSecondary),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final opt = filtered[i];
+                            final label = opt == _kTravelAllOption
+                                ? 'All places'
+                                : opt == _kTravelCurrentOption
+                                    ? 'Current location · ${widget.currentLocationLabel}'
+                                    : opt;
+                            final isSel = opt == widget.selected;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Material(
+                                color: isSel
+                                    ? _kTravelFilterPurple.withOpacity(0.14)
+                                    : context.surfaceSoft.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(14),
+                                child: ListTile(
+                                  onTap: () => Navigator.pop(context, opt),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  title: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontWeight: isSel
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: context.textPrimary,
+                                    ),
+                                  ),
+                                  trailing: isSel
+                                      ? const Icon(
+                                          Icons.check_rounded,
+                                          color: _kTravelFilterPurple,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -1781,63 +1981,129 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
 class _TravelLocationRow extends StatelessWidget {
   final _PlaceSuggestion? selectedPlace;
   final VoidCallback onSearchPressed;
+  final VoidCallback onClearFilter;
   final String viewerCity;
 
   const _TravelLocationRow({
     required this.selectedPlace,
     required this.onSearchPressed,
+    required this.onClearFilter,
     required this.viewerCity,
   });
 
   @override
   Widget build(BuildContext context) {
-    final placeText = selectedPlace == null
-        ? viewerCity
-        : (selectedPlace!.city.isEmpty
-            ? selectedPlace!.name
-            : '${selectedPlace!.name} · ${selectedPlace!.city}');
+    final currentLocation =
+        viewerCity.trim().isEmpty ? 'Location unavailable' : viewerCity.trim();
+    final filterText = selectedPlace == null
+        ? 'All places'
+        : selectedPlace!.useCurrentLocation
+            ? 'Current location'
+            : ((selectedPlace!.queryText ?? '').trim().isNotEmpty
+                ? selectedPlace!.queryText!.trim()
+                : (selectedPlace!.city.isEmpty
+                    ? selectedPlace!.name
+                    : '${selectedPlace!.name} · ${selectedPlace!.city}'));
+    final filterActive = selectedPlace != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+      child: Column(
         children: [
-          Icon(Icons.location_on, size: 20, color: context.textPrimary),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              placeText,
-              style: TextStyle(
-                fontSize: 28 / 2,
-                fontWeight: FontWeight.w500,
-                color: context.textPrimary,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: onSearchPressed,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: context.cardBg,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: context.borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black
-                        .withValues(alpha: context.isDark ? 0 : 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+          Row(
+            children: [
+              Icon(Icons.my_location_rounded,
+                  size: 18, color: context.textPrimary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Current location: $currentLocation',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: context.textPrimary,
                   ),
-                ],
-              ),
-              child: Text(
-                'Search place',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.textPrimary,
                 ),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: onSearchPressed,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          filterActive ? _kTravelFilterPurple : context.cardBg,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: filterActive
+                            ? _kTravelFilterPurple
+                            : context.borderColor,
+                      ),
+                      boxShadow: filterActive
+                          ? [
+                              BoxShadow(
+                                color: _kTravelFilterPurple.withValues(
+                                    alpha: 0.25),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 16,
+                          color: filterActive
+                              ? Colors.white
+                              : _kTravelFilterPurple,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            filterActive ? filterText : 'Filter by city',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: filterActive
+                                  ? Colors.white
+                                  : context.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        if (filterActive)
+                          GestureDetector(
+                            onTap: onClearFilter,
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                          )
+                        else
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                            color: context.textSecondary,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1865,7 +2131,8 @@ class _PlaceSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
-  late final TextEditingController _searchCtrl;
+  late final TextEditingController _cityCtrl;
+  late final TextEditingController _countryCtrl;
   Timer? _debounce;
   List<TravelPlaceResult> _results = const [];
   bool _loading = false;
@@ -1874,25 +2141,40 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
   @override
   void initState() {
     super.initState();
-    _searchCtrl = TextEditingController(text: widget.currentPlace?.name ?? '');
+    _cityCtrl = TextEditingController();
+    _countryCtrl = TextEditingController();
+
+    final query = (widget.currentPlace?.queryText ?? '').trim();
+    if (query.isNotEmpty) {
+      final parts = query.split(',');
+      _cityCtrl.text = parts.first.trim();
+      if (parts.length > 1) {
+        _countryCtrl.text = parts.sublist(1).join(',').trim();
+      }
+    }
     _loadPlaces();
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _searchCtrl.dispose();
+    _cityCtrl.dispose();
+    _countryCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _loadPlaces() async {
+    final city = _cityCtrl.text.trim();
+    final country = _countryCtrl.text.trim();
+    final query = [city, country].where((v) => v.isNotEmpty).join(' ');
+
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(postServiceProvider).searchTravelPlaces(
-            query: _searchCtrl.text,
+            query: query,
             limit: 30,
           );
       if (!mounted) return;
@@ -1919,9 +2201,9 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
   }
 
   Widget _searchField(BuildContext context) {
-    final query = _searchCtrl.text.trim();
+    final hasCity = _cityCtrl.text.trim().isNotEmpty;
+    final hasCountry = _countryCtrl.text.trim().isNotEmpty;
     return Container(
-      height: 52,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -1941,40 +2223,48 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
       ),
       child: Row(
         children: [
-          const SizedBox(width: 8),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: context.purpleSoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.search_rounded,
-              size: 20,
-              color: Color(0xFF7E3BE8),
-            ),
-          ),
-          const SizedBox(width: 8),
           Expanded(
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: _onSearchChanged,
-              textInputAction: TextInputAction.search,
-              style: TextStyle(color: context.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search place in travel posts...',
-                hintStyle: TextStyle(color: context.textSecondary),
-                border: InputBorder.none,
-                isDense: true,
-                filled: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _cityCtrl,
+                    onChanged: _onSearchChanged,
+                    textInputAction: TextInputAction.next,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.location_city, size: 18),
+                      hintText: 'Filter by city',
+                      hintStyle: TextStyle(color: context.textSecondary),
+                      isDense: true,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                  Divider(height: 1, color: context.borderColor),
+                  TextField(
+                    controller: _countryCtrl,
+                    onChanged: _onSearchChanged,
+                    textInputAction: TextInputAction.search,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.public, size: 18),
+                      hintText: 'Filter by country',
+                      hintStyle: TextStyle(color: context.textSecondary),
+                      isDense: true,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          if (query.isNotEmpty)
+          if (hasCity || hasCountry)
             IconButton(
               onPressed: () {
-                _searchCtrl.clear();
+                _cityCtrl.clear();
+                _countryCtrl.clear();
                 _loadPlaces();
               },
               icon: const Icon(Icons.close_rounded),
@@ -1990,18 +2280,96 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
   @override
   void didUpdateWidget(covariant _PlaceSearchScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentPlace?.name != widget.currentPlace?.name) {
-      _searchCtrl.text = widget.currentPlace?.name ?? '';
+    if (oldWidget.currentPlace?.queryText != widget.currentPlace?.queryText) {
+      final query = (widget.currentPlace?.queryText ?? '').trim();
+      final parts = query.split(',');
+      _cityCtrl.text = parts.first.trim();
+      _countryCtrl.text =
+          parts.length > 1 ? parts.sublist(1).join(',').trim() : '';
       _loadPlaces();
     }
   }
 
   _PlaceSuggestion _placeFromResult(TravelPlaceResult p) {
+    final queryText = p.city.trim().isEmpty ? p.name.trim() : p.city.trim();
     return _PlaceSuggestion(
-      name: p.name,
-      city: p.city,
+      name: queryText,
+      city: '',
       lat: p.lat,
       lng: p.lng,
+      queryText: queryText,
+    );
+  }
+
+  _PlaceSuggestion _typedFilter() {
+    final city = _cityCtrl.text.trim();
+    final country = _countryCtrl.text.trim();
+    final query = [city, country].where((v) => v.isNotEmpty).join(', ');
+    return _PlaceSuggestion(
+      name: query.isEmpty ? 'All places' : query,
+      city: '',
+      queryText: query,
+    );
+  }
+
+  Widget _allPlacesCard(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.pop(
+          context,
+          const _PlaceSuggestion(
+            name: 'All places',
+            city: '',
+          ),
+        ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: context.purpleSoft,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(Icons.public,
+                    size: 18, color: Color(0xFF7E3BE8)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'All places',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Default: show travel posts from anywhere.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -2071,8 +2439,10 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _searchCtrl.text.trim();
-    final hasQuery = query.isNotEmpty;
+    final city = _cityCtrl.text.trim();
+    final country = _countryCtrl.text.trim();
+    final hasQuery = city.isNotEmpty || country.isNotEmpty;
+    final typedFilter = _typedFilter();
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -2088,7 +2458,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                     icon: const Icon(Icons.arrow_back),
                   ),
                   Text(
-                    'Search Place',
+                    'Travel Filter',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -2100,8 +2470,25 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
               const SizedBox(height: 10),
               _searchField(context),
               const SizedBox(height: 12),
+              _allPlacesCard(context),
+              const SizedBox(height: 10),
               _currentLocationCard(context),
               const SizedBox(height: 14),
+              if (hasQuery)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, typedFilter),
+                      icon: const Icon(Icons.tune),
+                      label: Text(
+                        'Apply ${typedFilter.queryText}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
@@ -2150,8 +2537,8 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                                   ],
                                   Text(
                                     hasQuery
-                                        ? 'Results'
-                                        : 'Popular from travel posts',
+                                        ? 'Matching places'
+                                        : 'Popular cities/countries',
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontWeight: FontWeight.w700,
@@ -2183,7 +2570,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                                           ),
                                         ),
                                         title: Text(
-                                          p.name,
+                                          p.city.isEmpty ? p.name : p.city,
                                           style: TextStyle(
                                             color: context.textPrimary,
                                             fontWeight: FontWeight.w600,
@@ -2191,8 +2578,8 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                                         ),
                                         subtitle: Text(
                                           p.city.isEmpty
-                                              ? 'Unknown city'
-                                              : p.city,
+                                              ? 'Unknown city/country'
+                                              : 'From travel posts',
                                           style: TextStyle(
                                               color: context.textSecondary),
                                         ),
@@ -2280,128 +2667,6 @@ class _MaintenanceBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Horizontal chip strip shown above the travel feed. One-tap filters for
-/// "All places", "Nearby" (uses GPS), and the user's recently-viewed
-/// places. Tapping a chip swaps the active travel place and the feed
-/// re-queries automatically.
-class _TravelQuickFilters extends StatelessWidget {
-  final _PlaceSuggestion? selectedPlace;
-  final List<_PlaceSuggestion> recents;
-  final String viewerCity;
-  final VoidCallback onSelectAll;
-  final VoidCallback? onSelectNearby;
-  final void Function(_PlaceSuggestion) onSelectRecent;
-
-  const _TravelQuickFilters({
-    required this.selectedPlace,
-    required this.recents,
-    required this.viewerCity,
-    required this.onSelectAll,
-    required this.onSelectNearby,
-    required this.onSelectRecent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final activeName = selectedPlace?.name;
-    final isAll = selectedPlace == null;
-    final isNearby = selectedPlace?.useCurrentLocation == true;
-
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _TravelFilterChip(
-            label: 'All places',
-            icon: Icons.public,
-            selected: isAll,
-            onTap: onSelectAll,
-          ),
-          const SizedBox(width: 6),
-          _TravelFilterChip(
-            label: viewerCity.isNotEmpty ? 'Nearby · $viewerCity' : 'Nearby',
-            icon: Icons.my_location,
-            selected: isNearby,
-            onTap: onSelectNearby,
-          ),
-          for (final place in recents) ...[
-            const SizedBox(width: 6),
-            _TravelFilterChip(
-              label: place.name,
-              icon: Icons.place_outlined,
-              selected: !isAll && !isNearby && activeName == place.name,
-              onTap: () => onSelectRecent(place),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Pill-shaped filter chip used by [_TravelQuickFilters]. Matches the
-/// app's purple accent for the active state and uses muted surface for
-/// the inactive state. [onTap] of null disables the chip (e.g. Nearby
-/// when no location is available yet).
-class _TravelFilterChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback? onTap;
-  const _TravelFilterChip({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final disabled = onTap == null;
-    const purple = Color(0xFFB05ECC);
-    final bg = selected
-        ? purple
-        : (disabled
-            ? context.inputFill.withValues(alpha: 0.5)
-            : context.inputFill);
-    final fg = selected
-        ? Colors.white
-        : (disabled ? context.textMuted : context.textPrimary);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? purple : Colors.transparent,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: fg,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
