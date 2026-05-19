@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,19 +11,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'firebase_options.dart';
-
 import 'src/features/widgets/event_detail.dart';
 import 'src/features/widgets/event_unavailable_screen.dart';
 import 'src/providers/admin_providers.dart';
 import 'src/providers/auth_providers.dart';
 import 'src/providers/theme_provider.dart';
-import 'src/providers/chat_providers.dart';
 import 'src/router/app_router.dart';
-import 'src/features/screens/recovery_password_screens.dart';
 import 'src/services/admin_service.dart';
-import 'src/services/e2ee/key_manager.dart';
 import 'src/services/error_report_service.dart';
 import 'src/services/fcm_service.dart';
 import 'src/services/message_cache.dart';
@@ -166,21 +160,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_configureSystemUi());
-      // Re-attempt E2EE bootstrap on resume in case the previous run
-      // hit a transient network error. ensureKeyPair is idempotent and
-      // the multi-device check is a single Firestore read, so this is
-      // cheap when nothing's wrong.
-      final uid = ref.read(authStateProvider).value?.uid;
-      if (uid != null) {
-        unawaited(() async {
-          try {
-            await ref.read(keyManagerProvider).ensureKeyPair(uid);
-            await ref.read(keySyncCheckProvider(uid).future);
-          } catch (e) {
-            debugPrint('[e2ee] resume retry failed: $e');
-          }
-        }());
-      }
     }
   }
 
@@ -243,78 +222,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
       if (nextUser != null) {
         unawaited(fcmService.init(nextUser.uid));
-        // Generate (or load) the user's E2EE keypair the first time they
-        // sign in on this device, and publish the public half to Firestore
-        // so other users can wrap session keys for them. Idempotent on
-        // subsequent sign-ins / app launches.
-        unawaited(
-          ref
-              .read(keyManagerProvider)
-              .ensureKeyPair(nextUser.uid)
-              .then((_) {
-            // Multi-device detection: after the keypair routine settles,
-            // compare our published pub to whatever's currently advertised
-            // in Firestore. If they differ another device signed in and
-            // overwrote it, so UI can surface a banner.
-            return ref.read(keySyncCheckProvider(nextUser.uid).future);
-          }, onError: (Object e) {
-            debugPrint('[e2ee] ensureKeyPair failed: $e');
-          }),
-        );
-        // Recovery key bootstrap. resolveRecoveryPassword returns the
-        // user-chosen password if they've set one (set via
-        // SetRecoveryPasswordScreen) or the legacy uid-derived password
-        // otherwise. Until the user opens the migration screen, legacy
-        // installs keep working — but new secret-chat history written
-        // with the legacy password is only as secure as the uid.
-        unawaited(() async {
-          final km = ref.read(keyManagerProvider);
-          final password = await km.resolveRecoveryPassword(nextUser.uid);
-          if (!await km.hasUserChosenRecoveryPassword(nextUser.uid)) {
-            debugPrint(
-              '[e2ee] using legacy uid-derived recovery password for '
-              '${nextUser.uid} — prompt user to set a real one.',
-            );
-          }
-          try {
-            await km.ensureRecoveryKey(
-              uid: nextUser.uid,
-              password: password,
-            );
-            // Auto-unlock so messages decrypt seamlessly during the session.
-            await ref
-                .read(e2eeServiceProvider)
-                .unlockRecoveryKey(nextUser.uid, password);
-          } catch (e) {
-            debugPrint('[e2ee] recovery bootstrap failed: $e');
-          }
-        }());
       } else if (previousUser != null) {
         unawaited(fcmService.removeToken(previousUser.uid));
-        // Sign-out cleanup. Wipe the previous user's private key, the
-        // in-memory E2EE caches, and the on-disk plaintext message cache
-        // so the next user on this device can't see anything from the
-        // signed-out account. Errors are best-effort — we don't want a
-        // storage glitch to leave the user stuck on the auth screen.
-        final keyManager = ref.read(keyManagerProvider);
-        final e2ee = ref.read(e2eeServiceProvider);
-        unawaited(() async {
-          try {
-            await keyManager.deleteLocal(previousUser.uid);
-          } catch (e) {
-            debugPrint('[signout-cleanup] deleteLocal failed: $e');
-          }
-          try {
-            e2ee.clearCache();
-          } catch (e) {
-            debugPrint('[signout-cleanup] e2ee.clearCache failed: $e');
-          }
-          try {
-            await MessageCache.instance.clearAll();
-          } catch (e) {
-            debugPrint('[signout-cleanup] MessageCache.clearAll failed: $e');
-          }
-        }());
+        // Wipe the on-disk message cache so the next user on this
+        // device can't see plaintext previews from the signed-out
+        // account.
+        unawaited(MessageCache.instance.clearAll());
       }
     });
 
@@ -362,9 +275,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
             child: _VersionGate(
               minVersion: minVersion,
-              child: _RestoreEncryptionBanner(
-                child: child ?? const SizedBox.shrink(),
-              ),
+              child: child ?? const SizedBox.shrink(),
             ),
           ),
         );
@@ -436,101 +347,6 @@ class _VersionGateState extends State<_VersionGate> {
         Positioned.fill(
           child: _UpdateRequiredScreen(current: current, required: minVersion),
         ),
-      ],
-    );
-  }
-}
-
-/// Wraps the routed app and shows a top banner inviting the user to
-/// restore their secret-chat history whenever the local key is missing
-/// but a recovery backup exists on the server (fresh reinstall / new
-/// device). Tapping pushes [RestoreEncryptionScreen]; dismissing is
-/// best-effort — the banner reappears on the next missing-local read.
-class _RestoreEncryptionBanner extends ConsumerStatefulWidget {
-  final Widget child;
-  const _RestoreEncryptionBanner({required this.child});
-
-  @override
-  ConsumerState<_RestoreEncryptionBanner> createState() =>
-      _RestoreEncryptionBannerState();
-}
-
-class _RestoreEncryptionBannerState
-    extends ConsumerState<_RestoreEncryptionBanner> {
-  bool _backupAvailable = false;
-  bool _dismissed = false;
-  String? _checkedForUid;
-
-  Future<void> _maybeCheckBackup(String uid) async {
-    if (_checkedForUid == uid) return;
-    _checkedForUid = uid;
-    final has = await ref.read(keyManagerProvider).hasRecoveryBackup(uid);
-    if (!mounted) return;
-    setState(() => _backupAvailable = has);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final uid = ref.watch(authStateProvider).value?.uid;
-    final sync = ref.watch(keySyncStateProvider);
-    // Trigger the backup check on the first missing-local for this uid.
-    if (uid != null && sync == KeySyncState.missingLocal) {
-      unawaited(_maybeCheckBackup(uid));
-    }
-    final show = uid != null &&
-        sync == KeySyncState.missingLocal &&
-        _backupAvailable &&
-        !_dismissed;
-    if (!show) return widget.child;
-    return Column(
-      children: [
-        SafeArea(
-          bottom: false,
-          child: Material(
-            color: const Color(0xFFB05ECC),
-            child: InkWell(
-              onTap: () async {
-                final restored = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => const RestoreEncryptionScreen(),
-                  ),
-                );
-                if (restored == true && mounted) {
-                  setState(() => _dismissed = true);
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    const Icon(Icons.lock_open_outlined,
-                        size: 18, color: Colors.white),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Restore your encrypted chat history on this device',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Dismiss',
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => setState(() => _dismissed = true),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Expanded(child: widget.child),
       ],
     );
   }

@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
-import 'e2ee/e2ee_service.dart';
 import 'message_cache.dart';
 
 // ─────────────────────────────────────────────
@@ -235,11 +233,6 @@ class ChatConversation {
   final String adminUid;
   final List<String> participants;
 
-  /// True when this chat is end-to-end encrypted (Telegram-style "secret
-  /// chat"). Drives the lock icon in the inbox tile and the chat header,
-  /// and is the user-visible expression of [ChatService._isSecretChat].
-  final bool secret;
-
   const ChatConversation({
     required this.chatId,
     required this.otherUid,
@@ -255,7 +248,6 @@ class ChatConversation {
     this.groupAvatarUrl = '',
     this.adminUid = '',
     this.participants = const [],
-    this.secret = false,
   });
 
   bool isMutedBy(String uid) => mutedFor.contains(uid);
@@ -275,7 +267,6 @@ class ChatConversation {
     String? groupAvatarUrl,
     String? adminUid,
     List<String>? participants,
-    bool? secret,
   }) {
     return ChatConversation(
       chatId: chatId ?? this.chatId,
@@ -292,7 +283,6 @@ class ChatConversation {
       groupAvatarUrl: groupAvatarUrl ?? this.groupAvatarUrl,
       adminUid: adminUid ?? this.adminUid,
       participants: participants ?? this.participants,
-      secret: secret ?? this.secret,
     );
   }
 
@@ -356,7 +346,6 @@ class ChatConversation {
       groupAvatarUrl: (d['groupAvatarUrl'] as String?) ?? '',
       adminUid: (d['adminUid'] as String?) ?? '',
       participants: participants,
-      secret: ChatService._isSecretChat(d),
     );
   }
 }
@@ -366,16 +355,7 @@ class ChatConversation {
 // ─────────────────────────────────────────────
 
 class ChatService {
-  ChatService({E2EEService? e2ee}) : _e2ee = e2ee ?? E2EEService();
-
-  /// End-to-end encryption layer used for 1:1 chats. Group chats stay
-  /// plaintext in v1 (event chats use a separate service).
-  final E2EEService _e2ee;
-
-  /// Plaintext placeholder shown anywhere the server might leak preview
-  /// content (e.g. `lastMessage` for the inbox tile, or older clients
-  /// that don't yet decrypt).
-  static const String encryptedPreviewLabel = '🔒 Encrypted message';
+  ChatService();
 
   /// Permanently delete a group chat and all its messages. Admin only.
   Future<void> deleteGroup(String chatId) async {
@@ -405,12 +385,11 @@ class ChatService {
       !_isDeletedForEveryone(data) && !_isDeletedForUser(data, uid);
 
   String _previewTextForMessage(Map<String, dynamic> data) {
-    // Encrypted messages — never read content here. The server never had
-    // it. Return the opaque label so the inbox tile / FCM payload stays
-    // consistent with what was originally written.
-    if (data['enc'] is Map) return encryptedPreviewLabel;
     final text = (data['text'] as String? ?? '').trim();
     if (text.isNotEmpty) return text;
+    // Legacy ciphertext from before the encryption stack was removed —
+    // can't recover the original. Show a one-line placeholder.
+    if (data['enc'] is Map) return 'Message unavailable';
     if ((data['stickerUrl'] as String?)?.trim().isNotEmpty == true) {
       return 'Sent a sticker';
     }
@@ -467,77 +446,10 @@ class ChatService {
 
     final data = latestVisible.data();
     return conv.copyWith(
-      lastMessage: await _viewerPreviewForMessage(
-        chatId: doc.id,
-        meUid: uid,
-        data: data,
-      ),
+      lastMessage: _previewTextForMessage(data),
       lastTime: (data['createdAt'] as Timestamp?)?.toDate() ?? conv.lastTime,
       unreadCount: unread,
     );
-  }
-
-  /// Inbox preview text from the viewer's perspective. For encrypted
-  /// messages we attempt to decrypt locally — the server still only stores
-  /// the opaque "🔒 Encrypted message" label, but on the device that holds
-  /// the chat key we render the real text.
-  Future<String> _viewerPreviewForMessage({
-    required String chatId,
-    required String meUid,
-    required Map<String, dynamic> data,
-  }) async {
-    final env = data['enc'];
-    if (env is Map) {
-      try {
-        final clear = await _e2ee.decryptForChat(
-          chatId: chatId,
-          meUid: meUid,
-          envelope: Map<String, dynamic>.from(env),
-        );
-        if (clear != null && clear.isNotEmpty) {
-          final payload = jsonDecode(clear);
-          if (payload is Map) {
-            // Mirrors the field map written in sendMessage: 't' is the
-            // text body, 'rt' is reply-to text, etc.
-            final text = (payload['t'] as String?)?.trim();
-            if (text != null && text.isNotEmpty) return text;
-          }
-        }
-      } catch (_) {
-        // Fall through to the structural preview below.
-      }
-      // We have an envelope but couldn't decrypt it on this device — show
-      // the placeholder rather than empty.
-      return _previewFromMediaFields(data) ?? encryptedPreviewLabel;
-    }
-    return _previewTextForMessage(data);
-  }
-
-  /// Returns a structural preview ("Sent a photo", etc.) if the message
-  /// has any media fields, otherwise null. Used as a fallback when an
-  /// encrypted envelope can't be decrypted but the message has a media
-  /// attachment whose presence is already visible to the server anyway.
-  String? _previewFromMediaFields(Map<String, dynamic> data) {
-    if ((data['stickerUrl'] as String?)?.trim().isNotEmpty == true) {
-      return 'Sent a sticker';
-    }
-    if ((data['sharedPostId'] as String?)?.trim().isNotEmpty == true) {
-      return 'Shared a post';
-    }
-    if ((data['voiceUrl'] as String?)?.trim().isNotEmpty == true) {
-      return 'Voice message';
-    }
-    if ((data['videoUrl'] as String?)?.trim().isNotEmpty == true) {
-      return 'Sent a video';
-    }
-    if ((data['fileUrl'] as String?)?.trim().isNotEmpty == true) {
-      return 'Sent a file';
-    }
-    if ((data['imageUrl'] as String?)?.trim().isNotEmpty == true) {
-      return 'Sent a photo';
-    }
-    if (data['location'] is Map) return '📍 Shared a location';
-    return null;
   }
 
   Future<void> _refreshChatSummary(String chatId) async {
@@ -579,20 +491,9 @@ class ChatService {
 
   /// Creates or retrieves the chat document between two users. Returns the
   /// chatId.
-  ///
-  /// [secret] (default `false`) opts the new chat into the legacy E2EE
-  /// path: messages are encrypted client-side, the server only stores
-  /// ciphertext, and history will not be recoverable on a reinstall
-  /// without the user's recovery key. Normal chats store message text
-  /// in plaintext on Firestore, so reinstall sees full history.
-  ///
-  /// Has no effect when the chat already exists — pre-existing chats keep
-  /// whatever `secret` value they were created with. See [_isSecretChat]
-  /// for how existing chats without an explicit flag are classified.
   Future<String> openChat({
     required String currentUid,
     required String otherUid,
-    bool secret = false,
   }) async {
     final id = buildChatId(currentUid, otherUid);
     final snap = await _chatDoc(id).get();
@@ -629,32 +530,9 @@ class ChatService {
         'unread': {currentUid: 0, otherUid: 0},
         'acceptedBy': acceptedBy,
         'createdAt': FieldValue.serverTimestamp(),
-        'secret': secret,
       });
     }
     return id;
-  }
-
-  /// Returns true when [chatData] should be treated as end-to-end
-  /// encrypted. Used by [sendMessage] and [streamMessages] to decide
-  /// whether to invoke [_e2ee] at all.
-  ///
-  /// Rules:
-  ///   * Explicit `secret: true` on the chat doc wins (new hybrid path).
-  ///   * Explicit `secret: false` opts out of E2EE entirely.
-  ///   * Missing `secret` field but legacy `e2ee: true` (written by
-  ///     [_forceRotate] the first time the chat ever encrypted) — treat
-  ///     as secret to preserve readability of old ciphertext on devices
-  ///     that hold the key.
-  ///   * Otherwise — normal/plaintext chat.
-  ///
-  /// This conservative default means existing chats from before the
-  /// hybrid migration keep encrypting; users must opt-in to the new
-  /// plaintext default when starting a brand-new chat.
-  static bool _isSecretChat(Map<String, dynamic> chatData) {
-    final flag = chatData['secret'];
-    if (flag is bool) return flag;
-    return chatData['e2ee'] == true;
   }
 
   /// True if both users follow each other with `status == 'active'`.
@@ -763,109 +641,37 @@ class ChatService {
               ),
           ];
 
-    // ── Hybrid E2EE gate ────────────────────────────────────────────────
-    // Only secret chats (explicit `secret: true`, or legacy chats that
-    // already have `e2ee: true` from a prior encryption rotation) go
-    // through the AES-GCM wrap. Normal chats store message text in the
-    // doc's plaintext fields so reinstalled users can read full history
-    // from the server without holding any key.
-    //
-    // For secret chats: pack the small text-bearing fields into a single
-    // JSON blob, encrypt with the per-chat session key, and store under
-    // `enc`. Media URLs and structural fields (createdAt, senderUid, etc.)
-    // stay in plaintext — they are required for sorting / rules / link
-    // previews. The lock banner in ChatScreen explains what is and isn't
-    // covered.
-    //
-    // For groups: the participant list is read from the chat doc so every
-    // member gets a wrapped copy of the chat key. If membership has changed
-    // since the last key was issued, _ensureChatKey rotates automatically
-    // and archives the old wrapping so old messages stay readable for
-    // members who were present then.
-    Map<String, dynamic>? envelope;
-    final isSecret = _isSecretChat(chatData);
-    if (isSecret) {
-      final participantsForKey = isGroup
-          ? allParticipants.where((u) => u.isNotEmpty).toSet().toList()
-          : <String>{senderUid, ...recipients}
-              .where((u) => u.isNotEmpty)
-              .toList();
-      final payload = <String, dynamic>{
-        if (trimmedText.isNotEmpty) 't': trimmedText,
-        if (replyToText != null && replyToText.isNotEmpty) 'rt': replyToText,
-        if (normalizedVoiceTranscript != null &&
-            normalizedVoiceTranscript.isNotEmpty)
-          'vt': normalizedVoiceTranscript,
-        if (normalizedLocationLabel != null &&
-            normalizedLocationLabel.isNotEmpty)
-          'll': normalizedLocationLabel,
-        if (normalizedFileName != null && normalizedFileName.isNotEmpty)
-          'fn': normalizedFileName,
-      };
-      if (payload.isNotEmpty && participantsForKey.isNotEmpty) {
-        try {
-          envelope = await _e2ee.encryptForChat(
-            chatId: chatId,
-            senderUid: senderUid,
-            participantUids: participantsForKey,
-            plaintext: jsonEncode(payload),
-          );
-        } on E2EEUnavailable catch (e) {
-          debugPrint('[e2ee] unavailable, falling back to plaintext: $e');
-          envelope = null;
-        } catch (e, st) {
-          // Catch-all: never let an encryption failure block sending. The
-          // user would otherwise be stuck unable to message at all if the
-          // platform crypto plugin or Keystore is misbehaving on their
-          // device.
-          debugPrint(
-              '[e2ee] encrypt FAILED, falling back to plaintext: $e\n$st');
-          envelope = null;
-        }
-      }
-    }
-
     final batch = _db.batch();
     final msgRef = _messagesCol(chatId).doc();
     final chatRef = _chatDoc(chatId);
-    // For E2EE chats the server must never see message content. Replace the
-    // preview with a generic encrypted-message label so the inbox tile,
-    // FCM notification body (if backend reads `lastMessage`), and any other
-    // server-side consumer all see the same opaque text.
-    final lastMessage = (envelope != null)
-        ? encryptedPreviewLabel
-        : trimmedText.isNotEmpty
-            ? trimmedText
-            : hasSticker
-                ? 'Sent a sticker'
-                : hasSharedPost
-                    ? 'Shared a post'
-                    : hasVoice
-                        ? 'Voice message'
-                        : hasVideo
-                            ? 'Sent a video'
-                            : hasFile
-                                ? 'Sent a file'
-                                : hasImage
-                                    ? 'Sent a photo'
-                                    : hasLocation
-                                        ? '📍 Shared a location'
-                                        : '';
+    // Inbox preview text — falls back to a structural label when the
+    // message is just media.
+    final lastMessage = trimmedText.isNotEmpty
+        ? trimmedText
+        : hasSticker
+            ? 'Sent a sticker'
+            : hasSharedPost
+                ? 'Shared a post'
+                : hasVoice
+                    ? 'Voice message'
+                    : hasVideo
+                        ? 'Sent a video'
+                        : hasFile
+                            ? 'Sent a file'
+                            : hasImage
+                                ? 'Sent a photo'
+                                : hasLocation
+                                    ? '📍 Shared a location'
+                                    : '';
 
-    final encrypted = envelope != null;
     batch.set(msgRef, {
       'senderUid': senderUid,
       if (!isGroup) 'receiverUid': receiverUid,
-      // When encrypted, text-bearing fields are packed inside `enc`. Writing
-      // an empty string for `text` keeps older readers (those that index by
-      // `text`) from crashing on a missing field.
-      'text': encrypted ? '' : trimmedText,
-      if (encrypted) 'enc': envelope,
+      'text': trimmedText,
       'imageUrl': normalizedImageUrl,
       if (hasVideo) 'videoUrl': normalizedVideoUrl,
       if (hasFile) 'fileUrl': normalizedFileUrl,
-      if (!encrypted &&
-          hasFile &&
+      if (hasFile &&
           normalizedFileName != null &&
           normalizedFileName.isNotEmpty)
         'fileName': normalizedFileName,
@@ -876,13 +682,12 @@ class ChatService {
       if (hasVoice) 'voiceUrl': normalizedVoiceUrl,
       if (hasVoice && voiceDurationMs != null)
         'voiceDurationMs': voiceDurationMs,
-      if (!encrypted &&
-          hasVoice &&
+      if (hasVoice &&
           normalizedVoiceTranscript != null &&
           normalizedVoiceTranscript.isNotEmpty)
         'voiceTranscript': normalizedVoiceTranscript,
       if (replyToId != null && replyToId.isNotEmpty) 'replyToId': replyToId,
-      if (!encrypted && replyToText != null && replyToText.isNotEmpty)
+      if (replyToText != null && replyToText.isNotEmpty)
         'replyToText': replyToText,
       if (replyToSenderUid != null && replyToSenderUid.isNotEmpty)
         'replyToSenderUid': replyToSenderUid,
@@ -897,8 +702,7 @@ class ChatService {
           normalizedStickerPackId.isNotEmpty)
         'stickerPackId': normalizedStickerPackId,
       if (hasLocation) 'location': {'lat': locationLat, 'lng': locationLng},
-      if (!encrypted &&
-          hasLocation &&
+      if (hasLocation &&
           normalizedLocationLabel != null &&
           normalizedLocationLabel.isNotEmpty)
         'locationLabel': normalizedLocationLabel,
@@ -996,18 +800,12 @@ class ChatService {
     // idempotent — if everything is already wrapped it's a no-op. The
     // stream will re-emit on the Firestore update, making previously
     // locked messages decrypt successfully.
-    unawaited(_patchWrappingsForChat(chatId: chatId, uid: uid));
-
     final controller = StreamController<List<ChatMessage>>();
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? sub;
     final cache = MessageCache.instance;
-    // Mutated as we decrypt; persisted after each successful emission.
-    final payloads = <String, String>{};
     // Tail of the in-flight cache write. Firestore's snapshot listener
     // fires events back-to-back, so without a chain two writes can
-    // interleave and leave a half-written payload map paired with a
-    // snapshot from a later event. Chaining keeps writes serialized
-    // without blocking the UI emission.
+    // interleave and leave a half-written snapshot from a later event.
     Future<void> writeChain = Future<void>.value();
 
     Future<void> emitCached() async {
@@ -1016,43 +814,27 @@ class ChatService {
         if (snap != null && snap.isNotEmpty && !controller.isClosed) {
           controller.add(snap.map(ChatMessage.fromCacheJson).toList());
         }
-        payloads.addAll(await cache.loadPayloads(chatId));
       } catch (e) {
         debugPrint('[chat-cache] warmup failed for $chatId: $e');
       }
     }
 
-    Future<void> onSnapshot(QuerySnapshot<Map<String, dynamic>> s) async {
+    void onSnapshot(QuerySnapshot<Map<String, dynamic>> s) {
       try {
         final visible =
             s.docs.where((doc) => _isVisibleToUser(doc.data(), uid)).toList();
-        final out = <ChatMessage>[];
-        for (final doc in visible) {
-          out.add(await _decryptDoc(
-            chatId: chatId,
-            uid: uid,
-            doc: doc,
-            payloadCache: payloads,
-          ));
-        }
+        final out = visible.map(ChatMessage.fromDoc).toList();
         if (controller.isClosed) return;
         controller.add(out);
 
-        // Persist most-recent payloads + snapshot for the next open. We
-        // only keep the tail of [visible] so the cache doesn't grow
-        // unbounded on long chats. Writes are chained behind the previous
-        // write so back-to-back Firestore events can't interleave.
+        // Persist the most recent tail for the next chat-open. Chained
+        // behind the previous write so back-to-back Firestore events
+        // can't interleave.
         final tail = out.length <= MessageCache.maxEntries
             ? out
             : out.sublist(out.length - MessageCache.maxEntries);
-        final tailIds = tail.map((m) => m.id).toSet();
-        final trimmedPayloads = <String, String>{
-          for (final entry in payloads.entries)
-            if (tailIds.contains(entry.key)) entry.key: entry.value,
-        };
         final snapshotJson = tail.map((m) => m.toCacheJson()).toList();
         writeChain = writeChain.then((_) async {
-          await cache.savePayloads(chatId, trimmedPayloads);
           await cache.saveSnapshot(chatId, snapshotJson);
         }).catchError((Object e) {
           debugPrint('[chat-cache] persist failed for $chatId: $e');
@@ -1080,77 +862,6 @@ class ChatService {
     };
 
     return controller.stream;
-  }
-
-  Future<void> _patchWrappingsForChat({
-    required String chatId,
-    required String uid,
-  }) async {
-    try {
-      final chatSnap = await _chatDoc(chatId).get();
-      final data = chatSnap.data() ?? {};
-      // Non-secret chats never wrap keys, so there's nothing to patch.
-      // Skip the work to avoid spurious Firestore writes (and to keep
-      // normal chats clean of E2EE-side artifacts).
-      if (!_isSecretChat(data)) return;
-      final participants =
-          ((data['participants'] as List?)?.cast<String>() ?? const [])
-              .where((u) => u.isNotEmpty)
-              .toList();
-      if (participants.length < 2) return;
-      await _e2ee.patchMissingWrappings(
-        chatId: chatId,
-        meUid: uid,
-        participantUids: participants,
-      );
-    } catch (e) {
-      debugPrint('[chat-patch] key patch failed for $chatId: $e');
-    }
-  }
-
-  Future<ChatMessage> _decryptDoc({
-    required String chatId,
-    required String uid,
-    required QueryDocumentSnapshot<Map<String, dynamic>> doc,
-    Map<String, String>? payloadCache,
-  }) async {
-    final data = doc.data();
-    final env = data['enc'];
-    if (env is! Map) return ChatMessage.fromDoc(doc);
-
-    // Cache hit: skip the AES-GCM decrypt entirely. The envelope bytes
-    // are immutable for a given msgId, so a hit is always valid.
-    final cached = payloadCache?[doc.id];
-    if (cached != null) {
-      try {
-        final payload = jsonDecode(cached);
-        return ChatMessage.fromDoc(
-          doc,
-          decrypted: payload is Map ? Map<String, dynamic>.from(payload) : null,
-        );
-      } catch (_) {
-        payloadCache?.remove(doc.id);
-      }
-    }
-
-    try {
-      final clear = await _e2ee.decryptForChat(
-        chatId: chatId,
-        meUid: uid,
-        envelope: Map<String, dynamic>.from(env),
-      );
-      if (clear == null) {
-        return ChatMessage.fromDoc(doc, decryptionFailed: true);
-      }
-      if (payloadCache != null) payloadCache[doc.id] = clear;
-      final payload = jsonDecode(clear);
-      return ChatMessage.fromDoc(
-        doc,
-        decrypted: payload is Map ? Map<String, dynamic>.from(payload) : null,
-      );
-    } catch (_) {
-      return ChatMessage.fromDoc(doc, decryptionFailed: true);
-    }
   }
 
   /// Real-time stream of all conversations for [uid], sorted by latest message.
@@ -1268,7 +979,6 @@ class ChatService {
     required List<String> memberUids,
     required String groupName,
     String? groupAvatarUrl,
-    bool secret = false,
   }) async {
     final ids = <String>{creatorUid, ...memberUids}.toList();
     if (ids.length < 2) throw Exception('Need at least 2 participants');
@@ -1300,7 +1010,6 @@ class ChatService {
       // Everyone who's invited has already "accepted" (no request gate).
       'acceptedBy': ids,
       'createdAt': FieldValue.serverTimestamp(),
-      'secret': secret,
     });
     return ref.id;
   }

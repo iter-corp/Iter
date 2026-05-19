@@ -29,7 +29,6 @@ import '../../providers/event_chat_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../providers/reaction_providers.dart';
 import '../../services/chat_service.dart';
-import '../../services/e2ee/key_manager.dart';
 import '../../services/reaction_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/translate_service.dart';
@@ -42,7 +41,6 @@ import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
-import 'security_verification_screen.dart';
 import '../widgets/sticker_picker_sheet.dart';
 
 // Pick a text direction from the first strong-directional codepoint in
@@ -127,6 +125,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
   bool _isInputFocused = false;
+
+  /// Number of messages we last rendered for the current chat. Whenever
+  /// the live Firestore list returns a longer list than this — typical
+  /// when the cached snapshot was shorter than the server's truth, or
+  /// when a new message arrives — we re-snap to the bottom so the
+  /// newest message stays in view instead of being pushed off-screen
+  /// by the prepended history.
+  int _lastRenderedCount = 0;
+
+  /// Distance from the bottom of the rendered content at the moment of
+  /// the *previous* messages-list emission. The standard
+  /// `maxScrollExtent - offset` check fails when the list grows
+  /// between frames (you were at the bottom of a 20-message list,
+  /// then the list becomes 50 messages — your offset is the same but
+  /// you're suddenly 2000px from the new bottom). Tracking distance
+  /// across emissions instead lets us correctly say "user was at the
+  /// bottom" and re-snap.
+  double _lastDistanceFromBottom = double.infinity;
 
   /// Per-message GlobalKeys so [_scrollToMessage] can jump back to the
   /// original of a reply. Stale entries are cleared on rebuild because
@@ -279,6 +295,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!mounted) return;
       setState(() => _isInputFocused = _messageFocusNode.hasFocus);
     });
+    // Track the user's scroll position so the next data emission can
+    // distinguish "user was at the bottom, snap to new bottom" from
+    // "user scrolled up to read history, don't disturb them."
+    _scrollController.addListener(_captureDistanceFromBottom);
     _loadAutoTranslatePrefs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final uid = _currentUid;
@@ -1325,6 +1345,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _showReplyNavSnack('Original message is no longer in view');
   }
 
+  /// Records how far from the bottom of the rendered content the
+  /// viewport currently sits. Saved into [_lastDistanceFromBottom] so
+  /// the next messages emission can correctly decide whether the user
+  /// "was at the bottom" before the list changed.
+  void _captureDistanceFromBottom() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    _lastDistanceFromBottom = pos.maxScrollExtent - pos.pixels;
+  }
+
   void _scrollToBottom({bool animated = true}) {
     if (!_scrollController.hasClients) {
       // ListView hasn't been built yet. Try again next frame.
@@ -1416,14 +1446,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isGroup = (chatDoc['kind'] as String?) == 'group';
     final groupName = (chatDoc['groupName'] as String?) ?? widget.otherName;
     final participantCount = ((chatDoc['participants'] as List?)?.length ?? 0);
-    // Secret-chat flag — drives the header lock badge. Mirrors the rule
-    // in ChatService._isSecretChat so we don't show "Encrypted" on a
-    // chat that's actually plaintext on the server. Default-true for
-    // legacy chats (those with the older `e2ee: true` marker but no
-    // explicit `secret` field) keeps existing conversations marked.
-    final isSecret = (chatDoc['secret'] is bool)
-        ? chatDoc['secret'] as bool
-        : chatDoc['e2ee'] == true;
 
     final presenceAsync =
         isGroup ? null : ref.watch(presenceWatchProvider(widget.otherUid));
@@ -1444,9 +1466,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ? 'You\'ve blocked this user. Unblock from their profile to send messages.'
         : (theyBlockedMe ? 'You can\'t reply to this conversation.' : null);
 
+    // Mark-seen-on-update. Used to be paired with an unconditional
+    // _scrollToBottom() here, but that auto-scrolled even when nothing
+    // about the message list had changed (Firestore re-emits on every
+    // seenBy update too), which yanked the user away from older
+    // messages they were reading. Scroll is now handled only by the
+    // count-grew check in the data: builder below.
     ref.listen(messagesProvider(widget.chatId), (_, __) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
         unawaited(_markSeenNow());
       });
     });
@@ -1526,36 +1553,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (isSecret) ...[
-                                const SizedBox(width: 6),
-                                // Lock badge: this chat is end-to-end
-                                // encrypted. Tap (for 1:1) to open the
-                                // security-code verification screen so
-                                // both parties can confirm there's no
-                                // MITM.
-                                GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: (isGroup ||
-                                          widget.otherUid.isEmpty)
-                                      ? null
-                                      : () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  SecurityVerificationScreen(
-                                                peerUid: widget.otherUid,
-                                                peerName: widget.otherName,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                  child: const Icon(
-                                    Icons.lock,
-                                    size: 13,
-                                    color: AppColors.purple,
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                           Text(
@@ -1679,19 +1676,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
             Divider(height: 1, color: Theme.of(context).dividerColor),
 
-            // E2EE BANNER — only shown for secret chats. Normal chats
-            // would mislead the user if we said "messages are encrypted"
-            // while the server still holds plaintext.
-            if (isSecret) const _E2EEBanner(),
-            // Security-code-changed banner: only meaningful for 1:1
-            // secret chats where we can compare a specific peer key.
-            // Group chats would need per-member tracking; skip for now.
-            if (isSecret && !isGroup && widget.otherUid.isNotEmpty)
-              _SecurityCodeChangedBanner(
-                peerUid: widget.otherUid,
-                peerName: widget.otherName,
-              ),
-
             // MESSAGES
             Expanded(
               child: messagesAsync.when(
@@ -1711,6 +1695,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       child: Text('Say hello!',
                           style: TextStyle(color: context.textSecondary)),
                     );
+                  }
+                  // Re-snap to the newest message when the list grows.
+                  // We rely on the distance-from-bottom captured at
+                  // the END of the previous frame (after layout has
+                  // settled) rather than reading maxScrollExtent
+                  // inside build — at build time the new items aren't
+                  // laid out yet, so maxScrollExtent reflects the OLD
+                  // shorter list and offset==old-bottom would falsely
+                  // look like "user scrolled up by 2000 px" when the
+                  // cache → live snapshot transition swaps in a much
+                  // longer message list.
+                  if (msgs.length > _lastRenderedCount) {
+                    final wasNearBottom = _lastRenderedCount == 0 ||
+                        _lastDistanceFromBottom < 120;
+                    _lastRenderedCount = msgs.length;
+                    if (wasNearBottom) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _scrollToBottom(animated: false);
+                        // Re-measure once layout has settled so the
+                        // next emission has fresh data.
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _captureDistanceFromBottom();
+                        });
+                      });
+                    } else {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _captureDistanceFromBottom();
+                      });
+                    }
+                  } else {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _captureDistanceFromBottom();
+                    });
                   }
                   final pendingCount = _pending.length;
                   return ListView.builder(
@@ -1764,15 +1781,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 target: _replyTarget!,
                 previewText: _previewOf(_replyTarget!),
                 onCancel: () => setState(() => _replyTarget = null),
-              ),
-
-            // MISSING-KEY WARNING: in secret group chats, flag any
-            // members who haven't published a public key yet. Without
-            // this they'd silently miss every encrypted message you
-            // send (E2EE silently drops them from the wrapping set).
-            if (isSecret && isGroup)
-              _MissingKeyWarning(
-                chatDoc: chatDoc,
               ),
 
             // INPUT (or block banner)
@@ -2139,464 +2147,6 @@ class _AutoDeleteOption {
   final Duration? duration;
   const _AutoDeleteOption(this.label, this.duration);
 }
-
-// ─────────────────────────────────────────────
-// E2EE banner + info sheet
-//
-// Shown at the top of every 1:1 chat. Tapping opens a sheet that explains,
-// in honest detail, what's encrypted and what isn't — so users don't read
-// "🔒 Encrypted" and assume things we don't actually cover (media, lat/lng,
-// reply-to ids, etc.) are also secret.
-// ─────────────────────────────────────────────
-
-/// For secret group chats, surfaces members who haven't published a
-/// public key yet. The E2EE layer silently drops those members from
-/// the wrapping set (otherwise every send would rotate the chat key
-/// endlessly), which means they'd never see the sender's messages.
-/// Without this warning the sender would have no idea anyone was
-/// missing out.
-class _MissingKeyWarning extends ConsumerWidget {
-  final Map<String, dynamic> chatDoc;
-
-  const _MissingKeyWarning({required this.chatDoc});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final meUid = ref.watch(authStateProvider).value?.uid;
-    final participants =
-        ((chatDoc['participants'] as List?)?.cast<String>() ?? const <String>[])
-            .where((u) => u.isNotEmpty && u != meUid)
-            .toList()
-          ..sort();
-    if (participants.isEmpty) return const SizedBox.shrink();
-    final key = participants.join(',');
-    final asyncMissing = ref.watch(missingPubKeyMembersProvider(key));
-    final missing = asyncMissing.valueOrNull ?? const <String>[];
-    if (missing.isEmpty) return const SizedBox.shrink();
-    final userData = chatDoc['userData'] as Map<String, dynamic>?;
-    String labelFor(String uid) {
-      final entry = userData?[uid];
-      if (entry is Map) {
-        final name = entry['username'];
-        if (name is String && name.isNotEmpty) return name;
-      }
-      // Fallback to a short uid prefix so the user still gets some
-      // signal even if username denormalization is missing.
-      return uid.length > 6 ? '${uid.substring(0, 6)}…' : uid;
-    }
-
-    final names = missing.map(labelFor).toList();
-    final preview = names.length <= 3
-        ? names.join(', ')
-        : '${names.take(2).join(', ')} and ${names.length - 2} others';
-    return Container(
-      width: double.infinity,
-      color: Colors.amber.withValues(alpha: 0.18),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline,
-              size: 18, color: Color(0xFFB36A00)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '$preview won\'t be able to read this message until they '
-              'open the app on a device with encryption set up.',
-              style: const TextStyle(
-                color: Color(0xFFB36A00),
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Shown above the message list in a 1:1 secret chat when the peer's
-/// published pub-key fingerprint has changed since the last time this
-/// device saw it. Could mean the peer reinstalled / switched device —
-/// or, less commonly, a MITM. Tapping opens the verification screen
-/// where the user can compare codes and acknowledge the new key.
-class _SecurityCodeChangedBanner extends ConsumerWidget {
-  final String peerUid;
-  final String peerName;
-
-  const _SecurityCodeChangedBanner({
-    required this.peerUid,
-    required this.peerName,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final meUid = ref.watch(authStateProvider).value?.uid;
-    if (meUid == null) return const SizedBox.shrink();
-    final stateAsync =
-        ref.watch(peerKeyStateProvider('$meUid|$peerUid'));
-    final state = stateAsync.valueOrNull;
-    if (state != PeerKeyState.changed) return const SizedBox.shrink();
-    return Material(
-      color: Colors.amber.withValues(alpha: 0.18),
-      child: InkWell(
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SecurityVerificationScreen(
-                peerUid: peerUid,
-                peerName: peerName,
-              ),
-            ),
-          );
-          ref.invalidate(peerKeyStateProvider('$meUid|$peerUid'));
-        },
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              const Icon(Icons.shield_outlined,
-                  size: 18, color: Color(0xFFB36A00)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '$peerName\'s security code changed. Tap to verify.',
-                  style: const TextStyle(
-                    color: Color(0xFFB36A00),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              const Icon(Icons.chevron_right,
-                  size: 18, color: Color(0xFFB36A00)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _E2EEBanner extends StatelessWidget {
-  const _E2EEBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showE2EEInfoSheet(context),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: AppColors.purple.withValues(alpha: 0.08),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.lock_outline, size: 14, color: AppColors.purple),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  'Messages are end-to-end encrypted. Tap for details.',
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: context.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom sheet shown when the user taps a 🔒 "couldn't decrypt" bubble.
-/// Explains the cause based on [keySyncStateProvider] and (in a future
-/// session) will offer a "restore from recovery backup" action.
-void _showUndecryptableSheet(BuildContext context, WidgetRef ref) {
-  final syncState = ref.read(keySyncStateProvider);
-
-  // Map the sync state to a human explanation. The point is to tell the
-  // user WHY a message looks locked instead of leaving them stuck on a
-  // padlock with no context.
-  String title;
-  String body;
-  switch (syncState) {
-    case KeySyncState.replacedByOtherDevice:
-      title = 'Encryption key was replaced';
-      body =
-          'You signed in to Coil on another device, which created a new '
-          'encryption key. Messages sent before that switch were locked '
-          'to the previous device and can\'t be read here yet.\n\n'
-          'New messages will start decrypting automatically once the '
-          'other person opens this chat again.';
-      break;
-    case KeySyncState.missingLocal:
-      title = 'No encryption key on this device';
-      body =
-          'This device doesn\'t have an encryption key for your account '
-          'yet — usually because Coil was just reinstalled, or you\'re '
-          'signing in on a new device.\n\n'
-          'Old encrypted messages can be restored from your recovery '
-          'backup. We\'ll add that flow in an upcoming update.';
-      break;
-    case KeySyncState.synced:
-      title = 'Couldn\'t decrypt this message';
-      body =
-          'This message was encrypted with a key your device doesn\'t '
-          'hold. The most common cause is that the sender re-installed '
-          'the app before you opened this chat, so the key never made it '
-          'to you.\n\n'
-          'New messages they send will arrive decrypted once they open '
-          'this chat again.';
-      break;
-    case KeySyncState.unknown:
-      title = 'Couldn\'t decrypt this message';
-      body =
-          'Coil couldn\'t check your encryption key status — usually a '
-          'network issue. Try again once you\'re back online; if the '
-          'lock stays, the message was encrypted with a key this device '
-          'doesn\'t hold.';
-      break;
-  }
-
-  showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (sheetCtx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(Icons.lock_outline, size: 22, color: AppColors.purple),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: context.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                body,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: context.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(sheetCtx),
-                  child: const Text('Got it'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-void _showE2EEInfoSheet(BuildContext context) {
-  showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (sheetCtx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(Icons.lock_outline, size: 22, color: AppColors.purple),
-                  const SizedBox(width: 10),
-                  Text(
-                    'End-to-end encrypted',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Your messages are encrypted on this device using a key only '
-                'you and the other members of this chat hold. The Coil '
-                'servers and anyone with database access cannot read your '
-                'message text — only ciphertext. In group chats, the key '
-                'is rotated automatically when members are added or removed.',
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: context.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _E2EERow(
-                icon: Icons.check_circle_outline,
-                color: Colors.green,
-                title: 'Encrypted',
-                body: 'Message text, voice transcripts, reply-to text, '
-                    'location labels, and file names.',
-              ),
-              const SizedBox(height: 10),
-              _E2EERow(
-                icon: Icons.info_outline,
-                color: Colors.orange,
-                title: 'Not yet encrypted',
-                body: 'Photos, videos, voice recordings, file contents, '
-                    'shared posts, stickers, and exact location coordinates. '
-                    'These still upload via the same secure transport but '
-                    'are stored unencrypted on the server.',
-              ),
-              const SizedBox(height: 10),
-              _E2EERow(
-                icon: Icons.shield_outlined,
-                color: AppColors.purple,
-                title: 'Visible to the server',
-                body: 'Sender, recipient, timestamps, and message size. '
-                    'These are needed for delivery and notifications.',
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: context.surfaceSoft,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: context.borderColor),
-                ),
-                child: Text(
-                  'Your private key never leaves this device. Signing in on '
-                  'a new device creates a fresh key, so old encrypted '
-                  'messages won\'t be readable there.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.4,
-                    color: context.textSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(sheetCtx),
-                  child: const Text('Got it'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-class _E2EERow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String body;
-  const _E2EERow({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.body,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: context.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                body,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: context.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 // ─────────────────────────────────────────────
 // Reply preview bar — shown above the input while composing a reply.
 // ─────────────────────────────────────────────
@@ -2862,17 +2412,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   Widget _buildBody({required Color textColor}) {
     final originalStyle = TextStyle(color: textColor, fontSize: 14);
     if (msg.encryptedUnreadable) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _showUndecryptableSheet(context, ref),
-        child: Text(
-          '🔒 Encrypted message — tap to learn why',
-          style: originalStyle.copyWith(
-            decoration: TextDecoration.underline,
-            decorationStyle: TextDecorationStyle.dotted,
-          ),
-        ),
-      );
+      // Legacy ciphertext from an older client; no key to decrypt it
+      // with anymore.
+      return Text('Message unavailable', style: originalStyle);
     }
     if (!widget.autoTranslate || isMe || msg.text.trim().isEmpty) {
       return Text(msg.text, style: originalStyle);

@@ -15,7 +15,11 @@ class AdminEventsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final eventsAsync = ref.watch(adminEventsProvider);
+    // Use the role-scoped provider so an org_admin sees only their
+    // own events here. Full admins see everything (same result as
+    // adminEventsProvider). The public events page keeps using the
+    // unfiltered adminEventsProvider so users see everyone's events.
+    final eventsAsync = ref.watch(manageableEventsProvider);
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
@@ -165,7 +169,14 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  // Inline validation errors. Cleared on each save attempt, populated
+  // for whichever required fields are empty so the user can see every
+  // problem at once instead of fixing one snackbar at a time.
   String? _titleError;
+  String? _eventTypeError;
+  String? _countryError;
+  String? _descError;
+  String? _imagesError;
 
   final List<String> _imageUrls = [];
   bool _saving = false;
@@ -214,7 +225,10 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       // Re-use the post bucket / kind for now — event images go to the same
       // bucket under the admin's uid/posts folder.
       final url = await StorageService().uploadPostImage(File(picked.path));
-      setState(() => _imageUrls.add(url));
+      setState(() {
+        _imageUrls.add(url);
+        _imagesError = null;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -244,14 +258,34 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
 
   Future<void> _save() async {
     if (_saving) return;
-    if (_titleCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Title is required')));
-      return;
-    }
-    if (_country.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Country is required')));
+    // Validate every required field in one pass so the user sees all
+    // problems at once instead of being snackbar-pinged one at a time.
+    final titleError =
+        _titleCtrl.text.trim().isEmpty ? 'Title is required' : null;
+    final eventTypeError =
+        _eventType.trim().isEmpty ? 'Pick an event type' : null;
+    final countryError =
+        _country.trim().isEmpty ? 'Country is required' : null;
+    final descError = _descCtrl.text.trim().isEmpty
+        ? 'Description is required'
+        : null;
+    final imagesError =
+        _imageUrls.isEmpty ? 'Add at least one image' : null;
+    setState(() {
+      _titleError = titleError;
+      _eventTypeError = eventTypeError;
+      _countryError = countryError;
+      _descError = descError;
+      _imagesError = imagesError;
+    });
+    if (titleError != null ||
+        eventTypeError != null ||
+        countryError != null ||
+        descError != null ||
+        imagesError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please fix the highlighted fields'),
+      ));
       return;
     }
     setState(() => _saving = true);
@@ -351,6 +385,11 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               required: true,
               errorText: _titleError,
               textInputAction: TextInputAction.next,
+              onChanged: (v) {
+                if (_titleError != null && v.trim().isNotEmpty) {
+                  setState(() => _titleError = null);
+                }
+              },
             ),
             _refinedField(
               label: 'Subtitle',
@@ -364,16 +403,29 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               searchHint: 'Search event type...',
               options: typeOptions,
               selected: _eventType.isEmpty ? null : _eventType,
-              onChanged: (v) => setState(() => _eventType = v),
+              onChanged: (v) {
+                setState(() {
+                  _eventType = v;
+                  _eventTypeError = null;
+                });
+              },
             ),
+            if (_eventTypeError != null)
+              _FieldError(text: _eventTypeError!),
             _SearchablePickerField(
               placeholder: 'Country',
               sheetTitle: 'Choose country',
               searchHint: 'Search country...',
               options: countryOptions,
               selected: _country.isEmpty ? null : _country,
-              onChanged: (v) => setState(() => _country = v),
+              onChanged: (v) {
+                setState(() {
+                  _country = v;
+                  _countryError = null;
+                });
+              },
             ),
+            if (_countryError != null) _FieldError(text: _countryError!),
             _DeadlineField(
               deadlineAt: _deadlineAt,
               onPick: _pickDeadline,
@@ -386,7 +438,14 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               controller: _descCtrl,
               hint: 'Describe the event',
               maxLines: 4,
+              required: true,
+              errorText: _descError,
               textInputAction: TextInputAction.newline,
+              onChanged: (v) {
+                if (_descError != null && v.trim().isNotEmpty) {
+                  setState(() => _descError = null);
+                }
+              },
             ),
             _refinedField(
               label: 'Link',
@@ -410,9 +469,19 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: 8),
-            Text('Images',
-                style: TextStyle(
-                    color: context.textSecondary, fontWeight: FontWeight.w600)),
+            Row(
+              children: [
+                Text('Images',
+                    style: TextStyle(
+                        color: context.textSecondary,
+                        fontWeight: FontWeight.w600)),
+                const Text(' *',
+                    style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+            if (_imagesError != null) _FieldError(text: _imagesError!),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -483,6 +552,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     String? errorText,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
+    ValueChanged<String>? onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -495,6 +565,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           maxLines: maxLines,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
+          onChanged: onChanged,
           style: TextStyle(fontSize: 15, color: context.textPrimary),
           decoration: InputDecoration(
             labelText: label,
@@ -513,6 +584,30 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               ? (v) =>
                   (v == null || v.trim().isEmpty) ? '$label is required' : null
               : null,
+        ),
+      ),
+    );
+  }
+}
+
+/// Small inline validation message shown directly under a picker /
+/// image section that cannot host its own `errorText`. Matches the
+/// look of Flutter's default `TextField` error: 12px red caption,
+/// 6px left padding to align with field content.
+class _FieldError extends StatelessWidget {
+  final String text;
+  const _FieldError({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 4, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.redAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

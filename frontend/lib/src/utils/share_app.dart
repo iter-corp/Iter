@@ -7,7 +7,7 @@ import '../services/admin_service.dart';
 import 'app_feedback.dart';
 import 'package:flutter/material.dart';
 
-/// Opens the native share sheet so a user can invite friends to install COIL.
+/// Opens the native share sheet so a user can invite friends to install Iter.
 ///
 /// Picks the store link for the running platform from [AdminConfig]
 /// (iOS → App Store, Android → Google Play), falling back to the other store
@@ -24,7 +24,7 @@ Future<void> shareInviteLink(BuildContext context, AdminConfig config) async {
     return;
   }
 
-  final message = 'Join me on COIL — connect with students, researchers and '
+  final message = 'Join me on Iter — connect with students, researchers and '
       'travellers, discover events and more:\n$link';
 
   // share_plus uses the share sheet's anchor on iPad; pass the source rect so
@@ -32,7 +32,7 @@ Future<void> shareInviteLink(BuildContext context, AdminConfig config) async {
   final box = context.findRenderObject() as RenderBox?;
   await Share.share(
     message,
-    subject: 'Join me on COIL',
+    subject: 'Join me on Iter',
     sharePositionOrigin:
         box != null ? box.localToGlobal(Offset.zero) & box.size : null,
   );

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/contact_request_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../providers/profile_visitor_providers.dart';
 import '../../providers/theme_provider.dart';
@@ -13,8 +14,9 @@ import '../../services/admin_service.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/share_app.dart';
+import 'admin/admin_events_screen.dart';
+import 'contact_us_screen.dart';
 import 'event_notifications_settings_screen.dart';
-import 'recovery_password_screens.dart';
 import 'profile_visitors_screen.dart';
 
 /// Full-screen profile settings page. Replaces the older bottom-sheet
@@ -28,7 +30,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = ref.watch(isAdminProvider);
+    final isOrgAdmin = ref.watch(isOrgAdminProvider);
     final hasNewReports = ref.watch(hasAnyNewReportsProvider);
+    final hasUnreadReply = ref.watch(hasUnreadAdminReplyProvider);
     final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
     final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
@@ -180,7 +184,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.ios_share, color: AppColors.purple),
             title: const Text('Invite friends'),
             subtitle: Text(
-              'Share the COIL app link with your friends',
+              'Share the Iter app link with your friends',
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
@@ -190,19 +194,34 @@ class ProfileSettingsScreen extends ConsumerWidget {
               shareInviteLink(context, cfg);
             },
           ),
-          const _SectionHeader(title: 'Encryption'),
+          const _SectionHeader(title: 'Support'),
           ListTile(
-            leading: const Icon(Icons.lock_outline, color: AppColors.purple),
-            title: const Text('Secret-chat recovery password'),
+            leading:
+                const Icon(Icons.support_agent_outlined, color: AppColors.purple),
+            title: const Text('Contact us'),
             subtitle: Text(
-              'Used to restore secret-chat history on a new device',
+              'Send the Iter team a message or apply to publish events',
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasUnreadReply)
+                  Container(
+                    width: 9,
+                    height: 9,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.purple,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: context.cardBg, width: 1),
+                    ),
+                  ),
+                Icon(Icons.chevron_right, color: context.textSecondary),
+              ],
+            ),
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const SetRecoveryPasswordScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const ContactUsScreen()),
             ),
           ),
           const _SectionHeader(title: 'Safety'),
@@ -212,6 +231,30 @@ class ProfileSettingsScreen extends ConsumerWidget {
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _showBlockedUsers(context),
           ),
+          // Approved organizations land here with event-posting rights
+          // but no other admin tooling. Full admins see the broader
+          // "Admin panel" entry below; this tile is for the limited
+          // org_admin role granted via Contact us.
+          if (isOrgAdmin && !isAdmin) ...[
+            const _SectionHeader(title: 'Organization'),
+            ListTile(
+              leading: const Icon(Icons.event_outlined,
+                  color: AppColors.purple),
+              title: const Text('Manage events',
+                  style: TextStyle(
+                      color: AppColors.purple,
+                      fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                'Create and edit events on behalf of your organization',
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing:
+                  Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
+              ),
+            ),
+          ],
           if (isAdmin) ...[
             const _SectionHeader(title: 'Admin'),
             ListTile(

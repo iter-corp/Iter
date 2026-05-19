@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import 'post_service.dart';
 
@@ -600,6 +601,24 @@ class AdminService {
           }));
   }
 
+  /// Events filtered to those created by [uid]. Used by the org_admin
+  /// role so an organization only sees / manages the events they
+  /// posted themselves, never anyone else's.
+  Stream<List<AdminEvent>> streamEventsCreatedBy(String uid) {
+    return _db
+        .collection('events')
+        .where('createdByUid', isEqualTo: uid)
+        .snapshots()
+        .map((s) => s.docs.map(AdminEvent.fromDoc).toList()
+          ..sort((a, b) {
+            final at = a.createdAt;
+            final bt = b.createdAt;
+            if (at == null) return 1;
+            if (bt == null) return -1;
+            return bt.compareTo(at);
+          }));
+  }
+
   Future<String> createEvent({
     required String title,
     required String subtitle,
@@ -615,6 +634,11 @@ class AdminService {
     double? lat,
     double? lng,
   }) async {
+    // Stamp the creator so org_admin users only see/manage their own
+    // events (full admins still see everything via streamEvents()).
+    // Also required by Firestore rules to authorize org_admin updates
+    // and deletes.
+    final creatorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final ref = await _db.collection('events').add({
       'title': title,
       'subtitle': subtitle,
@@ -635,18 +659,25 @@ class AdminService {
       'country': country.trim(),
       'locationCountry': country.trim().toLowerCase(),
       'createdAt': FieldValue.serverTimestamp(),
+      'createdByUid': creatorUid,
     });
 
     // Auto-create the matching event group chat so the admin sees it in
     // their inbox immediately, before any registrations are approved.
+    // Best-effort: if rules reject (e.g. org_admin without the matching
+    // rule deployed) we still want the event itself to exist.
     final adminUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (adminUid.isNotEmpty) {
-      await _db.collection('eventChats').doc(ref.id).set({
-        'eventId': ref.id,
-        'eventTitle': title,
-        'adminUid': adminUid,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      try {
+        await _db.collection('eventChats').doc(ref.id).set({
+          'eventId': ref.id,
+          'eventTitle': title,
+          'adminUid': adminUid,
+          'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('[admin-event] eventChat seed failed (non-fatal): $e');
+      }
     }
 
     // Spark-plan stand-in for the `onEventCreate` Cloud Function: fan the

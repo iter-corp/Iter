@@ -418,12 +418,6 @@ class UserButtons extends StatelessWidget {
   final VoidCallback onFollowTap;
   final VoidCallback? onMessageTap;
 
-  /// Long-press handler on the Message button. Used to expose advanced
-  /// options (e.g. starting a Telegram-style secret chat) without
-  /// cluttering the default tap flow. Optional — falls back to plain
-  /// tap behavior when null.
-  final VoidCallback? onMessageLongPress;
-
   const UserButtons({
     super.key,
     required this.isFollowing,
@@ -431,7 +425,6 @@ class UserButtons extends StatelessWidget {
     required this.isPrivate,
     required this.onFollowTap,
     this.onMessageTap,
-    this.onMessageLongPress,
   });
 
   @override
@@ -485,9 +478,7 @@ class UserButtons extends StatelessWidget {
             Expanded(
               child: SizedBox(
                 height: 40,
-                child: GestureDetector(
-                  onLongPress: onMessageLongPress,
-                  child: OutlinedButton(
+                child: OutlinedButton(
                   onPressed: onMessageTap,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: context.borderColor),
@@ -505,7 +496,6 @@ class UserButtons extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
-                  ),
                   ),
                 ),
               ),

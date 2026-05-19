@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/admin_providers.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
+import '../../../providers/contact_request_providers.dart';
 import '../../../theme/app_theme.dart';
 import 'admin_blacklist_screen.dart';
+import 'admin_contact_requests_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
 import 'admin_reports_screen.dart';
@@ -18,6 +20,7 @@ class AdminDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = ref.watch(isAdminProvider);
     final hasNewReports = ref.watch(hasAnyNewReportsProvider);
+    final hasUnreadContact = ref.watch(hasUnreadContactRequestsProvider);
 
     if (!isAdmin) {
       return Scaffold(
@@ -81,6 +84,19 @@ class AdminDashboardScreen extends ConsumerWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminReportsScreen()),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AdminTile(
+            icon: Icons.support_agent_outlined,
+            title: 'Contact requests',
+            subtitle: 'Inbox + history of messages and org applications',
+            color: AppColors.purple,
+            showNotificationDot: hasUnreadContact,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AdminContactRequestsScreen()),
             ),
           ),
           const SizedBox(height: 10),

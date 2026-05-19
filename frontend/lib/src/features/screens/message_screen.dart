@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
@@ -14,7 +15,6 @@ import '../widgets/create_group_sheet.dart';
 import '../widgets/message_widget.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
-import 'recovery_password_screens.dart';
 import 'request_screen.dart';
 
 /// Unified row in the chat list — either a 1:1 chat or an event group chat.
@@ -364,7 +364,6 @@ class _SearchableConvList extends ConsumerWidget {
 
     return CustomScrollView(
       slivers: [
-        const SliverToBoxAdapter(child: _LegacyRecoveryPromptBanner()),
         SliverList.builder(
           itemCount: merged.length,
           itemBuilder: (_, i) {
@@ -540,12 +539,46 @@ class _ConvTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider).value?.uid;
-    final displayName = conv.isGroup ? conv.groupName : conv.otherUsername;
-    final displayAvatar =
-        conv.isGroup ? conv.groupAvatarUrl : conv.otherAvatarUrl;
     final isMuted = currentUid != null && conv.isMutedBy(currentUid);
+
+    // For 1:1 chats, watch the peer's live user doc so the avatar +
+    // username reflect their CURRENT profile rather than the snapshot
+    // taken when the chat was first created. The denormalized
+    // userData on the chat doc is kept as a fallback for the first
+    // frame (and offline).
+    final peerLive = (!conv.isGroup && conv.otherUid.isNotEmpty)
+        ? ref.watch(userByUidProvider(conv.otherUid)).valueOrNull
+        : null;
+    final displayName = conv.isGroup
+        ? conv.groupName
+        : ((peerLive?['username'] as String?)?.trim().isNotEmpty == true
+            ? peerLive!['username'] as String
+            : conv.otherUsername);
+    final displayAvatar = conv.isGroup
+        ? conv.groupAvatarUrl
+        : ((peerLive?['avatarUrl'] as String?)?.trim().isNotEmpty == true
+            ? peerLive!['avatarUrl'] as String
+            : conv.otherAvatarUrl);
+
+    // Presence + typing — only for 1:1 (group chats don't have a
+    // single "other party").
+    final isOneToOne = !conv.isGroup && conv.otherUid.isNotEmpty;
+    final presenceAsync = isOneToOne
+        ? ref.watch(presenceWatchProvider(conv.otherUid))
+        : null;
+    final isOnline =
+        presenceAsync?.whenOrNull(data: (p) => p.online) ?? false;
+    final typingAsync = (isOneToOne && currentUid != null)
+        ? ref.watch(
+            typingWatchProvider('${conv.chatId}|${conv.otherUid}'))
+        : null;
+    final isTyping = typingAsync?.whenOrNull(data: (t) => t) ?? false;
+
+    final hasUnread = conv.unreadCount > 0;
+    final timeLabel = _formatInboxTime(conv.lastTime);
+
     return _GlassChatCard(
-      emphasize: conv.unreadCount > 0,
+      emphasize: hasUnread,
       child: ListTile(
         onTap: onTap,
         onLongPress: currentUid == null
@@ -557,36 +590,64 @@ class _ConvTile extends ConsumerWidget {
                   currentUid: currentUid,
                   isMuted: isMuted,
                 ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        leading: conv.isGroup
-            ? CircleAvatar(
-                radius: 26,
-                backgroundColor: const Color(0xFF7E3BE8),
-                backgroundImage: displayAvatar.isNotEmpty
-                    ? NetworkImage(displayAvatar)
-                    : null,
-                child: displayAvatar.isEmpty
-                    ? const Icon(Icons.groups, color: Colors.white)
-                    : null,
-              )
-            : CircleAvatar(
-                radius: 26,
-                backgroundColor: context.inputFill,
-                backgroundImage: displayAvatar.isNotEmpty
-                    ? NetworkImage(displayAvatar)
-                    : null,
-                child: displayAvatar.isEmpty
-                    ? Icon(Icons.person, color: context.textSecondary)
-                    : null,
+        contentPadding: context.isDark
+            ? const EdgeInsets.symmetric(horizontal: 14, vertical: 6)
+            : const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        leading: Stack(
+          children: [
+            conv.isGroup
+                ? CircleAvatar(
+                    radius: 26,
+                    backgroundColor: const Color(0xFF7E3BE8),
+                    backgroundImage: displayAvatar.isNotEmpty
+                        ? NetworkImage(displayAvatar)
+                        : null,
+                    child: displayAvatar.isEmpty
+                        ? const Icon(Icons.groups, color: Colors.white)
+                        : null,
+                  )
+                : CircleAvatar(
+                    radius: 26,
+                    backgroundColor: context.inputFill,
+                    backgroundImage: displayAvatar.isNotEmpty
+                        ? NetworkImage(displayAvatar)
+                        : null,
+                    child: displayAvatar.isEmpty
+                        ? Icon(Icons.person, color: context.textSecondary)
+                        : null,
+                  ),
+            // Green dot indicating the peer is online. Same look as the
+            // chat-screen header so the inbox stays visually consistent.
+            if (isOnline)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 2,
+                    ),
+                  ),
+                ),
               ),
+          ],
+        ),
         title: Row(
           children: [
             Flexible(
               child: Text(
                 displayName,
                 style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    // Slightly heavier weight when unread so the eye is
+                    // drawn down the list to the rows that need
+                    // attention, the same trick iOS Messages uses.
+                    fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w600,
+                    fontSize: 15,
                     color: context.textPrimary),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -618,33 +679,67 @@ class _ConvTile extends ConsumerWidget {
                 color: context.textSecondary,
               ),
             ],
-            if (conv.secret) ...[
-              const SizedBox(width: 6),
-              // Lock icon marks Telegram-style secret chats so users can
-              // tell at a glance which conversations live only on their
-              // device (no full history on reinstall).
-              const Icon(
-                Icons.lock_outline,
-                size: 14,
-                color: AppColors.purple,
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            isTyping ? 'Typing…' : conv.lastMessage,
+            style: TextStyle(
+              color: isTyping
+                  ? const Color(0xFFB05ECC)
+                  : (hasUnread ? context.textPrimary : context.textSecondary),
+              fontSize: 13,
+              fontStyle: isTyping ? FontStyle.italic : FontStyle.normal,
+              fontWeight: hasUnread ? FontWeight.w500 : FontWeight.w400,
+              height: 1.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (timeLabel.isNotEmpty)
+              Text(
+                timeLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                      hasUnread ? FontWeight.w600 : FontWeight.w500,
+                  color: hasUnread
+                      ? const Color(0xFFB05ECC)
+                      : context.textSecondary,
+                ),
               ),
+            if (hasUnread) ...[
+              const SizedBox(height: 6),
+              _UnreadCountBadge(count: conv.unreadCount),
             ],
           ],
         ),
-        subtitle: Text(
-          conv.unreadCount > 0
-              ? '${conv.unreadCount} new ${conv.unreadCount == 1 ? 'message' : 'messages'}'
-              : conv.lastMessage,
-          style: TextStyle(color: context.textSecondary, fontSize: 12),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: conv.unreadCount > 0
-            ? _UnreadCountBadge(count: conv.unreadCount)
-            : null,
       ),
     );
   }
+}
+
+/// Formats a chat's last-message timestamp for the inbox tile.
+///   * Today  → "2:14 PM"
+///   * Yesterday → "Yest"
+///   * This week → weekday short name ("Mon")
+///   * Older → "Nov 12"
+String _formatInboxTime(DateTime? time) {
+  if (time == null) return '';
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final that = DateTime(time.year, time.month, time.day);
+  final daysAgo = today.difference(that).inDays;
+  if (daysAgo == 0) return DateFormat.jm().format(time);
+  if (daysAgo == 1) return 'Yest';
+  if (daysAgo < 7) return DateFormat.E().format(time);
+  return DateFormat.MMMd().format(time);
 }
 
 // ─────────────────────────────────────────────
@@ -1028,78 +1123,56 @@ class _GlassChatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = context.isDark
-        ? Colors.white.withValues(alpha: 0.20)
-        : const Color(0xFFB8C6E6).withValues(alpha: 0.74);
-    final topSheen =
-        Colors.white.withValues(alpha: context.isDark ? 0.08 : 0.28);
+    // Backdrop blur + soft uniform surface + thin hairline border +
+    // shadow stack. The top sheen was dropped to remove the reflection
+    // that read as harsh on light backgrounds. Sigma bumped to 22 for
+    // a softer, more diffused blur.
+    final isDark = context.isDark;
+    final surfaceColor = isDark
+        ? const Color(0xFF1E1E2C).withValues(alpha: 0.50)
+        : Colors.white.withValues(alpha: 0.40);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.white.withValues(alpha: 0.45);
+    final outerShadow = isDark
+        ? Colors.black.withValues(alpha: 0.14)
+        : const Color(0xFF0A1B3D).withValues(alpha: 0.07);
+    final emphasizeShadow =
+        AppColors.purple.withValues(alpha: isDark ? 0.20 : 0.10);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Stack(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: context.isDark
-                        ? [
-                            const Color(0xFF262636).withValues(alpha: 0.54),
-                            const Color(0xFF171724).withValues(alpha: 0.46),
-                          ]
-                        : [
-                            const Color(0xFFFFFFFF).withValues(alpha: 0.86),
-                            const Color(0xFFEAF2FF).withValues(alpha: 0.74),
-                          ],
-                  ),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: context.isDark ? 0.14 : 0.08),
-                      blurRadius: 20,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 4),
-                    ),
-                    if (emphasize)
-                      BoxShadow(
-                        color: const Color(0xFF7E3BE8)
-                            .withValues(alpha: context.isDark ? 0.20 : 0.10),
-                        blurRadius: 18,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 2),
-                      ),
-                  ],
-                ),
-                child: child,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: outerShadow,
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+            if (emphasize)
+              BoxShadow(
+                color: emphasizeShadow,
+                blurRadius: 18,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: IgnorePointer(
-                  child: Container(
-                    height: 28,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(18),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [topSheen, Colors.transparent],
-                      ),
-                    ),
-                  ),
-                ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: borderColor),
               ),
-            ],
+              child: child,
+            ),
           ),
         ),
       ),
@@ -1152,103 +1225,6 @@ class _UnreadCountBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 11,
           fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-/// One-time-per-session prompt for users who haven't picked their own
-/// recovery password yet. Sits at the top of the inbox sliver list, is
-/// dismissible for the session, and routes to
-/// [SetRecoveryPasswordScreen] on the primary action. Renders nothing
-/// once the user has chosen a password.
-class _LegacyRecoveryPromptBanner extends ConsumerWidget {
-  const _LegacyRecoveryPromptBanner();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final shouldShow = ref.watch(shouldPromptLegacyRecoveryProvider);
-    if (shouldShow.valueOrNull != true) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      decoration: BoxDecoration(
-        color: AppColors.purple.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.purple.withValues(alpha: 0.30)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.lock_outline,
-                size: 20, color: AppColors.purple),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Protect your secret chats',
-                    style: TextStyle(
-                      color: context.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Set a recovery password so you can restore secret-chat '
-                    'history if you reinstall or switch devices.',
-                    style: TextStyle(
-                      color: context.textSecondary,
-                      fontSize: 12,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.purple,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const SetRecoveryPasswordScreen(),
-                          ),
-                        ),
-                        child: const Text('Set password'),
-                      ),
-                      const SizedBox(width: 4),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: context.textSecondary,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => ref
-                            .read(legacyRecoveryPromptDismissedProvider
-                                .notifier)
-                            .state = true,
-                        child: const Text('Not now'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
