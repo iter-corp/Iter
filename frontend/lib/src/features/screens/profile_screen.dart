@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
@@ -578,6 +579,124 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
+/// Square thumbnail for a post grid cell. Renders, in priority order:
+/// 1. the first image if the post has any,
+/// 2. the first frame of the first video if the post is video-only,
+/// 3. a caption-only fallback for text posts.
+/// A small play badge overlays video thumbs so they're recognisable.
+class PostThumbTile extends StatelessWidget {
+  final Post post;
+  const PostThumbTile({super.key, required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    if (post.imageUrls.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: post.imageUrls.first,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: context.borderColor),
+        errorWidget: (_, __, ___) =>
+            Icon(Icons.broken_image, color: context.textSecondary),
+      );
+    }
+    if (post.videoUrls.isNotEmpty) {
+      return _VideoThumb(url: post.videoUrls.first);
+    }
+    return Padding(
+      padding: const EdgeInsets.all(6),
+      child: Center(
+        child: Text(
+          post.caption,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: context.textPrimary),
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders the first frame of a network video as a still thumbnail.
+/// We initialise a VideoPlayerController, seek to 0, and never call play —
+/// the plugin paints the decoded frame as the texture.
+class _VideoThumb extends StatefulWidget {
+  final String url;
+  const _VideoThumb({required this.url});
+
+  @override
+  State<_VideoThumb> createState() => _VideoThumbState();
+}
+
+class _VideoThumbState extends State<_VideoThumb> {
+  VideoPlayerController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller = c;
+    c.setVolume(0);
+    c.initialize().then((_) async {
+      if (!mounted) return;
+      await c.seekTo(Duration.zero);
+      if (!mounted) return;
+      setState(() {});
+    }).catchError((_) {
+      // Leave the placeholder visible on decode failure.
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _controller;
+    final ready = c != null && c.value.isInitialized;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(color: Colors.black),
+        if (ready)
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: c.value.size.width,
+              height: c.value.size.height,
+              child: VideoPlayer(c),
+            ),
+          )
+        else
+          const Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white70),
+            ),
+          ),
+        Positioned(
+          right: 6,
+          bottom: 6,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withValues(alpha: 0.55),
+            ),
+            padding: const EdgeInsets.all(4),
+            child: const Icon(Icons.play_arrow,
+                color: Colors.white, size: 14),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class UserPostsGrid extends ConsumerWidget {
   final String uid;
   const UserPostsGrid({super.key, required this.uid});
@@ -609,7 +728,6 @@ class UserPostsGrid extends ConsumerWidget {
           itemCount: posts.length,
           itemBuilder: (_, i) {
             final post = posts[i];
-            final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
@@ -624,30 +742,7 @@ class UserPostsGrid extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   color: context.borderColor,
-                  child: url != null
-                      ? CachedNetworkImage(
-                          imageUrl: url,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: context.borderColor),
-                          errorWidget: (_, __, ___) => Icon(
-                            Icons.broken_image,
-                            color: context.textSecondary,
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Center(
-                            child: Text(
-                              post.caption,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 11, color: context.textPrimary),
-                            ),
-                          ),
-                        ),
+                  child: PostThumbTile(post: post),
                 ),
               ),
             );
@@ -703,7 +798,6 @@ class UserRepostsGrid extends ConsumerWidget {
           itemCount: posts.length,
           itemBuilder: (_, i) {
             final post = posts[i];
-            final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
@@ -718,30 +812,7 @@ class UserRepostsGrid extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   color: context.borderColor,
-                  child: url != null
-                      ? CachedNetworkImage(
-                          imageUrl: url,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: context.borderColor),
-                          errorWidget: (_, __, ___) => Icon(
-                            Icons.broken_image,
-                            color: context.textSecondary,
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Center(
-                            child: Text(
-                              post.caption,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 11, color: context.textPrimary),
-                            ),
-                          ),
-                        ),
+                  child: PostThumbTile(post: post),
                 ),
               ),
             );
@@ -794,7 +865,6 @@ class UserSavedGrid extends ConsumerWidget {
           itemCount: posts.length,
           itemBuilder: (_, i) {
             final post = posts[i];
-            final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
@@ -809,30 +879,7 @@ class UserSavedGrid extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   color: context.borderColor,
-                  child: url != null
-                      ? CachedNetworkImage(
-                          imageUrl: url,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: context.borderColor),
-                          errorWidget: (_, __, ___) => Icon(
-                            Icons.broken_image,
-                            color: context.textSecondary,
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Center(
-                            child: Text(
-                              post.caption,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 11, color: context.textPrimary),
-                            ),
-                          ),
-                        ),
+                  child: PostThumbTile(post: post),
                 ),
               ),
             );

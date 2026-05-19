@@ -54,6 +54,7 @@ dependencies:
   record: ^5.1.2
   audioplayers: ^6.1.0
   video_player: ^2.9.1
+  visibility_detector: ^0.4.0+2
   file_picker: ^8.1.2
   open_filex: ^4.5.0
   path_provider: ^2.1.4

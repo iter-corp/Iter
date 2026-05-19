@@ -550,13 +550,14 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                           itemBuilder: (context, index) {
                             final p = visiblePosts[index];
                             if (_mode == _HomeMode.qa) {
-                              return _QaThreadCard(post: p);
+                              return _QaThreadCard(key: ValueKey(p.id), post: p);
                             }
                             final placeLabel = _travelPlaceLabel(p);
                             final hasPlace = placeLabel.isNotEmpty;
                             final viewerLocOff = _mode == _HomeMode.travel &&
                                 (_viewerLat == null || _viewerLng == null);
                             return PostCard(
+                              key: ValueKey(p.id),
                               post: p,
                               travelMode: _mode == _HomeMode.travel,
                               travelPlace: _mode == _HomeMode.travel && hasPlace
@@ -754,7 +755,7 @@ class _HomeModeToggle extends StatelessWidget {
 class _QaThreadCard extends ConsumerWidget {
   final Post post;
 
-  const _QaThreadCard({required this.post});
+  const _QaThreadCard({super.key, required this.post});
 
   static const List<String> _reportReasons = [
     'Spam or scam',

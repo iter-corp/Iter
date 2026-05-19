@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
@@ -924,6 +925,9 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   bool _muted = true;
   bool _showControls = true;
   bool _scrubbing = false;
+  // True when the user explicitly paused via the controls — we don't want
+  // visibility-based resume to override an intentional pause.
+  bool _userPaused = false;
   Duration _scrubPosition = Duration.zero;
   Timer? _hideTimer;
 
@@ -948,6 +952,33 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
     // here is fine — the controller fires roughly once per frame while
     // playing and not at all when paused.
     if (!_scrubbing) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant _PostVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the list re-uses this State for a different post (e.g. a new post
+    // is prepended and the existing element slots into a new index), swap
+    // controllers so we don't keep showing the old video.
+    if (oldWidget.url != widget.url) {
+      final old = _controller;
+      old.removeListener(_onTick);
+      old.dispose();
+      _hideTimer?.cancel();
+      _showControls = true;
+      _scrubbing = false;
+      _scrubPosition = Duration.zero;
+      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+        ..setLooping(true)
+        ..setVolume(_muted ? 0 : 1)
+        ..addListener(_onTick)
+        ..initialize().then((_) {
+          if (!mounted) return;
+          setState(() {});
+          _controller.play();
+          _scheduleHide();
+        });
+    }
   }
 
   @override
@@ -977,13 +1008,28 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
     setState(() {
       if (_controller.value.isPlaying) {
         _controller.pause();
+        _userPaused = true;
         _showControls = true;
         _hideTimer?.cancel();
       } else {
         _controller.play();
+        _userPaused = false;
         _showControlsThenAutoHide();
       }
     });
+  }
+
+  void _onVisibilityChanged(VisibilityInfo info) {
+    if (!mounted || !_controller.value.isInitialized) return;
+    // Pause once more than half the card leaves the viewport; resume only
+    // when at least half is back in view AND the user hadn't tapped pause.
+    if (info.visibleFraction < 0.5) {
+      if (_controller.value.isPlaying) _controller.pause();
+    } else {
+      if (!_userPaused && !_controller.value.isPlaying) {
+        _controller.play();
+      }
+    }
   }
 
   void _toggleMute() {
@@ -1012,7 +1058,10 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
     final maxMs = duration.inMilliseconds.toDouble();
     final posMs =
         position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
-    return GestureDetector(
+    return VisibilityDetector(
+      key: ValueKey('postvid:${widget.url}'),
+      onVisibilityChanged: _onVisibilityChanged,
+      child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (_showControls) {
@@ -1200,6 +1249,7 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

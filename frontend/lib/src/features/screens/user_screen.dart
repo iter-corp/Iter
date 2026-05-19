@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,7 +12,7 @@ import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/user_profile_widget.dart';
 import 'chat_screen.dart';
-import 'profile_screen.dart' show PostDetailScreen;
+import 'profile_screen.dart' show PostDetailScreen, PostThumbTile;
 import 'qa_thread_screen.dart';
 
 final _otherUserProvider =
@@ -916,7 +915,6 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
     itemCount: posts.length,
     itemBuilder: (_, i) {
       final post = posts[i];
-      final url = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
       return GestureDetector(
         onTap: () => Navigator.push(
           context,
@@ -931,28 +929,7 @@ Widget _postsGrid(BuildContext context, List<Post> posts) {
           borderRadius: BorderRadius.circular(16),
           child: Container(
             color: context.borderColor,
-            child: url != null
-                ? CachedNetworkImage(
-                    imageUrl: url,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) =>
-                        Container(color: context.borderColor),
-                    errorWidget: (_, __, ___) =>
-                        Icon(Icons.broken_image, color: context.textSecondary),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Center(
-                      child: Text(
-                        post.caption,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style:
-                            TextStyle(fontSize: 11, color: context.textPrimary),
-                      ),
-                    ),
-                  ),
+            child: PostThumbTile(post: post),
           ),
         ),
       );
