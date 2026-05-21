@@ -8,7 +8,7 @@
 
 const Map<String, String> ckbStrings = {
   // ── Generic / common ──────────────────────────────────────────
-  'app_name': 'Itr',
+  'app_name': 'Iter',
   'ok': 'باشە',
   'cancel': 'هەڵوەشاندنەوە',
   'save': 'پاشەکەوتکردن',
@@ -299,7 +299,7 @@ const Map<String, String> ckbStrings = {
   'onboarding_city': 'شار',
   'onboarding_city_autofilled': 'خۆکارانە پڕکراوەتەوە — گەر پێویست بوو دەستکاری بکە',
   'onboarding_city_hint': 'بۆ نموونە: پاریس',
-  'splash_app_name': 'Itr',
+  'splash_app_name': 'Iter',
   'home_feed': 'نوێکارییەکان',
   'home_travel_short': 'گەشت',
   'home_travel_mode': 'دۆخی گەشت',
@@ -359,7 +359,7 @@ const Map<String, String> ckbStrings = {
   'home_popular_travel_posts': 'باوەکان لە پۆستەکانی گەشت',
   'home_unknown_city': 'شاری نەناسراو',
   'home_use_current_location': 'شوێنی ئێستام بەکاربهێنە',
-  'header_app_title': 'Itr',
+  'header_app_title': 'Iter',
   'post_not_found': 'پۆست نەدۆزرایەوە',
   'comment_no_comments_first': 'هیچ کۆمێنتێک نییە هێشتا. یەکەم کەس بە!',
   'comment_hide_replies': 'شاردنەوەی وەڵامەکان',
@@ -1124,9 +1124,9 @@ const Map<String, String> ckbStrings = {
       'بەکاردێت کاتی وەرگێڕانی پۆست و نامە و تێبینییە دەنگییەکان',
   'settings_invite_friends': 'بانگهێشتی هاوڕێیان',
   'settings_invite_friends_subtitle':
-      'بەستەری ئەپی Itr لەگەڵ هاوڕێیانت هاوبەش بکە',
+      'بەستەری ئەپی Iter لەگەڵ هاوڕێیانت هاوبەش بکە',
   'settings_contact_us_subtitle':
-      'نامەیەک بۆ تیمی Itr بنێرە یان داوا بکە بۆ بڵاوکردنەوەی بۆنەکان',
+      'نامەیەک بۆ تیمی Iter بنێرە یان داوا بکە بۆ بڵاوکردنەوەی بۆنەکان',
   'settings_manage_events_subtitle':
       'بۆنە دروست بکە و دەستکارییان بکە لە جیاتی ڕێکخراوەکەت',
   'settings_admin_panel': 'پانێڵی بەڕێوەبردن',
@@ -1237,4 +1237,9 @@ const Map<String, String> ckbStrings = {
   'events_no_type_events': 'هیچ بۆنەیەکی {type} نییە',
   'events_no_type_events_in_city': 'هیچ بۆنەیەکی {type} نییە لە {city}',
   'clear_search': 'پاککردنەوەی گەڕان',
+  'city_picker_search_hint': 'گەڕان بۆ شار',
+  'city_picker_no_results': 'هیچ شارێک نەدۆزرایەوە',
+  'city_picker_select': 'شار هەڵبژێرە',
+  'city_picker_loading': 'بارکردنی شارەکان…',
+  'city_picker_all': 'هەموو شارەکان',
 };

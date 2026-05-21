@@ -639,7 +639,9 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                 ),
                 if (isOwnStory)
                   Positioned(
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 140, // Moved higher to avoid overlap with comment input
+                    // Own stories have no reply composer, so the pills sit
+                    // at the same low offset the composer would use.
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
                     left: 16,
                     right: 16,
                     child: Row(
@@ -802,9 +804,9 @@ class _LikersSheet extends ConsumerWidget {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -813,7 +815,7 @@ class _LikersSheet extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.textSecondary.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -836,9 +838,10 @@ class _LikersSheet extends ConsumerWidget {
                           count == 1
                               ? context.t.storyLikeCount(count)
                               : context.t.storyLikesCount(count),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
+                            color: context.textPrimary,
                           ),
                         ),
                       ],
@@ -863,7 +866,7 @@ class _LikersSheet extends ConsumerWidget {
                           padding: const EdgeInsets.all(24),
                           child: Text(
                             context.t.storyNoLikesYet,
-                            style: const TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         ),
                       );
@@ -886,27 +889,29 @@ class _LikersSheet extends ConsumerWidget {
                           },
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: Colors.grey.shade200,
+                            backgroundColor: context.surfaceSoft,
                             backgroundImage: avatarUrl != null
                                 ? CachedNetworkImageProvider(avatarUrl)
                                 : null,
                             child: avatarUrl == null
-                                ? const Icon(
+                                ? Icon(
                                     Icons.person,
                                     size: 18,
-                                    color: Colors.grey,
+                                    color: context.textSecondary,
                                   )
                                 : null,
                           ),
                           title: Text(
                             username.isEmpty ? v.uid : username,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: context.textPrimary,
+                            ),
                           ),
                           trailing: Text(
                             context.t.timeAgo(v.viewedAt),
-                            style: const TextStyle(
-                              color: Colors.grey,
+                            style: TextStyle(
+                              color: context.textSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -938,9 +943,9 @@ class _ViewersSheet extends ConsumerWidget {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -949,7 +954,7 @@ class _ViewersSheet extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.textSecondary.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -962,19 +967,20 @@ class _ViewersSheet extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.remove_red_eye_outlined,
                           size: 20,
-                          color: Colors.black87,
+                          color: context.textPrimary,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           count == 1
                               ? context.t.storyViewCount(count)
                               : context.t.storyViewsCount(count),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
+                            color: context.textPrimary,
                           ),
                         ),
                       ],
@@ -999,7 +1005,7 @@ class _ViewersSheet extends ConsumerWidget {
                           padding: const EdgeInsets.all(24),
                           child: Text(
                             context.t.storyNoViewsYet,
-                            style: const TextStyle(color: Colors.grey),
+                            style: TextStyle(color: context.textSecondary),
                           ),
                         ),
                       );
@@ -1020,26 +1026,29 @@ class _ViewersSheet extends ConsumerWidget {
                           },
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: Colors.grey.shade200,
+                            backgroundColor: context.surfaceSoft,
                             backgroundImage: avatarUrl != null
                                 ? CachedNetworkImageProvider(avatarUrl)
                                 : null,
                             child: avatarUrl == null
-                                ? const Icon(
+                                ? Icon(
                                     Icons.person,
                                     size: 18,
-                                    color: Colors.grey,
+                                    color: context.textSecondary,
                                   )
                                 : null,
                           ),
                           title: Text(
                             username.isEmpty ? v.uid : username,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: context.textPrimary,
+                            ),
                           ),
                           trailing: Text(
                             context.t.timeAgo(v.viewedAt),
-                            style: const TextStyle(
-                              color: Colors.grey,
+                            style: TextStyle(
+                              color: context.textSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -1257,16 +1266,21 @@ class _SharedPostStoryViewState extends ConsumerState<_SharedPostStoryView> {
               ),
             );
           }
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => PostDetailScreen(postId: post.id),
+          // Keep the centred card clear of the bottom controls — both the
+          // reply composer (others' stories) and the views/likes pills
+          // (own stories) sit at the same low bottom offset.
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 96),
+            child: Center(
+              child: SingleChildScrollView(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PostDetailScreen(postId: post.id),
+                    ),
                   ),
+                  child: _SharedPostCard(post: post),
                 ),
-                child: _SharedPostCard(post: post),
               ),
             ),
           );

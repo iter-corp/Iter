@@ -8,7 +8,7 @@
 
 const Map<String, String> arStrings = {
   // ── Generic / common ──────────────────────────────────────────
-  'app_name': 'Itr',
+  'app_name': 'Iter',
   'ok': 'حسناً',
   'cancel': 'إلغاء',
   'save': 'حفظ',
@@ -299,7 +299,7 @@ const Map<String, String> arStrings = {
   'onboarding_city': 'المدينة',
   'onboarding_city_autofilled': 'تم الملء تلقائياً — قم بالتعديل إذا لزم الأمر',
   'onboarding_city_hint': 'مثل: باريس',
-  'splash_app_name': 'Itr',
+  'splash_app_name': 'Iter',
   'home_feed': 'آخر الأخبار',
   'home_travel_short': 'السفر',
   'home_travel_mode': 'وضع السفر',
@@ -359,7 +359,7 @@ const Map<String, String> arStrings = {
   'home_popular_travel_posts': 'شائع في منشورات السفر',
   'home_unknown_city': 'مدينة غير معروفة',
   'home_use_current_location': 'استخدام موقعي الحالي',
-  'header_app_title': 'Itr',
+  'header_app_title': 'Iter',
   'post_not_found': 'المنشور غير موجود',
   'comment_no_comments_first': 'لا توجد تعليقات بعد. كن الأول!',
   'comment_hide_replies': 'إخفاء الردود',
@@ -1133,9 +1133,9 @@ const Map<String, String> arStrings = {
   'settings_translation_language_subtitle':
       'تُستخدم عند ترجمة المنشورات والرسائل والملاحظات الصوتية',
   'settings_invite_friends': 'دعوة الأصدقاء',
-  'settings_invite_friends_subtitle': 'شارك رابط تطبيق Itr مع أصدقائك',
+  'settings_invite_friends_subtitle': 'شارك رابط تطبيق Iter مع أصدقائك',
   'settings_contact_us_subtitle':
-      'أرسل رسالة لفريق Itr أو قدّم طلباً لنشر الفعاليات',
+      'أرسل رسالة لفريق Iter أو قدّم طلباً لنشر الفعاليات',
   'settings_manage_events_subtitle':
       'أنشئ وعدّل الفعاليات نيابةً عن منظمتك',
   'settings_admin_panel': 'لوحة الإدارة',
@@ -1245,4 +1245,9 @@ const Map<String, String> arStrings = {
   'events_no_type_events': 'لا توجد فعاليات {type}',
   'events_no_type_events_in_city': 'لا توجد فعاليات {type} في {city}',
   'clear_search': 'مسح البحث',
+  'city_picker_search_hint': 'ابحث عن مدينة',
+  'city_picker_no_results': 'لم يتم العثور على مدن',
+  'city_picker_select': 'اختر المدينة',
+  'city_picker_loading': 'جارٍ تحميل المدن…',
+  'city_picker_all': 'كل المدن',
 };

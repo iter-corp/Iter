@@ -1490,6 +1490,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isOnline = presenceAsync?.whenOrNull(data: (p) => p.online) ?? false;
     final isTyping = typingAsync?.whenOrNull(data: (t) => t) ?? false;
 
+    // The avatar passed into the screen comes from the chat doc's cached
+    // userData snapshot, which can be stale or empty for older chats. For
+    // 1:1 chats watch the peer's live user doc and prefer that avatar so
+    // the header + message bubbles always show the current profile photo.
+    final peerLive = isGroup || widget.otherUid.isEmpty
+        ? null
+        : ref.watch(userByUidProvider(widget.otherUid)).value;
+    final liveAvatar = (peerLive?['avatarUrl'] as String?)?.trim() ?? '';
+    final resolvedAvatar =
+        liveAvatar.isNotEmpty ? liveAvatar : widget.otherAvatar;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -1517,10 +1528,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               )
                             : CircleAvatar(
                                 radius: 18,
-                                backgroundImage: widget.otherAvatar.isNotEmpty
-                                    ? NetworkImage(widget.otherAvatar)
+                                backgroundImage: resolvedAvatar.isNotEmpty
+                                    ? NetworkImage(resolvedAvatar)
                                     : null,
-                                child: widget.otherAvatar.isEmpty
+                                child: resolvedAvatar.isEmpty
                                     ? const Icon(Icons.person)
                                     : null,
                               ),
@@ -1765,7 +1776,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           msg: msg,
                           isMe: msg.senderUid == currentUid,
                           otherUid: widget.otherUid,
-                          otherAvatar: widget.otherAvatar,
+                          otherAvatar: resolvedAvatar,
                           isGroup: isGroup,
                           onReply: () => _startReply(msg),
                           onReplyQuoteTap: _scrollToMessage,

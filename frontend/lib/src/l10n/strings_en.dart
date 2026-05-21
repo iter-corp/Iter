@@ -12,7 +12,7 @@
 
 const Map<String, String> enStrings = {
   // ── Generic / common ──────────────────────────────────────────
-  'app_name': 'Itr',
+  'app_name': 'Iter',
   'ok': 'OK',
   'cancel': 'Cancel',
   'save': 'Save',
@@ -308,7 +308,7 @@ const Map<String, String> enStrings = {
   'onboarding_city': 'City',
   'onboarding_city_autofilled': 'Auto-filled — edit if needed',
   'onboarding_city_hint': 'e.g. Paris',
-  'splash_app_name': 'Itr',
+  'splash_app_name': 'Iter',
 
   // ── HOME/FEED SCREENS (added) ──
   'home_feed': 'Feed',
@@ -378,7 +378,7 @@ const Map<String, String> enStrings = {
   'home_popular_travel_posts': 'Popular from travel posts',
   'home_unknown_city': 'Unknown city',
   'home_use_current_location': 'Use my current location',
-  'header_app_title': 'Itr',
+  'header_app_title': 'Iter',
   'post_not_found': 'Post not found',
   'comment_no_comments_first': 'No comments yet. Be the first!',
   'comment_hide_replies': 'Hide replies',
@@ -1228,9 +1228,9 @@ const Map<String, String> enStrings = {
       'Used when translating posts, messages, and voice notes',
   'settings_invite_friends': 'Invite friends',
   'settings_invite_friends_subtitle':
-      'Share the Itr app link with your friends',
+      'Share the Iter app link with your friends',
   'settings_contact_us_subtitle':
-      'Send the Itr team a message or apply to publish events',
+      'Send the Iter team a message or apply to publish events',
   'settings_manage_events_subtitle':
       'Create and edit events on behalf of your organization',
   'settings_admin_panel': 'Admin panel',
@@ -1339,4 +1339,11 @@ const Map<String, String> enStrings = {
   'events_no_type_events': 'No {type} events',
   'events_no_type_events_in_city': 'No {type} events in {city}',
   'clear_search': 'Clear search',
+  // Shared city picker (used by Create Post, Onboarding, Connect & Events
+  // filters, Travel search) — all backed by one world-city source.
+  'city_picker_search_hint': 'Search city',
+  'city_picker_no_results': 'No cities found',
+  'city_picker_select': 'Select city',
+  'city_picker_loading': 'Loading cities…',
+  'city_picker_all': 'All cities',
 };

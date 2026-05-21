@@ -16,6 +16,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/admin_service.dart';
+import '../../services/city_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/maps_links.dart';
 import '../widgets/event_detail.dart';
@@ -168,17 +169,14 @@ class _EventBodyState extends ConsumerState<EventBody> {
   }
 
   Future<void> _onEventCityTap(List<AdminEvent> events) async {
-    final cities = events
-        .map(_eventCity)
-        .where((c) => c.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    if (cities.isEmpty) return;
-    final chosen = await _pickFromSheet(
-      title: context.t.eventsFilterEventsByCity,
-      options: cities,
-      selected: _selectedEventCity,
+    // Tapping the chip while a city is active clears the filter.
+    if (_selectedEventCity != null) {
+      setState(() => _selectedEventCity = null);
+      return;
+    }
+    final chosen = await showCityPicker(
+      context,
+      initialQuery: _selectedEventCity ?? '',
     );
     if (chosen == null) return;
     setState(() => _selectedEventCity = chosen.isEmpty ? null : chosen);
@@ -215,26 +213,12 @@ class _EventBodyState extends ConsumerState<EventBody> {
         return;
       }
 
-      // City filter - with Nearby and City options
-      final cityOptions = <String>['Nearby'];
-      final cities = users
-          .map((u) => (u['city'] as String? ?? '').trim())
-          .where((c) => c.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      cityOptions.addAll(cities);
+      // Open the world-city picker directly; "Nearby" is a pinned row
+      // at the top of the same list.
+      final chosen = await showCityPicker(context, showNearby: true);
+      if (chosen == null || chosen.isEmpty) return;
 
-      if (cityOptions.isEmpty) return;
-
-      final chosen = await _pickFromSheet(
-        title: context.t.eventsFilterByCity,
-        options: cityOptions,
-        selected: _selectedCity ?? (_nearbyMode ? 'Nearby' : null),
-      );
-      if (chosen == null) return;
-
-      if (chosen == 'Nearby') {
+      if (chosen == kCityPickerNearby) {
         setState(() {
           _nearbyMode = true;
           _selectedCity = null;
@@ -242,7 +226,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
       } else {
         setState(() {
           _nearbyMode = false;
-          _selectedCity = chosen.isEmpty ? null : chosen;
+          _selectedCity = chosen;
         });
       }
     } else if (i == 2) {

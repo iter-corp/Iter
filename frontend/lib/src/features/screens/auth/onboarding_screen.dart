@@ -7,6 +7,7 @@ import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/admin_service.dart';
+import '../../../services/city_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/responsive.dart';
 import '../../widgets/personalization_fields.dart';
@@ -222,6 +223,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   busy: _gpsBusy,
                   error: _gpsError,
                   cityCtrl: _cityCtrl,
+                  onCityChanged: () => setState(() {}),
                   onUseGps: _useGps,
                   onClear: _clearLocation,
                 ),
@@ -320,6 +322,10 @@ class _LocationSection extends StatelessWidget {
   final bool busy;
   final String? error;
   final TextEditingController cityCtrl;
+
+  /// Fired after the city picker writes a new value into [cityCtrl], so
+  /// the parent can rebuild and reflect the selection.
+  final VoidCallback onCityChanged;
   final VoidCallback onUseGps;
   final VoidCallback onClear;
 
@@ -328,6 +334,7 @@ class _LocationSection extends StatelessWidget {
     required this.busy,
     required this.error,
     required this.cityCtrl,
+    required this.onCityChanged,
     required this.onUseGps,
     required this.onClear,
   });
@@ -430,19 +437,28 @@ class _LocationSection extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          TextFormField(
-            controller: cityCtrl,
-            decoration: InputDecoration(
-              labelText: context.t.onboardingCity,
-              hintText: hasGps
-                  ? context.t.onboardingCityAutofilled
-                  : context.t.onboardingCityHint,
-              prefixIcon: const Icon(Icons.location_city_outlined, size: 20),
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+          Text(
+            context.t.onboardingCity,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: context.textSecondary,
             ),
+          ),
+          const SizedBox(height: 6),
+          CityPickerField(
+            value: cityCtrl.text,
+            hintText: hasGps
+                ? context.t.onboardingCityAutofilled
+                : context.t.onboardingCityHint,
+            onChanged: (city) {
+              cityCtrl.text = city;
+              onCityChanged();
+            },
+            onClear: () {
+              cityCtrl.clear();
+              onCityChanged();
+            },
           ),
         ],
       ),

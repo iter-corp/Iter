@@ -84,10 +84,12 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   _HomeMode _mode = _HomeMode.feed;
   _PlaceSuggestion? _selectedPlace;
   final List<_PlaceSuggestion> _recentPlaces = [];
-  final TextEditingController _qaSearchCtrl = TextEditingController();
-  String _qaSearch = '';
-  final TextEditingController _feedSearchCtrl = TextEditingController();
-  String _feedSearch = '';
+
+  // A single global search shared by all three tabs. Whichever tab the
+  // user opens it from, the results combine matching Feed posts, Travel
+  // posts and Discuss questions into one list.
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   // Discuss search also matches answers. Because answers (comments)
   // aren't loaded with the QA posts, the answer lookup is async — its
@@ -97,10 +99,9 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   String _qaAnswerMatchesQuery = '';
   Timer? _qaAnswerSearchDebounce;
 
-  // When a search field is focused, the header + stories collapse and
+  // When the search field is focused, the header + stories collapse and
   // the mode tabs pin to the top so the results get maximum space.
-  final FocusNode _qaSearchFocus = FocusNode();
-  final FocusNode _feedSearchFocus = FocusNode();
+  final FocusNode _searchFocus = FocusNode();
   bool _searchFocused = false;
   double? _viewerLat;
   double? _viewerLng;
@@ -121,8 +122,7 @@ class _HomeBodyState extends ConsumerState<HomeBody>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureViewerLocation();
     });
-    _qaSearchFocus.addListener(_onSearchFocusChange);
-    _feedSearchFocus.addListener(_onSearchFocusChange);
+    _searchFocus.addListener(_onSearchFocusChange);
   }
 
   @override
@@ -140,19 +140,14 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   }
 
   void _onSearchFocusChange() {
-    final focused = _qaSearchFocus.hasFocus || _feedSearchFocus.hasFocus;
+    final focused = _searchFocus.hasFocus;
     if (focused != _searchFocused && mounted) {
       setState(() => _searchFocused = focused);
     }
   }
 
-  /// The active search query for the current tab (Feed/Discuss).
-  /// Travel has no inline query, so it's always empty there.
-  String get _currentSearch {
-    if (_mode == _HomeMode.qa) return _qaSearch;
-    if (_mode == _HomeMode.feed) return _feedSearch;
-    return '';
-  }
+  /// The single global search query, shared by all three tabs.
+  String get _currentSearch => _searchQuery;
 
   /// True once the user has run a search and results are showing
   /// (a query exists and the keyboard is dismissed). In this state
@@ -165,28 +160,23 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   /// the scrolling list so it never scrolls away.
   bool get _searchActive => _searchFocused || _showingSearchResults;
 
-  /// Clears the current tab's search query and field.
+  /// Clears the global search query and field.
   void _clearCurrentSearch() {
-    if (_mode == _HomeMode.qa) {
-      _qaSearchCtrl.clear();
-      setState(() {
-        _qaSearch = '';
-        _qaAnswerMatches = <String>{};
-        _qaAnswerMatchesQuery = '';
-      });
-      _qaAnswerSearchDebounce?.cancel();
-    } else {
-      _feedSearchCtrl.clear();
-      setState(() => _feedSearch = '');
-    }
+    _searchCtrl.clear();
+    setState(() {
+      _searchQuery = '';
+      _qaAnswerMatches = <String>{};
+      _qaAnswerMatchesQuery = '';
+    });
+    _qaAnswerSearchDebounce?.cancel();
   }
 
-  /// Debounced answer search for the Discuss tab. Question-text
+  /// Debounced answer search for Discuss results. Question-text
   /// matching is instant (done in the build); this fills in the extra
   /// matches whose ANSWER text contains the query.
   void _scheduleQaAnswerSearch() {
     _qaAnswerSearchDebounce?.cancel();
-    final query = _qaSearch;
+    final query = _searchQuery;
     if (query.isEmpty) {
       if (_qaAnswerMatches.isNotEmpty) {
         setState(() {
@@ -204,7 +194,7 @@ class _HomeBodyState extends ConsumerState<HomeBody>
         final matches = await ref
             .read(postServiceProvider)
             .qaPostsWithMatchingAnswer(ids, query);
-        if (!mounted || _qaSearch != query) return;
+        if (!mounted || _searchQuery != query) return;
         setState(() {
           _qaAnswerMatches = matches;
           _qaAnswerMatchesQuery = query;
@@ -219,10 +209,8 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _qaAnswerSearchDebounce?.cancel();
-    _qaSearchCtrl.dispose();
-    _feedSearchCtrl.dispose();
-    _qaSearchFocus.dispose();
-    _feedSearchFocus.dispose();
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -373,6 +361,10 @@ class _HomeBodyState extends ConsumerState<HomeBody>
     }
   }
 
+  // Travel place-picker. No longer wired to the search icon (search is
+  // now a global text search across all tabs) but kept for the Travel
+  // quick-filter "more places" affordance.
+  // ignore: unused_element
   Future<void> _openPlaceSearch() async {
     final data = await ref.read(postServiceProvider).searchTravelPlaces(
           query: '',
@@ -519,49 +511,31 @@ class _HomeBodyState extends ConsumerState<HomeBody>
         if (maintenance) const _MaintenanceBanner(),
       ],
       SizedBox(height: collapsed ? 4 : 8),
-      // The tabs row — always present. While search RESULTS are
-      // showing it swaps the tab icons for the "Itr" title; while
-      // typing the tabs stay as normal.
+      // App-bar row — "Itr" title + mode dropdown + notification bell.
       _HomeModeToggle(
         mode: _mode,
         onChanged: _switchMode,
-        showTitleInsteadOfTabs: _showingSearchResults,
       ),
       // Stories — directly under the tabs, identical on every tab.
       // Hidden while search is active.
       if (showStories && !collapsed)
         const StoriesList(),
-      // Search + Post row — on every tab.
+      // Search + Post row — one global search shared by every tab.
       _SearchPostRow(
         searching: _searchFocused,
         query: _currentSearch,
-        hintText: _mode == _HomeMode.qa
-            ? context.t.homeSearchQuestionsUsers
-            : context.t.homeSearchPosts,
-        controller: _mode == _HomeMode.travel
-            ? null
-            : (_mode == _HomeMode.qa ? _qaSearchCtrl : _feedSearchCtrl),
-        focusNode: _mode == _HomeMode.travel
-            ? null
-            : (_mode == _HomeMode.qa ? _qaSearchFocus : _feedSearchFocus),
+        hintText: context.t.homeSearchPosts,
+        controller: _searchCtrl,
+        focusNode: _searchFocus,
         onChanged: (value) {
-          if (_mode == _HomeMode.qa) {
-            setState(() => _qaSearch = value.trim());
-            _scheduleQaAnswerSearch();
-          } else {
-            setState(() => _feedSearch = value.trim());
-          }
+          setState(() => _searchQuery = value.trim());
+          _scheduleQaAnswerSearch();
         },
         onClear: _clearCurrentSearch,
         onSearchTap: () {
-          if (_mode == _HomeMode.travel) {
-            // Travel search is a full page, not an inline field.
-            _openPlaceSearch();
-          } else {
-            // Flip to the expanded layout; the inline TextField then
-            // appears with autofocus:true and grabs the keyboard.
-            setState(() => _searchFocused = true);
-          }
+          // Flip to the expanded layout; the inline TextField then
+          // appears with autofocus:true and grabs the keyboard.
+          setState(() => _searchFocused = true);
         },
         onPost: () {
           // In Discuss, "Post" opens the ask-a-question sheet;
@@ -605,6 +579,92 @@ class _HomeBodyState extends ConsumerState<HomeBody>
     ];
   }
 
+  /// Builds the combined, all-tabs search result list. Merges matching
+  /// Feed posts, Travel posts and Discuss questions into one scroll
+  /// view, each rendered with its own card type. Returns null while the
+  /// underlying providers are still loading their first data.
+  Widget? _buildSearchResults({
+    required AsyncValue<List<Post>>? feedAsync,
+    required AsyncValue<List<Post>>? travelAsync,
+    required AsyncValue<List<Post>>? qaAsync,
+    required List<Widget> topContent,
+  }) {
+    final feedPosts = feedAsync?.valueOrNull;
+    final travelPosts = travelAsync?.valueOrNull;
+    final qaPosts = qaAsync?.valueOrNull;
+
+    // Wait until every provider has produced at least one value so the
+    // merged list isn't half-empty on first paint.
+    if (feedPosts == null || travelPosts == null || qaPosts == null) {
+      return null;
+    }
+
+    final answerMatches =
+        _qaAnswerMatchesQuery == _searchQuery && _searchQuery.isNotEmpty
+            ? _qaAnswerMatches
+            : const <String>{};
+
+    // De-dupe across tabs by post id (a post may surface in both Feed
+    // and Travel). Feed wins first, then Travel, then Discuss.
+    final seen = <String>{};
+    final hits = <_SearchHit>[];
+    for (final p in _filterFeedPosts(feedPosts, _searchQuery)) {
+      if (seen.add(p.id)) hits.add(_SearchHit(p, _HomeMode.feed));
+    }
+    for (final p in _filterFeedPosts(travelPosts, _searchQuery)) {
+      if (seen.add(p.id)) hits.add(_SearchHit(p, _HomeMode.travel));
+    }
+    for (final p in _filterQaPosts(qaPosts, _searchQuery, answerMatches)) {
+      if (seen.add(p.id)) hits.add(_SearchHit(p, _HomeMode.qa));
+    }
+
+    if (hits.isEmpty) {
+      return ListView(
+        controller: widget.scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 100),
+        children: [
+          ...topContent,
+          const SizedBox(height: 24),
+          Center(child: Text(context.t.homeNoMatchingPosts)),
+        ],
+      );
+    }
+
+    return CustomScrollView(
+      controller: widget.scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(child: Column(children: topContent)),
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 8, bottom: 100),
+          sliver: SliverList.builder(
+            itemCount: hits.length,
+            itemBuilder: (context, index) {
+              final hit = hits[index];
+              final p = hit.post;
+              if (hit.origin == _HomeMode.qa) {
+                return _QaThreadCard(key: ValueKey('qa_${p.id}'), post: p);
+              }
+              final isTravel = hit.origin == _HomeMode.travel;
+              final placeLabel = isTravel ? _travelPlaceLabel(p) : '';
+              return PostCard(
+                key: ValueKey('${isTravel ? 'travel' : 'feed'}_${p.id}'),
+                post: p,
+                travelMode: isTravel,
+                travelPlace:
+                    isTravel && placeLabel.isNotEmpty ? placeLabel : null,
+                travelDistance:
+                    isTravel ? (p.travelDistanceLabel ?? '') : null,
+                viewerLocationOff: false,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(currentUserDocProvider).valueOrNull;
@@ -633,11 +693,22 @@ class _HomeBodyState extends ConsumerState<HomeBody>
 
     final travelQuery = _buildTravelQuery();
 
+    // The global search merges all three tabs, so while it is active we
+    // need every provider. When it is idle only the current tab's
+    // provider matters.
+    final searching = _searchActive && _searchQuery.isNotEmpty;
+
     final postsAsync = _mode == _HomeMode.travel
         ? ref.watch(travelFeedProvider(travelQuery))
         : _mode == _HomeMode.qa
             ? ref.watch(qaFeedProvider)
             : ref.watch(feedProvider);
+
+    // Extra providers consulted only while a global search is running.
+    final feedAsync = searching ? ref.watch(feedProvider) : null;
+    final travelAsync =
+        searching ? ref.watch(travelFeedProvider(travelQuery)) : null;
+    final qaAsync = searching ? ref.watch(qaFeedProvider) : null;
 
     final cfg = ref.watch(adminConfigProvider).valueOrNull;
     final announcement = cfg?.announcement ?? '';
@@ -671,7 +742,32 @@ class _HomeBodyState extends ConsumerState<HomeBody>
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => _refresh(ref),
-              child: postsAsync.when(
+              child: searching
+                  ? (_buildSearchResults(
+                        feedAsync: feedAsync,
+                        travelAsync: travelAsync,
+                        qaAsync: qaAsync,
+                        topContent: _scrollTopContent(
+                          announcement: announcement,
+                          maintenance: maintenance,
+                          showStories: showStories,
+                        ),
+                      ) ??
+                      ListView(
+                        controller: widget.scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 100),
+                        children: [
+                          ..._scrollTopContent(
+                            announcement: announcement,
+                            maintenance: maintenance,
+                            showStories: showStories,
+                          ),
+                          const SizedBox(height: 24),
+                          const Center(child: CircularProgressIndicator()),
+                        ],
+                      ))
+                  : postsAsync.when(
                 skipLoadingOnReload: true,
                 skipLoadingOnRefresh: true,
                 loading: () => ListView(
@@ -703,27 +799,14 @@ class _HomeBodyState extends ConsumerState<HomeBody>
                   ],
                 ),
                 data: (posts) {
-                  // Only apply the answer-match set when it was computed
-                  // for the CURRENT query — otherwise it's stale (the
-                  // debounce hasn't caught up yet).
-                  final answerMatches =
-                      _qaAnswerMatchesQuery == _qaSearch && _qaSearch.isNotEmpty
-                          ? _qaAnswerMatches
-                          : const <String>{};
-                  final visiblePosts = _mode == _HomeMode.qa
-                      ? _filterQaPosts(posts, _qaSearch, answerMatches)
-                      : _mode == _HomeMode.feed
-                          ? _filterFeedPosts(posts, _feedSearch)
-                          : posts;
+                  // Search is handled by the separate all-tabs path
+                  // above, so here we just show the current tab's posts.
+                  final visiblePosts = posts;
 
                   if (visiblePosts.isEmpty) {
                     final emptyText = _mode == _HomeMode.qa
-                        ? (_qaSearch.isEmpty
-                            ? context.t.homeNoDiscussThreads
-                            : context.t.homeNoMatchingQuestions)
-                        : (_mode == _HomeMode.feed && _feedSearch.isNotEmpty
-                            ? context.t.homeNoMatchingPosts
-                            : context.t.homeNoPostsCreateFirst);
+                        ? context.t.homeNoDiscussThreads
+                        : context.t.homeNoPostsCreateFirst;
                     return ListView(
                       controller: widget.scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -1099,309 +1182,252 @@ List<Post> _filterFeedPosts(List<Post> posts, String query) {
       .toList();
 }
 
-class _HomeModeToggle extends ConsumerStatefulWidget {
+/// One row in the global (all-tabs) search result list. Carries the
+/// post plus the tab it came from so the right card type is rendered.
+class _SearchHit {
+  final Post post;
+  final _HomeMode origin;
+  const _SearchHit(this.post, this.origin);
+}
+
+/// Home app-bar: the "Itr" brand title centred, a dropdown next to it
+/// to switch between the three modes (Feed / Travel / Discuss), and the
+/// notification bell at the trailing edge.
+class _HomeModeToggle extends ConsumerWidget {
   final _HomeMode mode;
   final ValueChanged<_HomeMode> onChanged;
-
-  /// When true the three tab buttons are replaced by the "Itr" title.
-  /// Used while search results are showing — the tabs step aside but
-  /// the row (and notification bell) stay in place.
-  final bool showTitleInsteadOfTabs;
 
   const _HomeModeToggle({
     required this.mode,
     required this.onChanged,
-    this.showTitleInsteadOfTabs = false,
   });
 
-  @override
-  ConsumerState<_HomeModeToggle> createState() => _HomeModeToggleState();
-}
+  static const _all = [_HomeMode.feed, _HomeMode.travel, _HomeMode.qa];
 
-class _HomeModeToggleState extends ConsumerState<_HomeModeToggle>
-    with SingleTickerProviderStateMixin {
-  // Drives the tabs <-> title morph. 0 = tabs, 1 = "Itr" title.
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-      value: widget.showTitleInsteadOfTabs ? 1.0 : 0.0,
-    );
+  IconData _iconFor(_HomeMode m) {
+    switch (m) {
+      case _HomeMode.feed:
+        return Icons.dynamic_feed_rounded;
+      case _HomeMode.travel:
+        return Icons.flight;
+      case _HomeMode.qa:
+        return Icons.forum_outlined;
+    }
   }
 
-  @override
-  void didUpdateWidget(covariant _HomeModeToggle old) {
-    super.didUpdateWidget(old);
-    if (widget.showTitleInsteadOfTabs != old.showTitleInsteadOfTabs) {
-      if (widget.showTitleInsteadOfTabs) {
-        _ctrl.forward();
-      } else {
-        _ctrl.reverse();
-      }
+  String _labelFor(BuildContext context, _HomeMode m) {
+    switch (m) {
+      case _HomeMode.feed:
+        return context.t.homeFeed;
+      case _HomeMode.travel:
+        return context.t.homeTravelShort;
+      case _HomeMode.qa:
+        return context.t.homeDiscuss;
     }
   }
 
   @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadCountProvider);
-
-    // ── The app-title pill shown in the search-results state ──────
-    final Widget titlePill = Container(
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: AppColors.purple,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.purple.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        context.t.headerAppTitle,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-
-    // ── The three mode tabs ──────────────────────────────────────
-    // The Row sizes to its content. The active tab always shows its
-    // full name (its labels are short — Feed / Travel / Discuss); the
-    // other two are compact 42px icon-only buttons. Comfortably fits
-    // the slot, so no shrinking/ellipsis is needed.
-    Widget tabSlot(IconData icon, String label, _HomeMode m) {
-      return _ModeTab(
-        icon: icon,
-        label: label,
-        selected: widget.mode == m,
-        onTap: () => widget.onChanged(m),
-      );
-    }
-
-    final Widget tabs = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        tabSlot(Icons.dynamic_feed_rounded, context.t.homeFeed,
-            _HomeMode.feed),
-        const SizedBox(width: 6),
-        tabSlot(Icons.flight, context.t.homeTravelShort,
-            _HomeMode.travel),
-        const SizedBox(width: 6),
-        tabSlot(Icons.forum_outlined, context.t.homeDiscuss,
-            _HomeMode.qa),
-      ],
-    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-      child: Row(
-        children: [
-          // Smooth, driven morph between the mode tabs and the "Itr"
-          // pill. Expanded takes all the space left of the bell; both
-          // layers are stacked in that slot at a fixed 42px height and
-          // start-aligned, so nothing overflows and the row never
-          // jumps width.
-          Expanded(
-            child: AnimatedBuilder(
-              animation: _ctrl,
-              builder: (context, _) {
-                final t = Curves.easeInOutCubic.transform(_ctrl.value);
-
-                // Tabs: fully visible at t=0, gone by t≈0.55.
-                final tabsOpacity = (1.0 - t / 0.55).clamp(0.0, 1.0);
-                final tabsScale = 0.92 + 0.08 * tabsOpacity;
-
-                // Title: starts appearing at t≈0.45, full by t=1.
-                final titleProgress =
-                    ((t - 0.45) / 0.55).clamp(0.0, 1.0);
-                final titleOpacity = titleProgress;
-                final titleScale = 0.92 + 0.08 * titleProgress;
-
-                final dirAlign = AlignmentDirectional.centerStart
-                    .resolve(Directionality.of(context));
-
-                // Gentle vertical glide — tabs lift up & out as the
-                // title rises up into place.
-                final tabsDy = -10.0 * (1.0 - tabsOpacity);
-                final titleDy = 10.0 * (1.0 - titleProgress);
-
-                return SizedBox(
-                  height: 42,
-                  child: Stack(
-                    alignment: AlignmentDirectional.centerStart,
-                    children: [
-                      // Tabs layer — the PositionedDirectional fills
-                      // the slot width, giving the tabs Row a bounded
-                      // width so its Flexible children lay out.
-                      PositionedDirectional(
-                        start: 0,
-                        top: 0,
-                        bottom: 0,
-                        end: 0,
-                        child: IgnorePointer(
-                          ignoring: t > 0.5,
-                          child: Opacity(
-                            opacity: tabsOpacity,
-                            child: Transform.translate(
-                              offset: Offset(0, tabsDy),
-                              child: Transform.scale(
-                                scale: tabsScale,
-                                alignment: dirAlign,
-                                child: tabs,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Title layer.
-                      PositionedDirectional(
-                        start: 0,
-                        top: 0,
-                        bottom: 0,
-                        child: IgnorePointer(
-                          ignoring: t <= 0.5,
-                          child: Align(
-                            alignment: AlignmentDirectional.centerStart,
-                            child: Opacity(
-                              opacity: titleOpacity,
-                              child: Transform.translate(
-                                offset: Offset(0, titleDy),
-                                child: Transform.scale(
-                                  scale: titleScale,
-                                  alignment: dirAlign,
-                                  child: titlePill,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+      child: SizedBox(
+        height: 44,
+        child: Stack(
+          children: [
+            // Centred: "Itr" title + the mode dropdown beside it.
+            Align(
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.t.headerAppTitle,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                      color: context.textPrimary,
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          // ── Notification bell — sits next to the tabs ───────────
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: Icon(Icons.notifications_outlined,
-                    size: 26, color: context.textPrimary),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationScreen(),
+                  const SizedBox(width: 10),
+                  _ModeDropdown(
+                    mode: mode,
+                    onChanged: onChanged,
+                    all: _all,
+                    iconFor: _iconFor,
+                    labelFor: (m) => _labelFor(context, m),
                   ),
-                ),
+                ],
               ),
-              if (unreadCount > 0)
-                PositionedDirectional(
-                  end: 6,
-                  top: 6,
-                  child: Container(
-                    width: 17,
-                    height: 17,
-                    decoration: const BoxDecoration(
-                      color: AppColors.purple,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        unreadCount > 9 ? '9+' : '$unreadCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
+            ),
+            // Trailing: notification bell (start side in RTL).
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: _NotificationBell(unreadCount: unreadCount),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// One home-mode tab. Selected → a purple pill with icon + label;
-/// unselected → a compact icon-only button.
-class _ModeTab extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+/// The notification bell with an unread-count badge.
+class _NotificationBell extends StatelessWidget {
+  final int unreadCount;
+  const _NotificationBell({required this.unreadCount});
 
-  const _ModeTab({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: Icon(Icons.notifications_outlined,
+              size: 26, color: context.textPrimary),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NotificationScreen()),
+          ),
+        ),
+        if (unreadCount > 0)
+          PositionedDirectional(
+            end: 6,
+            top: 6,
+            child: Container(
+              width: 17,
+              height: 17,
+              decoration: const BoxDecoration(
+                color: AppColors.purple,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  unreadCount > 9 ? '9+' : '$unreadCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Pill-shaped dropdown that switches the active home mode. Shows the
+/// current mode's icon + name and a chevron; tapping opens a menu with
+/// all three modes.
+class _ModeDropdown extends StatelessWidget {
+  final _HomeMode mode;
+  final ValueChanged<_HomeMode> onChanged;
+  final List<_HomeMode> all;
+  final IconData Function(_HomeMode) iconFor;
+  final String Function(_HomeMode) labelFor;
+
+  const _ModeDropdown({
+    required this.mode,
+    required this.onChanged,
+    required this.all,
+    required this.iconFor,
+    required this.labelFor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inactiveBg =
-        isDark ? const Color(0xFF252528) : const Color(0xFFEDEDF2);
-
-    return Material(
-      color: selected ? AppColors.purple : inactiveBg,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          height: 42,
-          padding: EdgeInsets.symmetric(horizontal: selected ? 16 : 11),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: selected ? Colors.white : context.textSecondary,
+    return PopupMenuButton<_HomeMode>(
+      // No `initialValue` — that paints a square selected highlight that
+      // breaks out of the rounded menu. We draw our own rounded
+      // highlight inside each item instead.
+      onSelected: onChanged,
+      tooltip: '',
+      offset: const Offset(0, 48),
+      color: context.cardBg,
+      menuPadding: const EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      itemBuilder: (context) => [
+        for (final m in all)
+          PopupMenuItem<_HomeMode>(
+            value: m,
+            padding: EdgeInsets.zero,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: m == mode
+                    ? AppColors.purple.withValues(alpha: 0.14)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
               ),
-              // The active tab always shows its full name.
-              if (selected) ...[
-                const SizedBox(width: 7),
-                Text(
-                  label,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+              child: Row(
+                children: [
+                  Icon(
+                    iconFor(m),
+                    size: 20,
+                    color: m == mode
+                        ? AppColors.purple
+                        : context.textSecondary,
                   ),
-                ),
-              ],
-            ],
+                  const SizedBox(width: 12),
+                  Text(
+                    labelFor(m),
+                    style: TextStyle(
+                      fontWeight:
+                          m == mode ? FontWeight.w700 : FontWeight.w500,
+                      color: m == mode
+                          ? AppColors.purple
+                          : context.textPrimary,
+                    ),
+                  ),
+                  if (m == mode) ...[
+                    const Spacer(),
+                    const Icon(Icons.check_rounded,
+                        size: 18, color: AppColors.purple),
+                  ],
+                ],
+              ),
+            ),
           ),
+      ],
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: AppColors.purple,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.purple.withValues(alpha: 0.30),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(iconFor(mode), size: 18, color: Colors.white),
+            const SizedBox(width: 7),
+            Text(
+              labelFor(mode),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                size: 20, color: Colors.white),
+          ],
         ),
       ),
     );

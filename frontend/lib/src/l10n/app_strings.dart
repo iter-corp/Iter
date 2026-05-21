@@ -1623,6 +1623,13 @@ class AppStrings {
   String eventsNoTypeEventsInCity(Object type, Object city) =>
       _fmt('events_no_type_events_in_city', {'type': type, 'city': city});
   String get clearSearch => _get('clear_search');
+
+  // Shared city picker.
+  String get cityPickerSearchHint => _get('city_picker_search_hint');
+  String get cityPickerNoResults => _get('city_picker_no_results');
+  String get cityPickerSelect => _get('city_picker_select');
+  String get cityPickerLoading => _get('city_picker_loading');
+  String get cityPickerAll => _get('city_picker_all');
 }
 
 /// Convenience accessor: `context.t.settings`.
