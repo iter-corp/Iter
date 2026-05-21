@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'notification_service.dart';
 import 'post_service.dart';
 
 class AdminConfig {
@@ -26,10 +27,20 @@ class AdminConfig {
   /// [kEventTypes] when unset/empty.
   final List<String> eventTypes;
 
-  /// Country options admins tag events with and users filter notifications by.
-  /// Editable from the admin dashboard; falls back to [kEventCountries] when
-  /// unset/empty.
+  /// Country options used for event tagging/filtering. This list is static
+  /// (all countries + Online) and is not editable from the admin dashboard.
   final List<String> eventCountries;
+
+  /// Profile personalization options shown in onboarding/edit profile.
+  /// Editable from admin settings; each list falls back to canonical defaults
+  /// when unset/empty.
+  final List<String> profileProfessionOptions;
+  final List<String> profileFieldOptions;
+  final List<String> profileAcademicLevelOptions;
+  final List<String> profileGoalOptions;
+
+  /// English profanity words used by chat moderation.
+  final List<String> profanityWordsEn;
 
   const AdminConfig({
     this.storiesEnabled = true,
@@ -44,6 +55,11 @@ class AdminConfig {
     this.androidPlayStoreUrl = '',
     this.eventTypes = kEventTypes,
     this.eventCountries = kEventCountries,
+    this.profileProfessionOptions = kProfileProfessionOptions,
+    this.profileFieldOptions = kProfileFieldOptions,
+    this.profileAcademicLevelOptions = kProfileAcademicLevelOptions,
+    this.profileGoalOptions = kProfileGoalOptions,
+    this.profanityWordsEn = kProfanityWordsEn,
   });
 
   factory AdminConfig.fromMap(Map<String, dynamic>? d) {
@@ -69,7 +85,16 @@ class AdminConfig {
       iosAppStoreUrl: (m['iosAppStoreUrl'] as String?) ?? '',
       androidPlayStoreUrl: (m['androidPlayStoreUrl'] as String?) ?? '',
       eventTypes: cleanList(m['eventTypes'], kEventTypes),
-      eventCountries: cleanList(m['eventCountries'], kEventCountries),
+      eventCountries: kEventCountries,
+      profileProfessionOptions:
+          cleanList(m['profileProfessionOptions'], kProfileProfessionOptions),
+      profileFieldOptions:
+          cleanList(m['profileFieldOptions'], kProfileFieldOptions),
+      profileAcademicLevelOptions: cleanList(
+          m['profileAcademicLevelOptions'], kProfileAcademicLevelOptions),
+      profileGoalOptions:
+          cleanList(m['profileGoalOptions'], kProfileGoalOptions),
+      profanityWordsEn: cleanList(m['profanityWordsEn'], kProfanityWordsEn),
     );
   }
 
@@ -85,7 +110,11 @@ class AdminConfig {
         'iosAppStoreUrl': iosAppStoreUrl,
         'androidPlayStoreUrl': androidPlayStoreUrl,
         'eventTypes': eventTypes,
-        'eventCountries': eventCountries,
+        'profileProfessionOptions': profileProfessionOptions,
+        'profileFieldOptions': profileFieldOptions,
+        'profileAcademicLevelOptions': profileAcademicLevelOptions,
+        'profileGoalOptions': profileGoalOptions,
+        'profanityWordsEn': profanityWordsEn,
       };
 
   AdminConfig copyWith({
@@ -101,6 +130,11 @@ class AdminConfig {
     String? androidPlayStoreUrl,
     List<String>? eventTypes,
     List<String>? eventCountries,
+    List<String>? profileProfessionOptions,
+    List<String>? profileFieldOptions,
+    List<String>? profileAcademicLevelOptions,
+    List<String>? profileGoalOptions,
+    List<String>? profanityWordsEn,
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
@@ -115,9 +149,80 @@ class AdminConfig {
       androidPlayStoreUrl: androidPlayStoreUrl ?? this.androidPlayStoreUrl,
       eventTypes: eventTypes ?? this.eventTypes,
       eventCountries: eventCountries ?? this.eventCountries,
+      profileProfessionOptions:
+          profileProfessionOptions ?? this.profileProfessionOptions,
+      profileFieldOptions: profileFieldOptions ?? this.profileFieldOptions,
+      profileAcademicLevelOptions:
+          profileAcademicLevelOptions ?? this.profileAcademicLevelOptions,
+      profileGoalOptions: profileGoalOptions ?? this.profileGoalOptions,
+      profanityWordsEn: profanityWordsEn ?? this.profanityWordsEn,
     );
   }
 }
+
+/// Canonical personalization options shown in onboarding/edit-profile. Admins
+/// can override these lists from App settings.
+const List<String> kProfileProfessionOptions = [
+  'Student',
+  'Researcher',
+  'Professor',
+  'Traveler',
+];
+
+const List<String> kProfileFieldOptions = [
+  'Tech',
+  'Medicine',
+  'Law',
+  'Business',
+  'Arts',
+  'Engineering',
+  'Science',
+  'Education',
+  'Social sciences',
+  'Other',
+];
+
+const List<String> kProfileAcademicLevelOptions = [
+  'Undergraduate',
+  'Masters',
+  'PhD',
+  'Faculty',
+];
+
+const List<String> kProfileGoalOptions = [
+  'Internships',
+  'Scholarships',
+  'Conferences',
+  'Research',
+  'Networking',
+  'Local events',
+];
+
+const List<String> kProfanityWordsEn = [
+  'arse',
+  'asshole',
+  'bastard',
+  'bitch',
+  'bloody',
+  'bollocks',
+  'bullshit',
+  'crap',
+  'damn',
+  'dick',
+  'freaking',
+  'fuck',
+  'fucker',
+  'fucking',
+  'goddamn',
+  'hell',
+  'motherfucker',
+  'piss',
+  'prick',
+  'shit',
+  'slut',
+  'whore',
+  'wanker',
+];
 
 /// Canonical event-type options. Admins pick one when creating an event;
 /// users can filter event notifications by these.
@@ -133,31 +238,214 @@ const List<String> kEventTypes = [
   'other',
 ];
 
-/// Canonical country options. Admins tag an event with the country it takes
-/// place in; users filter event notifications by these. Keeping a curated
-/// list (instead of free text) means the user's picks always match what the
-/// admin chose. Stored lower-cased on the event doc as `locationCountry`.
+/// Canonical static country options used for event tagging/filtering.
+/// Kept comprehensive (all countries + Online) so admins do not need to
+/// maintain this list from settings. Stored lower-cased on event docs as
+/// `locationCountry`.
 const List<String> kEventCountries = [
-  'Iraq',
-  'Kurdistan Region',
-  'Turkey',
-  'Jordan',
-  'Lebanon',
+  'Afghanistan',
+  'Albania',
+  'Algeria',
+  'Andorra',
+  'Angola',
+  'Antigua and Barbuda',
+  'Argentina',
+  'Armenia',
+  'Australia',
+  'Austria',
+  'Azerbaijan',
+  'Bahamas',
+  'Bahrain',
+  'Bangladesh',
+  'Barbados',
+  'Belarus',
+  'Belgium',
+  'Belize',
+  'Benin',
+  'Bhutan',
+  'Bolivia',
+  'Bosnia and Herzegovina',
+  'Botswana',
+  'Brazil',
+  'Brunei',
+  'Bulgaria',
+  'Burkina Faso',
+  'Burundi',
+  'Cabo Verde',
+  'Cambodia',
+  'Cameroon',
+  'Canada',
+  'Central African Republic',
+  'Chad',
+  'Chile',
+  'China',
+  'Colombia',
+  'Comoros',
+  'Congo',
+  'Costa Rica',
+  'Cote d\'Ivoire',
+  'Croatia',
+  'Cuba',
+  'Cyprus',
+  'Czechia',
+  'Democratic Republic of the Congo',
+  'Denmark',
+  'Djibouti',
+  'Dominica',
+  'Dominican Republic',
+  'Ecuador',
   'Egypt',
-  'United Arab Emirates',
-  'Saudi Arabia',
+  'El Salvador',
+  'Equatorial Guinea',
+  'Eritrea',
+  'Estonia',
+  'Eswatini',
+  'Ethiopia',
+  'Fiji',
+  'Finland',
+  'France',
+  'Gabon',
+  'Gambia',
+  'Georgia',
+  'Germany',
+  'Ghana',
+  'Greece',
+  'Grenada',
+  'Guatemala',
+  'Guinea',
+  'Guinea-Bissau',
+  'Guyana',
+  'Haiti',
+  'Honduras',
+  'Hungary',
+  'Iceland',
+  'India',
+  'Indonesia',
+  'Iran',
+  'Iraq',
+  'Ireland',
+  'Israel',
+  'Italy',
+  'Jamaica',
+  'Japan',
+  'Jordan',
+  'Kazakhstan',
+  'Kenya',
+  'Kiribati',
+  'Kuwait',
+  'Kyrgyzstan',
+  'Laos',
+  'Latvia',
+  'Lebanon',
+  'Lesotho',
+  'Liberia',
+  'Libya',
+  'Liechtenstein',
+  'Lithuania',
+  'Luxembourg',
+  'Madagascar',
+  'Malawi',
+  'Malaysia',
+  'Maldives',
+  'Mali',
+  'Malta',
+  'Marshall Islands',
+  'Mauritania',
+  'Mauritius',
+  'Mexico',
+  'Micronesia',
+  'Moldova',
+  'Monaco',
+  'Mongolia',
+  'Montenegro',
+  'Morocco',
+  'Mozambique',
+  'Myanmar',
+  'Namibia',
+  'Nauru',
+  'Nepal',
+  'Netherlands',
+  'New Zealand',
+  'Nicaragua',
+  'Niger',
+  'Nigeria',
+  'North Korea',
+  'North Macedonia',
+  'Norway',
+  'Oman',
+  'Pakistan',
+  'Palau',
+  'Palestine',
+  'Panama',
+  'Papua New Guinea',
+  'Paraguay',
+  'Peru',
+  'Philippines',
+  'Poland',
+  'Portugal',
   'Qatar',
+  'Romania',
+  'Russia',
+  'Rwanda',
+  'Saint Kitts and Nevis',
+  'Saint Lucia',
+  'Saint Vincent and the Grenadines',
+  'Samoa',
+  'San Marino',
+  'Sao Tome and Principe',
+  'Saudi Arabia',
+  'Senegal',
+  'Serbia',
+  'Seychelles',
+  'Sierra Leone',
+  'Singapore',
+  'Slovakia',
+  'Slovenia',
+  'Solomon Islands',
+  'Somalia',
+  'South Africa',
+  'South Korea',
+  'South Sudan',
+  'Spain',
+  'Sri Lanka',
+  'Sudan',
+  'Suriname',
+  'Sweden',
+  'Switzerland',
+  'Syria',
+  'Tajikistan',
+  'Tanzania',
+  'Thailand',
+  'Timor-Leste',
+  'Togo',
+  'Tonga',
+  'Trinidad and Tobago',
+  'Tunisia',
+  'Turkey',
+  'Turkmenistan',
+  'Tuvalu',
+  'Uganda',
+  'Ukraine',
+  'United Arab Emirates',
   'United Kingdom',
   'United States',
-  'Germany',
-  'France',
-  'Italy',
-  'Spain',
-  'Netherlands',
-  'Sweden',
-  'Canada',
-  'Australia',
+  'Uruguay',
+  'Uzbekistan',
+  'Vanuatu',
+  'Vatican City',
+  'Venezuela',
+  'Vietnam',
+  'Yemen',
+  'Zambia',
+  'Zimbabwe',
   'Online',
+];
+
+/// Canonical funding-status options admins choose from when creating events.
+const List<String> kEventFundingStatuses = [
+  'Fully Funded',
+  'Partially Funded',
+  'Self Funded',
 ];
 
 class AdminEvent {
@@ -180,6 +468,9 @@ class AdminEvent {
   /// events). Stored on the doc lower-cased as `locationCountry` for matching.
   final String country;
 
+  /// Funding status label chosen by admin (empty on legacy events).
+  final String funds;
+
   /// Optional pin coordinates for the events map. Null when unknown.
   final double? lat;
   final double? lng;
@@ -198,6 +489,7 @@ class AdminEvent {
     this.deadlineAt,
     this.eventType = '',
     this.country = '',
+    this.funds = '',
     this.lat,
     this.lng,
   });
@@ -224,6 +516,7 @@ class AdminEvent {
       country: ((d['country'] as String?)?.trim().isNotEmpty ?? false)
           ? (d['country'] as String).trim()
           : ((d['locationCountry'] as String?) ?? '').trim(),
+      funds: (d['funds'] as String?) ?? '',
       lat: (geoMap?['lat'] as num?)?.toDouble(),
       lng: (geoMap?['lng'] as num?)?.toDouble(),
     );
@@ -329,6 +622,7 @@ class UserProfileReport {
 
 class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final NotificationService _notifications = NotificationService();
 
   DocumentReference<Map<String, dynamic>> get _configRef =>
       _db.collection('adminConfig').doc('app');
@@ -347,7 +641,7 @@ class AdminService {
   Stream<List<Map<String, dynamic>>> streamUsers({String query = ''}) {
     return _db.collection('users').snapshots().map((snap) {
       final q = query.trim().toLowerCase();
-      return snap.docs.map((d) => d.data()).where((u) {
+      return snap.docs.map((d) => {'uid': d.id, ...d.data()}).where((u) {
         if (q.isEmpty) return true;
         final name = (u['username'] as String? ?? '').toLowerCase();
         final email = (u['email'] as String? ?? '').toLowerCase();
@@ -359,8 +653,39 @@ class AdminService {
   Future<void> suspendUser(String uid, bool suspended) =>
       _db.collection('users').doc(uid).update({'suspended': suspended});
 
-  Future<void> setRole(String uid, String role) =>
-      _db.collection('users').doc(uid).update({'role': role});
+  Future<void> setRole(String uid, String role) async {
+    final userRef = _db.collection('users').doc(uid);
+    final before = await userRef.get();
+    final previousRole = (before.data()?['role'] as String?) ?? 'user';
+    if (previousRole == role) return;
+
+    await userRef.update({'role': role});
+
+    String? title;
+    String? subtitle;
+    if (role == 'admin') {
+      title = 'Admin access granted';
+      subtitle = 'Iter Team made you an admin.';
+    } else if (previousRole == 'admin' && role == 'user') {
+      title = 'Admin access removed';
+      subtitle = 'Iter Team removed your admin role.';
+    } else if (role == 'org_admin') {
+      title = 'Event manager access granted';
+      subtitle = 'Iter Team approved you as an event manager.';
+    } else if (previousRole == 'org_admin' && role == 'user') {
+      title = 'Event manager access removed';
+      subtitle = 'Iter Team revoked your event manager access.';
+    }
+
+    if (title != null) {
+      await _notifications.createSystemNotification(
+        targetUid: uid,
+        type: 'role_update',
+        title: title,
+        subtitle: subtitle,
+      );
+    }
+  }
 
   /// Cascade-deletes ALL user data and adds their email to the blacklist.
   /// Runs client-side — relies on Firestore rules that grant admin delete
@@ -528,6 +853,43 @@ class AdminService {
         .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
   }
 
+  /// Normal social posts only (excludes discuss/Q&A posts where postType=qa).
+  Stream<List<Map<String, dynamic>>> streamRegularPosts({int limit = 100}) {
+    return _db
+        .collection('posts')
+        .orderBy('createdAt', descending: true)
+        .limit(limit * 4)
+        .snapshots()
+        .map((s) {
+      final filtered = s.docs
+          .where((d) => (d.data()['postType'] as String?) != 'qa')
+          .map((d) => {...d.data(), 'id': d.id})
+          .toList();
+      if (filtered.length <= limit) return filtered;
+      return filtered.take(limit).toList();
+    });
+  }
+
+  /// Discuss/Q&A posts only (postType == qa).
+  Stream<List<Map<String, dynamic>>> streamDiscussPosts({int limit = 100}) {
+    return _db
+        .collection('posts')
+        .where('postType', isEqualTo: 'qa')
+        .limit(limit)
+        .snapshots()
+        .map((s) {
+      final out = s.docs.map((d) => {...d.data(), 'id': d.id}).toList()
+        ..sort((a, b) {
+          final at = (a['createdAt'] as Timestamp?)?.toDate();
+          final bt = (b['createdAt'] as Timestamp?)?.toDate();
+          if (at == null) return 1;
+          if (bt == null) return -1;
+          return bt.compareTo(at);
+        });
+      return out;
+    });
+  }
+
   /// Delete a post as admin, properly updating author's postsCount.
   Future<void> deletePost(String postId) =>
       PostService().deletePostAsAdmin(postId);
@@ -631,6 +993,7 @@ class AdminService {
     DateTime? deadlineAt,
     String eventType = '',
     String country = '',
+    String funds = '',
     double? lat,
     double? lng,
   }) async {
@@ -658,6 +1021,7 @@ class AdminService {
       // fan-out to match against users' selected countries.
       'country': country.trim(),
       'locationCountry': country.trim().toLowerCase(),
+      'funds': funds.trim(),
       'createdAt': FieldValue.serverTimestamp(),
       'createdByUid': creatorUid,
     });
@@ -726,19 +1090,22 @@ class AdminService {
       // notification pipeline look broken from the user's side.
       final types = ((prefs['types'] as List?)?.map((e) => e.toString()) ??
               const <String>[])
+          .where((t) => t.trim().isNotEmpty)
           .toList();
-      if (types.isNotEmpty && eventType.isNotEmpty) {
-        if (!types.contains(eventType)) return false;
-      }
       final countries = ((prefs['countries'] as List?)
                   ?.map((e) => e.toString().trim().toLowerCase()) ??
               const <String>[])
           .where((c) => c.isNotEmpty)
           .toList();
-      if (countries.isNotEmpty && eventCountry.isNotEmpty) {
-        if (!countries.contains(eventCountry)) return false;
-      }
-      return true;
+
+      // Matching policy: notify if the event matches the selected type OR
+      // the selected country. Empty list means "all" for that dimension.
+      final typePass =
+          types.isEmpty || eventType.isEmpty || types.contains(eventType);
+      final countryPass = countries.isEmpty ||
+          eventCountry.isEmpty ||
+          countries.contains(eventCountry);
+      return typePass || countryPass;
     }
 
     var batch = _db.batch();

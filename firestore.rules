@@ -22,6 +22,16 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Limited "events-only admin" role granted via the contact-us
+    // organization flow. Lets these users create / edit / delete events
+    // but nothing else (no user moderation, no app config, no reports
+    // access). Always rule-or'd alongside isAdmin() at the event match.
+    function isOrgAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'org_admin';
+    }
+
     function isChatParticipant(chatId) {
       return signedIn() &&
         request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
@@ -292,6 +302,17 @@ service cloud.firestore {
         }
       }
 
+      match /privateComments/{uid} {
+        allow read, write: if isSelf(uid) || isAdmin();
+
+        match /items/{commentId} {
+          allow read: if isSelf(uid) || isAdmin();
+          allow create: if isSelf(uid) && request.resource.data.authorUid == request.auth.uid;
+          allow update: if false;
+          allow delete: if isSelf(uid) || isAdmin();
+        }
+      }
+
       match /reposts/{uid} {
         allow read: if signedIn();
         allow create: if isSelf(uid);
@@ -348,9 +369,17 @@ service cloud.firestore {
 
     match /events/{eventId} {
       allow read: if true;
-      // Admin-managed events — only admins may create/update/delete.
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      // Full admins may create / edit / delete any event. Org-admins
+      // (organizations approved via the contact-us flow) may create
+      // their own and only edit / delete the ones THEY created.
+      allow create: if isAdmin() || (
+        isOrgAdmin() &&
+        request.resource.data.createdByUid == request.auth.uid
+      );
+      allow update, delete: if isAdmin() || (
+        isOrgAdmin() &&
+        resource.data.createdByUid == request.auth.uid
+      );
 
       match /attendees/{uid} {
         allow read: if true;
@@ -362,9 +391,17 @@ service cloud.firestore {
     // Doc id is deterministic `{eventId}_{uid}` so a user can only have one
     // in-flight request per event and can read their own record.
     match /eventRegistrations/{regId} {
+      // `get` must succeed even when the doc doesn't yet exist, so the
+      // event-detail screen can render the "Register" button for a
+      // user who has never registered for this event. We allow it
+      // when the deterministic doc id ends with the user's uid — that
+      // guarantees the user is only ever reading their own
+      // (potentially missing) record.
       allow get: if signedIn() && (
         isAdmin() ||
-        resource.data.userUid == request.auth.uid
+        (resource != null &&
+          resource.data.userUid == request.auth.uid) ||
+        regId.matches('.*_' + request.auth.uid)
       );
       allow list: if isAdmin();
       allow create: if signedIn() &&
@@ -389,7 +426,14 @@ service cloud.firestore {
         isAdmin() ||
         exists(/databases/$(database)/documents/eventChats/$(eventId)/members/$(request.auth.uid))
       );
-      allow create, update: if isAdmin();
+      // Full admins manage every event chat; org-admins may create or
+      // update only the chat for an event they themselves created
+      // (write happens inline from AdminService.createEvent right
+      // after the parent event doc is written).
+      allow create, update: if isAdmin() || (
+        isOrgAdmin() &&
+        request.resource.data.adminUid == request.auth.uid
+      );
       allow delete: if isAdmin();
 
       match /members/{uid} {
@@ -542,12 +586,15 @@ service cloud.firestore {
       allow update: if isSelf(uid);
       allow delete: if isSelf(uid) || isAdmin() || resource.data.actorUid == request.auth.uid;
       // Normal notifications must name their author as the actor. Admins may
-      // additionally fan out system `new_event` notifications (actorUid '')
-      // to any user — this is the Spark-plan stand-in for the onEventCreate
-      // Cloud Function.
+      // additionally fan out any system notification (actorUid == '') to any
+      // user — used for new_event fan-out, role_update, and other admin-driven
+      // system messages.
       allow create: if (signedIn() &&
           request.resource.data.actorUid == request.auth.uid)
-        || (isAdmin() && request.resource.data.type == 'new_event');
+        || (isAdmin() && request.resource.data.actorUid == '')
+        || (isOrgAdmin() &&
+            request.resource.data.actorUid == '' &&
+            request.resource.data.type == 'new_event');
     }
 
     match /liveStreams/{streamId} {
@@ -556,6 +603,47 @@ service cloud.firestore {
       allow update, delete: if signedIn() && (
         resource.data.hostUid == request.auth.uid || isAdmin()
       );
+    }
+
+    // ── Contact-us / support threads ──────────────────────────
+    // Each doc is one back-and-forth conversation between a user and
+    // the admin team. The user can create their own threads and read
+    // only their own; admins can see and reply to everything. The
+    // chat-style turns live in the `messages` subcollection.
+    match /contactRequests/{requestId} {
+      allow get: if signedIn() && (
+        isAdmin() ||
+        resource.data.userUid == request.auth.uid
+      );
+      // Admins can list everything. Regular users may list too, but
+      // Firestore enforces that every doc returned must individually
+      // pass the `get` rule above — so the client MUST filter by
+      // userUid == auth.uid or the query will error. The service
+      // wrapper does exactly that.
+      allow list: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.userUid == request.auth.uid &&
+        request.resource.data.type in ['message', 'organization'];
+      // Either party can update the thread doc to flip unread flags /
+      // bump lastMessageAt. Admins can additionally change status.
+      allow update: if signedIn() && (
+        isAdmin() ||
+        resource.data.userUid == request.auth.uid
+      );
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && (
+          isAdmin() ||
+          get(/databases/$(database)/documents/contactRequests/$(requestId)).data.userUid == request.auth.uid
+        );
+        allow create: if signedIn() &&
+          request.resource.data.senderUid == request.auth.uid && (
+            isAdmin() ||
+            get(/databases/$(database)/documents/contactRequests/$(requestId)).data.userUid == request.auth.uid
+          );
+        allow update, delete: if false;
+      }
     }
 
     match /{document=**} {

@@ -1323,4 +1323,20 @@ const Map<String, String> enStrings = {
   // ── DISCUSS EDIT QUESTION (added) ──
   'qa_edit_question': 'Edit question',
   'qa_edit_question_hint': 'Edit your question',
+
+  // ── MERGE WITH DEMO (added) ──
+  'admin_status_revoked': 'REVOKED',
+  'admin_pick_funding_status': 'Pick a funding status',
+  'admin_search_by_username_or_caption': 'Search by username or caption',
+  'admin_no_posts_match': 'No posts match your search',
+  'create_post_blocked_title': 'Post blocked',
+  'create_post_blocked_body': 'This post cannot be published because its caption or place fields contain blocked words.',
+  'events_no_one_in_field': 'No one in this field has joined yet.',
+  'events_no_one_at_academic_level': 'No one at this academic level has joined yet.',
+  'events_filter_field': 'Field',
+  'events_filter_level': 'Level',
+  'events_no_matching_people': 'No matching people',
+  'events_no_type_events': 'No {type} events',
+  'events_no_type_events_in_city': 'No {type} events in {city}',
+  'clear_search': 'Clear search',
 };

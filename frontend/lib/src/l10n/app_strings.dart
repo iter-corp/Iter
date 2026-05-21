@@ -1603,6 +1603,26 @@ class AppStrings {
       _get('settings_email_invalid_yours');
   String get settingsCouldNotSendReset =>
       _get('settings_could_not_send_reset');
+
+  // ── MERGE WITH DEMO (added) ──
+  String get adminStatusRevoked => _get('admin_status_revoked');
+  String get adminPickFundingStatus => _get('admin_pick_funding_status');
+  String get adminSearchByUsernameOrCaption =>
+      _get('admin_search_by_username_or_caption');
+  String get adminNoPostsMatch => _get('admin_no_posts_match');
+  String get createPostBlockedTitle => _get('create_post_blocked_title');
+  String get createPostBlockedBody => _get('create_post_blocked_body');
+  String get eventsNoOneInField => _get('events_no_one_in_field');
+  String get eventsNoOneAtAcademicLevel =>
+      _get('events_no_one_at_academic_level');
+  String get eventsFilterField => _get('events_filter_field');
+  String get eventsFilterLevel => _get('events_filter_level');
+  String get eventsNoMatchingPeople => _get('events_no_matching_people');
+  String eventsNoTypeEvents(Object type) =>
+      _fmt('events_no_type_events', {'type': type});
+  String eventsNoTypeEventsInCity(Object type, Object city) =>
+      _fmt('events_no_type_events_in_city', {'type': type, 'city': city});
+  String get clearSearch => _get('clear_search');
 }
 
 /// Convenience accessor: `context.t.settings`.

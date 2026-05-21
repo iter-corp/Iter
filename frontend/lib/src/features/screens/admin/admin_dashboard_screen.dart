@@ -8,6 +8,7 @@ import '../../../providers/contact_request_providers.dart';
 import '../../../theme/app_theme.dart';
 import 'admin_blacklist_screen.dart';
 import 'admin_contact_requests_screen.dart';
+import 'admin_discuss_posts_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
 import 'admin_reports_screen.dart';
@@ -77,6 +78,18 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _AdminTile(
+            icon: Icons.forum_outlined,
+            title: 'Discuss posts',
+            subtitle: 'Review and delete discuss/Q&A posts',
+            color: const Color(0xFF9C6ADE),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AdminDiscussPostsScreen()),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AdminTile(
             icon: Icons.assessment_outlined,
             title: context.t.reports,
             subtitle: context.t.adminTileReportsSubtitle,
@@ -130,6 +143,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             title: context.t.adminAppSettings,
             subtitle: context.t.adminTileSettingsSubtitle,
             color: const Color(0xFF3AB0FF),
+            showNotificationDot: hasUnreadContact,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),

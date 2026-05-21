@@ -34,6 +34,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final isAdmin = ref.watch(isAdminProvider);
     final isOrgAdmin = ref.watch(isOrgAdminProvider);
     final hasNewReports = ref.watch(hasAnyNewReportsProvider);
+    final hasUnreadContact = ref.watch(hasUnreadContactRequestsProvider);
     final hasUnreadReply = ref.watch(hasUnreadAdminReplyProvider);
     final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
     final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
@@ -254,7 +255,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _showBlockedUsers(context),
           ),
-          // Approved organizations land here with event-posting rights
+          // Approved event managers land here with event-posting rights
           // but no other admin tooling. Full admins see the broader
           // "Admin panel" entry below; this tile is for the limited
           // org_admin role granted via Contact us.
@@ -271,8 +272,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 context.t.settingsManageEventsSubtitle,
                 style: TextStyle(fontSize: 12, color: context.textSecondary),
               ),
-              trailing:
-                  Icon(Icons.chevron_right, color: context.textSecondary),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
               ),
@@ -293,7 +293,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (hasNewReports)
+                  if (hasNewReports || hasUnreadContact)
                     Container(
                       width: 9,
                       height: 9,

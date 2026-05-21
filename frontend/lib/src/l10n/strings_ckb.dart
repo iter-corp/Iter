@@ -1221,4 +1221,20 @@ const Map<String, String> ckbStrings = {
   // ── DISCUSS EDIT QUESTION (added) ──
   'qa_edit_question': 'دەستکاری پرسیار',
   'qa_edit_question_hint': 'پرسیارەکەت دەستکاری بکە',
+
+  // ── MERGE WITH DEMO (added) ──
+  'admin_status_revoked': 'هەڵوەشێنراوەتەوە',
+  'admin_pick_funding_status': 'دۆخی پاڵپشتی دارایی هەڵبژێرە',
+  'admin_search_by_username_or_caption': 'گەڕان بەپێی ناوی بەکارهێنەر یان کاپشن',
+  'admin_no_posts_match': 'هیچ پۆستێک نییە کە لەگەڵ گەڕانەکەت بگونجێت',
+  'create_post_blocked_title': 'پۆست بلۆککرا',
+  'create_post_blocked_body': 'ئەم پۆستە ناتوانرێت بڵاوبکرێتەوە چونکە کاپشن یان خانەکانی شوێن وشەی بلۆککراویان تێدایە.',
+  'events_no_one_in_field': 'هیچ کەسێک لەم بوارەدا بەشداری نەکردووە هێشتا.',
+  'events_no_one_at_academic_level': 'هیچ کەسێک لەم ئاستە ئەکادیمییەدا بەشداری نەکردووە هێشتا.',
+  'events_filter_field': 'بوار',
+  'events_filter_level': 'ئاست',
+  'events_no_matching_people': 'هیچ کەسێکی گونجاو نییە',
+  'events_no_type_events': 'هیچ بۆنەیەکی {type} نییە',
+  'events_no_type_events_in_city': 'هیچ بۆنەیەکی {type} نییە لە {city}',
+  'clear_search': 'پاککردنەوەی گەڕان',
 };

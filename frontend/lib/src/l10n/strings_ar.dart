@@ -1229,4 +1229,20 @@ const Map<String, String> arStrings = {
   // ── DISCUSS EDIT QUESTION (added) ──
   'qa_edit_question': 'تعديل السؤال',
   'qa_edit_question_hint': 'عدّل سؤالك',
+
+  // ── MERGE WITH DEMO (added) ──
+  'admin_status_revoked': 'مُلغى',
+  'admin_pick_funding_status': 'اختر حالة التمويل',
+  'admin_search_by_username_or_caption': 'ابحث باسم المستخدم أو التسمية التوضيحية',
+  'admin_no_posts_match': 'لا توجد منشورات تطابق بحثك',
+  'create_post_blocked_title': 'تم حظر المنشور',
+  'create_post_blocked_body': 'لا يمكن نشر هذا المنشور لأن التسمية التوضيحية أو حقول المكان تحتوي على كلمات محظورة.',
+  'events_no_one_in_field': 'لم ينضم أحد في هذا المجال بعد.',
+  'events_no_one_at_academic_level': 'لم ينضم أحد في هذا المستوى الأكاديمي بعد.',
+  'events_filter_field': 'المجال',
+  'events_filter_level': 'المستوى',
+  'events_no_matching_people': 'لا يوجد أشخاص مطابقون',
+  'events_no_type_events': 'لا توجد فعاليات {type}',
+  'events_no_type_events_in_city': 'لا توجد فعاليات {type} في {city}',
+  'clear_search': 'مسح البحث',
 };

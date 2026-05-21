@@ -50,13 +50,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
+      final authService = ref.read(authServiceProvider);
+
       final userDoc = userDocAsync.value;
-      if (userDoc == null) {
+      if (userDoc == null && authService.justSignedUp) {
         if (loc == '/onboarding' || loc == '/otp') return null;
         return '/onboarding';
       }
 
-      final needsOnboarding = userDoc['username'] == null;
+      final needsOnboarding =
+          authService.justSignedUp && (userDoc?['username'] == null);
 
       if (needsOnboarding) {
         if (loc == '/onboarding' || loc == '/otp') return null;
@@ -127,14 +130,18 @@ class _AuthListenable extends ChangeNotifier {
   static final _routingStateSelector = Provider((ref) {
     final authAsync = ref.watch(authStateProvider);
     final userDocAsync = ref.watch(currentUserDocProvider);
+    final justSignedUp = ref.watch(
+      Provider((r) => r.read(authServiceProvider).justSignedUp),
+    );
 
     // Return a tuple of only the values that matter for routing decisions
     return (
       isAuthLoading: authAsync.isLoading,
       user: authAsync.value?.uid, // Only compare UIDs, not whole User objects
       isUserDocLoading: userDocAsync.isLoading,
-      needsOnboarding:
-          userDocAsync.value != null && userDocAsync.value!['username'] == null,
+      needsOnboarding: justSignedUp &&
+          (userDocAsync.value == null ||
+              userDocAsync.value!['username'] == null),
     );
   });
 

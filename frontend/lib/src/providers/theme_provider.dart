@@ -18,7 +18,7 @@ final themeModeProvider =
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   ThemeModeNotifier(this._prefs)
       : super(
-          _prefs.getBool(_kKey) == true ? ThemeMode.dark : ThemeMode.light,
+          _prefs.getBool(_kKey) == false ? ThemeMode.light : ThemeMode.dark,
         );
 
   final SharedPreferences _prefs;

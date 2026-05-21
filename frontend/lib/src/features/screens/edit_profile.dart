@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
+import '../../services/admin_service.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
@@ -57,7 +59,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
-  void _hydrate(Map<String, dynamic> user) {
+  void _hydrate(Map<String, dynamic> user, AdminConfig cfg) {
     if (_initialized) return;
     final username = (user['username'] as String?) ?? '';
     _nameController.text = (user['name'] as String?) ?? username;
@@ -76,11 +78,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
     _avatarUrl = user['avatarUrl'] as String?;
     _coverUrl = user['coverUrl'] as String?;
-    _profession = _matchOption(user['profession'], kProfessionOptions);
-    _field = _matchOption(user['field'], kFieldOptions);
-    _academicLevel = _matchOption(user['academicLevel'], kAcademicLevelOptions);
+    _profession = _matchOption(user['profession'], cfg.profileProfessionOptions);
+    _field = _matchOption(user['field'], cfg.profileFieldOptions);
+    _academicLevel =
+      _matchOption(user['academicLevel'], cfg.profileAcademicLevelOptions);
     _goals = ((user['goals'] as List?)?.cast<String>() ?? const [])
-        .where(kGoalOptions.contains)
+      .where(cfg.profileGoalOptions.contains)
         .toList();
     _initialized = true;
   }
@@ -260,6 +263,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserDocProvider);
+    final cfg = ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -271,7 +275,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             if (user == null) {
               return Center(child: Text(context.t.profileNoProfileData));
             }
-            _hydrate(user);
+            _hydrate(user, cfg);
             return Column(
               children: [
                 _Header(
@@ -359,6 +363,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               field: _field,
                               academicLevel: _academicLevel,
                               goals: _goals,
+                              professionOptions: cfg.profileProfessionOptions,
+                              fieldOptions: cfg.profileFieldOptions,
+                              academicLevelOptions:
+                                  cfg.profileAcademicLevelOptions,
+                              goalOptions: cfg.profileGoalOptions,
                               onProfessionChanged: (v) =>
                                   setState(() => _profession = v),
                               onFieldChanged: (v) => setState(() => _field = v),

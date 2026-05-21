@@ -301,6 +301,46 @@ class _ReportTile extends ConsumerWidget {
                   },
                   child: Text(context.t.adminRemoveUser),
                 ),
+                IconButton(
+                  tooltip: 'Delete report',
+                  icon: const Icon(Icons.delete_outline,
+                      size: 18, color: Colors.red),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete report?'),
+                        content: const Text(
+                          'This will remove this report without taking any action on the user.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
+                    try {
+                      await ref
+                          .read(adminServiceProvider)
+                          .deleteUserProfileReport(report.id);
+                      if (!context.mounted) return;
+                      AppFeedback.showSuccess(context, 'Report deleted');
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      AppFeedback.showError(context, 'Failed: $e');
+                    }
+                  },
+                ),
               ],
             ),
           ],

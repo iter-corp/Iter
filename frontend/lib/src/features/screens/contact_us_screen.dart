@@ -7,60 +7,59 @@ import '../../providers/auth_providers.dart';
 import '../../providers/contact_request_providers.dart';
 import '../../services/contact_request_service.dart';
 import '../../theme/app_theme.dart';
+import 'user_screen.dart';
 
-/// User-facing "Contact us" entry. Opened from Settings. Lets the
-/// signed-in user file a new support thread (general message or
-/// organization request) and review any past threads with the admin
-/// team's replies inline.
+/// User-facing "Contact us" entry. Opened from Settings. This now
+/// routes straight into the user's single ongoing conversation with
+/// the Iter team instead of showing a list of separate requests.
 class ContactUsScreen extends ConsumerWidget {
   const ContactUsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authStateProvider).value;
+    final profile = ref.watch(currentUserDocProvider).valueOrNull;
     final myThreads = ref.watch(myContactRequestsProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Contact us')),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.purple,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.edit_outlined),
-        label: const Text('New request'),
-        onPressed: () => _openComposer(context),
-      ),
-      body: SafeArea(
-        child: myThreads.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) =>
-              Center(child: Text('Could not load your requests: $e')),
-          data: (threads) {
-            if (threads.isEmpty) {
-              return _EmptyHint(onTap: () => _openComposer(context));
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-              itemCount: threads.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) {
-                final t = threads[i];
-                return _ThreadTile(
-                  request: t,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ContactThreadScreen(request: t),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
+    if (auth == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Contact us')),
+        body: Center(
+          child: Text(
+            'You need to sign in first.',
+            style: TextStyle(color: context.textSecondary),
+          ),
         ),
+      );
+    }
+    return myThreads.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Contact us')),
+        body: const Center(child: CircularProgressIndicator()),
       ),
-    );
-  }
-
-  void _openComposer(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const _NewRequestScreen()),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(title: const Text('Contact us')),
+        body: Center(child: Text('Could not open chat: $e')),
+      ),
+      data: (threads) {
+        final active = threads.isNotEmpty
+            ? threads.first
+            : ContactRequest(
+                id: '',
+                userUid: auth.uid,
+                userEmail: (profile?['email'] as String?) ?? auth.email ?? '',
+                userName: (profile?['username'] as String?) ??
+                    (auth.displayName ?? ''),
+                type: ContactRequestType.message,
+                subject: '',
+                status: ContactRequestStatus.open,
+                createdAt: null,
+                lastMessageAt: null,
+                lastMessagePreview: '',
+                unreadByUser: false,
+                unreadByAdmin: false,
+              );
+        return ContactThreadScreen(request: active);
+      },
     );
   }
 }
@@ -91,7 +90,7 @@ class _EmptyHint extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Send a message to the Iter team. Pick "Organization" if '
+              'Send a message to the Iter team. Pick "Event manager" if '
               'you want to be approved to post events.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -146,8 +145,8 @@ class _ThreadTile extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: isOrg
                           ? AppColors.purple.withValues(alpha: 0.12)
@@ -155,14 +154,12 @@ class _ThreadTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      isOrg ? 'ORGANIZATION' : 'MESSAGE',
+                      isOrg ? 'EVENT MANAGER' : 'MESSAGE',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.6,
-                        color: isOrg
-                            ? AppColors.purple
-                            : context.textSecondary,
+                        color: isOrg ? AppColors.purple : context.textSecondary,
                       ),
                     ),
                   ),
@@ -227,6 +224,7 @@ class _StatusPill extends StatelessWidget {
       ContactRequestStatus.open => ('Awaiting reply', Colors.orange),
       ContactRequestStatus.answered => ('Answered', Colors.green),
       ContactRequestStatus.promoted => ('Approved', AppColors.purple),
+      ContactRequestStatus.revoked => ('Access revoked', Colors.red),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -285,19 +283,16 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
       _error = null;
     });
     try {
-      final email = (profile?['email'] as String?) ??
-          auth.email ??
-          '';
-      final name = (profile?['username'] as String?) ??
-          (auth.displayName ?? '');
-      final id =
-          await ref.read(contactRequestServiceProvider).submit(
-                userUid: auth.uid,
-                userEmail: email,
-                userName: name,
-                type: _type,
-                firstMessage: body,
-              );
+      final email = (profile?['email'] as String?) ?? auth.email ?? '';
+      final name =
+          (profile?['username'] as String?) ?? (auth.displayName ?? '');
+      final id = await ref.read(contactRequestServiceProvider).submit(
+            userUid: auth.uid,
+            userEmail: email,
+            userName: name,
+            type: _type,
+            firstMessage: body,
+          );
       if (!mounted) return;
       // Replace the composer with the live thread screen so the user
       // sees their message land and any future admin reply inline.
@@ -320,6 +315,12 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
           builder: (_) => ContactThreadScreen(request: placeholder),
         ),
       );
+    } on ContactRequestDailyLimitException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = e.message;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -350,8 +351,8 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
               const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
                   color: context.surfaceSoft,
                   borderRadius: BorderRadius.circular(10),
@@ -359,8 +360,7 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                 ),
                 child: Text(
                   email.isNotEmpty ? email : '(no email on account)',
-                  style: TextStyle(
-                      color: context.textPrimary, fontSize: 14),
+                  style: TextStyle(color: context.textPrimary, fontSize: 14),
                 ),
               ),
               const SizedBox(height: 16),
@@ -388,7 +388,7 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   hintText: _type == ContactRequestType.organization
-                      ? 'Tell us about your organization: what it does, '
+                      ? 'Tell us about your event plans, what you manage, '
                           'why you want to post events, any links.'
                       : 'How can we help?',
                   border: const OutlineInputBorder(),
@@ -433,8 +433,8 @@ class _TypeChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget tile(ContactRequestType t, String label, String subtitle,
-        IconData icon) {
+    Widget tile(
+        ContactRequestType t, String label, String subtitle, IconData icon) {
       final selected = value == t;
       return Expanded(
         child: GestureDetector(
@@ -457,8 +457,7 @@ class _TypeChoice extends StatelessWidget {
               children: [
                 Icon(icon,
                     size: 22,
-                    color:
-                        selected ? AppColors.purple : context.textSecondary),
+                    color: selected ? AppColors.purple : context.textSecondary),
                 const SizedBox(height: 8),
                 Text(label,
                     style: TextStyle(
@@ -485,8 +484,11 @@ class _TypeChoice extends StatelessWidget {
         tile(ContactRequestType.message, 'Message',
             'Question, feedback, or report a problem.', Icons.chat_outlined),
         const SizedBox(width: 10),
-        tile(ContactRequestType.organization, 'Organization',
-            'Get approved to post events on Iter.', Icons.apartment_outlined),
+        tile(
+            ContactRequestType.organization,
+            'Event manager',
+            'Get approved to manage and post events on Iter.',
+            Icons.apartment_outlined),
       ],
     );
   }
@@ -509,6 +511,17 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
   final _scrollController = ScrollController();
   bool _sending = false;
   bool _markedRead = false;
+  late bool _orgApproved;
+  late String _requestId;
+  late ContactRequestType _requestType;
+
+  @override
+  void initState() {
+    super.initState();
+    _orgApproved = widget.request.status == ContactRequestStatus.promoted;
+    _requestId = widget.request.id;
+    _requestType = widget.request.type;
+  }
 
   @override
   void dispose() {
@@ -520,17 +533,40 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
   Future<void> _send(bool isAdmin) async {
     final body = _replyCtrl.text.trim();
     if (body.isEmpty || _sending) return;
-    final senderUid = ref.read(authStateProvider).value?.uid;
+    final auth = ref.read(authStateProvider).value;
+    final senderUid = auth?.uid;
     if (senderUid == null) return;
     setState(() => _sending = true);
     try {
-      await ref.read(contactRequestServiceProvider).sendMessage(
-            requestId: widget.request.id,
-            senderUid: senderUid,
-            senderIsAdmin: isAdmin,
-            body: body,
-          );
+      if (!isAdmin && _requestId.isEmpty) {
+        final profile = ref.read(currentUserDocProvider).valueOrNull;
+        final email = (profile?['email'] as String?) ?? auth?.email ?? '';
+        final name =
+            (profile?['username'] as String?) ?? (auth?.displayName ?? '');
+        final id = await ref.read(contactRequestServiceProvider).submit(
+              userUid: senderUid,
+              userEmail: email,
+              userName: name,
+              type: _requestType,
+              firstMessage: body,
+            );
+        if (mounted) {
+          setState(() => _requestId = id);
+        }
+      } else {
+        await ref.read(contactRequestServiceProvider).sendMessage(
+              requestId: _requestId,
+              senderUid: senderUid,
+              senderIsAdmin: isAdmin,
+              body: body,
+            );
+      }
       _replyCtrl.clear();
+    } on ContactRequestDailyLimitException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -541,6 +577,25 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     }
   }
 
+  Future<void> _changeType(ContactRequestType type) async {
+    if (_requestType == type) return;
+    final previousType = _requestType;
+    setState(() => _requestType = type);
+    if (_requestId.isEmpty) return;
+    try {
+      await ref.read(contactRequestServiceProvider).setType(
+            requestId: _requestId,
+            type: type,
+          );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _requestType = previousType);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update request type: $e')),
+      );
+    }
+  }
+
   Future<void> _promote(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -548,9 +603,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
         title: const Text('Approve as organization?'),
         content: Text(
           'This will let ${widget.request.userName.isNotEmpty ? widget.request.userName : widget.request.userEmail} '
-          'create events on Iter. They will not gain any other admin '
-          'permissions. You can revoke this later by changing their '
-          'role back to "user" in the Users panel.',
+          'become an event manager on Iter. They will not gain any other '
+          'admin permissions. You can revoke this later from this same thread.',
         ),
         actions: [
           TextButton(
@@ -574,9 +628,12 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
             requestId: widget.request.id,
             userUid: widget.request.userUid,
           );
+      if (mounted) {
+        setState(() => _orgApproved = true);
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Organization approved.')),
+        const SnackBar(content: Text('Event manager approved.')),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -586,92 +643,351 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     }
   }
 
+  Future<void> _revoke(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Revoke organization access?'),
+        content: Text(
+          'This will remove event manager access for '
+          '${widget.request.userName.isNotEmpty ? widget.request.userName : widget.request.userEmail} '
+          'and change their role back to user.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Revoke'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (!context.mounted) return;
+    try {
+      await ref.read(contactRequestServiceProvider).revokeOrgAdmin(
+            requestId: widget.request.id,
+            userUid: widget.request.userUid,
+          );
+      if (mounted) {
+        setState(() => _orgApproved = false);
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event manager access revoked.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Revoke failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _handleAdminUserAction({
+    required BuildContext context,
+    required String uid,
+    required String action,
+    required String role,
+    required bool suspended,
+  }) async {
+    final admin = ref.read(adminServiceProvider);
+    try {
+      if (action == 'role') {
+        await admin.setRole(uid, role == 'admin' ? 'user' : 'admin');
+      } else if (action == 'orgRole') {
+        final isRevoking = role == 'org_admin';
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text(isRevoking
+                ? 'Revoke event manager access?'
+                : 'Grant event manager access?'),
+            content: Text(isRevoking
+                ? 'This will remove event posting permissions and set role to user.'
+                : 'This will grant event posting permissions by making this user an event manager.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(isRevoking ? 'Revoke' : 'Grant'),
+              ),
+            ],
+          ),
+        );
+        if (ok == true) {
+          if (_requestId.isNotEmpty) {
+            if (isRevoking) {
+              await ref.read(contactRequestServiceProvider).revokeOrgAdmin(
+                    requestId: _requestId,
+                    userUid: uid,
+                  );
+              if (mounted) {
+                setState(() => _orgApproved = false);
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Event manager access revoked.'),
+                  ),
+                );
+              }
+            } else {
+              await ref.read(contactRequestServiceProvider).promoteToOrgAdmin(
+                    requestId: _requestId,
+                    userUid: uid,
+                  );
+              if (mounted) {
+                setState(() => _orgApproved = true);
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Event manager approved.'),
+                  ),
+                );
+              }
+            }
+          } else {
+            await admin.setRole(uid, isRevoking ? 'user' : 'org_admin');
+          }
+        }
+      } else if (action == 'suspend') {
+        await admin.suspendUser(uid, !suspended);
+      } else if (action == 'delete') {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Delete user permanently?'),
+            content: const Text(
+              'This will delete ALL user data: posts, comments, stories, chats, followers, and notifications. Their email will be blacklisted.\n\nThis cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete everything',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (ok == true) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Deleting all user data...')),
+            );
+          }
+          await admin.deleteUser(uid);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('User deleted and blacklisted')),
+            );
+          }
+        }
+      }
+    } catch (e, st) {
+      print('[admin] action=$action failed: $e\n$st');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(isAdminProvider);
     // Whichever side opens the thread, flip their unread flag off
     // once per build. Cheap idempotent write.
-    if (!_markedRead) {
+    if (_requestId.isNotEmpty && !_markedRead) {
       _markedRead = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(contactRequestServiceProvider).markRead(
-              requestId: widget.request.id,
+              requestId: _requestId,
               readerIsAdmin: isAdmin,
             );
       });
     }
-    final msgsAsync =
-        ref.watch(contactRequestMessagesProvider(widget.request.id));
-    final isOrgRequest =
-        widget.request.type == ContactRequestType.organization;
-    final canPromote = isAdmin &&
-        isOrgRequest &&
-        widget.request.status != ContactRequestStatus.promoted;
+    final msgsAsync = _requestId.isEmpty
+        ? const AsyncValue<List<ContactRequestMessage>>.data(
+            <ContactRequestMessage>[],
+          )
+        : ref.watch(contactRequestMessagesProvider(_requestId));
+    final isOrgRequest = _requestType == ContactRequestType.organization;
+    final canEditType = !isAdmin &&
+        !_orgApproved &&
+        widget.request.status != ContactRequestStatus.revoked;
+    final requesterLive = isAdmin && widget.request.userUid.isNotEmpty
+        ? ref.watch(userByUidProvider(widget.request.userUid)).valueOrNull
+        : null;
+    final requesterName =
+        ((requesterLive?['username'] as String?)?.trim().isNotEmpty ?? false)
+            ? (requesterLive!['username'] as String).trim()
+            : widget.request.userName.isNotEmpty
+                ? widget.request.userName
+                : widget.request.userEmail.isNotEmpty
+                    ? widget.request.userEmail
+                    : 'User';
+    final requesterEmail =
+        ((requesterLive?['email'] as String?)?.trim().isNotEmpty ?? false)
+            ? (requesterLive!['email'] as String).trim()
+            : widget.request.userEmail;
+    final requesterAvatar =
+        ((requesterLive?['avatarUrl'] as String?)?.trim().isNotEmpty ?? false)
+            ? (requesterLive!['avatarUrl'] as String).trim()
+            : '';
+    final requesterRole = (requesterLive?['role'] as String?) ?? 'user';
+    final requesterSuspended = (requesterLive?['suspended'] as bool?) ?? false;
+    final canManageRequester = isAdmin && widget.request.userUid.isNotEmpty;
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              // User-side always sees "Iter support" — the thread is
-              // their conversation WITH support, not with themselves.
-              // Admin-side sees the requesting user's identity so they
-              // know who they're talking to at a glance.
-              isAdmin
-                  ? (widget.request.userName.isNotEmpty
-                      ? widget.request.userName
-                      : widget.request.userEmail.isNotEmpty
-                          ? widget.request.userEmail
-                          : 'User')
-                  : 'Iter support',
-              style: const TextStyle(fontSize: 15),
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (isAdmin && widget.request.userEmail.isNotEmpty)
-              Text(
-                widget.request.userEmail,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: context.textSecondary,
+        title: isAdmin
+            ? InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: widget.request.userUid.isEmpty
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                UserProfileScreen(uid: widget.request.userUid),
+                          ),
+                        );
+                      },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: context.inputFill,
+                      backgroundImage: requesterAvatar.isNotEmpty
+                          ? NetworkImage(requesterAvatar)
+                          : null,
+                      child: requesterAvatar.isEmpty
+                          ? const Icon(Icons.person, size: 18)
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            requesterName,
+                            style: const TextStyle(fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (requesterEmail.isNotEmpty)
+                            Text(
+                              requesterEmail,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-          ],
-        ),
+              )
+            : const Text('Iter Team'),
         actions: [
-          if (canPromote)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.purple,
-                ),
-                onPressed: () => _promote(context),
-                icon: const Icon(Icons.verified_outlined, size: 18),
-                label: const Text('Approve org'),
+          if (canManageRequester)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (action) => _handleAdminUserAction(
+                context: context,
+                uid: widget.request.userUid,
+                action: action,
+                role: requesterRole,
+                suspended: requesterSuspended,
               ),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'role',
+                  child: Text(
+                    requesterRole == 'admin'
+                        ? 'Demote to user'
+                        : 'Promote to admin',
+                  ),
+                ),
+                if (requesterRole != 'admin')
+                  PopupMenuItem(
+                    value: 'orgRole',
+                    child: Text(
+                      requesterRole == 'org_admin'
+                          ? 'Revoke event manager'
+                          : 'Grant event manager',
+                    ),
+                  ),
+                PopupMenuItem(
+                  value: 'suspend',
+                  child: Text(
+                    requesterSuspended ? 'Unsuspend' : 'Suspend',
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    'Delete user',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
             ),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
+            if (canEditType)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: _ThreadTypeBar(
+                  value: _requestType,
+                  onChanged: _changeType,
+                ),
+              ),
             Expanded(
               child: msgsAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (messages) {
                   if (messages.isEmpty) {
                     return Center(
-                      child: Text('No messages yet.',
-                          style:
-                              TextStyle(color: context.textSecondary)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: Text(
+                          _requestType == ContactRequestType.organization
+                              ? 'Tell Iter Team why you should be approved as an event manager and what events you want to post.'
+                              : 'Start the conversation with Iter Team. Your replies will stay in this one chat.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                      ),
                     );
                   }
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!_scrollController.hasClients) return;
-                    _scrollController.jumpTo(
-                        _scrollController.position.maxScrollExtent);
+                    _scrollController
+                        .jumpTo(_scrollController.position.maxScrollExtent);
                   });
                   return ListView.builder(
                     controller: _scrollController,
@@ -714,7 +1030,11 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                       maxLines: 5,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        hintText: isAdmin ? 'Reply to user…' : 'Type a reply…',
+                        hintText: isAdmin
+                            ? 'Reply to user…'
+                            : _requestType == ContactRequestType.organization
+                                ? 'Tell Iter Team about your event plans…'
+                                : 'Type a reply…',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -788,9 +1108,7 @@ class _Bubble extends StatelessWidget {
             bottomLeft: Radius.circular(isMine ? 14 : 2),
             bottomRight: Radius.circular(isMine ? 2 : 14),
           ),
-          border: isMine
-              ? null
-              : Border.all(color: context.borderColor),
+          border: isMine ? null : Border.all(color: context.borderColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -825,6 +1143,71 @@ class _Bubble extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ThreadTypeBar extends StatelessWidget {
+  final ContactRequestType value;
+  final ValueChanged<ContactRequestType> onChanged;
+
+  const _ThreadTypeBar({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(ContactRequestType type, String label, IconData icon) {
+      final selected = value == type;
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => onChanged(type),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColors.purple.withValues(alpha: 0.10)
+                  : context.cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? AppColors.purple : context.borderColor,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? AppColors.purple : context.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? AppColors.purple : context.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        chip(ContactRequestType.message, 'Message', Icons.chat_outlined),
+        const SizedBox(width: 10),
+        chip(
+          ContactRequestType.organization,
+          'Event manager',
+          Icons.apartment_outlined,
+        ),
+      ],
     );
   }
 }

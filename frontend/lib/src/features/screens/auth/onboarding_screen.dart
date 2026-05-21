@@ -4,7 +4,9 @@ import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 
 import '../../../l10n/app_strings.dart';
+import '../../../providers/admin_providers.dart';
 import '../../../providers/auth_providers.dart';
+import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/responsive.dart';
 import '../../widgets/personalization_fields.dart';
@@ -168,6 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cfg = ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
     final pad = context.scaleW(16, 24);
     return Scaffold(
       appBar: AppBar(title: Text(context.t.onboardingSetupProfile)),
@@ -274,6 +277,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         field: _field,
                         academicLevel: _academicLevel,
                         goals: _goals,
+                        professionOptions: cfg.profileProfessionOptions,
+                        fieldOptions: cfg.profileFieldOptions,
+                        academicLevelOptions: cfg.profileAcademicLevelOptions,
+                        goalOptions: cfg.profileGoalOptions,
                         onProfessionChanged: (v) =>
                             setState(() => _profession = v),
                         onFieldChanged: (v) => setState(() => _field = v),

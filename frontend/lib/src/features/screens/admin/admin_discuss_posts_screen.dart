@@ -1,29 +1,32 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
-import '../post_detail_screen.dart';
+import '../../model/post_model.dart';
+import '../qa_thread_screen.dart';
 
-class AdminPostsScreen extends ConsumerStatefulWidget {
-  const AdminPostsScreen({super.key});
+class AdminDiscussPostsScreen extends ConsumerStatefulWidget {
+  const AdminDiscussPostsScreen({super.key});
 
   @override
-  ConsumerState<AdminPostsScreen> createState() => _AdminPostsScreenState();
+  ConsumerState<AdminDiscussPostsScreen> createState() =>
+      _AdminDiscussPostsScreenState();
 }
 
-class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
+class _AdminDiscussPostsScreenState
+    extends ConsumerState<AdminDiscussPostsScreen> {
   String _query = '';
 
   @override
   Widget build(BuildContext context) {
-    final postsAsync = ref.watch(adminPostsProvider);
+    final postsAsync = ref.watch(adminDiscussPostsProvider);
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: Text(context.t.adminTilePostsTitle),
+        title: const Text('Discuss posts'),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -36,7 +39,7 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
-                hintText: context.t.adminSearchByUsernameOrCaption,
+                hintText: 'Search by username or question',
                 filled: true,
                 fillColor: context.cardBg,
                 border: OutlineInputBorder(
@@ -49,8 +52,7 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
           Expanded(
             child: postsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text(context.t.errorWithMessage(e))),
+              error: (e, _) => Center(child: Text('Error: $e')),
               data: (allPosts) {
                 final q = _query.trim().toLowerCase();
                 final posts = q.isEmpty
@@ -64,11 +66,11 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
                       }).toList();
                 if (posts.isEmpty) {
                   return Center(
-                      child: Text(
-                          q.isEmpty
-                              ? context.t.noPosts
-                              : context.t.adminNoPostsMatch,
-                          style: TextStyle(color: context.textSecondary)));
+                    child: Text(
+                      q.isEmpty ? 'No discuss posts' : 'No discuss posts match',
+                      style: TextStyle(color: context.textSecondary),
+                    ),
+                  );
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -88,14 +90,20 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
                           border: Border.all(color: context.borderColor),
                         ),
                         child: ListTile(
-                          onTap: () {
+                          onTap: () async {
                             final postId = (p['id'] as String? ?? '').trim();
                             if (postId.isEmpty) return;
+                            final snap = await FirebaseFirestore.instance
+                                .collection('posts')
+                                .doc(postId)
+                                .get();
+                            if (!context.mounted) return;
+                            if (!snap.exists) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
-                                    PostDetailScreen(postId: postId),
+                                    QaThreadScreen(post: Post.fromDoc(snap)),
                               ),
                             );
                           },
@@ -109,21 +117,18 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
                                       imageUrl: url, fit: BoxFit.cover)
                                   : Container(
                                       color: context.inputFill,
-                                      child: Icon(Icons.text_fields,
+                                      child: Icon(Icons.forum_outlined,
                                           color: context.textSecondary),
                                     ),
                             ),
                           ),
                           title: Text(
-                            caption.isEmpty
-                                ? context.t.adminNoCaption
-                                : caption,
+                            caption.isEmpty ? '(No question text)' : caption,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            context.t.adminPostByAuthor(
-                                p['authorUsername'] ?? context.t.adminUnknown),
+                            'by ${p['authorUsername'] ?? 'unknown'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -152,16 +157,15 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(context.t.postCardDeletePostTitle),
-        content: Text(context.t.postCardCannotBeUndone),
+        title: const Text('Delete discuss post?'),
+        content: const Text('This cannot be undone.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(context.t.cancel)),
+              child: const Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(context.t.delete,
-                  style: const TextStyle(color: Colors.red))),
+              child: const Text('Delete', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -171,7 +175,7 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
+              .showSnackBar(SnackBar(content: Text('Failed: $e')));
         }
       }
     }

@@ -9,7 +9,9 @@
     "build": "tsc",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
-    "lint": "echo \"No lint configured\""
+    "lint": "echo \"No lint configured\"",
+    "seed:profanity": "node scripts/seed-profanity.js",
+    "backfill:message-visibility": "node scripts/backfill-message-visibility.js"
   },
   "dependencies": {
     "@google-cloud/translate": "^8.5.0",
