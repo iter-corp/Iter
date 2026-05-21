@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/block_providers.dart';
 import '../../providers/chat_providers.dart';
@@ -75,7 +76,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e')),
+          SnackBar(content: Text(context.t.createGroupFailed(e))),
         );
       }
     } finally {
@@ -112,13 +113,14 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    'New group',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    context.t.createGroupNewGroup,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -128,7 +130,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                 child: TextField(
                   controller: _nameCtrl,
                   decoration: InputDecoration(
-                    hintText: 'Group name',
+                    hintText: context.t.createGroupGroupName,
                     filled: true,
                     fillColor: context.inputFill,
                     contentPadding: const EdgeInsets.symmetric(
@@ -147,7 +149,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   controller: _searchCtrl,
                   onChanged: (v) => setState(() => _query = v),
                   decoration: InputDecoration(
-                    hintText: 'Search people you follow…',
+                    hintText: context.t.createGroupSearchPeople,
                     prefixIcon: Icon(Icons.search, color: context.textMuted),
                     filled: true,
                     fillColor: context.inputFill,
@@ -164,9 +166,9 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    'Add members (from people you follow)',
+                    context.t.createGroupAddMembers,
                     style:
                         TextStyle(fontSize: 12, color: context.textSecondary),
                   ),
@@ -177,12 +179,13 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                 child: followingAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Error: $e')),
+                  error: (e, _) =>
+                      Center(child: Text(context.t.createGroupError(e))),
                   data: (uids) {
                     if (uids.isEmpty) {
                       return Center(
                         child: Text(
-                          'You aren\'t following anyone yet.',
+                          context.t.createGroupNotFollowingAnyone,
                           style: TextStyle(color: context.textSecondary),
                         ),
                       );
@@ -235,8 +238,10 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                                   strokeWidth: 2, color: Colors.white),
                             )
                           : Text(
-                              'Create'
-                              '${_selected.isEmpty ? '' : ' (${_selected.length})'}',
+                              _selected.isEmpty
+                                  ? context.t.createGroupCreate
+                                  : context.t
+                                      .createGroupCreateCount(_selected.length),
                               style:
                                   const TextStyle(fontWeight: FontWeight.w600),
                             ),

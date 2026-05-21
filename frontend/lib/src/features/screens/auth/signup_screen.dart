@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
@@ -125,7 +126,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Sign Up',
+                  context.t.signUp,
                   style: TextStyle(
                     fontSize: context.scaleW(20, 24),
                     fontWeight: FontWeight.bold,
@@ -134,7 +135,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Please enter the code we just sent\nto email',
+                  context.t.signupSubtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -145,30 +146,30 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 const SizedBox(height: 30),
                 _buildTextField(
                   controller: _usernameCtrl,
-                  hint: 'Username',
+                  hint: context.t.username,
                   prefixIcon: Icons.person_2_outlined,
                   validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a username'
+                      ? context.t.signupEnterUsername
                       : null,
                 ),
                 const SizedBox(height: 14),
                 _buildTextField(
                   controller: _emailCtrl,
-                  hint: 'Email',
+                  hint: context.t.email,
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) => value == null || !value.contains('@')
-                      ? 'Enter a valid email'
+                      ? context.t.signupEnterValidEmail
                       : null,
                 ),
                 const SizedBox(height: 14),
                 _buildTextField(
                   controller: _passCtrl,
-                  hint: 'Password',
+                  hint: context.t.password,
                   prefixIcon: Icons.lock_outline,
                   isPassword: true,
                   validator: (value) => value == null || value.length < 6
-                      ? 'Min 6 characters'
+                      ? context.t.loginMin6Chars
                       : null,
                 ),
                 if (_error != null) ...[
@@ -207,9 +208,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Sign Up',
-                            style: TextStyle(
+                        : Text(
+                            context.t.signUp,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
@@ -224,7 +225,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'Or',
+                        context.t.loginOr,
                         style:
                             TextStyle(fontSize: 13, color: context.textMuted),
                       ),
@@ -234,8 +235,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildSocialButton(
-                  label:
-                      _googleLoading ? 'Signing in...' : 'Continue with Google',
+                  label: _googleLoading
+                      ? context.t.loginSigningIn
+                      : context.t.continueWithGoogle,
                   icon: _googleLoading
                       ? const SizedBox(
                           width: 20,
@@ -247,7 +249,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 12),
                 _buildSocialButton(
-                  label: 'Sign In with Facebook',
+                  label: context.t.signupSignInWithFacebook,
                   icon: _buildSocialBadge('f', const Color(0xFF1877F2)),
                   onTap: () {},
                 ),
@@ -257,14 +259,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      'Already have an account? ',
+                      context.t.alreadyHaveAccount,
                       style: TextStyle(fontSize: 13, color: context.textMuted),
                     ),
+                    const SizedBox(width: 4),
                     GestureDetector(
                       onTap: () => context.go('/login'),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(
+                      child: Text(
+                        context.t.signIn,
+                        style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFFCE5DE5),
                           fontWeight: FontWeight.w600,

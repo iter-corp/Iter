@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 
@@ -14,14 +15,14 @@ class AdminBlacklistScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Blacklisted emails'),
+        title: Text(context.t.adminBlacklistedEmails),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: listAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (items) {
           if (items.isEmpty) {
             return Center(
@@ -31,7 +32,7 @@ class AdminBlacklistScreen extends ConsumerWidget {
                   Icon(Icons.check_circle_outline,
                       size: 48, color: context.textSecondary),
                   const SizedBox(height: 12),
-                  Text('No blacklisted emails',
+                  Text(context.t.adminNoBlacklistedEmails,
                       style: TextStyle(color: context.textSecondary)),
                 ],
               ),
@@ -78,7 +79,8 @@ class AdminBlacklistScreen extends ConsumerWidget {
                           ),
                           if (deletedAt != null)
                             Text(
-                              'Deleted ${DateFormat('MMM d, y').format(deletedAt)}',
+                              context.t.adminDeletedOn(
+                                  DateFormat('MMM d, y').format(deletedAt)),
                               style: TextStyle(
                                   color: context.textSecondary, fontSize: 11),
                             ),
@@ -90,18 +92,18 @@ class AdminBlacklistScreen extends ConsumerWidget {
                         final ok = await showDialog<bool>(
                           context: context,
                           builder: (_) => AlertDialog(
-                            title: const Text('Remove from blacklist?'),
+                            title: Text(context.t.adminRemoveFromBlacklistTitle),
                             content: Text(
-                                'Allow $email to register again?'),
+                                context.t.adminAllowToRegisterAgain(email)),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
+                                child: Text(context.t.cancel),
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Remove',
-                                    style: TextStyle(color: Colors.green)),
+                                child: Text(context.t.remove,
+                                    style: const TextStyle(color: Colors.green)),
                               ),
                             ],
                           ),
@@ -113,7 +115,7 @@ class AdminBlacklistScreen extends ConsumerWidget {
                         }
                       },
                       icon: Icon(Icons.restore, color: context.textSecondary),
-                      tooltip: 'Remove from blacklist',
+                      tooltip: context.t.adminRemoveFromBlacklistTooltip,
                     ),
                   ],
                 ),

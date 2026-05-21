@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
@@ -64,7 +65,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: uids.isEmpty
                       ? Center(
                           child: Text(
-                            'No users yet',
+                            context.t.profileNoUsersYet,
                             style: TextStyle(color: context.textSecondary),
                           ),
                         )
@@ -140,10 +141,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.cardBg,
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (user) {
           if (user == null) {
-            return const Center(child: Text('No profile data'));
+            return Center(child: Text(context.t.profileNoProfileData));
           }
           return SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 100),
@@ -177,11 +178,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       (user['postsCount'] as int?) ??
                       0,
                   onFollowersTap: () => _showUserListSheet(
-                    title: 'Followers',
+                    title: context.t.followers,
                     uids: followersAsync.value ?? const [],
                   ),
                   onFollowingTap: () => _showUserListSheet(
-                    title: 'Following',
+                    title: context.t.following,
                     uids: followingAsync.value ?? const [],
                   ),
                 ),
@@ -287,7 +288,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Settings',
+                context.t.settings,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -305,11 +306,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       isPrivate ? Icons.lock_outline : Icons.lock_open,
                       color: AppColors.purple,
                     ),
-                    title: const Text('Private account'),
+                    title: Text(context.t.privateAccount),
                     subtitle: Text(
                       isPrivate
-                          ? 'Only followers can see your posts'
-                          : 'Anyone can see your posts',
+                          ? context.t.profileOnlyFollowersCanSee
+                          : context.t.profileAnyoneCanSee,
                       style:
                           TextStyle(fontSize: 12, color: context.textSecondary),
                     ),
@@ -345,7 +346,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       isDark ? Icons.dark_mode : Icons.light_mode,
                       color: isDark ? Colors.amber : Colors.grey,
                     ),
-                    title: const Text('Dark mode'),
+                    title: Text(context.t.darkMode),
                     trailing: Switch.adaptive(
                       value: isDark,
                       activeTrackColor: AppColors.purple,
@@ -359,7 +360,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Blocked users
               ListTile(
                 leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
-                title: const Text('Blocked users'),
+                title: Text(context.t.blockedUsers),
                 trailing:
                     Icon(Icons.chevron_right, color: context.textSecondary),
                 onTap: () {
@@ -371,8 +372,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.shield_outlined,
                       color: Color(0xFF7E3BE8)),
-                  title: const Text('Admin panel',
-                      style: TextStyle(
+                  title: Text(context.t.profileAdminPanel,
+                      style: const TextStyle(
                         color: Color(0xFF7E3BE8),
                         fontWeight: FontWeight.w600,
                       )),
@@ -384,8 +385,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Divider(color: context.borderColor, height: 1),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title:
-                    const Text('Log out', style: TextStyle(color: Colors.red)),
+                title: Text(context.t.logout,
+                    style: const TextStyle(color: Colors.red)),
                 onTap: () async {
                   Navigator.pop(context);
                   await ref.read(authServiceProvider).signOut();
@@ -401,10 +402,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ListTile(
                 leading:
                     const Icon(Icons.delete_forever, color: Colors.redAccent),
-                title: const Text('Delete account',
-                    style: TextStyle(color: Colors.redAccent)),
-                subtitle: const Text(
-                    'Permanently remove your account and all your data.'),
+                title: Text(context.t.deleteAccount,
+                    style: const TextStyle(color: Colors.redAccent)),
+                subtitle: Text(context.t.profileDeleteAccountSubtitle),
                 onTap: () => _confirmDeleteAccount(context, ref),
               ),
             ],
@@ -439,7 +439,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Blocked Users',
+                  context.t.blockedUsers,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -454,7 +454,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     return blockedAsync.when(
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('Error: $e')),
+                      error: (e, _) =>
+                          Center(child: Text(context.t.errorWithMessage(e))),
                       data: (blockedUids) {
                         if (blockedUids.isEmpty) {
                           return Center(
@@ -465,7 +466,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     size: 48, color: context.textMuted),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'No blocked users',
+                                  context.t.profileNoBlockedUsers,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
@@ -474,7 +475,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Users you block will appear here.',
+                                  context.t.profileBlockedUsersHint,
                                   style: TextStyle(
                                     color: context.textSecondary,
                                     fontSize: 13,
@@ -508,25 +509,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete your account?'),
-        content: const Text(
-            'This permanently deletes your profile, posts, comments, stories, '
-            'followers, and notifications. This cannot be undone.'),
+        title: Text(context.t.profileDeleteAccountTitle),
+        content: Text(context.t.profileDeleteAccountBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: Text(context.t.cancel)),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete everything',
-                  style: TextStyle(color: Colors.red))),
+              child: Text(context.t.profileDeleteEverything,
+                  style: const TextStyle(color: Colors.red))),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Deleting your account...')),
+      SnackBar(content: Text(context.t.profileDeletingAccount)),
     );
 
     final authUser = FirebaseAuth.instance.currentUser;
@@ -540,9 +539,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (e.code == 'requires-recent-login') {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'For security, please log out and log back in, then try again.'),
+            SnackBar(
+              content: Text(context.t.profileReauthRequired),
             ),
           );
         }
@@ -550,14 +548,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: ${e.message ?? e.code}')),
+          SnackBar(
+              content:
+                  Text(context.t.deleteFailed(e.message ?? e.code))),
         );
       }
       return;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
+          SnackBar(content: Text(context.t.deleteFailed(e))),
         );
       }
       return;
@@ -711,7 +711,7 @@ class UserPostsGrid extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
-        child: Center(child: Text('Error: $e')),
+        child: Center(child: Text(context.t.errorWithMessage(e))),
       ),
       data: (posts) {
         if (posts.isEmpty) return const ProfileEmpty();
@@ -773,16 +773,16 @@ class UserRepostsGrid extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
-        child: Center(child: Text('Error: $e')),
+        child: Center(child: Text(context.t.errorWithMessage(e))),
       ),
       data: (allPosts) {
         final posts =
             allPosts.where((p) => !blockedSet.contains(p.authorUid)).toList();
         if (posts.isEmpty) {
-          return const _EmptyTab(
+          return _EmptyTab(
             icon: Icons.repeat,
-            title: 'No reposts yet',
-            subtitle: 'Posts you repost will show here.',
+            title: context.t.profileNoRepostsYet,
+            subtitle: context.t.profileNoRepostsSubtitle,
           );
         }
         return GridView.builder(
@@ -840,16 +840,16 @@ class UserSavedGrid extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
-        child: Center(child: Text('Error: $e')),
+        child: Center(child: Text(context.t.errorWithMessage(e))),
       ),
       data: (allPosts) {
         final posts =
             allPosts.where((p) => !blockedSet.contains(p.authorUid)).toList();
         if (posts.isEmpty) {
-          return const _EmptyTab(
+          return _EmptyTab(
             icon: Icons.bookmark_border,
-            title: 'No saved posts',
-            subtitle: 'Save posts to view them here later.',
+            title: context.t.profileNoSavedPosts,
+            subtitle: context.t.profileNoSavedSubtitle,
           );
         }
         return GridView.builder(
@@ -915,16 +915,18 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
         ),
         error: (e, _) => Padding(
           padding: const EdgeInsets.all(24),
-          child: Center(child: Text('Error: $e')),
+          child: Center(child: Text(context.t.errorWithMessage(e))),
         ),
         data: (posts) {
           if (posts.isEmpty) {
             return _EmptyTab(
               icon: asked ? Icons.help_outline_rounded : Icons.rate_review,
-              title: asked ? 'No questions asked yet' : 'No answers yet',
+              title: asked
+                  ? context.t.profileNoQuestionsAsked
+                  : context.t.profileNoAnswersYet,
               subtitle: asked
-                  ? 'Questions you ask in Discuss will appear here.'
-                  : 'Questions you answered will appear here.',
+                  ? context.t.profileNoQuestionsAskedSubtitle
+                  : context.t.profileNoAnswersSubtitle,
             );
           }
           return ListView.separated(
@@ -936,7 +938,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
             itemBuilder: (_, i) {
               final p = posts[i];
               final title = p.caption.trim().split('\n').first.trim();
-              final time = _timeAgo(p.createdAt);
+              final time = context.t.timeAgo(p.createdAt);
               return GestureDetector(
                 onTap: () => Navigator.push(
                   context,
@@ -968,7 +970,9 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              title.isEmpty ? 'Untitled question' : title,
+                              title.isEmpty
+                                  ? context.t.qaUntitledQuestion
+                                  : title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -979,7 +983,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$time • ${p.commentsCount} answers',
+                              '$time • ${context.t.homeAnswersCount(p.commentsCount)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.textSecondary,
@@ -1012,7 +1016,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
               children: [
                 Expanded(
                   child: _InnerQaTab(
-                    label: 'Questions Asked',
+                    label: context.t.profileQuestionsAsked,
                     selected: _innerTab == 0,
                     onTap: () => setState(() => _innerTab = 0),
                   ),
@@ -1020,7 +1024,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: _InnerQaTab(
-                    label: 'Questions Answered',
+                    label: context.t.profileQuestionsAnswered,
                     selected: _innerTab == 1,
                     onTap: () => setState(() => _innerTab = 1),
                   ),
@@ -1074,18 +1078,6 @@ class _InnerQaTab extends StatelessWidget {
       ),
     );
   }
-}
-
-String _timeAgo(DateTime? dt) {
-  if (dt == null) return 'just now';
-  final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'now';
-  if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-  if (diff.inDays < 1) return '${diff.inHours}h ago';
-  if (diff.inDays < 30) return '${diff.inDays}d ago';
-  final mo = (diff.inDays / 30).floor();
-  if (mo < 12) return '${mo}mo ago';
-  return '${(mo / 12).floor()}y ago';
 }
 
 class _EmptyTab extends StatelessWidget {
@@ -1157,7 +1149,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     return Scaffold(
       backgroundColor: context.cardBg,
       appBar: AppBar(
-        title: const Text('Posts'),
+        title: Text(context.t.posts),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -1208,9 +1200,9 @@ class _BlockedUserTile extends ConsumerWidget {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
           ),
-          child: const Text(
-            'Unblock',
-            style: TextStyle(
+          child: Text(
+            context.t.unblock,
+            style: const TextStyle(
               color: Colors.red,
               fontSize: 12,
               fontWeight: FontWeight.w600,

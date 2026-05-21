@@ -8,14 +8,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'src/features/widgets/event_detail.dart';
 import 'src/features/widgets/event_unavailable_screen.dart';
+import 'src/l10n/app_strings.dart';
+import 'src/l10n/ckb_material_localizations.dart';
 import 'src/providers/admin_providers.dart';
 import 'src/providers/auth_providers.dart';
+import 'src/providers/locale_provider.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/router/app_router.dart';
 import 'src/services/admin_service.dart';
@@ -250,6 +254,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final language = ref.watch(localeProvider);
     final minVersion =
         ref.watch(adminConfigProvider).valueOrNull?.minAppVersion ?? '';
     return MaterialApp.router(
@@ -257,6 +262,24 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
+      // ── Localization ──────────────────────────────────────────
+      // `locale` is driven by localeProvider; changing it rebuilds
+      // the whole app, including text direction (LTR ↔ RTL), with
+      // no restart needed.
+      locale: language.locale,
+      supportedLocales:
+          AppLanguage.values.map((l) => l.locale).toList(growable: false),
+      localizationsDelegates: const [
+        // Kurdish Sorani (ckb) is not bundled with Flutter, so this
+        // custom delegate maps it onto the Arabic Material/Cupertino
+        // localizations (same RTL behavior, Arabic-script widgets).
+        CkbMaterialLocalizations.delegate,
+        CkbCupertinoLocalizations.delegate,
+        CkbWidgetsLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       routerConfig: router,
       builder: (context, child) {
         // Update system UI to match current theme.
@@ -360,9 +383,7 @@ class _UpdateRequiredScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Center(
@@ -375,7 +396,7 @@ class _UpdateRequiredScreen extends StatelessWidget {
                       size: 64, color: Color(0xFFB05ECC)),
                   const SizedBox(height: 16),
                   Text(
-                    'Update required',
+                    context.t.updateRequiredTitle,
                     textAlign: TextAlign.center,
                     style: Theme.of(context)
                         .textTheme
@@ -384,8 +405,7 @@ class _UpdateRequiredScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Please update to version $required or newer to continue. '
-                    'You are on version $current.',
+                    context.t.updateRequiredBody(required, current),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
@@ -394,7 +414,6 @@ class _UpdateRequiredScreen extends StatelessWidget {
             ),
           ),
         ),
-      ),
     );
   }
 }

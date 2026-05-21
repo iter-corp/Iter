@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
@@ -100,13 +101,13 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       await ref.read(adminServiceProvider).saveConfig(next);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved')),
+          SnackBar(content: Text(context.t.adminSaved)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -119,7 +120,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('App settings'),
+        title: Text(context.t.adminAppSettings),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -132,13 +133,13 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(context.t.save),
           ),
         ],
       ),
       body: cfgAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (cfg) {
           _hydrate(cfg);
           return ListView(
@@ -149,113 +150,108 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               16 + MediaQuery.of(context).padding.bottom + 8,
             ),
             children: [
-              _section('Feature flags'),
+              _section(context.t.adminSectionFeatureFlags),
               _flag(
-                title: 'Stories enabled',
+                title: context.t.adminFlagStories,
                 value: _cfg.storiesEnabled,
                 onChanged: (v) =>
                     setState(() => _cfg = _cfg.copyWith(storiesEnabled: v)),
               ),
               _flag(
-                title: 'Live streaming enabled',
+                title: context.t.adminFlagLive,
                 value: _cfg.liveEnabled,
                 onChanged: (v) =>
                     setState(() => _cfg = _cfg.copyWith(liveEnabled: v)),
               ),
               _flag(
-                title: 'Reposts enabled',
+                title: context.t.adminFlagReposts,
                 value: _cfg.repostsEnabled,
                 onChanged: (v) =>
                     setState(() => _cfg = _cfg.copyWith(repostsEnabled: v)),
               ),
               _flag(
-                title: 'Translate enabled',
+                title: context.t.adminFlagTranslate,
                 value: _cfg.translateEnabled,
                 onChanged: (v) =>
                     setState(() => _cfg = _cfg.copyWith(translateEnabled: v)),
               ),
               const SizedBox(height: 16),
-              _section('Announcement'),
+              _section(context.t.adminSectionAnnouncement),
               _textInputCard(
                 controller: _announcementCtrl,
-                hintText:
-                    'Shown at the top of the home screen. Leave empty to hide.',
+                hintText: context.t.adminAnnouncementHint,
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-              _section('Maintenance'),
+              _section(context.t.adminSectionMaintenance),
               _flag(
-                title: 'Maintenance mode (read-only banner)',
+                title: context.t.adminFlagMaintenance,
                 value: _cfg.maintenanceMode,
                 onChanged: (v) =>
                     setState(() => _cfg = _cfg.copyWith(maintenanceMode: v)),
               ),
               const SizedBox(height: 16),
-              _section('Minimum app version'),
+              _section(context.t.adminSectionMinAppVersion),
               _textInputCard(
                 controller: _minVersionCtrl,
-                hintText: 'e.g. 1.0.0',
+                hintText: context.t.adminMinVersionHint,
               ),
               const SizedBox(height: 16),
-              _section('Contact email'),
+              _section(context.t.adminSectionContactEmail),
               _textInputCard(
                 controller: _contactEmailCtrl,
-                hintText: 'Email shown on "Become an event admin" mailto link',
+                hintText: context.t.adminContactEmailHint,
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
-              _section('App store links (Invite friends)'),
+              _section(context.t.adminSectionAppStoreLinks),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Used by the "Invite friends" button in the profile. The app picks '
-                  'the right link for the user\'s platform.',
+                  context.t.adminAppStoreLinksDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _textInputCard(
                 controller: _iosUrlCtrl,
-                hintText: 'iOS App Store URL (https://apps.apple.com/...)',
+                hintText: context.t.adminIosUrlHint,
                 keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 8),
               _textInputCard(
                 controller: _androidUrlCtrl,
-                hintText:
-                    'Google Play URL (https://play.google.com/store/apps/details?id=...)',
+                hintText: context.t.adminAndroidUrlHint,
                 keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 16),
-              _section('Event types'),
+              _section(context.t.adminSectionEventTypes),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Options admins choose from when creating an event, and users '
-                  'filter notifications by.',
+                  context.t.adminEventTypesDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.eventTypes,
                 controller: _newTypeCtrl,
-                hint: 'Add an event type',
+                hint: context.t.adminAddEventType,
                 onAdd: _addEventType,
                 onRemove: _removeEventType,
               ),
               const SizedBox(height: 16),
-              _section('Event countries'),
+              _section(context.t.adminSectionEventCountries),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Countries admins tag events with, and users filter '
-                  'notifications by.',
+                  context.t.adminEventCountriesDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.eventCountries,
                 controller: _newCountryCtrl,
-                hint: 'Add a country',
+                hint: context.t.adminAddCountry,
                 onAdd: _addCountry,
                 onRemove: _removeCountry,
               ),
@@ -498,7 +494,7 @@ class _FocusInputRowState extends State<_FocusInputRow> {
               decoration: widget.decoration,
             ),
           ),
-          TextButton(onPressed: widget.onAdd, child: const Text('Add')),
+          TextButton(onPressed: widget.onAdd, child: Text(context.t.add)),
         ],
       ),
     );

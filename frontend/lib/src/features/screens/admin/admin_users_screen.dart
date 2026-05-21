@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 
@@ -21,7 +22,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Users'),
+        title: Text(context.t.adminTileUsersTitle),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -34,7 +35,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
-                hintText: 'Search by username or email',
+                hintText: context.t.adminUsersSearchHint,
                 filled: true,
                 fillColor: context.cardBg,
                 border: OutlineInputBorder(
@@ -47,11 +48,11 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
           Expanded(
             child: usersAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
               data: (users) {
                 if (users.isEmpty) {
                   return Center(
-                      child: Text('No users match',
+                      child: Text(context.t.adminNoUsersMatch,
                           style: TextStyle(color: context.textSecondary)));
                 }
                 return ListView.separated(
@@ -102,28 +103,28 @@ class _UserTile extends ConsumerWidget {
           ),
           if (role == 'admin')
             Container(
-              margin: const EdgeInsets.only(left: 6),
+              margin: const EdgeInsetsDirectional.only(start: 6),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: context.purpleSoft,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('ADMIN',
-                  style: TextStyle(
+              child: Text(context.t.adminBadge,
+                  style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFD044E8))),
             ),
           if (suspended)
             Container(
-              margin: const EdgeInsets.only(left: 6),
+              margin: const EdgeInsetsDirectional.only(start: 6),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: Colors.red.shade50,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('SUSPENDED',
-                  style: TextStyle(
+              child: Text(context.t.adminSuspendedBadge,
+                  style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       color: Colors.red)),
@@ -141,16 +142,19 @@ class _UserTile extends ConsumerWidget {
         itemBuilder: (_) => [
           PopupMenuItem(
             value: 'role',
-            child:
-                Text(role == 'admin' ? 'Demote to user' : 'Promote to admin'),
+            child: Text(role == 'admin'
+                ? context.t.adminDemoteToUser
+                : context.t.adminPromoteToAdmin),
           ),
           PopupMenuItem(
             value: 'suspend',
-            child: Text(suspended ? 'Unsuspend' : 'Suspend'),
+            child: Text(
+                suspended ? context.t.adminUnsuspend : context.t.adminSuspend),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'delete',
-            child: Text('Delete user', style: TextStyle(color: Colors.red)),
+            child: Text(context.t.adminDeleteUser,
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -169,30 +173,29 @@ class _UserTile extends ConsumerWidget {
         final ok = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('Delete user permanently?'),
-            content: const Text(
-                'This will delete ALL user data: posts, comments, stories, chats, followers, and notifications. Their email will be blacklisted.\n\nThis cannot be undone.'),
+            title: Text(context.t.adminDeleteUserPermanentlyTitle),
+            content: Text(context.t.adminDeleteUserPermanentlyBody),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
+                  child: Text(context.t.cancel)),
               TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Delete everything',
-                      style: TextStyle(color: Colors.red))),
+                  child: Text(context.t.adminDeleteEverything,
+                      style: const TextStyle(color: Colors.red))),
             ],
           ),
         );
         if (ok == true) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Deleting all user data...')),
+              SnackBar(content: Text(context.t.adminDeletingAllUserData)),
             );
           }
           await admin.deleteUser(uid);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('User deleted and blacklisted')),
+              SnackBar(content: Text(context.t.adminUserDeletedBlacklisted)),
             );
           }
         }
@@ -202,7 +205,7 @@ class _UserTile extends ConsumerWidget {
       print('[admin] action=$action failed: $e\n$st');
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
       }
     }
   }

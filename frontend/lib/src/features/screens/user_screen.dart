@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/block_providers.dart';
@@ -116,7 +117,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           _localIsRequested = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Follow action failed: $e')),
+          SnackBar(content: Text(context.t.userFollowActionFailed(e))),
         );
       }
     } finally {
@@ -129,6 +130,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     required String targetUsername,
     String? targetAvatar,
   }) async {
+    // Keys are stable English values stored in Firestore; labels are
+    // resolved to the active language only for display.
     const reasons = <String>[
       'Spam or scam profile',
       'Impersonation',
@@ -138,6 +141,24 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       'Violence or threats',
       'Something else',
     ];
+    String reasonLabel(String key) {
+      switch (key) {
+        case 'Spam or scam profile':
+          return context.t.userReportReasonSpam;
+        case 'Impersonation':
+          return context.t.userReportReasonImpersonation;
+        case 'Harassment or bullying':
+          return context.t.userReportReasonHarassment;
+        case 'Hate speech':
+          return context.t.userReportReasonHateSpeech;
+        case 'Nudity or sexual content':
+          return context.t.userReportReasonNudity;
+        case 'Violence or threats':
+          return context.t.userReportReasonViolence;
+        default:
+          return context.t.userReportReasonOther;
+      }
+    }
 
     final detailsCtrl = TextEditingController();
     String selectedReason = reasons.first;
@@ -164,10 +185,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Report profile',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    Text(
+                      context.t.userReportProfile,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
                     for (final reason in reasons)
@@ -182,7 +203,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                 if (v == null) return;
                                 setModalState(() => selectedReason = v);
                               },
-                        title: Text(reason),
+                        title: Text(reasonLabel(reason)),
                       ),
                     const SizedBox(height: 6),
                     TextField(
@@ -190,9 +211,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       maxLines: 3,
                       maxLength: 2000,
                       enabled: !sending,
-                      decoration: const InputDecoration(
-                        labelText: 'Details (optional)',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: context.t.userReportDetailsOptional,
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -202,7 +223,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                           child: OutlinedButton(
                             onPressed:
                                 sending ? null : () => Navigator.pop(ctx),
-                            child: const Text('Cancel'),
+                            child: Text(context.t.cancel),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -227,9 +248,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                       if (!context.mounted) return;
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
-                                        const SnackBar(
-                                            content:
-                                                Text('Report sent to admins')),
+                                        SnackBar(
+                                            content: Text(context
+                                                .t.postCardReportSentAdmins)),
                                       );
                                     } catch (e) {
                                       if (!ctx.mounted) return;
@@ -239,7 +260,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                       );
                                     }
                                   },
-                            child: const Text('Send report'),
+                            child: Text(context.t.homeSendReport),
                           ),
                         ),
                       ],
@@ -283,7 +304,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _messageBusy = false);
@@ -323,7 +344,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   child: uids.isEmpty
                       ? Center(
                           child: Text(
-                            'No users yet',
+                            context.t.profileNoUsersYet,
                             style: TextStyle(color: context.textSecondary),
                           ),
                         )
@@ -351,7 +372,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                     : null,
                               ),
                               title: userAsync.when(
-                                loading: () => const Text('Loading...'),
+                                loading: () => Text(context.t.loading),
                                 error: (_, __) => Text(uid),
                                 data: (user) =>
                                     Text((user?['username'] as String?) ?? uid),
@@ -395,29 +416,29 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       backgroundColor: context.cardBg,
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (user) {
           if (user == null) {
             return SafeArea(
               child: Column(
                 children: [
                   Align(
-                    alignment: Alignment.topLeft,
+                    alignment: AlignmentDirectional.topStart,
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
-                      child: Text('User not found'),
+                      child: Text(context.t.userNotFound),
                     ),
                   ),
                 ],
               ),
             );
           }
-          final username = (user['username'] as String?) ?? 'User';
+          final username = (user['username'] as String?) ?? context.t.user;
           final displayName = (user['name'] as String?) ?? username;
           final handle = (user['handle'] as String?) ?? '@$username';
           final avatarUrl = user['avatarUrl'] as String?;
@@ -469,7 +490,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('User unblocked')),
+                            SnackBar(content: Text(context.t.userUnblocked)),
                           );
                         }
                       } else {
@@ -479,7 +500,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('User blocked')),
+                            SnackBar(content: Text(context.t.userBlocked)),
                           );
                         }
                       }
@@ -487,9 +508,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              'Failed to block/unblock: $e\nDid you deploy the Firestore rules?',
-                            ),
+                            content:
+                                Text(context.t.userFailedBlockUnblock(e)),
                           ),
                         );
                       }
@@ -512,11 +532,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     following: following,
                     posts: posts,
                     onFollowersTap: () => _showUserListSheet(
-                      title: 'Followers',
+                      title: context.t.followers,
                       uids: followersAsync.value ?? const [],
                     ),
                     onFollowingTap: () => _showUserListSheet(
-                      title: 'Following',
+                      title: context.t.following,
                       uids: followingAsync.value ?? const [],
                     ),
                     isPrivateAndNotFollowing: enforcePrivacy,
@@ -562,16 +582,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         const SizedBox(height: 12),
                         Text(
                           isBlockedBy
-                              ? 'User not found'
-                              : 'You have blocked this user',
+                              ? context.t.userNotFound
+                              : context.t.userYouBlockedThisUser,
                           style: TextStyle(
                               fontSize: 16, color: context.textSecondary),
                         ),
                         if (isBlocked && !isBlockedBy) ...[
                           const SizedBox(height: 6),
                           Text(
-                            'Their posts, reposts and saved items are hidden, '
-                            'and they can\'t message you.',
+                            context.t.userBlockedContentHidden,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
@@ -583,7 +602,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               icon: const Icon(Icons.lock_open, size: 18),
-                              label: const Text('Unblock'),
+                              label: Text(context.t.unblock),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFB05ECC),
                                 foregroundColor: Colors.white,
@@ -604,15 +623,17 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                       );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text('User unblocked')),
+                                      SnackBar(
+                                          content:
+                                              Text(context.t.userUnblocked)),
                                     );
                                   }
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Failed to unblock: $e'),
+                                        content: Text(
+                                            context.t.userFailedUnblock(e)),
                                       ),
                                     );
                                   }
@@ -648,14 +669,14 @@ class _UserPostsGrid extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
-        child: Center(child: Text('Error: $e')),
+        child: Center(child: Text(context.t.errorWithMessage(e))),
       ),
       data: (posts) {
         if (posts.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 60),
             child: Center(
-              child: Text('No posts yet',
+              child: Text(context.t.noPosts,
                   style: TextStyle(color: context.textSecondary)),
             ),
           );
@@ -680,14 +701,14 @@ class _UserRepostsGrid extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
-        child: Center(child: Text('Error: $e')),
+        child: Center(child: Text(context.t.errorWithMessage(e))),
       ),
       data: (posts) {
         if (posts.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 60),
             child: Center(
-              child: Text('No reposts yet',
+              child: Text(context.t.profileNoRepostsYet,
                   style: TextStyle(color: context.textSecondary)),
             ),
           );
@@ -725,7 +746,7 @@ class _UserQaActivitySectionState
         ),
         error: (e, _) => Padding(
           padding: const EdgeInsets.all(24),
-          child: Center(child: Text('Error: $e')),
+          child: Center(child: Text(context.t.errorWithMessage(e))),
         ),
         data: (posts) {
           if (posts.isEmpty) {
@@ -733,7 +754,9 @@ class _UserQaActivitySectionState
               padding: const EdgeInsets.symmetric(vertical: 60),
               child: Center(
                 child: Text(
-                  asked ? 'No questions asked yet' : 'No answers yet',
+                  asked
+                      ? context.t.profileNoQuestionsAsked
+                      : context.t.profileNoAnswersYet,
                   style: TextStyle(color: context.textSecondary),
                 ),
               ),
@@ -748,7 +771,7 @@ class _UserQaActivitySectionState
             itemBuilder: (_, i) {
               final p = posts[i];
               final title = p.caption.trim().split('\n').first.trim();
-              final time = _userQaTimeAgo(p.createdAt);
+              final time = context.t.timeAgo(p.createdAt);
               return GestureDetector(
                 onTap: () => Navigator.push(
                   context,
@@ -780,7 +803,9 @@ class _UserQaActivitySectionState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              title.isEmpty ? 'Untitled question' : title,
+                              title.isEmpty
+                                  ? context.t.qaUntitledQuestion
+                                  : title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -791,7 +816,7 @@ class _UserQaActivitySectionState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$time • ${p.commentsCount} answers',
+                              '$time • ${context.t.homeAnswersCount(p.commentsCount)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.textSecondary,
@@ -824,7 +849,7 @@ class _UserQaActivitySectionState
               children: [
                 Expanded(
                   child: _UserQaInnerTab(
-                    label: 'Questions Asked',
+                    label: context.t.profileQuestionsAsked,
                     selected: _innerTab == 0,
                     onTap: () => setState(() => _innerTab = 0),
                   ),
@@ -832,7 +857,7 @@ class _UserQaActivitySectionState
                 const SizedBox(width: 6),
                 Expanded(
                   child: _UserQaInnerTab(
-                    label: 'Questions Answered',
+                    label: context.t.profileQuestionsAnswered,
                     selected: _innerTab == 1,
                     onTap: () => setState(() => _innerTab = 1),
                   ),
@@ -887,18 +912,6 @@ class _UserQaInnerTab extends StatelessWidget {
       ),
     );
   }
-}
-
-String _userQaTimeAgo(DateTime? dt) {
-  if (dt == null) return 'just now';
-  final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'now';
-  if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-  if (diff.inDays < 1) return '${diff.inHours}h ago';
-  if (diff.inDays < 30) return '${diff.inDays}d ago';
-  final mo = (diff.inDays / 30).floor();
-  if (mo < 12) return '${mo}mo ago';
-  return '${(mo / 12).floor()}y ago';
 }
 
 Widget _postsGrid(BuildContext context, List<Post> posts) {

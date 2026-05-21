@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/profile_visitor_providers.dart';
@@ -16,16 +17,6 @@ import '../../theme/app_theme.dart';
 class ProfileVisitorsScreen extends ConsumerWidget {
   const ProfileVisitorsScreen({super.key});
 
-  String _ago(DateTime? dt) {
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${(diff.inDays / 7).floor()}w ago';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final visitorsAsync = ref.watch(myProfileVisitorsProvider);
@@ -34,7 +25,7 @@ class ProfileVisitorsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.cardBg,
       appBar: AppBar(
-        title: const Text('Profile visitors'),
+        title: Text(context.t.profileVisitors),
         centerTitle: false,
       ),
       body: Column(
@@ -48,9 +39,9 @@ class ProfileVisitorsScreen extends ConsumerWidget {
                 const SizedBox(width: 10),
                 Text(
                   countAsync.when(
-                    data: (c) => '$c ${c == 1 ? 'visitor' : 'visitors'}',
-                    loading: () => '… visitors',
-                    error: (_, __) => '— visitors',
+                    data: (c) => context.t.profileVisitorsCount(c),
+                    loading: () => context.t.profileVisitorsCount('…'),
+                    error: (_, __) => context.t.profileVisitorsCount('—'),
                   ),
                   style: const TextStyle(
                     fontSize: 16,
@@ -65,7 +56,8 @@ class ProfileVisitorsScreen extends ConsumerWidget {
             child: visitorsAsync.when(
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) =>
+                  Center(child: Text(context.t.errorWithMessage(e))),
               data: (visitors) {
                 if (visitors.isEmpty) {
                   return Center(
@@ -78,7 +70,7 @@ class ProfileVisitorsScreen extends ConsumerWidget {
                               size: 48, color: context.textMuted),
                           const SizedBox(height: 12),
                           Text(
-                            'No profile visits yet',
+                            context.t.profileNoVisitsYet,
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
@@ -87,8 +79,7 @@ class ProfileVisitorsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'When other users open your profile, they\'ll '
-                            'show up here.',
+                            context.t.profileNoVisitsSubtitle,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
@@ -107,7 +98,7 @@ class ProfileVisitorsScreen extends ConsumerWidget {
                     final v = visitors[i];
                     return _VisitorTile(
                       entry: v,
-                      relative: _ago(v.lastVisitedAt),
+                      relative: context.t.timeAgo(v.lastVisitedAt),
                     );
                   },
                 );
@@ -132,6 +123,7 @@ class _VisitorTile extends ConsumerWidget {
     final data = userAsync.value;
     final username = (data?['username'] as String?) ?? '…';
     final fullName = (data?['fullName'] as String?) ?? '';
+    final t = context.t;
     final avatar = (data?['avatarUrl'] as String?) ?? '';
 
     return ListTile(
@@ -152,10 +144,10 @@ class _VisitorTile extends ConsumerWidget {
       subtitle: Text(
         fullName.isEmpty
             ? (entry.visitCount > 1
-                ? 'Visited $relative · ${entry.visitCount}× total'
-                : 'Visited $relative')
+                ? t.profileVisitedTimes(relative, entry.visitCount)
+                : t.profileVisited(relative))
             : (entry.visitCount > 1
-                ? '$fullName · ${entry.visitCount}× visits'
+                ? t.profileVisitorVisits(fullName, entry.visitCount)
                 : fullName),
         style: TextStyle(color: context.textSecondary, fontSize: 12),
       ),

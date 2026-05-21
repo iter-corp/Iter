@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/storage_service.dart';
@@ -47,10 +48,13 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   }
 
   Future<void> _useCurrentLocationForPlace() async {
+    final servicesOffMsg = context.t.createPostLocationServicesOff;
+    final permissionDeniedMsg = context.t.createPostLocationPermissionDenied;
+    final currentLocationLabel = context.t.createPostCurrentLocation;
     try {
       final enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) {
-        throw 'Location services are off. Enable them in device settings.';
+        throw servicesOffMsg;
       }
 
       var perm = await Geolocator.checkPermission();
@@ -59,7 +63,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
-        throw 'Location permission denied.';
+        throw permissionDeniedMsg;
       }
 
       final pos = await Geolocator.getCurrentPosition(
@@ -94,7 +98,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         if (place.isNotEmpty) {
           _placeNameCtrl.text = place;
         } else if (_placeNameCtrl.text.trim().isEmpty) {
-          _placeNameCtrl.text = 'Current location';
+          _placeNameCtrl.text = currentLocationLabel;
         }
       });
     } catch (e) {
@@ -112,8 +116,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final query = [name, city].where((s) => s.isNotEmpty).join(', ');
     if (query.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Type a place name or city first'),
+        SnackBar(
+          content: Text(context.t.createPostTypePlaceFirst),
         ),
       );
       return;
@@ -123,7 +127,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (results.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No coordinates found for "$query"')),
+          SnackBar(
+              content: Text(context.t.createPostNoCoordinates(query))),
         );
         return;
       }
@@ -136,7 +141,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lookup failed: $e')),
+        SnackBar(content: Text(context.t.createPostLookupFailed(e))),
       );
     }
   }
@@ -200,7 +205,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         'exists=$exists size=$size');
     if (!exists || size <= 0) {
       if (mounted) {
-        AppFeedback.showError(context, 'Could not read the selected video.');
+        AppFeedback.showError(
+            context, context.t.createPostCouldNotReadVideo);
       }
       return false;
     }
@@ -210,8 +216,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (mounted) {
         AppFeedback.showError(
           context,
-          'Video is too large (${mb}MB). The limit is 30MB — '
-          'pick a shorter clip or compress it first.',
+          context.t.createPostVideoTooLarge(mb),
         );
       }
       return false;
@@ -233,13 +238,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final placeCity = _placeCityCtrl.text.trim();
     if (caption.isEmpty && _pickedImages.isEmpty && _pickedVideos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add a caption, image, or video')),
+        SnackBar(
+            content: Text(context.t.createPostAddCaptionImageVideo)),
       );
       return;
     }
     // Capture the messenger up-front so the success toast survives popping
     // this route after the post is created.
     final messenger = ScaffoldMessenger.of(context);
+    final publishedWithContentMsg = context.t.createPostPublishedWithContent;
+    final publishedMsg = context.t.createPostPublished;
+    final t = context.t;
     setState(() => _posting = true);
     try {
       // If place name is entered but coordinates aren't set, geocode the place
@@ -308,14 +317,14 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         AppFeedback.showSuccessOn(
           messenger,
           (urls.isNotEmpty || videoUrls.isNotEmpty)
-              ? 'Post published — content uploaded'
-              : 'Post published',
+              ? publishedWithContentMsg
+              : publishedMsg,
         );
       }
     } catch (e, st) {
       debugPrint('[CreatePost] _submit FAILED: $e\n$st');
       if (mounted) {
-        AppFeedback.showError(context, 'Could not publish post: $e');
+        AppFeedback.showError(context, t.createPostCouldNotPublish(e));
       }
     } finally {
       if (mounted) setState(() => _posting = false);
@@ -345,10 +354,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close, size: 26),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'New post',
-                        style: TextStyle(
+                        context.t.createPostNewPost,
+                        style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.2,
@@ -386,7 +395,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  username.isEmpty ? 'You' : username,
+                                  username.isEmpty
+                                      ? context.t.createPostYou
+                                      : username,
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -420,7 +431,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                           style: TextStyle(
                               fontSize: 15, color: context.textPrimary),
                           decoration: InputDecoration(
-                            hintText: "What's happening? Share your moment…",
+                            hintText: context.t.createPostCaptionHint,
                             hintStyle: TextStyle(
                               color: context.textSecondary,
                               fontSize: 15,
@@ -445,7 +456,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Place',
+                              context.t.createPostPlace,
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -454,7 +465,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                             const SizedBox(height: 8),
                             _PostFormField(
                               controller: _placeNameCtrl,
-                              hintText: 'Place name (optional)',
+                              hintText: context.t.createPostPlaceNameHint,
                               icon: Icons.place_outlined,
                               onChanged: (_) {
                                 if (_placeFromCurrentLocation) {
@@ -466,7 +477,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                             const SizedBox(height: 10),
                             _PostFormField(
                               controller: _placeCityCtrl,
-                              hintText: 'City (optional)',
+                              hintText: context.t.createPostCityHint,
                               icon: Icons.location_city_outlined,
                               onChanged: (_) {
                                 if (_placeFromCurrentLocation) {
@@ -483,8 +494,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                                     onPressed: _useCurrentLocationForPlace,
                                     icon: const Icon(
                                         Icons.my_location_rounded),
-                                    label: const Text(
-                                      'Use current location',
+                                    label: Text(
+                                      context.t
+                                          .createPostUseCurrentLocation,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -494,8 +506,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                                   child: TextButton.icon(
                                     onPressed: _locateTypedPlaceOnMap,
                                     icon: const Icon(Icons.map_outlined),
-                                    label: const Text(
-                                      'Locate on map',
+                                    label: Text(
+                                      context.t.createPostLocateOnMap,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -540,25 +552,25 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       // ACTION TILES
                       _ActionTile(
                         icon: Icons.photo_library_outlined,
-                        label: 'Photo from gallery',
+                        label: context.t.createPostPhotoFromGallery,
                         onTap: _pickImages,
                       ),
                       const SizedBox(height: 8),
                       _ActionTile(
                         icon: Icons.camera_alt_outlined,
-                        label: 'Take a photo',
+                        label: context.t.createPostTakeAPhoto,
                         onTap: _pickFromCamera,
                       ),
                       const SizedBox(height: 8),
                       _ActionTile(
                         icon: Icons.video_library_outlined,
-                        label: 'Video from gallery',
+                        label: context.t.createPostVideoFromGallery,
                         onTap: _pickVideoFromGallery,
                       ),
                       const SizedBox(height: 8),
                       _ActionTile(
                         icon: Icons.videocam_outlined,
-                        label: 'Record a video',
+                        label: context.t.createPostRecordAVideo,
                         onTap: _pickVideoFromCamera,
                       ),
                       const SizedBox(height: 6),
@@ -574,7 +586,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Videos must be 30MB or less.',
+                                context.t.createPostVideoSizeLimit,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: context.textMuted,
@@ -602,9 +614,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _bottomTab('Post', 0, true),
-                        _bottomTab('Story', 1, false),
-                        _bottomTab('Live', 2, false),
+                        _bottomTab(context.t.post, 0, true),
+                        _bottomTab(context.t.story, 1, false),
+                        _bottomTab(context.t.live, 2, false),
                       ],
                     ),
                   ),
@@ -683,9 +695,9 @@ class _PostButton extends StatelessWidget {
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: Colors.white),
               )
-            : const Text(
-                'Post',
-                style: TextStyle(
+            : Text(
+                context.t.post,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -728,7 +740,9 @@ class _PrivacyChip extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              isPrivate ? 'Followers only' : 'Public',
+              isPrivate
+                  ? context.t.createPostFollowersOnly
+                  : context.t.createPostPublic,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,

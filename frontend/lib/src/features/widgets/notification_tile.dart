@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 
 enum NotificationType { follow, followBack, image }
@@ -92,10 +93,10 @@ class NotificationTile extends StatelessWidget {
 
     switch (trailingType) {
       case NotificationType.followBack:
-        return _buildButton(context, 'Follow back', onFollowTap);
+        return _buildButton(context, context.t.notifFollowBack, onFollowTap);
 
       case NotificationType.follow:
-        return _buildButton(context, 'Follow', onFollowTap);
+        return _buildButton(context, context.t.notifFollow, onFollowTap);
 
       case NotificationType.image:
         if (postImage == null || postImage!.isEmpty) {

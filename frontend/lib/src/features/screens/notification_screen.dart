@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/event_chat_providers.dart';
 import '../../providers/follow_providers.dart';
@@ -109,14 +110,14 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     }
   }
 
-  String _emptyLabel() {
+  String _emptyLabel(BuildContext context) {
     switch (_selectedCategory) {
       case _NotificationCategory.activity:
-        return 'No activity notifications yet';
+        return context.t.notifNoActivity;
       case _NotificationCategory.follow:
-        return 'No follow notifications yet';
+        return context.t.notifNoFollow;
       case _NotificationCategory.event:
-        return 'No event notifications yet';
+        return context.t.notifNoEvent;
     }
   }
 
@@ -151,9 +152,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     icon: const Icon(Icons.arrow_back, size: 26),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Notifications',
-                    style: TextStyle(
+                  Text(
+                    context.t.notifications,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -164,9 +165,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       onPressed: () => ref
                           .read(notificationServiceProvider)
                           .markAllRead(user.uid),
-                      child: const Text(
-                        'Mark all read',
-                        style: TextStyle(
+                      child: Text(
+                        context.t.markAllRead,
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFFB05ECC),
                         ),
@@ -183,7 +184,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                 child: Row(
                   children: [
                     _CategoryChip(
-                      label: 'Activity',
+                      label: context.t.notifCategoryActivity,
                       selected:
                           _selectedCategory == _NotificationCategory.activity,
                       unreadCount:
@@ -194,7 +195,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     ),
                     const SizedBox(width: 8),
                     _CategoryChip(
-                      label: 'Follow',
+                      label: context.t.notifCategoryFollow,
                       selected:
                           _selectedCategory == _NotificationCategory.follow,
                       unreadCount:
@@ -205,7 +206,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     ),
                     const SizedBox(width: 8),
                     _CategoryChip(
-                      label: 'Event',
+                      label: context.t.notifCategoryEvent,
                       selected:
                           _selectedCategory == _NotificationCategory.event,
                       unreadCount:
@@ -224,7 +225,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             Expanded(
               child: notificationsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) =>
+                    Center(child: Text(context.t.errorWithMessage(e))),
                 data: (notifications) {
                   final followRequests =
                       followRequestsAsync.valueOrNull ?? const <String>[];
@@ -257,7 +259,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   if (items.isEmpty) {
                     return Center(
                       child: Text(
-                        _emptyLabel(),
+                        _emptyLabel(context),
                         style: TextStyle(color: context.textMuted),
                       ),
                     );
@@ -386,7 +388,7 @@ class _FollowStateButton extends StatelessWidget {
           color: isFollowing ? context.borderColor : const Color(0xFFB44FFF),
         ),
         child: Text(
-          isFollowing ? 'Following' : 'Follow back',
+          isFollowing ? context.t.notifFollowing : context.t.notifFollowBack,
           style: TextStyle(
             color: isFollowing ? context.textPrimary : Colors.white,
             fontSize: 12,
@@ -438,8 +440,8 @@ class _NotificationItem extends ConsumerWidget {
 
         switch (notif.type) {
           case 'follow':
-            title = '$username started following you';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifStartedFollowing(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.followBack;
             if (currentUser != null) {
               onFollow = () => ref.read(followServiceProvider).follow(
@@ -460,8 +462,8 @@ class _NotificationItem extends ConsumerWidget {
             }
             break;
           case 'follow_request':
-            title = '$username requested to follow you';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifRequestedToFollow(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             if (currentUser != null) {
               final followRequestsAsync =
@@ -490,7 +492,9 @@ class _NotificationItem extends ConsumerWidget {
                 } else {
                   // Request was already processed (accepted or rejected)
                   trailingWidget = Text(
-                    isFollower ? 'Accepted' : 'Rejected',
+                    isFollower
+                        ? context.t.notifAccepted
+                        : context.t.notifRejected,
                     style:
                         TextStyle(color: context.textSecondary, fontSize: 12),
                   );
@@ -499,92 +503,92 @@ class _NotificationItem extends ConsumerWidget {
             }
             break;
           case 'like':
-            title = '$username liked your post';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifLikedYourPost(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             isLike = true;
             break;
           case 'comment_like':
-            title = '$username liked your comment';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifLikedYourComment(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             isLike = true;
             break;
           case 'comment':
-            title = '$username commented on your post';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifCommentedOnPost(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'reply':
-            title = '$username replied to your comment';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifRepliedToComment(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'qa_answer':
-            title = '$username answered your question';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifAnsweredQuestion(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'qa_reply':
-            title = '$username replied to your answer';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifRepliedToAnswer(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'qa_answer_like':
-            title = '$username liked your answer';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifLikedYourAnswer(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             isLike = true;
             break;
           case 'qa_answer_dislike':
-            title = '$username disliked your answer';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifDislikedYourAnswer(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'message':
-            title = '$username sent you a message';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifSentYouMessage(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'event_approved':
-            title = 'Your event registration was approved';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifEventApproved;
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'event_rejected':
-            title = 'Your event registration was rejected';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifEventRejected;
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'event_invited':
-            title = '$username added you to an event group';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifAddedToEventGroup(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'event_removed':
-            title = 'You were removed from an event group';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifRemovedFromEventGroup;
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           case 'new_event':
             final eventName = (notif.title ?? '').trim();
             title = eventName.isEmpty
-                ? 'A new event was published'
-                : 'New event: $eventName';
+                ? context.t.notifNewEventPublished
+                : context.t.notifNewEventNamed(eventName);
             final loc = (notif.subtitle ?? '').trim();
             subtitle = loc.isEmpty
-                ? _timeAgo(notif.createdAt)
-                : '$loc · ${_timeAgo(notif.createdAt)}';
+                ? context.t.timeAgo(notif.createdAt)
+                : '$loc · ${context.t.timeAgo(notif.createdAt)}';
             trailingType = NotificationType.image;
             break;
           case 'follow_accept':
-            title = '$username accepted your follow request';
-            subtitle = _timeAgo(notif.createdAt);
+            title = context.t.notifAcceptedFollowRequest(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
             break;
           default:
             title = username;
-            subtitle = _timeAgo(notif.createdAt);
+            subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.image;
         }
 
@@ -636,8 +640,8 @@ class _NotificationItem extends ConsumerWidget {
           key: ValueKey(notif.id),
           direction: DismissDirection.endToStart,
           background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
+            alignment: AlignmentDirectional.centerEnd,
+            padding: const EdgeInsetsDirectional.only(end: 20),
             color: Colors.red.shade400,
             child: const Icon(Icons.delete_outline, color: Colors.white),
           ),
@@ -812,10 +816,11 @@ class _NotificationItem extends ConsumerWidget {
     final db = FirebaseFirestore.instance;
     final snap = await db.collection('eventChats').doc(notif.targetId!).get();
     final d = snap.data() ?? {};
-    final title = (d['eventTitle'] as String?) ?? 'Event';
     final adminUid = (d['adminUid'] as String?) ?? '';
 
     if (!context.mounted) return;
+    final title =
+        (d['eventTitle'] as String?) ?? context.t.notifEventFallbackTitle;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -837,10 +842,11 @@ class _NotificationItem extends ConsumerWidget {
     // Fetch actor (the sender) info for ChatScreen header.
     final actorSnap = await db.collection('users').doc(notif.actorUid).get();
     final actorData = actorSnap.data() ?? {};
-    final otherName = (actorData['username'] as String?) ?? 'User';
     final otherAvatar = (actorData['avatarUrl'] as String?) ?? '';
 
     if (!context.mounted) return;
+    final otherName =
+        (actorData['username'] as String?) ?? context.t.notifUserFallback;
 
     Navigator.push(
       context,
@@ -855,15 +861,6 @@ class _NotificationItem extends ConsumerWidget {
     );
   }
 
-  String _timeAgo(DateTime? dt) {
-    if (dt == null) return '';
-    final d = DateTime.now().difference(dt);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inMinutes < 60) return '${d.inMinutes}m';
-    if (d.inHours < 24) return '${d.inHours}h';
-    if (d.inDays < 7) return '${d.inDays}d';
-    return '${(d.inDays / 7).floor()}w';
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -902,8 +899,8 @@ class _InviteActionsState extends ConsumerState<_InviteActions> {
       widget.onDone?.call();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -923,9 +920,9 @@ class _InviteActionsState extends ConsumerState<_InviteActions> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFE04E5C)),
             ),
-            child: const Text(
-              'Reject',
-              style: TextStyle(
+            child: Text(
+              context.t.notifReject,
+              style: const TextStyle(
                   color: Color(0xFFE04E5C),
                   fontSize: 12,
                   fontWeight: FontWeight.w600),
@@ -941,9 +938,9 @@ class _InviteActionsState extends ConsumerState<_InviteActions> {
               borderRadius: BorderRadius.circular(8),
               color: const Color(0xFFB44FFF),
             ),
-            child: const Text(
-              'Accept',
-              style: TextStyle(
+            child: Text(
+              context.t.notifAccept,
+              style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.w600),
@@ -998,8 +995,8 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
       if (mounted) setState(() => _success = true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1027,8 +1024,8 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
       if (mounted) setState(() => _success = true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1038,7 +1035,7 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
   @override
   Widget build(BuildContext context) {
     if (_success) {
-      return Text('Processed',
+      return Text(context.t.notifProcessed,
           style: TextStyle(color: context.textSecondary, fontSize: 12));
     }
     if (_busy) {
@@ -1059,9 +1056,9 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFE04E5C)),
             ),
-            child: const Text(
-              'Reject',
-              style: TextStyle(
+            child: Text(
+              context.t.notifReject,
+              style: const TextStyle(
                   color: Color(0xFFE04E5C),
                   fontSize: 12,
                   fontWeight: FontWeight.w600),
@@ -1077,9 +1074,9 @@ class _FollowRequestActionsState extends ConsumerState<_FollowRequestActions> {
               borderRadius: BorderRadius.circular(8),
               color: const Color(0xFFB44FFF),
             ),
-            child: const Text(
-              'Accept',
-              style: TextStyle(
+            child: Text(
+              context.t.notifAccept,
+              style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.w600),

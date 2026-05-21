@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/responsive.dart';
@@ -169,7 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final pad = context.scaleW(16, 24);
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up profile')),
+      appBar: AppBar(title: Text(context.t.onboardingSetupProfile)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(pad, pad, pad, pad + context.bottomSafeInset),
@@ -180,27 +181,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               children: [
                 TextFormField(
                   controller: _usernameCtrl,
-                  decoration: const InputDecoration(labelText: 'Username'),
+                  decoration: InputDecoration(labelText: context.t.username),
                   validator: (v) => (v == null || v.trim().length < 3)
-                      ? 'Min 3 characters'
+                      ? context.t.onboardingMin3Chars
                       : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _bioCtrl,
-                  decoration: const InputDecoration(labelText: 'Bio'),
+                  decoration: InputDecoration(labelText: context.t.bio),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   initialValue: _gender,
-                  decoration: const InputDecoration(labelText: 'Gender'),
-                  items: const [
-                    DropdownMenuItem(value: 'Male', child: Text('Male')),
-                    DropdownMenuItem(value: 'Female', child: Text('Female')),
+                  decoration:
+                      InputDecoration(labelText: context.t.onboardingGender),
+                  items: [
                     DropdownMenuItem(
-                        value: 'Non-binary', child: Text('Non-binary')),
-                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                        value: 'Male',
+                        child: Text(context.t.onboardingGenderMale)),
+                    DropdownMenuItem(
+                        value: 'Female',
+                        child: Text(context.t.onboardingGenderFemale)),
+                    DropdownMenuItem(
+                        value: 'Non-binary',
+                        child: Text(context.t.onboardingGenderNonBinary)),
+                    DropdownMenuItem(
+                        value: 'Other',
+                        child: Text(context.t.onboardingGenderOther)),
                   ],
                   onChanged: (v) => setState(() => _gender = v),
                 ),
@@ -231,7 +240,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'About you',
+                              context.t.onboardingAboutYou,
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -241,7 +250,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             ),
                           ),
                           Text(
-                            'Optional',
+                            context.t.onboardingOptional,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -252,8 +261,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Helps us show events, scholarships and people that match '
-                        'your interests. You can skip and add this later.',
+                        context.t.onboardingAboutYouDesc,
                         style: TextStyle(
                           fontSize: 12,
                           color: context.textSecondary,
@@ -289,7 +297,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Continue'),
+                      : Text(context.t.continueLabel),
                 ),
               ],
             ),
@@ -335,7 +343,7 @@ class _LocationSection extends StatelessWidget {
                   color: Color(0xFFB05ECC), size: 20),
               const SizedBox(width: 8),
               Text(
-                'Where are you?',
+                context.t.onboardingWhereAreYou,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -351,9 +359,9 @@ class _LocationSection extends StatelessWidget {
                     color: const Color(0xFF3BD671).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
-                    'GPS set',
-                    style: TextStyle(
+                  child: Text(
+                    context.t.onboardingGpsSet,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF1F8D4D),
@@ -364,7 +372,7 @@ class _LocationSection extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Lets the Connect tab show people near you. Optional — you can skip and just enter your city.',
+            context.t.onboardingLocationDesc,
             style: TextStyle(
                 fontSize: 12, color: context.textSecondary, height: 1.3),
           ),
@@ -389,7 +397,9 @@ class _LocationSection extends StatelessWidget {
                               : Icons.my_location_rounded,
                           size: 18,
                         ),
-                  label: Text(hasGps ? 'Update location' : 'Use my location'),
+                  label: Text(hasGps
+                      ? context.t.onboardingUpdateLocation
+                      : context.t.onboardingUseMyLocation),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFB05ECC),
                   ),
@@ -399,7 +409,7 @@ class _LocationSection extends StatelessWidget {
                 const SizedBox(width: 8),
                 IconButton(
                   onPressed: onClear,
-                  tooltip: 'Clear',
+                  tooltip: context.t.clear,
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
@@ -416,8 +426,10 @@ class _LocationSection extends StatelessWidget {
           TextFormField(
             controller: cityCtrl,
             decoration: InputDecoration(
-              labelText: 'City',
-              hintText: hasGps ? 'Auto-filled — edit if needed' : 'e.g. Paris',
+              labelText: context.t.onboardingCity,
+              hintText: hasGps
+                  ? context.t.onboardingCityAutofilled
+                  : context.t.onboardingCityHint,
               prefixIcon: const Icon(Icons.location_city_outlined, size: 20),
               isDense: true,
               border: OutlineInputBorder(

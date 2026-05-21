@@ -1,20 +1,24 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/notification_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
 import '../../services/post_service.dart';
-import '../../utils/responsive.dart';
+import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import 'create_post_screen.dart';
+import 'notification_screen.dart';
+import 'post_detail_screen.dart';
 import 'qa_thread_screen.dart';
-import '../widgets/header.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_section.dart';
 
@@ -50,9 +54,12 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: const HomeBody(),
+    // Transparent so the per-tab background painted by MainScreen
+    // shows through — otherwise a white Scaffold here peeked out as
+    // strips above/below the SafeArea content.
+    return const Scaffold(
+      backgroundColor: Colors.transparent,
+      body: HomeBody(),
     );
   }
 }
@@ -66,12 +73,29 @@ class HomeBody extends ConsumerStatefulWidget {
   ConsumerState<HomeBody> createState() => _HomeBodyState();
 }
 
-class _HomeBodyState extends ConsumerState<HomeBody> {
+class _HomeBodyState extends ConsumerState<HomeBody>
+    with WidgetsBindingObserver {
   _HomeMode _mode = _HomeMode.feed;
   _PlaceSuggestion? _selectedPlace;
   final List<_PlaceSuggestion> _recentPlaces = [];
   final TextEditingController _qaSearchCtrl = TextEditingController();
   String _qaSearch = '';
+  final TextEditingController _feedSearchCtrl = TextEditingController();
+  String _feedSearch = '';
+
+  // Discuss search also matches answers. Because answers (comments)
+  // aren't loaded with the QA posts, the answer lookup is async — its
+  // result (the set of QA post ids with a matching answer) is cached
+  // here, recomputed after a short debounce as the user types.
+  Set<String> _qaAnswerMatches = <String>{};
+  String _qaAnswerMatchesQuery = '';
+  Timer? _qaAnswerSearchDebounce;
+
+  // When a search field is focused, the header + stories collapse and
+  // the mode tabs pin to the top so the results get maximum space.
+  final FocusNode _qaSearchFocus = FocusNode();
+  final FocusNode _feedSearchFocus = FocusNode();
+  bool _searchFocused = false;
   double? _viewerLat;
   double? _viewerLng;
   String _viewerCity = 'Location unavailable';
@@ -87,14 +111,112 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureViewerLocation();
+    });
+    _qaSearchFocus.addListener(_onSearchFocusChange);
+    _feedSearchFocus.addListener(_onSearchFocusChange);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the user returns from the system location settings, re-check
+    // — if they enabled location the red travel banner auto-hides.
+    if (state == AppLifecycleState.resumed &&
+        (_viewerLat == null || _viewerLng == null)) {
+      _ensureViewerLocation().then((status) {
+        if (status == _LocationStatus.ok && mounted) {
+          ref.invalidate(travelFeedProvider(_buildTravelQuery()));
+        }
+      });
+    }
+  }
+
+  void _onSearchFocusChange() {
+    final focused = _qaSearchFocus.hasFocus || _feedSearchFocus.hasFocus;
+    if (focused != _searchFocused && mounted) {
+      setState(() => _searchFocused = focused);
+    }
+  }
+
+  /// The active search query for the current tab (Feed/Discuss).
+  /// Travel has no inline query, so it's always empty there.
+  String get _currentSearch {
+    if (_mode == _HomeMode.qa) return _qaSearch;
+    if (_mode == _HomeMode.feed) return _feedSearch;
+    return '';
+  }
+
+  /// True once the user has run a search and results are showing
+  /// (a query exists and the keyboard is dismissed). In this state
+  /// the tabs hide and the search bar shows the query as a chip.
+  bool get _showingSearchResults =>
+      !_searchFocused && _currentSearch.isNotEmpty;
+
+  /// True whenever search is in play — either the keyboard is open
+  /// (typing) or results are showing. Used to pin the search row above
+  /// the scrolling list so it never scrolls away.
+  bool get _searchActive => _searchFocused || _showingSearchResults;
+
+  /// Clears the current tab's search query and field.
+  void _clearCurrentSearch() {
+    if (_mode == _HomeMode.qa) {
+      _qaSearchCtrl.clear();
+      setState(() {
+        _qaSearch = '';
+        _qaAnswerMatches = <String>{};
+        _qaAnswerMatchesQuery = '';
+      });
+      _qaAnswerSearchDebounce?.cancel();
+    } else {
+      _feedSearchCtrl.clear();
+      setState(() => _feedSearch = '');
+    }
+  }
+
+  /// Debounced answer search for the Discuss tab. Question-text
+  /// matching is instant (done in the build); this fills in the extra
+  /// matches whose ANSWER text contains the query.
+  void _scheduleQaAnswerSearch() {
+    _qaAnswerSearchDebounce?.cancel();
+    final query = _qaSearch;
+    if (query.isEmpty) {
+      if (_qaAnswerMatches.isNotEmpty) {
+        setState(() {
+          _qaAnswerMatches = <String>{};
+          _qaAnswerMatchesQuery = '';
+        });
+      }
+      return;
+    }
+    _qaAnswerSearchDebounce =
+        Timer(const Duration(milliseconds: 350), () async {
+      final posts = ref.read(qaFeedProvider).valueOrNull ?? const <Post>[];
+      final ids = posts.map((p) => p.id);
+      try {
+        final matches = await ref
+            .read(postServiceProvider)
+            .qaPostsWithMatchingAnswer(ids, query);
+        if (!mounted || _qaSearch != query) return;
+        setState(() {
+          _qaAnswerMatches = matches;
+          _qaAnswerMatchesQuery = query;
+        });
+      } catch (_) {
+        // Answer search is best-effort; question-text search still works.
+      }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _qaAnswerSearchDebounce?.cancel();
     _qaSearchCtrl.dispose();
+    _feedSearchCtrl.dispose();
+    _qaSearchFocus.dispose();
+    _feedSearchFocus.dispose();
     super.dispose();
   }
 
@@ -221,61 +343,40 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     }
   }
 
-  /// Show a user-facing message when location couldn't be resolved during a
-  /// user-initiated action (e.g. switching to Travel Mode). Includes an
-  /// action button that opens the relevant system settings page.
-  void _showLocationStatusMessage(_LocationStatus status) {
-    if (!mounted) return;
-    String message;
-    String? actionLabel;
-    Future<void> Function()? onAction;
+  /// Handler for the red travel banner's "Enable" button. It first
+  /// tries to resolve the location directly (this triggers the iOS/
+  /// Android permission prompt). If that fails because the OS-level
+  /// location *service* is off, it opens the system location settings
+  /// — there is no in-app way to flip that switch. No snackbar is
+  /// shown; the red banner itself is the only message, and it hides
+  /// automatically once a location is obtained.
+  Future<void> _enableLocationFromBanner() async {
+    final status = await _ensureViewerLocation();
 
-    switch (status) {
-      case _LocationStatus.serviceDisabled:
-        message = 'Location services are turned off. '
-            'Turn them on so Travel Mode can show nearby posts.';
-        actionLabel = 'Open settings';
-        onAction = Geolocator.openLocationSettings;
-        break;
-      case _LocationStatus.permissionDenied:
-        message = 'Location permission was denied. '
-            'Travel Mode works best with your location.';
-        actionLabel = 'Try again';
-        onAction = () async {
-          await _ensureViewerLocation();
-        };
-        break;
-      case _LocationStatus.permissionDeniedForever:
-        message = 'Location permission is blocked. '
-            'Enable it in app settings to use Travel Mode.';
-        actionLabel = 'App settings';
-        onAction = Geolocator.openAppSettings;
-        break;
-      case _LocationStatus.unknown:
-        message = "Couldn't get your location. "
-            'You can still search for a place manually.';
-        break;
-      case _LocationStatus.ok:
-      case _LocationStatus.alreadyResolving:
-        return;
+    if (status == _LocationStatus.ok) {
+      // Location resolved — refresh the feed; the banner disappears
+      // because _viewerLat/_viewerLng are now set.
+      ref.invalidate(travelFeedProvider(_buildTravelQuery()));
+      return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearSnackBars();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 6),
-        action: actionLabel == null || onAction == null
-            ? null
-            : SnackBarAction(
-                label: actionLabel,
-                onPressed: () {
-                  onAction?.call();
-                },
-              ),
-      ),
-    );
+    // Couldn't get location — send the user straight to the right
+    // system settings page so they can actually turn it on.
+    switch (status) {
+      case _LocationStatus.serviceDisabled:
+        await Geolocator.openLocationSettings();
+        break;
+      case _LocationStatus.permissionDeniedForever:
+        await Geolocator.openAppSettings();
+        break;
+      case _LocationStatus.permissionDenied:
+      case _LocationStatus.unknown:
+      case _LocationStatus.alreadyResolving:
+      case _LocationStatus.ok:
+        // permissionDenied already re-prompted inside
+        // _ensureViewerLocation; nothing more to open.
+        break;
+    }
   }
 
   Future<void> _openPlaceSearch() async {
@@ -332,9 +433,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     setState(() => _mode = mode);
 
     if (mode == _HomeMode.travel) {
-      final status = await _ensureViewerLocation();
+      // Resolve location silently — if it's off, the red in-feed
+      // banner is the only message shown (no snackbar).
+      await _ensureViewerLocation();
       if (!mounted) return;
-      _showLocationStatusMessage(status);
       final query = _buildTravelQuery();
       ref.invalidate(travelFeedProvider(query));
       try {
@@ -363,28 +465,100 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     }
   }
 
+  /// Top content for the scrolling list. Returns empty while a search
+  /// field is focused, because [_topContent] is then rendered pinned
+  /// above the list instead (see [build]).
+  List<Widget> _scrollTopContent({
+    required String announcement,
+    required bool maintenance,
+    required bool showStories,
+  }) {
+    if (_searchActive) return const <Widget>[];
+    return _topContent(
+      announcement: announcement,
+      maintenance: maintenance,
+      showStories: showStories,
+    );
+  }
+
   List<Widget> _topContent({
     required String announcement,
     required bool maintenance,
     required bool showStories,
   }) {
+    // While search is active (typing or showing results), banners +
+    // stories collapse so the results get the full screen. The tabs
+    // stay visible while typing; once results show they are replaced
+    // by the "Itr" title.
+    final collapsed = _searchActive;
+
     return [
-      if (announcement.isNotEmpty)
-        _AnnouncementBanner(announcement: announcement),
-      if (maintenance) const _MaintenanceBanner(),
-      if (showStories) const StoriesList(),
-      const SizedBox(height: 8),
+      if (!collapsed) ...[
+        if (announcement.isNotEmpty)
+          _AnnouncementBanner(announcement: announcement),
+        if (maintenance) const _MaintenanceBanner(),
+      ],
+      SizedBox(height: collapsed ? 4 : 8),
+      // The tabs row — always present. While search RESULTS are
+      // showing it swaps the tab icons for the "Itr" title; while
+      // typing the tabs stay as normal.
       _HomeModeToggle(
         mode: _mode,
         onChanged: _switchMode,
+        showTitleInsteadOfTabs: _showingSearchResults,
+      ),
+      // Stories — directly under the tabs, identical on every tab.
+      // Hidden while search is active.
+      if (showStories && !collapsed)
+        const StoriesList(),
+      // Search + Post row — on every tab.
+      _SearchPostRow(
+        searching: _searchFocused,
+        query: _currentSearch,
+        hintText: _mode == _HomeMode.qa
+            ? context.t.homeSearchQuestionsUsers
+            : context.t.homeSearchPosts,
+        controller: _mode == _HomeMode.travel
+            ? null
+            : (_mode == _HomeMode.qa ? _qaSearchCtrl : _feedSearchCtrl),
+        focusNode: _mode == _HomeMode.travel
+            ? null
+            : (_mode == _HomeMode.qa ? _qaSearchFocus : _feedSearchFocus),
+        onChanged: (value) {
+          if (_mode == _HomeMode.qa) {
+            setState(() => _qaSearch = value.trim());
+            _scheduleQaAnswerSearch();
+          } else {
+            setState(() => _feedSearch = value.trim());
+          }
+        },
+        onClear: _clearCurrentSearch,
+        onSearchTap: () {
+          if (_mode == _HomeMode.travel) {
+            // Travel search is a full page, not an inline field.
+            _openPlaceSearch();
+          } else {
+            // Flip to the expanded layout; the inline TextField then
+            // appears with autofocus:true and grabs the keyboard.
+            setState(() => _searchFocused = true);
+          }
+        },
+        onPost: () {
+          // In Discuss, "Post" opens the ask-a-question sheet;
+          // elsewhere it opens the create-post screen.
+          if (_mode == _HomeMode.qa) {
+            _showAskSheet(context);
+          } else {
+            _openCreatePost(context);
+          }
+        },
+        onDismissSearch: () {
+          FocusScope.of(context).unfocus();
+        },
       ),
       if (_mode == _HomeMode.travel) ...[
-        _TravelPromptStrip(onPost: () => _openCreatePost(context)),
-        _TravelLocationRow(
-          selectedPlace: _selectedPlace,
-          onSearchPressed: _openPlaceSearch,
-          viewerCity: _viewerCity,
-        ),
+        // The old inline location row was replaced by the search icon
+        // in _SearchPostRow (which opens the travel search page).
         _TravelQuickFilters(
           selectedPlace: _selectedPlace,
           recents: _recentPlaces,
@@ -407,18 +581,6 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 },
           onSelectRecent: (place) => setState(() => _selectedPlace = place),
         ),
-      ] else if (_mode == _HomeMode.qa) ...[
-        _QaPromptStrip(onAsk: () => _showAskSheet(context)),
-        _QaSearchBar(
-          controller: _qaSearchCtrl,
-          onChanged: (value) => setState(() => _qaSearch = value.trim()),
-          onClear: () {
-            _qaSearchCtrl.clear();
-            setState(() => _qaSearch = '');
-          },
-        ),
-      ] else ...[
-        _FeedPromptStrip(onPost: () => _openCreatePost(context)),
       ],
     ];
   }
@@ -464,10 +626,30 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     final maintenance = cfg?.maintenanceMode ?? false;
     final showStories = cfg?.storiesEnabled ?? true;
 
+    // While searching, the mode tabs + search bar are lifted OUT of the
+    // scrolling list into a fixed bar so they stay pinned to the top
+    // and never scroll away with the results.
+    final pinnedTopContent = _searchActive
+        ? _topContent(
+            announcement: announcement,
+            maintenance: maintenance,
+            showStories: showStories,
+          )
+        : const <Widget>[];
+
     return SafeArea(
       child: Column(
         children: [
-          const HeaderWidget(),
+          // The tabs row (with the notification bell) is the top of the
+          // screen — the old title header was removed. While searching
+          // or showing results, the search row stays pinned here.
+          if (_searchActive)
+            Material(
+              // Transparent so the per-tab background shows through —
+              // no white strip behind the pinned search row.
+              color: Colors.transparent,
+              child: Column(children: pinnedTopContent),
+            ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => _refresh(ref),
@@ -479,7 +661,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    ..._topContent(
+                    ..._scrollTopContent(
                       announcement: announcement,
                       maintenance: maintenance,
                       showStories: showStories,
@@ -493,32 +675,43 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    ..._topContent(
+                    ..._scrollTopContent(
                       announcement: announcement,
                       maintenance: maintenance,
                       showStories: showStories,
                     ),
                     const SizedBox(height: 24),
-                    Center(child: Text('Error: $e')),
+                    Center(child: Text(context.t.homeErrorPrefix(e))),
                   ],
                 ),
                 data: (posts) {
+                  // Only apply the answer-match set when it was computed
+                  // for the CURRENT query — otherwise it's stale (the
+                  // debounce hasn't caught up yet).
+                  final answerMatches =
+                      _qaAnswerMatchesQuery == _qaSearch && _qaSearch.isNotEmpty
+                          ? _qaAnswerMatches
+                          : const <String>{};
                   final visiblePosts = _mode == _HomeMode.qa
-                      ? _filterQaPosts(posts, _qaSearch)
-                      : posts;
+                      ? _filterQaPosts(posts, _qaSearch, answerMatches)
+                      : _mode == _HomeMode.feed
+                          ? _filterFeedPosts(posts, _feedSearch)
+                          : posts;
 
                   if (visiblePosts.isEmpty) {
                     final emptyText = _mode == _HomeMode.qa
                         ? (_qaSearch.isEmpty
-                            ? 'No Discuss threads yet. Ask the first question!'
-                            : 'No matching questions found.')
-                        : 'No posts yet. Create the first one!';
+                            ? context.t.homeNoDiscussThreads
+                            : context.t.homeNoMatchingQuestions)
+                        : (_mode == _HomeMode.feed && _feedSearch.isNotEmpty
+                            ? context.t.homeNoMatchingPosts
+                            : context.t.homeNoPostsCreateFirst);
                     return ListView(
                       controller: widget.scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.only(bottom: 100),
                       children: [
-                        ..._topContent(
+                        ..._scrollTopContent(
                           announcement: announcement,
                           maintenance: maintenance,
                           showStories: showStories,
@@ -530,19 +723,30 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                       ],
                     );
                   }
+                  // Travel mode with no device location → a red/white
+                  // banner shown above the first card.
+                  final showTravelLocBanner = _mode == _HomeMode.travel &&
+                      (_viewerLat == null || _viewerLng == null);
+
                   return CustomScrollView(
                     controller: widget.scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
                       SliverToBoxAdapter(
                         child: Column(
-                          children: _topContent(
+                          children: _scrollTopContent(
                             announcement: announcement,
                             maintenance: maintenance,
                             showStories: showStories,
                           ),
                         ),
                       ),
+                      if (showTravelLocBanner)
+                        SliverToBoxAdapter(
+                          child: _TravelLocationOffBanner(
+                            onEnable: _enableLocationFromBanner,
+                          ),
+                        ),
                       SliverPadding(
                         padding: const EdgeInsets.only(top: 8, bottom: 100),
                         sliver: SliverList.builder(
@@ -554,8 +758,6 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                             }
                             final placeLabel = _travelPlaceLabel(p);
                             final hasPlace = placeLabel.isNotEmpty;
-                            final viewerLocOff = _mode == _HomeMode.travel &&
-                                (_viewerLat == null || _viewerLng == null);
                             return PostCard(
                               key: ValueKey(p.id),
                               post: p,
@@ -566,18 +768,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                               travelDistance: _mode == _HomeMode.travel
                                   ? (p.travelDistanceLabel ?? '')
                                   : null,
-                              viewerLocationOff: viewerLocOff,
-                              onTurnOnLocationTap: viewerLocOff
-                                  ? () async {
-                                      final status =
-                                          await _ensureViewerLocation();
-                                      _showLocationStatusMessage(status);
-                                      if (status == _LocationStatus.ok) {
-                                        ref.invalidate(travelFeedProvider(
-                                            _buildTravelQuery()));
-                                      }
-                                    }
-                                  : null,
+                              // Location-off prompting now lives solely in
+                              // the red banner above the feed, so the
+                              // per-card prompt is disabled.
+                              viewerLocationOff: false,
                             );
                           },
                         ),
@@ -625,128 +819,396 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
   }
 }
 
-List<Post> _filterQaPosts(List<Post> posts, String query) {
+/// Filters the Discuss feed. A post matches when its question text
+/// (the caption) contains [query], OR its id is in [answerMatches] —
+/// the async-resolved set of posts whose answers contain the query.
+List<Post> _filterQaPosts(
+  List<Post> posts,
+  String query,
+  Set<String> answerMatches,
+) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return posts;
 
   return posts.where((post) {
-    final caption = post.caption.toLowerCase();
-    final author = post.authorUsername.toLowerCase();
-    return caption.contains(q) || author.contains(q);
+    final question = post.caption.toLowerCase();
+    return question.contains(q) || answerMatches.contains(post.id);
   }).toList();
 }
 
-class _HomeModeToggle extends StatelessWidget {
+/// Filters the main feed by post caption text. Case-insensitive
+/// substring match; an empty query returns the list unchanged.
+List<Post> _filterFeedPosts(List<Post> posts, String query) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return posts;
+
+  return posts
+      .where((post) => post.caption.toLowerCase().contains(q))
+      .toList();
+}
+
+class _HomeModeToggle extends ConsumerStatefulWidget {
   final _HomeMode mode;
   final ValueChanged<_HomeMode> onChanged;
 
-  const _HomeModeToggle({required this.mode, required this.onChanged});
+  /// When true the three tab buttons are replaced by the "Itr" title.
+  /// Used while search results are showing — the tabs step aside but
+  /// the row (and notification bell) stay in place.
+  final bool showTitleInsteadOfTabs;
+
+  const _HomeModeToggle({
+    required this.mode,
+    required this.onChanged,
+    this.showTitleInsteadOfTabs = false,
+  });
+
+  @override
+  ConsumerState<_HomeModeToggle> createState() => _HomeModeToggleState();
+}
+
+class _HomeModeToggleState extends ConsumerState<_HomeModeToggle>
+    with SingleTickerProviderStateMixin {
+  // Drives the tabs <-> title morph. 0 = tabs, 1 = "Itr" title.
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+      value: widget.showTitleInsteadOfTabs ? 1.0 : 0.0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeModeToggle old) {
+    super.didUpdateWidget(old);
+    if (widget.showTitleInsteadOfTabs != old.showTitleInsteadOfTabs) {
+      if (widget.showTitleInsteadOfTabs) {
+        _ctrl.forward();
+      } else {
+        _ctrl.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = mode == _HomeMode.feed
-        ? 0
-        : mode == _HomeMode.travel
-            ? 1
-            : 2;
-    const flexes = [10.0, 12.0, 10.0];
-    const totalFlex = 32.0;
-    final isXSmall = context.isXSmall;
-    final isCompact = context.isCompact;
-    // Hide icons on the tightest phones to give labels breathing room.
-    final showIcons = !isXSmall;
-    final gap = isXSmall ? 4.0 : 6.0;
-    final outerHPad = context.scaleW(10, 14);
-    final pillHeight = context.scaleW(42, 48);
+    final unreadCount = ref.watch(unreadCountProvider);
+
+    // ── The app-title pill shown in the search-results state ──────
+    final Widget titlePill = Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.purple,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.purple.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        context.t.headerAppTitle,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+
+    // ── The three mode tabs ──────────────────────────────────────
+    // The Row sizes to its content. The active tab always shows its
+    // full name (its labels are short — Feed / Travel / Discuss); the
+    // other two are compact 42px icon-only buttons. Comfortably fits
+    // the slot, so no shrinking/ellipsis is needed.
+    Widget tabSlot(IconData icon, String label, _HomeMode m) {
+      return _ModeTab(
+        icon: icon,
+        label: label,
+        selected: widget.mode == m,
+        onTap: () => widget.onChanged(m),
+      );
+    }
+
+    final Widget tabs = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        tabSlot(Icons.dynamic_feed_rounded, context.t.homeFeed,
+            _HomeMode.feed),
+        const SizedBox(width: 6),
+        tabSlot(Icons.flight, context.t.homeTravelShort,
+            _HomeMode.travel),
+        const SizedBox(width: 6),
+        tabSlot(Icons.forum_outlined, context.t.homeDiscuss,
+            _HomeMode.qa),
+      ],
+    );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(outerHPad, 0, outerHPad, 6),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: gap, vertical: gap),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(40),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 12,
-              offset: Offset(0, 4),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      child: Row(
+        children: [
+          // Smooth, driven morph between the mode tabs and the "Itr"
+          // pill. Expanded takes all the space left of the bell; both
+          // layers are stacked in that slot at a fixed 42px height and
+          // start-aligned, so nothing overflows and the row never
+          // jumps width.
+          Expanded(
+            child: AnimatedBuilder(
+              animation: _ctrl,
+              builder: (context, _) {
+                final t = Curves.easeInOutCubic.transform(_ctrl.value);
+
+                // Tabs: fully visible at t=0, gone by t≈0.55.
+                final tabsOpacity = (1.0 - t / 0.55).clamp(0.0, 1.0);
+                final tabsScale = 0.92 + 0.08 * tabsOpacity;
+
+                // Title: starts appearing at t≈0.45, full by t=1.
+                final titleProgress =
+                    ((t - 0.45) / 0.55).clamp(0.0, 1.0);
+                final titleOpacity = titleProgress;
+                final titleScale = 0.92 + 0.08 * titleProgress;
+
+                final dirAlign = AlignmentDirectional.centerStart
+                    .resolve(Directionality.of(context));
+
+                // Gentle vertical glide — tabs lift up & out as the
+                // title rises up into place.
+                final tabsDy = -10.0 * (1.0 - tabsOpacity);
+                final titleDy = 10.0 * (1.0 - titleProgress);
+
+                return SizedBox(
+                  height: 42,
+                  child: Stack(
+                    alignment: AlignmentDirectional.centerStart,
+                    children: [
+                      // Tabs layer — the PositionedDirectional fills
+                      // the slot width, giving the tabs Row a bounded
+                      // width so its Flexible children lay out.
+                      PositionedDirectional(
+                        start: 0,
+                        top: 0,
+                        bottom: 0,
+                        end: 0,
+                        child: IgnorePointer(
+                          ignoring: t > 0.5,
+                          child: Opacity(
+                            opacity: tabsOpacity,
+                            child: Transform.translate(
+                              offset: Offset(0, tabsDy),
+                              child: Transform.scale(
+                                scale: tabsScale,
+                                alignment: dirAlign,
+                                child: tabs,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Title layer.
+                      PositionedDirectional(
+                        start: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: IgnorePointer(
+                          ignoring: t <= 0.5,
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Opacity(
+                              opacity: titleOpacity,
+                              child: Transform.translate(
+                                offset: Offset(0, titleDy),
+                                child: Transform.scale(
+                                  scale: titleScale,
+                                  alignment: dirAlign,
+                                  child: titlePill,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-          ],
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final available = constraints.maxWidth;
-            // Row: gap + Expanded*3 + gap*2 (between items) + gap
-            final flexWidth = available - gap * 4;
-            final w = flexes.map((f) => flexWidth * f / totalFlex).toList();
-            final x = [
-              gap,
-              gap + w[0] + gap,
-              gap + w[0] + gap + w[1] + gap,
-            ];
-            return SizedBox(
-              height: pillHeight,
-              child: Stack(
-                children: [
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeInOut,
-                    left: x[selectedIndex],
-                    width: w[selectedIndex],
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(40),
+          ),
+          const SizedBox(width: 8),
+          // ── Notification bell — sits next to the tabs ───────────
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: Icon(Icons.notifications_outlined,
+                    size: 26, color: context.textPrimary),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationScreen(),
+                  ),
+                ),
+              ),
+              if (unreadCount > 0)
+                PositionedDirectional(
+                  end: 6,
+                  top: 6,
+                  child: Container(
+                    width: 17,
+                    height: 17,
+                    decoration: const BoxDecoration(
+                      color: AppColors.purple,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        unreadCount > 9 ? '9+' : '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      SizedBox(width: gap),
-                      Expanded(
-                        flex: 10,
-                        child: _ModePillButton(
-                          label: 'Feed',
-                          icon: showIcons ? Icons.dynamic_feed_rounded : null,
-                          selected: mode == _HomeMode.feed,
-                          compact: isCompact,
-                          onTap: () => onChanged(_HomeMode.feed),
-                        ),
-                      ),
-                      SizedBox(width: gap),
-                      Expanded(
-                        flex: 12,
-                        child: _ModePillButton(
-                          label: isXSmall ? 'Travel' : 'Travel Mode',
-                          icon: showIcons ? Icons.flight : null,
-                          selected: mode == _HomeMode.travel,
-                          selectedHorizontalPadding: isXSmall ? 6 : 10,
-                          compact: isCompact,
-                          onTap: () => onChanged(_HomeMode.travel),
-                        ),
-                      ),
-                      SizedBox(width: gap),
-                      Expanded(
-                        flex: 10,
-                        child: _ModePillButton(
-                          label: 'Discuss',
-                          icon: showIcons ? Icons.forum_outlined : null,
-                          selected: mode == _HomeMode.qa,
-                          compact: isCompact,
-                          onTap: () => onChanged(_HomeMode.qa),
-                        ),
-                      ),
-                      SizedBox(width: gap),
-                    ],
-                  ),
-                ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One home-mode tab. Selected → a purple pill with icon + label;
+/// unselected → a compact icon-only button.
+class _ModeTab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ModeTab({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inactiveBg =
+        isDark ? const Color(0xFF252528) : const Color(0xFFEDEDF2);
+
+    return Material(
+      color: selected ? AppColors.purple : inactiveBg,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          height: 42,
+          padding: EdgeInsets.symmetric(horizontal: selected ? 16 : 11),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? Colors.white : context.textSecondary,
               ),
-            );
-          },
+              // The active tab always shows its full name.
+              if (selected) ...[
+                const SizedBox(width: 7),
+                Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Red/white banner shown above the first travel card when the
+/// device's location is off — prompts the user to enable it.
+class _TravelLocationOffBanner extends StatelessWidget {
+  final VoidCallback onEnable;
+
+  const _TravelLocationOffBanner({required this.onEnable});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.red,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_off, color: Colors.white, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              context.t.travelLocationOffBanner,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          TextButton(
+            onPressed: onEnable,
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.red,
+              visualDensity: VisualDensity.compact,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              context.t.travelEnableLocation,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -779,10 +1241,11 @@ class _QaThreadCard extends ConsumerWidget {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    final title = lines.isEmpty ? 'Untitled question' : lines.first;
+    final title =
+        lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
     final body = lines.length > 1 ? lines.sublist(1).join(' ') : '';
     final preview = _twoSentencePreview(body);
-    final timeLabel = _relativeTime(post.createdAt);
+    final timeLabel = context.t.timeAgo(post.createdAt);
     final isQuestion = title.contains('?');
 
     void openThread() {
@@ -853,7 +1316,7 @@ class _QaThreadCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '$timeLabel ago',
+                            timeLabel,
                             style: TextStyle(
                               fontSize: 12,
                               color: context.textSecondary,
@@ -870,7 +1333,9 @@ class _QaThreadCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        isQuestion ? 'Question' : 'Discussion',
+                        isQuestion
+                            ? context.t.homeQuestionLabel
+                            : context.t.homeDiscussionLabel,
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -881,7 +1346,7 @@ class _QaThreadCard extends ConsumerWidget {
                     if (canDelete || canReport) ...[
                       const SizedBox(width: 4),
                       PopupMenuButton<String>(
-                        tooltip: 'Question actions',
+                        tooltip: context.t.homeQuestionActions,
                         icon: Icon(Icons.more_horiz,
                             color: context.textSecondary),
                         onSelected: (value) async {
@@ -893,20 +1358,20 @@ class _QaThreadCard extends ConsumerWidget {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (dialogContext) => AlertDialog(
-                              title: const Text('Delete question?'),
-                              content: const Text(
-                                'This will permanently remove your question from Discuss.',
-                              ),
+                              title:
+                                  Text(context.t.homeDeleteQuestionTitle),
+                              content:
+                                  Text(context.t.homeDeleteQuestionBody),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
                                       Navigator.pop(dialogContext, false),
-                                  child: const Text('Cancel'),
+                                  child: Text(context.t.cancel),
                                 ),
                                 FilledButton(
                                   onPressed: () =>
                                       Navigator.pop(dialogContext, true),
-                                  child: const Text('Delete'),
+                                  child: Text(context.t.delete),
                                 ),
                               ],
                             ),
@@ -919,25 +1384,31 @@ class _QaThreadCard extends ConsumerWidget {
                                 .deletePost(post.id);
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Question deleted')),
+                              SnackBar(
+                                  content: Text(
+                                      context.t.homeQuestionDeleted)),
                             );
                           } catch (e) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Could not delete: $e')),
+                              SnackBar(
+                                  content: Text(
+                                      context.t.homeCouldNotDelete(e))),
                             );
                           }
                         },
                         itemBuilder: (_) => [
                           if (canReport)
-                            const PopupMenuItem<String>(
+                            PopupMenuItem<String>(
                               value: 'report',
-                              child: Text('Report question'),
+                              child:
+                                  Text(context.t.homeReportQuestionMenu),
                             ),
                           if (canDelete)
-                            const PopupMenuItem<String>(
+                            PopupMenuItem<String>(
                               value: 'delete',
-                              child: Text('Delete question'),
+                              child:
+                                  Text(context.t.homeDeleteQuestionMenu),
                             ),
                         ],
                       ),
@@ -967,6 +1438,13 @@ class _QaThreadCard extends ConsumerWidget {
                     ),
                   ),
                 ],
+                // When this discuss item was created from a post, show
+                // a mini preview of that post.
+                if (post.sourcePostId != null &&
+                    post.sourcePostId!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _MiniPostPreview(postId: post.sourcePostId!),
+                ],
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -974,12 +1452,12 @@ class _QaThreadCard extends ConsumerWidget {
                   children: [
                     _QaMeta(
                       icon: Icons.chat_bubble_outline,
-                      label: '${post.commentsCount} answers',
+                      label: context.t.homeAnswersCount(post.commentsCount),
                       onTap: openThread,
                     ),
                     _QaMeta(
                       icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                      label: '${post.likesCount} helpful',
+                      label: context.t.homeHelpfulCount(post.likesCount),
                       highlighted: isLiked,
                       onTap: () async {
                         try {
@@ -990,14 +1468,15 @@ class _QaThreadCard extends ConsumerWidget {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                                content: Text('Could not like question: $e')),
+                                content: Text(
+                                    context.t.homeErrorPrefix(e))),
                           );
                         }
                       },
                     ),
                     _QaMeta(
                       icon: Icons.edit_outlined,
-                      label: 'Write answer',
+                      label: context.t.homeWriteAnswer,
                       onTap: openThread,
                     ),
                   ],
@@ -1042,7 +1521,7 @@ class _QaThreadCard extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                'Report question',
+                                context.t.homeReportQuestionMenu,
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -1058,7 +1537,7 @@ class _QaThreadCard extends ConsumerWidget {
                           ],
                         ),
                         Text(
-                          'Pick the reason that best fits this question.',
+                          context.t.homePickReasonQuestion,
                           style: TextStyle(color: context.textSecondary),
                         ),
                         const SizedBox(height: 12),
@@ -1082,7 +1561,7 @@ class _QaThreadCard extends ConsumerWidget {
                           controller: detailsCtrl,
                           maxLines: 4,
                           decoration: InputDecoration(
-                            hintText: 'Extra details (optional)',
+                            hintText: context.t.homeExtraDetailsOptional,
                             filled: true,
                             fillColor: context.inputFill,
                             border: OutlineInputBorder(
@@ -1099,7 +1578,7 @@ class _QaThreadCard extends ConsumerWidget {
                               child: OutlinedButton(
                                 onPressed: () =>
                                     Navigator.pop(sheetContext, false),
-                                child: const Text('Cancel'),
+                                child: Text(context.t.cancel),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1107,7 +1586,7 @@ class _QaThreadCard extends ConsumerWidget {
                               child: FilledButton(
                                 onPressed: () =>
                                     Navigator.pop(sheetContext, true),
-                                child: const Text('Send report'),
+                                child: Text(context.t.homeSendReport),
                               ),
                             ),
                           ],
@@ -1131,17 +1610,156 @@ class _QaThreadCard extends ConsumerWidget {
           );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report sent to admins')),
+        SnackBar(content: Text(context.t.homeReportSentAdmins)),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not report question: $e')),
+        SnackBar(content: Text(context.t.homeCouldNotReportQuestion(e))),
       );
     } finally {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => detailsCtrl.dispose());
     }
+  }
+}
+
+/// Mini preview of the post a Discuss item was created from — shown
+/// inside the Discuss home list card. Author line + image + caption
+/// in a compact bordered card; tapping it opens the full post.
+class _MiniPostPreview extends ConsumerWidget {
+  final String postId;
+
+  const _MiniPostPreview({required this.postId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postAsync = ref.watch(singlePostProvider(postId));
+
+    return postAsync.when(
+      loading: () => Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: context.surfaceSoft,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (src) {
+        if (src == null) return const SizedBox.shrink();
+        final hasImage = src.imageUrls.isNotEmpty;
+        final cap = src.caption.trim();
+
+        return Material(
+          color: context.surfaceSoft,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PostDetailScreen(postId: src.id),
+              ),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.borderColor),
+              ),
+              clipBehavior: Clip.antiAlias,
+              // IntrinsicHeight gives the Row a definite height (the
+              // text column's natural height) so the stretched
+              // thumbnail has a bounded height — without it, stretch
+              // forces infinite height and the layout crashes.
+              child: IntrinsicHeight(
+                child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Thumbnail (if the post has an image).
+                  if (hasImage)
+                    SizedBox(
+                      width: 70,
+                      child: CachedNetworkImage(
+                        imageUrl: src.imageUrls.first,
+                        cacheManager: MediaCache.images,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) =>
+                            Container(color: context.borderColor),
+                      ),
+                    ),
+                  // Author + caption.
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 9,
+                                backgroundColor: context.purpleSoft,
+                                backgroundImage: (src.authorAvatar != null &&
+                                        src.authorAvatar!.isNotEmpty)
+                                    ? CachedNetworkImageProvider(
+                                        src.authorAvatar!)
+                                    : null,
+                                child: (src.authorAvatar == null ||
+                                        src.authorAvatar!.isEmpty)
+                                    ? Icon(Icons.person,
+                                        size: 11,
+                                        color: context.textSecondary)
+                                    : null,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  src.authorUsername,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Icon(Icons.chevron_right,
+                                  size: 16, color: context.textMuted),
+                            ],
+                          ),
+                          if (cap.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              cap,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1157,279 +1775,97 @@ String _twoSentencePreview(String text) {
   return parts.take(2).join(' ');
 }
 
-class _QaPromptStrip extends StatelessWidget {
-  final VoidCallback onAsk;
-  const _QaPromptStrip({required this.onAsk});
+/// Compact row shown under the stories on every home tab. Three
+/// states:
+///
+///   idle      →  [ 🔍 ]············· [ + Post ]
+///   searching →  [ 🔍 search input……… ] [ blank tap-to-close ]
+///   results   →  [ 🔍 "query…" ]······· [ ✕ ] [ + Post ]
+///
+/// On Feed / Discuss the search icon expands an inline [TextField].
+/// On Travel there is no inline field — tapping the icon calls
+/// [onSearchTap] which navigates to the dedicated travel search page.
+class _SearchPostRow extends StatelessWidget {
+  /// Inline search controller + focus node. Null on Travel (page-based
+  /// search), where [onSearchTap] is used instead.
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final String hintText;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onClear;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: context.isDark
-              ? const [Color(0xFF2B2638), Color(0xFF252333)]
-              : const [Color(0xFFF8F1FF), Color(0xFFF3F7FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.isDark
-              ? const Color(0xFF4A4066)
-              : const Color(0xFFDCC8E6),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: context.borderColor),
-            ),
-            child: const Icon(
-              Icons.question_answer_rounded,
-              size: 20,
-              color: Color(0xFF7E3BE8),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Have a question? Ask the community',
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Get quick answers from people nearby.',
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          FilledButton.tonal(
-            onPressed: onAsk,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('Ask'),
-          ),
-        ],
-      ),
-    );
-  }
-}
+  /// True while the inline search field is focused — drives the
+  /// idle/searching/results layout.
+  final bool searching;
 
-class _FeedPromptStrip extends StatelessWidget {
+  /// The active search query. When non-empty and [searching] is false,
+  /// the row enters the "results" state: the query shows as a chip and
+  /// a ✕ reset button appears before the Post button.
+  final String query;
+
+  /// Tap handler for the search icon. On Feed/Discuss this focuses the
+  /// inline field; on Travel it opens the travel search page.
+  final VoidCallback onSearchTap;
+
+  /// Opens the create-post screen.
   final VoidCallback onPost;
 
-  const _FeedPromptStrip({required this.onPost});
+  /// Dismisses the keyboard / unfocuses the search field. Invoked when
+  /// the user taps the blank space where the Post button used to be.
+  final VoidCallback onDismissSearch;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: context.isDark
-              ? const [Color(0xFF23303A), Color(0xFF202A34)]
-              : const [Color(0xFFEFF9FF), Color(0xFFF3F7FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.isDark
-              ? const Color(0xFF395168)
-              : const Color(0xFFC9DDEE),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: context.borderColor),
-            ),
-            child: const Icon(
-              Icons.dynamic_feed_rounded,
-              size: 20,
-              color: Color(0xFF2F7CA8),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Got something to share? Post it',
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Share updates, photos, and moments with your feed.',
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          FilledButton.tonal(
-            onPressed: onPost,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('Post'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TravelPromptStrip extends StatelessWidget {
-  final VoidCallback onPost;
-
-  const _TravelPromptStrip({required this.onPost});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: context.isDark
-              ? const [Color(0xFF2B3125), Color(0xFF253026)]
-              : const [Color(0xFFF2FFE9), Color(0xFFEAF9FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.isDark
-              ? const Color(0xFF4A6143)
-              : const Color(0xFFCFE6C2),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: context.borderColor),
-            ),
-            child: const Icon(
-              Icons.explore_rounded,
-              size: 20,
-              color: Color(0xFF3E8B44),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Traveling somewhere? Post from there',
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Share place-based moments others can discover.',
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          FilledButton.tonal(
-            onPressed: onPost,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('Post'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QaSearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-
-  const _QaSearchBar({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
+  const _SearchPostRow({
+    required this.hintText,
+    required this.searching,
+    required this.query,
+    required this.onSearchTap,
+    required this.onPost,
+    required this.onDismissSearch,
+    this.controller,
+    this.focusNode,
+    this.onChanged,
+    this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldFill = isDark ? context.inputFill : Colors.white;
     final borderColor = isDark ? Colors.transparent : const Color(0xFFD5D7DF);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      child: TextField(
+
+    // "results" = a query has been run and the keyboard dismissed.
+    final hasResults = !searching && query.isNotEmpty;
+
+    // ── Search side ──────────────────────────────────────────────
+    final Widget searchSide;
+    if (searching && controller != null) {
+      // Expanded inline field (keyboard open).
+      searchSide = TextField(
         controller: controller,
+        focusNode: focusNode,
+        autofocus: true,
         onChanged: onChanged,
         textInputAction: TextInputAction.search,
+        onSubmitted: (_) => onDismissSearch(),
+        // Explicit text color so the typed query is legible in dark
+        // mode too.
+        style: TextStyle(color: context.textPrimary),
         decoration: InputDecoration(
-          hintText: 'Search questions or users...',
+          isDense: true,
+          hintText: hintText,
           hintStyle: TextStyle(color: context.textSecondary),
           filled: true,
-          fillColor: isDark ? context.inputFill : Colors.white,
+          fillColor: fieldFill,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          prefixIcon: Icon(Icons.search, color: context.textSecondary),
+          suffixIcon: (controller!.text.isEmpty)
+              ? null
+              : IconButton(
+                  onPressed: onClear,
+                  icon: Icon(Icons.close,
+                      size: 18, color: context.textSecondary),
+                ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: borderColor),
@@ -1440,18 +1876,143 @@ class _QaSearchBar extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF7E3BE8), width: 1.2),
+            borderSide:
+                const BorderSide(color: Color(0xFF7E3BE8), width: 1.2),
           ),
-          prefixIcon: Icon(Icons.search, color: context.textSecondary),
-          suffixIcon: controller.text.isEmpty
-              ? null
-              : IconButton(
-                  onPressed: onClear,
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Clear search',
+        ),
+      );
+    } else if (hasResults) {
+      // Results state: show the query as a chip. Tapping it re-opens
+      // the input for editing.
+      searchSide = Material(
+        color: fieldFill,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onSearchTap,
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.search, size: 20, color: context.textSecondary),
+                const SizedBox(width: 8),
+                // The entered query — ellipsized if it is too long.
+                Flexible(
+                  child: Text(
+                    query,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: context.textPrimary,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Idle: a compact tappable search icon button.
+      searchSide = Material(
+        color: fieldFill,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onSearchTap,
+          child: Container(
+            height: 42,
+            width: 42,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Icon(Icons.search, color: context.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    // ── Post button (shared) ─────────────────────────────────────
+    final Widget postButton = SizedBox(
+      height: 42,
+      child: FilledButton.icon(
+        onPressed: onPost,
+        icon: const Icon(Icons.add, size: 18),
+        label: Text(context.t.post),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.purple,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
+    );
+
+    // ── Reset (✕) button — only in the results state ─────────────
+    final Widget resetButton = SizedBox(
+      height: 42,
+      width: 42,
+      child: Material(
+        color: fieldFill,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onClear,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Icon(Icons.close, size: 20, color: context.textSecondary),
+          ),
+        ),
+      ),
+    );
+
+    // ── Assemble the row ─────────────────────────────────────────
+    final List<Widget> rowChildren;
+    if (searching) {
+      // Input fills the row; blank tap-to-dismiss area on the side.
+      rowChildren = [
+        Expanded(child: searchSide),
+        const SizedBox(width: 10),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismissSearch,
+          child: const SizedBox(width: 84, height: 42),
+        ),
+      ];
+    } else if (hasResults) {
+      // Query chip fills the row; ✕ reset then + Post on the side.
+      rowChildren = [
+        Expanded(child: searchSide),
+        const SizedBox(width: 8),
+        resetButton,
+        const SizedBox(width: 8),
+        postButton,
+      ];
+    } else {
+      // Idle: compact search icon, spacer, + Post.
+      rowChildren = [
+        searchSide,
+        const Spacer(),
+        postButton,
+      ];
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      child: Row(children: rowChildren),
     );
   }
 }
@@ -1504,76 +2065,6 @@ class _QaMeta extends StatelessWidget {
   }
 }
 
-String _relativeTime(DateTime? dt) {
-  if (dt == null) return 'just now';
-  final now = DateTime.now();
-  final diff = now.difference(dt);
-  if (diff.inMinutes < 1) return 'now';
-  if (diff.inHours < 1) return '${diff.inMinutes}m';
-  if (diff.inDays < 1) return '${diff.inHours}h';
-  if (diff.inDays < 30) return '${diff.inDays}d';
-  final months = (diff.inDays / 30).floor();
-  if (months < 12) return '${months}mo';
-  return '${(months / 12).floor()}y';
-}
-
-class _ModePillButton extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  final bool selected;
-  final double selectedHorizontalPadding;
-  final bool compact;
-  final VoidCallback onTap;
-
-  const _ModePillButton({
-    required this.label,
-    this.icon,
-    required this.selected,
-    this.selectedHorizontalPadding = 8,
-    this.compact = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hPad =
-        compact ? selectedHorizontalPadding * 0.6 : selectedHorizontalPadding;
-    // Match BottomNav: selected = black-on-white, unselected = white-on-dark.
-    final color = selected ? Colors.black : Colors.white;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: hPad),
-        color: Colors.transparent,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: compact ? 14 : 16, color: color),
-              SizedBox(width: compact ? 3 : 4),
-            ],
-            Flexible(
-              child: FitText(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: color,
-                ),
-                minFontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────
 // 📌 SECTION: Ask Question Sheet
 // ─────────────────────────────────────────────
@@ -1603,7 +2094,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
     final question = _questionCtrl.text.trim();
     if (question.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Write your question first')));
+          SnackBar(content: Text(context.t.homeWriteQuestionFirst)));
       return;
     }
     setState(() => _submitting = true);
@@ -1618,7 +2109,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+          .showSnackBar(SnackBar(content: Text(context.t.homeErrorPrefix(e))));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -1680,7 +2171,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Ask the community',
+                    context.t.homeAskCommunity,
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -1703,7 +2194,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                   color: context.textPrimary,
                 ),
                 decoration: InputDecoration(
-                  hintText: "What's your question?",
+                  hintText: context.t.homeWhatsYourQuestion,
                   hintStyle: TextStyle(
                       color: context.textSecondary,
                       fontWeight: FontWeight.w400),
@@ -1726,7 +2217,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                 textCapitalization: TextCapitalization.sentences,
                 style: TextStyle(fontSize: 14, color: context.textPrimary),
                 decoration: InputDecoration(
-                  hintText: 'Add more context (optional)...',
+                  hintText: context.t.homeAddMoreContext,
                   hintStyle: TextStyle(color: context.textSecondary),
                   filled: true,
                   fillColor: context.inputFill,
@@ -1761,9 +2252,9 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'Post Question',
-                          style: TextStyle(
+                      : Text(
+                          context.t.homePostQuestion,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
@@ -1778,74 +2269,6 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
     );
   }
 }
-
-class _TravelLocationRow extends StatelessWidget {
-  final _PlaceSuggestion? selectedPlace;
-  final VoidCallback onSearchPressed;
-  final String viewerCity;
-
-  const _TravelLocationRow({
-    required this.selectedPlace,
-    required this.onSearchPressed,
-    required this.viewerCity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final placeText = selectedPlace == null
-        ? viewerCity
-        : (selectedPlace!.city.isEmpty
-            ? selectedPlace!.name
-            : '${selectedPlace!.name} · ${selectedPlace!.city}');
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-      child: Row(
-        children: [
-          Icon(Icons.location_on, size: 20, color: context.textPrimary),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              placeText,
-              style: TextStyle(
-                fontSize: 28 / 2,
-                fontWeight: FontWeight.w500,
-                color: context.textPrimary,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: onSearchPressed,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: context.cardBg,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: context.borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black
-                        .withValues(alpha: context.isDark ? 0 : 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Text(
-                'Search place',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.textPrimary,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PlaceSearchScreen extends ConsumerStatefulWidget {
   final _PlaceSuggestion? currentPlace;
   final List<_PlaceSuggestion> recents;
@@ -1964,7 +2387,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
               textInputAction: TextInputAction.search,
               style: TextStyle(color: context.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Search place in travel posts...',
+                hintText: context.t.homeSearchPlaceInPosts,
                 hintStyle: TextStyle(color: context.textSecondary),
                 border: InputBorder.none,
                 isDense: true,
@@ -2286,6 +2709,7 @@ class _MaintenanceBanner extends StatelessWidget {
   }
 }
 
+
 /// Horizontal chip strip shown above the travel feed. One-tap filters for
 /// "All places", "Nearby" (uses GPS), and the user's recently-viewed
 /// places. Tapping a chip swaps the active travel place and the feed
@@ -2320,14 +2744,16 @@ class _TravelQuickFilters extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         children: [
           _TravelFilterChip(
-            label: 'All places',
+            label: context.t.homeAllPlaces,
             icon: Icons.public,
             selected: isAll,
             onTap: onSelectAll,
           ),
           const SizedBox(width: 6),
           _TravelFilterChip(
-            label: viewerCity.isNotEmpty ? 'Nearby · $viewerCity' : 'Nearby',
+            label: viewerCity.isNotEmpty
+                ? context.t.homeNearbyCity(viewerCity)
+                : context.t.homeNearby,
             icon: Icons.my_location,
             selected: isNearby,
             onTap: onSelectNearby,

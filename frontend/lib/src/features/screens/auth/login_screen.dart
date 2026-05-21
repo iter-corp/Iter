@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
@@ -154,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Login',
+                  context.t.login,
                   style: TextStyle(
                     fontSize: context.scaleW(20, 24),
                     fontWeight: FontWeight.bold,
@@ -163,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Welcome back. Enter your details to continue.',
+                  context.t.loginSubtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -174,29 +175,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 30),
                 _buildTextField(
                   controller: _usernameCtrl,
-                  hint: 'Username or email',
+                  hint: context.t.loginUsernameOrEmail,
                   prefixIcon: Icons.person_2_outlined,
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Enter your username or email'
+                      ? context.t.loginEnterUsernameOrEmail
                       : null,
                 ),
                 const SizedBox(height: 14),
                 _buildTextField(
                   controller: _passCtrl,
-                  hint: 'Password',
+                  hint: context.t.password,
                   prefixIcon: Icons.lock_outline,
                   isPassword: true,
-                  validator: (v) =>
-                      (v == null || v.length < 6) ? 'Min 6 characters' : null,
+                  validator: (v) => (v == null || v.length < 6)
+                      ? context.t.loginMin6Chars
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 Align(
-                  alignment: Alignment.centerRight,
+                  alignment: AlignmentDirectional.centerEnd,
                   child: GestureDetector(
                     onTap: () => context.push('/forgot-password'),
-                    child: const Text(
-                      'Forget Password?',
-                      style: TextStyle(
+                    child: Text(
+                      context.t.forgotPassword,
+                      style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFFCE5DE5),
                       ),
@@ -239,9 +241,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Login',
-                            style: TextStyle(
+                        : Text(
+                            context.t.login,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
@@ -256,7 +258,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'Or',
+                        context.t.loginOr,
                         style:
                             TextStyle(fontSize: 13, color: context.textMuted),
                       ),
@@ -266,8 +268,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildSocialButton(
-                  label:
-                      _googleLoading ? 'Signing in...' : 'Continue with Google',
+                  label: _googleLoading
+                      ? context.t.loginSigningIn
+                      : context.t.continueWithGoogle,
                   icon: _googleLoading
                       ? const SizedBox(
                           width: 20,
@@ -280,8 +283,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 if (_isIOS) ...[
                   const SizedBox(height: 12),
                   _buildSocialButton(
-                    label:
-                        _appleLoading ? 'Signing in...' : 'Continue with Apple',
+                    label: _appleLoading
+                        ? context.t.loginSigningIn
+                        : context.t.continueWithApple,
                     icon: _appleLoading
                         ? const SizedBox(
                             width: 20,
@@ -299,14 +303,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      "Don't have account? ",
+                      context.t.dontHaveAccount,
                       style: TextStyle(fontSize: 13, color: context.textMuted),
                     ),
+                    const SizedBox(width: 4),
                     GestureDetector(
                       onTap: () => context.push('/signup'),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
+                      child: Text(
+                        context.t.signUp,
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFFCE5DE5),

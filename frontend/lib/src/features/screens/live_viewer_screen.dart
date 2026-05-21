@@ -2,8 +2,13 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/live_providers.dart';
 import '../../services/live_service.dart';
+
+/// Viewer-side live join failure modes, resolved to a localized message in
+/// [_buildVideoArea] where a BuildContext is available.
+enum _LiveViewerError { sparkUnavailable, agora, unknown }
 
 class LiveViewerScreen extends ConsumerStatefulWidget {
   final LiveStream stream;
@@ -17,7 +22,8 @@ class LiveViewerScreen extends ConsumerStatefulWidget {
 class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   RtcEngine? _engine;
   int? _remoteUid;
-  String? _errorText;
+  _LiveViewerError? _errorKind;
+  String _agoraErrorDetail = '';
 
   bool _joined = false;
   bool _loading = true;
@@ -40,8 +46,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         setState(() {
           _joined = false;
           _loading = false;
-          _errorText =
-              'Live streaming is unavailable in Spark mode. Configure external Agora token service to enable it.';
+          _errorKind = _LiveViewerError.sparkUnavailable;
         });
         return;
       }
@@ -72,7 +77,8 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
           onError: (error, _) {
             if (!mounted) return;
             setState(() {
-              _errorText = 'Agora error: $error';
+              _errorKind = _LiveViewerError.agora;
+              _agoraErrorDetail = '$error';
             });
           },
         ),
@@ -103,7 +109,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _errorText = 'Unable to join stream';
+          _errorKind = _LiveViewerError.unknown;
         });
       }
     }
@@ -142,26 +148,38 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_errorText != null) {
+    if (_errorKind != null) {
+      final String message;
+      switch (_errorKind!) {
+        case _LiveViewerError.sparkUnavailable:
+          message = context.t.liveUnavailableSpark;
+          break;
+        case _LiveViewerError.agora:
+          message = context.t.liveAgoraError(_agoraErrorDetail);
+          break;
+        case _LiveViewerError.unknown:
+          message = context.t.liveUnableToJoin;
+          break;
+      }
       return Center(
         child: Text(
-          _errorText!,
+          message,
           style: const TextStyle(color: Colors.white70),
           textAlign: TextAlign.center,
         ),
       );
     }
     if (_engine == null || !_joined) {
-      return const Center(
-        child: Text('Unable to join stream',
-            style: TextStyle(color: Colors.white)),
+      return Center(
+        child: Text(context.t.liveUnableToJoin,
+            style: const TextStyle(color: Colors.white)),
       );
     }
     if (_remoteUid == null) {
-      return const Center(
+      return Center(
         child: Text(
-          'Waiting for host video…',
-          style: TextStyle(color: Colors.white70),
+          context.t.liveWaitingHostVideo,
+          style: const TextStyle(color: Colors.white70),
         ),
       );
     }

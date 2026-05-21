@@ -10,6 +10,7 @@ import 'package:geocoding/geocoding.dart' as geo;
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
@@ -23,13 +24,6 @@ import 'chat_screen.dart';
 const _kBrandPurple = Color(0xFFB05ECC);
 const _kBrandDeep = Color(0xFF8A3FB8);
 const _kTagOrangeText = Color(0xFFD27B2B);
-
-const List<String> _kPartnerFilters = [
-  'All',
-  'Nearby',
-  'City',
-  'Gender',
-];
 
 double? _distanceKm(dynamic a, dynamic b) {
   if (a is! Map || b is! Map) return null;
@@ -179,7 +173,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
       ..sort();
     if (cities.isEmpty) return;
     final chosen = await _pickFromSheet(
-      title: 'Filter events by city',
+      title: context.t.eventsFilterEventsByCity,
       options: cities,
       selected: _selectedEventCity,
     );
@@ -199,7 +193,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
       setState(() => _partnerFilter = 2);
       if (cities.isEmpty) return;
       final chosen = await _pickFromSheet(
-        title: 'Filter by city',
+        title: context.t.eventsFilterByCity,
         options: cities,
         selected: _selectedCity,
       );
@@ -247,8 +241,8 @@ class _EventBodyState extends ConsumerState<EventBody> {
                   _SearchBar(
                     controller: _searchController,
                     hint: _mainTab == _MainTab.partners
-                        ? 'Search people'
-                        : 'Search events',
+                        ? context.t.eventsSearchPeople
+                        : context.t.eventsSearchEvents,
                   ),
                 ],
               ),
@@ -328,8 +322,9 @@ class _MainToggle extends StatelessWidget {
               AnimatedAlign(
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
-                alignment:
-                    isEvents ? Alignment.centerLeft : Alignment.centerRight,
+                alignment: isEvents
+                    ? AlignmentDirectional.centerStart
+                    : AlignmentDirectional.centerEnd,
                 child: Container(
                   width: pillWidth,
                   height: 40,
@@ -352,7 +347,7 @@ class _MainToggle extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _ToggleItem(
-                      label: 'Events',
+                      label: context.t.events,
                       icon: Icons.event_rounded,
                       active: isEvents,
                       onTap: () => onChanged(_MainTab.events),
@@ -360,7 +355,7 @@ class _MainToggle extends StatelessWidget {
                   ),
                   Expanded(
                     child: _ToggleItem(
-                      label: 'Connect',
+                      label: context.t.eventsConnect,
                       icon: Icons.people_alt_rounded,
                       active: !isEvents,
                       onTap: () => onChanged(_MainTab.partners),
@@ -568,14 +563,14 @@ class _PartnersView extends ConsumerWidget {
     }
   }
 
-  String _emptySubtitle(int i) {
+  String _emptySubtitle(BuildContext context, int i) {
     switch (i) {
       case 1:
-        return 'No one nearby yet — invite someone around you.';
+        return context.t.eventsNoOneNearby;
       case 2:
-        return 'No one from your city has joined yet.';
+        return context.t.eventsNoOneFromCity;
       default:
-        return 'Be the first to say hi — invite someone.';
+        return context.t.eventsBeFirstSayHi;
     }
   }
 
@@ -586,9 +581,9 @@ class _PartnersView extends ConsumerWidget {
     final currentUserDoc = ref.watch(currentUserDocProvider).valueOrNull;
 
     final chipLabels = <String>[
-      'All',
-      'Nearby',
-      selectedCity ?? 'City',
+      context.t.eventsFilterAll,
+      context.t.eventsFilterNearby,
+      selectedCity ?? context.t.eventsFilterCity,
     ];
 
     return Column(
@@ -605,23 +600,23 @@ class _PartnersView extends ConsumerWidget {
             loading: () => const _LoadingList(),
             error: (e, _) => _EmptyState(
               icon: Icons.error_outline,
-              title: 'Something went wrong',
+              title: context.t.somethingWentWrong,
               subtitle: '$e',
             ),
             data: (users) {
               final results = _filter(users, currentUid, currentUserDoc);
               if (results.isEmpty) {
-                final filterName = _kPartnerFilters[filterIndex].toLowerCase();
+                final filterName = chipLabels[filterIndex].toLowerCase();
                 return _EmptyState(
                   icon: _emptyIcon(filterIndex),
                   title: query.isEmpty
                       ? (filterIndex == 0
-                          ? 'No people yet'
-                          : 'No $filterName right now')
-                      : 'No results for "$query"',
+                          ? context.t.eventsNoPeopleYet
+                          : context.t.eventsNoFilterRightNow(filterName))
+                      : context.t.eventsNoResultsFor(query),
                   subtitle: query.isEmpty
-                      ? _emptySubtitle(filterIndex)
-                      : 'Try a different keyword or filter.',
+                      ? _emptySubtitle(context, filterIndex)
+                      : context.t.eventsTryDifferentKeyword,
                 );
               }
               return RefreshIndicator(
@@ -793,32 +788,32 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to open chat: $e')),
+        SnackBar(content: Text(context.t.eventsFailedToOpenChat(e))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
-  String _joinedAgo(DateTime? dt) {
+  String _joinedAgo(BuildContext context, DateTime? dt) {
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return 'Joined just now';
-    if (diff.inHours < 24) return 'Joined ${diff.inHours}h ago';
-    if (diff.inDays < 30) return 'Joined ${diff.inDays}d ago';
+    if (diff.inMinutes < 60) return context.t.eventsJoinedJustNow;
+    if (diff.inHours < 24) return context.t.eventsJoinedHoursAgo(diff.inHours);
+    if (diff.inDays < 30) return context.t.eventsJoinedDaysAgo(diff.inDays);
     if (diff.inDays < 365) {
       final months = (diff.inDays / 30).floor();
-      return 'Joined ${months}mo ago';
+      return context.t.eventsJoinedMonthsAgo(months);
     }
     final years = (diff.inDays / 365).floor();
-    return 'Joined ${years}y ago';
+    return context.t.eventsJoinedYearsAgo(years);
   }
 
   @override
   Widget build(BuildContext context) {
     final presenceAsync = ref.watch(presenceWatchProvider(widget.uid));
     final isOnline = presenceAsync.whenOrNull(data: (p) => p.online) ?? false;
-    final joined = _joinedAgo(widget.createdAt);
+    final joined = _joinedAgo(context, widget.createdAt);
 
     return AnimatedScale(
       scale: _pressed ? 0.98 : 1.0,
@@ -925,7 +920,7 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                isOnline ? 'Active now' : joined,
+                                isOnline ? context.t.eventsActiveNow : joined,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -972,9 +967,9 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
                       _Tag(label: widget.city, icon: Icons.location_on_rounded),
                     if (widget.gender.isNotEmpty) _Tag(label: widget.gender),
                     if (widget.postsCount > 0)
-                      _Tag(label: '${widget.postsCount} posts'),
+                      _Tag(label: context.t.eventsPostsCount(widget.postsCount)),
                     if (widget.postsCount >= 3)
-                      const _Tag(label: 'Very active'),
+                      _Tag(label: context.t.eventsVeryActive),
                   ],
                 ),
               ],
@@ -1097,7 +1092,7 @@ class _EventsView extends ConsumerWidget {
       loading: () => const _LoadingGrid(),
       error: (e, _) => _EmptyState(
         icon: Icons.error_outline,
-        title: 'Something went wrong',
+        title: context.t.somethingWentWrong,
         subtitle: '$e',
       ),
       data: (events) {
@@ -1141,14 +1136,15 @@ class _EventsView extends ConsumerWidget {
                   ? _EmptyState(
                       icon: Icons.event_busy_outlined,
                       title: q.isEmpty && (cityPick == null || cityPick.isEmpty)
-                          ? 'No events yet'
+                          ? context.t.noEvents
                           : (q.isNotEmpty
-                              ? 'No events matching "$query"'
-                              : 'No events in $selectedCity'),
+                              ? context.t.eventsNoEventsMatching(query)
+                              : context.t
+                                  .eventsNoEventsInCity(selectedCity ?? '')),
                       subtitle:
                           q.isEmpty && (cityPick == null || cityPick.isEmpty)
-                              ? 'New events will appear here when posted.'
-                              : 'Try a different keyword or location.',
+                              ? context.t.eventsNewEventsAppearHere
+                              : context.t.eventsTryDifferentKeywordLocation,
                     )
                   : layout == _EventsLayout.map
                       ? _EventsMapView(events: filtered)
@@ -1256,7 +1252,9 @@ class _EventFilterBar extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        cityActive ? selectedCity! : 'Filter by city',
+                        cityActive
+                            ? selectedCity!
+                            : context.t.eventsFilterByCity,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1407,16 +1405,16 @@ class _BecomeAdminBanner extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Want to host your own event?',
-                        style: TextStyle(
+                      Text(
+                        context.t.eventsWantHostEvent,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Tap to contact our admin team.',
+                        context.t.eventsTapContactAdmin,
                         style: TextStyle(
                             fontSize: 12, color: context.textSecondary),
                       ),
@@ -1460,16 +1458,16 @@ class _BecomeAdminBanner extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Become an event admin',
-                style: TextStyle(
+              Text(
+                context.t.eventsBecomeEventAdmin,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Email us with your name, a short description of the event you\'d like to host, and why. We\'ll get back to you.',
+                context.t.eventsBecomeAdminBody,
                 style: TextStyle(color: context.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -1495,12 +1493,13 @@ class _BecomeAdminBanner extends ConsumerWidget {
                         await Clipboard.setData(ClipboardData(text: email));
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Email copied')),
+                            SnackBar(
+                                content: Text(context.t.eventsEmailCopied)),
                           );
                         }
                       },
                       icon: const Icon(Icons.copy, size: 16),
-                      label: const Text('Copy'),
+                      label: Text(context.t.copy),
                     ),
                   ],
                 ),
@@ -1629,7 +1628,7 @@ class _EventCardState extends State<_EventCard> {
                     children: [
                       // City pill
                       Align(
-                        alignment: Alignment.centerLeft,
+                        alignment: AlignmentDirectional.centerStart,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -1667,7 +1666,7 @@ class _EventCardState extends State<_EventCard> {
                       if (e.eventType.trim().isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Align(
-                          alignment: Alignment.centerLeft,
+                          alignment: AlignmentDirectional.centerStart,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 9,
@@ -1693,7 +1692,7 @@ class _EventCardState extends State<_EventCard> {
                       if (widget.recommended) ...[
                         const SizedBox(height: 6),
                         Align(
-                          alignment: Alignment.centerLeft,
+                          alignment: AlignmentDirectional.centerStart,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 9,
@@ -1705,15 +1704,15 @@ class _EventCardState extends State<_EventCard> {
                               ),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.auto_awesome_rounded,
+                                const Icon(Icons.auto_awesome_rounded,
                                     size: 11, color: Colors.white),
-                                SizedBox(width: 3),
+                                const SizedBox(width: 3),
                                 Text(
-                                  'For you',
-                                  style: TextStyle(
+                                  context.t.eventsForYou,
+                                  style: const TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white,
@@ -1772,19 +1771,19 @@ class _EventCardState extends State<_EventCard> {
                           ),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'See more',
-                              style: TextStyle(
+                              context.t.eventsSeeMore,
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(width: 4),
-                            Icon(
+                            const SizedBox(width: 4),
+                            const Icon(
                               Icons.arrow_forward_rounded,
                               size: 13,
                               color: Colors.white,
@@ -1979,7 +1978,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                         style: TextButton.styleFrom(
                           foregroundColor: _kBrandPurple,
                         ),
-                        child: const Text('Clear'),
+                        child: Text(context.t.clear),
                       ),
                   ],
                 ),
@@ -2004,7 +2003,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                           decoration: InputDecoration(
                             isDense: true,
                             border: InputBorder.none,
-                            hintText: 'Search',
+                            hintText: context.t.search,
                             hintStyle: TextStyle(
                                 fontSize: 13, color: context.textSecondary),
                             contentPadding: EdgeInsets.zero,
@@ -2024,7 +2023,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            'No matches',
+                            context.t.noMatches,
                             style: TextStyle(color: context.textSecondary),
                           ),
                         ),
@@ -2268,8 +2267,8 @@ class _EventsMapViewState extends State<_EventsMapView> {
                   Expanded(
                     child: Text(
                       _resolving
-                          ? 'Locating $unresolved event${unresolved == 1 ? '' : 's'}...'
-                          : '$unresolved event${unresolved == 1 ? '' : 's'} could not be mapped',
+                          ? context.t.eventsLocatingEvents(unresolved)
+                          : context.t.eventsCouldNotBeMapped(unresolved),
                       style:
                           const TextStyle(color: Colors.white, fontSize: 11.5),
                     ),
@@ -2440,7 +2439,7 @@ class _EventMapSheet extends StatelessWidget {
                     lng: point.longitude,
                   ),
                   icon: const Icon(Icons.directions_rounded, size: 16),
-                  label: const Text('Directions'),
+                  label: Text(context.t.eventsDirections),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _kBrandPurple,
                     side: const BorderSide(color: _kBrandPurple),
@@ -2475,7 +2474,7 @@ class _EventMapSheet extends StatelessWidget {
                     );
                   },
                   icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: const Text('View event'),
+                  label: Text(context.t.eventsViewEvent),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kBrandPurple,
                     foregroundColor: Colors.white,
@@ -2549,28 +2548,28 @@ class _TravelQuickStartSheet extends StatelessWidget {
                     ),
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.travel_explore_rounded,
+                      const Icon(Icons.travel_explore_rounded,
                           color: Colors.white, size: 28),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Travel Mode',
-                              style: TextStyle(
+                              context.t.eventsTravelMode,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'Quick start guide',
-                              style: TextStyle(
+                              context.t.eventsQuickStartGuide,
+                              style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
                               ),
@@ -2582,29 +2581,25 @@ class _TravelQuickStartSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                const _QuickStartStep(
+                _QuickStartStep(
                   icon: Icons.swap_horiz_rounded,
-                  title: 'Switch to Travel feed',
-                  body:
-                      'On Home, tap the Travel toggle to see posts from people in other places — not just the ones you follow.',
+                  title: context.t.eventsSwitchTravelFeed,
+                  body: context.t.eventsSwitchTravelFeedBody,
                 ),
-                const _QuickStartStep(
+                _QuickStartStep(
                   icon: Icons.location_on_rounded,
-                  title: 'Filter by city',
-                  body:
-                      'In Events, tap "Filter by city" to narrow events down to a specific destination.',
+                  title: context.t.eventsFilterByCityStep,
+                  body: context.t.eventsFilterByCityStepBody,
                 ),
-                const _QuickStartStep(
+                _QuickStartStep(
                   icon: Icons.map_outlined,
-                  title: 'See events on a map',
-                  body:
-                      'Use the map toggle next to the city filter to drop pins for every event and tap any pin to preview it.',
+                  title: context.t.eventsSeeEventsOnMap,
+                  body: context.t.eventsSeeEventsOnMapBody,
                 ),
-                const _QuickStartStep(
+                _QuickStartStep(
                   icon: Icons.flight_takeoff_rounded,
-                  title: 'Plan your trip',
-                  body:
-                      'Open any event and use the Hotels and Flights shortcuts to start planning before you go.',
+                  title: context.t.eventsPlanYourTrip,
+                  body: context.t.eventsPlanYourTripBody,
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -2619,9 +2614,9 @@ class _TravelQuickStartSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Text(
-                      'Got it',
-                      style: TextStyle(
+                    child: Text(
+                      context.t.eventsGotIt,
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),

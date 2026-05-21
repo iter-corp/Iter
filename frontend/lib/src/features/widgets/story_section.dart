@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/story_providers.dart';
 import '../../navigation/user_profile_nav.dart';
@@ -162,7 +163,7 @@ class _MyStoryBubble extends StatelessWidget {
               }
             },
             child: Stack(
-              alignment: Alignment.bottomRight,
+              alignment: AlignmentDirectional.bottomEnd,
               children: [
                 Container(
                   padding: const EdgeInsets.all(2),
@@ -203,7 +204,7 @@ class _MyStoryBubble extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text('Your story',
+          Text(context.t.yourStory,
               style: TextStyle(fontSize: 11, color: context.textSecondary)),
         ],
       ),

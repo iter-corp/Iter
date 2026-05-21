@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/live_providers.dart';
 import '../../services/live_service.dart';
+
+/// Host-side live setup failure modes, resolved to a localized message in
+/// [_buildBody] where a BuildContext is available.
+enum _LiveHostError { permissions, sparkUnavailable, agora, unknown }
 
 class LiveHostScreen extends ConsumerStatefulWidget {
   final LiveStream stream;
@@ -20,7 +25,8 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
   RtcEngine? _engine;
   bool _joined = false;
   bool _loading = true;
-  String? _errorText;
+  _LiveHostError? _errorKind;
+  String _agoraErrorDetail = '';
 
   @override
   void initState() {
@@ -42,8 +48,7 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
       final hasPermissions = await _ensurePermissions();
       if (!hasPermissions) {
         setState(() {
-          _errorText =
-              'Camera and microphone permissions are required to go live.';
+          _errorKind = _LiveHostError.permissions;
           _loading = false;
         });
         return;
@@ -51,8 +56,7 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
 
       if (widget.stream.appId == null || widget.stream.token == null) {
         setState(() {
-          _errorText =
-              'Live streaming is unavailable in Spark mode. Configure external Agora token service to enable it.';
+          _errorKind = _LiveHostError.sparkUnavailable;
           _loading = false;
         });
         return;
@@ -75,7 +79,8 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
           onError: (error, _) {
             if (!mounted) return;
             setState(() {
-              _errorText = 'Agora error: $error';
+              _errorKind = _LiveHostError.agora;
+              _agoraErrorDetail = '$error';
             });
           },
         ),
@@ -107,7 +112,7 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'Unable to start live stream';
+        _errorKind = _LiveHostError.unknown;
         _loading = false;
       });
     }
@@ -117,7 +122,8 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
     await _cleanupAgora();
     if (!mounted) return;
     setState(() {
-      _errorText = null;
+      _errorKind = null;
+      _agoraErrorDetail = '';
       _loading = true;
       _joined = false;
     });
@@ -150,29 +156,44 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_errorText != null) {
+    if (_errorKind != null) {
+      final String message;
+      switch (_errorKind!) {
+        case _LiveHostError.permissions:
+          message = context.t.livePermissionsRequired;
+          break;
+        case _LiveHostError.sparkUnavailable:
+          message = context.t.liveUnavailableSpark;
+          break;
+        case _LiveHostError.agora:
+          message = context.t.liveAgoraError(_agoraErrorDetail);
+          break;
+        case _LiveHostError.unknown:
+          message = context.t.liveUnableToStart;
+          break;
+      }
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _errorText!,
+              message,
               style: const TextStyle(color: Colors.white70),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _retryStart,
-              child: const Text('Retry'),
+              child: Text(context.t.retry),
             ),
           ],
         ),
       );
     }
     if (_engine == null || !_joined) {
-      return const Center(
-        child: Text('Unable to start stream',
-            style: TextStyle(color: Colors.white)),
+      return Center(
+        child: Text(context.t.liveUnableToStartStream,
+            style: const TextStyle(color: Colors.white)),
       );
     }
     return AgoraVideoView(
@@ -216,9 +237,9 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
                   ),
                   TextButton(
                     onPressed: _endLive,
-                    child: const Text(
-                      'End',
-                      style: TextStyle(color: Colors.redAccent),
+                    child: Text(
+                      context.t.liveEndButton,
+                      style: const TextStyle(color: Colors.redAccent),
                     ),
                   ),
                 ],

@@ -5,12 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../widgets/feature_disabled_view.dart';
 import 'add_to_story_screen.dart';
 import 'create_post_screen.dart';
 import 'live_screen.dart';
 import 'story_preview_screen.dart';
+
+/// Distinguishes the two camera-setup failure modes so the message can be
+/// localized at render time (the async setup code has no BuildContext).
+enum _CameraInitError { noCameras, initFailed }
 
 class CameraStoryScreen extends ConsumerStatefulWidget {
   const CameraStoryScreen({super.key});
@@ -28,7 +33,11 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
   int _activeCamera = 0;
   FlashMode _flashMode = FlashMode.auto;
   bool _uploading = false;
-  String? _initError;
+  // Camera setup error kind, resolved to a localized message in
+  // [_buildPreview] where a BuildContext is available. [_initErrorDetail]
+  // holds the raw exception text for the "init failed" case.
+  _CameraInitError? _initError;
+  String _initErrorDetail = '';
 
   @override
   void initState() {
@@ -61,7 +70,7 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
-        setState(() => _initError = 'No cameras found');
+        setState(() => _initError = _CameraInitError.noCameras);
         return;
       }
       final desc = _cameras[_activeCamera];
@@ -78,7 +87,12 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
       await c.setFlashMode(_flashMode);
       setState(() {});
     } catch (e) {
-      if (mounted) setState(() => _initError = 'Camera init failed: $e');
+      if (mounted) {
+        setState(() {
+          _initError = _CameraInitError.initFailed;
+          _initErrorDetail = '$e';
+        });
+      }
     }
   }
 
@@ -140,7 +154,7 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Capture failed: $e')),
+          SnackBar(content: Text(context.t.cameraCaptureFailed(e))),
         );
       }
     } finally {
@@ -172,8 +186,8 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
     final storiesEnabled =
         ref.watch(adminConfigProvider).valueOrNull?.storiesEnabled ?? true;
     if (!storiesEnabled) {
-      return const FeatureDisabledView(
-        feature: 'Stories',
+      return FeatureDisabledView(
+        feature: context.t.featureStories,
         icon: Icons.auto_stories_outlined,
       );
     }
@@ -265,11 +279,11 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildTab('Post', 0),
+                        _buildTab(context.t.post, 0),
                         const SizedBox(width: 24),
-                        _buildTab('Story', 1),
+                        _buildTab(context.t.story, 1),
                         const SizedBox(width: 24),
-                        _buildTab('Live', 2),
+                        _buildTab(context.t.live, 2),
                       ],
                     ),
                   ),
@@ -295,11 +309,14 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
 
   Widget _buildPreview() {
     if (_initError != null) {
+      final message = _initError == _CameraInitError.noCameras
+          ? context.t.cameraNoCamerasFound
+          : context.t.cameraInitFailed(_initErrorDetail);
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            _initError!,
+            message,
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white),
           ),
@@ -317,12 +334,61 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
           return const Center(
               child: CircularProgressIndicator(color: Colors.white));
         }
-        return FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: c.value.previewSize?.width ?? 1,
-            height: c.value.previewSize?.height ?? 1,
-            child: CameraPreview(c),
+        // `previewSize` is reported in the sensor's natural (landscape)
+        // orientation, so in a portrait UI its width/height are
+        // effectively swapped. Building a SizedBox straight from those
+        // values and forcing BoxFit.cover stretched the image.
+        //
+        // Instead: take the camera's true aspect ratio (long/short),
+        // and size an AspectRatio box so the *shorter* side fills the
+        // screen — overflow on the longer side is cropped by the
+        // surrounding ClipRect. This is the standard distortion-free
+        // "camera cover" and matches the native camera app.
+        final preview = c.value.previewSize;
+        final shortSide = preview == null
+            ? 9.0
+            : (preview.width < preview.height
+                ? preview.width
+                : preview.height);
+        final longSide = preview == null
+            ? 16.0
+            : (preview.width < preview.height
+                ? preview.height
+                : preview.width);
+
+        return ClipRect(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final screenW = constraints.maxWidth;
+              final screenH = constraints.maxHeight;
+              // Camera aspect ratio in the current (portrait) UI:
+              // height is the long edge, width is the short edge.
+              final cameraAspect = shortSide / longSide;
+              final screenAspect = screenW / screenH;
+
+              double previewW;
+              double previewH;
+              if (screenAspect > cameraAspect) {
+                // Screen is wider than the camera frame → match width,
+                // let height overflow (cropped top/bottom).
+                previewW = screenW;
+                previewH = screenW / cameraAspect;
+              } else {
+                // Screen is taller → match height, crop the sides.
+                previewH = screenH;
+                previewW = screenH * cameraAspect;
+              }
+
+              return OverflowBox(
+                maxWidth: previewW,
+                maxHeight: previewH,
+                child: SizedBox(
+                  width: previewW,
+                  height: previewH,
+                  child: CameraPreview(c),
+                ),
+              );
+            },
           ),
         );
       },

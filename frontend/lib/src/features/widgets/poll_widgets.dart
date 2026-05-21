@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/poll_providers.dart';
 import '../../services/poll_service.dart';
@@ -75,7 +76,7 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e')),
+          SnackBar(content: Text(context.t.failedWithError(e))),
         );
       }
     } finally {
@@ -107,12 +108,13 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text('Create poll',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(context.t.pollCreateTitle,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               TextField(
                 controller: _questionCtrl,
-                decoration: _decoration('Ask a question...'),
+                decoration: _decoration(context.t.pollAskQuestionHint),
               ),
               const SizedBox(height: 16),
               for (var i = 0; i < _optionCtrls.length; i++)
@@ -123,7 +125,8 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                       Expanded(
                         child: TextField(
                           controller: _optionCtrls[i],
-                          decoration: _decoration('Option ${i + 1}'),
+                          decoration:
+                              _decoration(context.t.pollOptionHint(i + 1)),
                         ),
                       ),
                       if (_optionCtrls.length > 2)
@@ -139,11 +142,11 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                 TextButton.icon(
                   onPressed: _addOption,
                   icon: const Icon(Icons.add),
-                  label: const Text('Add option'),
+                  label: Text(context.t.pollAddOption),
                 ),
               const SizedBox(height: 8),
-              const Text('Visibility',
-                  style: TextStyle(
+              Text(context.t.pollVisibilityLabel,
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   )),
@@ -152,8 +155,8 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                 children: [
                   Expanded(
                     child: _VisibilityChip(
-                      label: 'Public',
-                      description: 'Voters visible',
+                      label: context.t.pollVisibilityPublic,
+                      description: context.t.pollVisibilityPublicDesc,
                       icon: Icons.public,
                       active: _visibility == PollVisibility.public,
                       onTap: () =>
@@ -163,8 +166,8 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _VisibilityChip(
-                      label: 'Secret',
-                      description: 'Only counts visible',
+                      label: context.t.pollVisibilitySecret,
+                      description: context.t.pollVisibilitySecretDesc,
                       icon: Icons.lock_outline,
                       active: _visibility == PollVisibility.secret,
                       onTap: () =>
@@ -193,8 +196,9 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Post poll',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      : Text(context.t.pollPostButton,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
@@ -296,8 +300,9 @@ class PollsSection extends ConsumerWidget {
             children: [
               const Icon(Icons.bar_chart, size: 16, color: Color(0xFFB05ECC)),
               const SizedBox(width: 6),
-              const Text('Polls',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              Text(context.t.pollSectionTitle,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (canCreate)
                 TextButton.icon(
@@ -306,7 +311,8 @@ class PollsSection extends ConsumerWidget {
                     parentPath: parentPath,
                   ),
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text('New', style: TextStyle(fontSize: 12)),
+                  label: Text(context.t.pollNewButton,
+                      style: const TextStyle(fontSize: 12)),
                 ),
             ],
           ),
@@ -364,7 +370,9 @@ class PollTile extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  isSecret ? 'SECRET' : 'PUBLIC',
+                  isSecret
+                      ? context.t.pollBadgeSecret
+                      : context.t.pollBadgePublic,
                   style: TextStyle(
                     fontSize: 9,
                     letterSpacing: 0.5,
@@ -381,7 +389,7 @@ class PollTile extends ConsumerWidget {
                   onPressed: () => ref
                       .read(pollServiceProvider)
                       .closePoll(parentPath, poll.id),
-                  tooltip: 'Close poll',
+                  tooltip: context.t.pollCloseTooltip,
                 ),
             ],
           ),
@@ -405,8 +413,10 @@ class PollTile extends ConsumerWidget {
           Row(
             children: [
               Text(
-                '$total ${total == 1 ? "vote" : "votes"}'
-                '${poll.closed ? " · closed" : ""}',
+                (total == 1
+                        ? context.t.pollVoteCount(total)
+                        : context.t.pollVotesCount(total)) +
+                    (poll.closed ? context.t.pollClosedSuffix : ''),
                 style: TextStyle(fontSize: 11, color: context.textSecondary),
               ),
             ],
@@ -448,7 +458,7 @@ class _PollOptionRow extends StatelessWidget {
               // Progress fill
               Positioned.fill(
                 child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   widthFactor: pct.clamp(0, 1),
                   child: Container(
                     color: isMine ? const Color(0xFFE5C4F2) : context.inputFill,
@@ -469,7 +479,7 @@ class _PollOptionRow extends StatelessWidget {
                   children: [
                     if (isMine)
                       const Padding(
-                        padding: EdgeInsets.only(right: 6),
+                        padding: EdgeInsetsDirectional.only(end: 6),
                         child: Icon(Icons.check_circle,
                             size: 14, color: Color(0xFFB05ECC)),
                       ),

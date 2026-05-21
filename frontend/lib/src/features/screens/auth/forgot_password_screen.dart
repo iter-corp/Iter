@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../theme/app_theme.dart';
 
@@ -74,7 +75,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: 12),
                 // Back button
                 Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
@@ -105,7 +106,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Forgot Password?',
+                  context.t.forgotPassword,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -114,7 +115,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Don't worry! Enter the email associated with\nyour account and we'll send a reset link.",
+                  context.t.forgotPasswordSubtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -141,7 +142,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                             color: Color(0xFF3BD671), size: 48),
                         const SizedBox(height: 12),
                         Text(
-                          'Email Sent!',
+                          context.t.forgotPasswordEmailSent,
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
@@ -150,7 +151,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Check your inbox for a password reset link.\nAlso check your spam folder.',
+                          context.t.forgotPasswordCheckInbox,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13,
@@ -174,7 +175,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         ),
                       ),
                       child: Text(
-                        'Back to Login',
+                        context.t.forgotPasswordBackToLogin,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -190,16 +191,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
-                        return 'Enter your email address';
+                        return context.t.forgotPasswordEnterEmail;
                       }
                       if (!v.contains('@')) {
-                        return 'Enter a valid email address';
+                        return context.t.forgotPasswordEnterValidEmail;
                       }
                       return null;
                     },
                     style: TextStyle(fontSize: 14, color: context.textPrimary),
                     decoration: InputDecoration(
-                      hintText: 'Email address',
+                      hintText: context.t.forgotPasswordEmailAddress,
                       hintStyle:
                           TextStyle(fontSize: 14, color: context.textMuted),
                       prefixIcon: Icon(Icons.email_outlined,
@@ -263,9 +264,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text(
-                              'Send Reset Link',
-                              style: TextStyle(
+                          : Text(
+                              context.t.forgotPasswordSendResetLink,
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
@@ -283,7 +284,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                             size: 16, color: context.textMuted),
                         const SizedBox(width: 4),
                         Text(
-                          'Back to Login',
+                          context.t.forgotPasswordBackToLogin,
                           style: TextStyle(
                             fontSize: 13,
                             color: context.textMuted,

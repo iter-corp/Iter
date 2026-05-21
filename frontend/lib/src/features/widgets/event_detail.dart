@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/event_registration_providers.dart';
 import '../../services/event_registration_service.dart';
 import '../../theme/app_theme.dart';
@@ -105,7 +106,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             children: [
               // 📌 SECTION: Back Arrow
               Padding(
-                padding: const EdgeInsets.only(left: 14, top: 10, bottom: 6),
+                padding: const EdgeInsetsDirectional.only(
+                    start: 14, top: 10, bottom: 6),
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Icon(
@@ -207,29 +209,34 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           ),
                         ),
                       ),
-                      // 🔹 Left arrow — vertically centered
+                      // 🔹 Previous arrow — on the start side, points
+                      //    toward the start. PositionedDirectional +
+                      //    the directional chevron keep it correct in
+                      //    both LTR and RTL.
                       if (widget.imageUrls.length > 1)
-                        Positioned(
-                          left: 12,
+                        PositionedDirectional(
+                          start: 12,
                           top: 0,
                           bottom: 0,
                           child: Center(
                             child: _ArrowButton(
                               icon: Icons.chevron_left,
+                              flipForRtl: true,
                               onTap: _prev,
                             ),
                           ),
                         ),
 
-                      // 🔹 Right arrow — vertically centered
+                      // 🔹 Next arrow — on the end side
                       if (widget.imageUrls.length > 1)
-                        Positioned(
-                          right: 12,
+                        PositionedDirectional(
+                          end: 12,
                           top: 0,
                           bottom: 0,
                           child: Center(
                             child: _ArrowButton(
                               icon: Icons.chevron_right,
+                              flipForRtl: true,
                               onTap: _next,
                             ),
                           ),
@@ -262,8 +269,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       if (widget.deadlineAt != null)
                         _MetaChip(
                           icon: Icons.calendar_month_outlined,
-                          label:
-                              'Deadline ${_formatDate(context, widget.deadlineAt!)}',
+                          label: context.t.eventDetailDeadline(
+                              _formatDate(context, widget.deadlineAt!)),
                         ),
                     ],
                   ),
@@ -297,8 +304,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   children: [
                     Text(
                       _parsedEventLink() != null
-                          ? 'If you would like to join, you\ncan apply below:'
-                          : 'If you would like to become one of us, you\ncan register below:',
+                          ? context.t.eventDetailApplyBelow
+                          : context.t.eventDetailRegisterBelow,
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
@@ -331,7 +338,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 // 📌 SECTION: Contact title
                 Center(
                   child: Text(
-                    'Contact',
+                    context.t.eventDetailContact,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -373,10 +380,23 @@ class _ArrowButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _ArrowButton({required this.icon, required this.onTap});
+  /// When true, the chevron is mirrored under RTL so a "left" chevron
+  /// visually points toward the start in both directions.
+  final bool flipForRtl;
+
+  const _ArrowButton({
+    required this.icon,
+    required this.onTap,
+    this.flipForRtl = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    Widget iconWidget = Icon(icon, size: 20, color: Colors.white);
+    if (flipForRtl && isRtl) {
+      iconWidget = Transform.flip(flipX: true, child: iconWidget);
+    }
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -386,7 +406,7 @@ class _ArrowButton extends StatelessWidget {
           color: Colors.black.withOpacity(0.4),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 20, color: Colors.white),
+        child: iconWidget,
       ),
     );
   }
@@ -484,8 +504,8 @@ class _RegistrationButton extends ConsumerWidget {
             );
             if (!ok && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Could not open application link')),
+                SnackBar(
+                    content: Text(context.t.eventDetailCouldNotOpenLink)),
               );
             }
           },
@@ -495,9 +515,9 @@ class _RegistrationButton extends ConsumerWidget {
               color: const Color(0xFFCE5DE5),
               borderRadius: BorderRadius.circular(30),
             ),
-            child: const Text(
-              'Apply',
-              style: TextStyle(
+            child: Text(
+              context.t.eventDetailApply,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -516,7 +536,7 @@ class _RegistrationButton extends ConsumerWidget {
     VoidCallback? onTap;
 
     if (reg == null) {
-      label = 'Registration';
+      label = context.t.eventDetailRegistration;
       color = const Color(0xFFCE5DE5);
       onTap = () => showEventRegistrationSheet(
             context,
@@ -526,17 +546,17 @@ class _RegistrationButton extends ConsumerWidget {
     } else {
       switch (reg.status) {
         case RegistrationStatus.pending:
-          label = 'Request pending';
+          label = context.t.eventDetailRequestPending;
           color = context.textSecondary;
           onTap = null;
           break;
         case RegistrationStatus.approved:
-          label = 'Approved ✓';
+          label = context.t.eventDetailApproved;
           color = const Color(0xFF2EBD6B);
           onTap = null;
           break;
         case RegistrationStatus.rejected:
-          label = 'Rejected — tap to retry';
+          label = context.t.eventDetailRejectedRetry;
           color = const Color(0xFFE04E5C);
           onTap = () => showEventRegistrationSheet(
                 context,

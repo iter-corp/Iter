@@ -149,10 +149,19 @@ service cloud.firestore {
       // the whole query.
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
+      // A post (including a Q&A "question" post) may only be EDITED by
+      // its author or an admin. Everyone else is limited to two
+      // non-content tagging operations:
+      //   - bumping commentsCount / likesCount,
+      //   - setting discussTopicId once, when turning the post into a
+      //     Discuss topic.
+      // This keeps question/caption text author-only while still
+      // letting any user link a post to its Discuss thread.
       allow update: if signedIn() && (
         resource.data.authorUid == request.auth.uid ||
         isAdmin() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount', 'likesCount'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount', 'likesCount']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['discussTopicId'])
       );
       allow delete: if signedIn() && (
         resource.data.authorUid == request.auth.uid || isAdmin()

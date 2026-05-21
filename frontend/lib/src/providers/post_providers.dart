@@ -35,6 +35,13 @@ class TravelFeedQuery {
 
 final postServiceProvider = Provider<PostService>((_) => PostService());
 
+/// Fetches a single post by id. Used to embed a post inside other
+/// screens (e.g. the discussed post shown in a Discuss thread).
+final singlePostProvider =
+    FutureProvider.family<Post?, String>((ref, postId) async {
+  return ref.watch(postServiceProvider).getPostById(postId);
+});
+
 final feedProvider = StreamProvider<List<Post>>((ref) {
   // Rebuild only when the effective UID changes to avoid restarting the feed
   // stream during transient auth state re-emissions.

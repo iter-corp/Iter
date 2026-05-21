@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/live_providers.dart';
@@ -77,8 +78,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final liveEnabled =
         ref.watch(adminConfigProvider).valueOrNull?.liveEnabled ?? true;
     if (!liveEnabled) {
-      return const FeatureDisabledView(
-        feature: 'Live streaming',
+      return FeatureDisabledView(
+        feature: context.t.featureLiveStreaming,
         icon: Icons.live_tv_outlined,
       );
     }
@@ -140,11 +141,11 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildTab("Post", 0),
+                        _buildTab(context.t.post, 0),
                         const SizedBox(width: 24),
-                        _buildTab("Story", 1),
+                        _buildTab(context.t.story, 1),
                         const SizedBox(width: 24),
-                        _buildTab("Live", 2),
+                        _buildTab(context.t.live, 2),
                       ],
                     ),
                   ),
@@ -282,7 +283,7 @@ class _ActiveStreamsList extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
         child: Text(
-          'Live list unavailable',
+          context.t.liveListUnavailable,
           style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
         ),
       ),
@@ -290,7 +291,7 @@ class _ActiveStreamsList extends ConsumerWidget {
         if (streams.isEmpty) {
           return Center(
             child: Text(
-              'No one is live right now',
+              context.t.liveNoOneLive,
               style: TextStyle(color: Colors.white.withValues(alpha: 0.75)),
             ),
           );
@@ -324,9 +325,9 @@ class _ActiveStreamsList extends ConsumerWidget {
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          'LIVE',
-                          style: TextStyle(
+                        child: Text(
+                          context.t.liveLabelShort,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 10,
@@ -350,7 +351,7 @@ class _ActiveStreamsList extends ConsumerWidget {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'Host: ${stream.hostUid}',
+                              context.t.liveHostPrefix(stream.hostUid),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -472,7 +473,7 @@ class _LiveTitleSheetState extends ConsumerState<_LiveTitleSheet> {
                     fontWeight: FontWeight.w400,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Add a title...',
+                    hintText: context.t.liveAddTitleHint,
                     hintStyle:
                         TextStyle(color: context.textMuted, fontSize: 16),
                     border: InputBorder.none,
@@ -486,9 +487,9 @@ class _LiveTitleSheetState extends ConsumerState<_LiveTitleSheet> {
           const SizedBox(height: 10),
 
           // ── Helper text ──────────────────────
-          const Text(
-            'your follower and anyone watching will see this title.',
-            style: TextStyle(
+          Text(
+            context.t.liveTitleHelper,
+            style: const TextStyle(
               color: Color(0xFF999999),
               fontSize: 12.5,
               height: 1.4,
@@ -536,9 +537,9 @@ class _LiveTitleSheetState extends ConsumerState<_LiveTitleSheet> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text(
-                        'Go Live',
-                        style: TextStyle(
+                    : Text(
+                        context.t.liveGoLiveButton,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,

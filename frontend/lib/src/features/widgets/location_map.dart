@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 
 /// Compact map preview pinned at [lat]/[lng]. Tapping it opens
@@ -210,7 +211,7 @@ class LocationMapScreen extends StatelessWidget {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the maps app')),
+        SnackBar(content: Text(context.t.locationMapCouldNotOpen)),
       );
     }
   }
@@ -219,11 +220,11 @@ class LocationMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(label ?? 'Location'),
+        title: Text(label ?? context.t.locationMapLocation),
         centerTitle: false,
         actions: [
           IconButton(
-            tooltip: 'Open in Maps',
+            tooltip: context.t.locationMapOpenInMaps,
             onPressed: () => _openExternal(context),
             icon: const Icon(Icons.open_in_new),
           ),

@@ -13,6 +13,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Localization — Material/Cupertino localized widgets + RTL support
+  flutter_localizations:
+    sdk: flutter
+
   # State management
   flutter_riverpod: ^2.5.1
   rxdart: ^0.28.0
@@ -22,6 +26,9 @@ dependencies:
 
   # Image caching (better than raw Image.network)
   cached_network_image: ^3.3.1
+  # Disk cache manager — used to cache post images (large) and to
+  # cache post videos to disk so they don't re-stream every view.
+  flutter_cache_manager: ^3.3.1
 
   # Safe area / device info
   flutter_native_splash: ^2.4.0

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/comment_providers.dart';
@@ -159,9 +160,10 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Row(
                 children: [
-                  const Text(
-                    'Comments',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  Text(
+                    context.t.comments,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -199,11 +201,12 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
             Expanded(
               child: commentsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) =>
+                    Center(child: Text(context.t.homeErrorPrefix(e))),
                 data: (comments) {
                   if (comments.isEmpty) {
                     return Center(
-                      child: Text('No comments yet. Be the first!',
+                      child: Text(context.t.commentNoCommentsFirst,
                           style: TextStyle(color: context.textSecondary)),
                     );
                   }
@@ -280,7 +283,8 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                           ),
                           if (replies.isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.only(left: 56),
+                              padding:
+                                  const EdgeInsetsDirectional.only(start: 56),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -300,9 +304,9 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                                           const SizedBox(width: 8),
                                           Text(
                                             expanded
-                                                ? 'Hide replies'
-                                                : 'View ${replies.length} '
-                                                    '${replies.length == 1 ? "reply" : "replies"}',
+                                                ? context.t.commentHideReplies
+                                                : '${context.t.viewComments} '
+                                                    '(${replies.length})',
                                             style: TextStyle(
                                               color: context.textSecondary,
                                               fontSize: 12,
@@ -352,7 +356,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Replying to @${_replyTo!.username}',
+                        context.t.commentReplyingTo(_replyTo!.username),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF8A3FB8),
@@ -391,8 +395,9 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                         focusNode: _focusNode,
                         decoration: InputDecoration(
                           hintText: _replyTo != null
-                              ? 'Reply to @${_replyTo!.username}...'
-                              : 'Add a comment...',
+                              ? context.t
+                                  .commentReplyToHint(_replyTo!.username)
+                              : context.t.commentAddCommentHint,
                           border: InputBorder.none,
                         ),
                         onSubmitted: (_) => _submit(),
@@ -599,7 +604,9 @@ class _CommentTile extends ConsumerWidget {
                                     builder: (context, countSnap) {
                                       final count = countSnap.data ?? 0;
                                       return Text(
-                                        count > 0 ? '$count' : 'Like',
+                                        count > 0
+                                            ? '$count'
+                                            : context.t.like,
                                         style: TextStyle(
                                           color: isLiked
                                               ? const Color(0xFFFF4D6D)
@@ -623,7 +630,7 @@ class _CommentTile extends ConsumerWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Text(
-                            'Reply',
+                            context.t.reply,
                             style: TextStyle(
                               color: context.textSecondary,
                               fontSize: 12,
@@ -640,7 +647,7 @@ class _CommentTile extends ConsumerWidget {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 2),
                             child: Text(
-                              'Translate',
+                              context.t.translate,
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -663,7 +670,7 @@ class _CommentTile extends ConsumerWidget {
                       .deleteComment(postId: post.id, commentId: comment.id);
                 },
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsetsDirectional.only(start: 8),
                   child:
                       Icon(Icons.close, size: 16, color: context.textSecondary),
                 ),
@@ -749,7 +756,7 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
                 const Icon(Icons.translate, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Translate to ${_labelOf(_target)}',
+                  context.t.commentTranslateTo(_labelOf(_target)),
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700),
                 ),
@@ -814,18 +821,19 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
                       : () {
                           Clipboard.setData(ClipboardData(text: _translated!));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Translation copied'),
+                            SnackBar(
+                              content:
+                                  Text(context.t.commentTranslationCopied),
                             ),
                           );
                         },
                   icon: const Icon(Icons.copy, size: 18),
-                  label: const Text('Copy'),
+                  label: Text(context.t.copy),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
+                  child: Text(context.t.close),
                 ),
               ],
             ),

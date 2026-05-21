@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
@@ -64,7 +65,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Post'),
+        title: Text(context.t.post),
         foregroundColor: context.textPrimary,
         elevation: 0,
       ),
@@ -80,7 +81,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!snap.hasData || !snap.data!.exists) {
             return Center(
               child: Text(
-                'Post not found',
+                context.t.postNotFound,
                 style: TextStyle(color: context.textSecondary),
               ),
             );

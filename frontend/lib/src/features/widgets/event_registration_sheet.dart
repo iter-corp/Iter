@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/event_registration_providers.dart';
 import '../../theme/app_theme.dart';
@@ -115,14 +116,14 @@ class _EventRegistrationFormState
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Request submitted. Waiting for admin approval.'),
+        SnackBar(
+          content: Text(context.t.eventRegRequestSubmitted),
         ),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e')),
+          SnackBar(content: Text(context.t.eventRegFailed(e))),
         );
       }
     } finally {
@@ -158,7 +159,7 @@ class _EventRegistrationFormState
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Register for',
+                  context.t.eventRegRegisterFor,
                   style: TextStyle(color: context.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
@@ -171,32 +172,33 @@ class _EventRegistrationFormState
                 ),
                 const SizedBox(height: 20),
                 _LabeledField(
-                  label: 'Full name',
+                  label: context.t.eventRegFullName,
                   child: TextFormField(
                     controller: _nameCtrl,
-                    decoration: _inputDecoration('e.g. John Doe'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    decoration: _inputDecoration(context.t.eventRegNameHint),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? context.t.eventRegRequired
+                        : null,
                   ),
                 ),
                 _LabeledField(
-                  label: 'Email',
+                  label: context.t.eventRegEmail,
                   child: TextFormField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: _inputDecoration('you@example.com'),
+                    decoration: _inputDecoration(context.t.eventRegEmailHint),
                     validator: (v) {
                       final t = v?.trim() ?? '';
-                      if (t.isEmpty) return 'Required';
+                      if (t.isEmpty) return context.t.eventRegRequired;
                       if (!t.contains('@') || !t.contains('.')) {
-                        return 'Invalid email';
+                        return context.t.eventRegInvalidEmail;
                       }
                       return null;
                     },
                   ),
                 ),
                 _LabeledField(
-                  label: 'Phone',
+                  label: context.t.eventRegPhone,
                   child: Row(
                     children: [
                       Container(
@@ -235,11 +237,12 @@ class _EventRegistrationFormState
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                           ],
-                          decoration: _inputDecoration('5551234567'),
+                          decoration:
+                              _inputDecoration(context.t.eventRegPhoneHint),
                           validator: (v) {
                             final t = v?.trim() ?? '';
-                            if (t.isEmpty) return 'Required';
-                            if (t.length < 6) return 'Too short';
+                            if (t.isEmpty) return context.t.eventRegRequired;
+                            if (t.length < 6) return context.t.eventRegTooShort;
                             return null;
                           },
                         ),
@@ -269,9 +272,9 @@ class _EventRegistrationFormState
                               color: Colors.white,
                             ),
                           )
-                        : const Text(
-                            'Submit request',
-                            style: TextStyle(
+                        : Text(
+                            context.t.eventRegSubmitRequest,
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
                           ),

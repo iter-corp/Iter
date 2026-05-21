@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
@@ -94,6 +95,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return null;
   }
 
+  /// Maps a stable gender option value to its localized display label.
+  String _genderLabel(String value) {
+    switch (value) {
+      case 'Female':
+        return context.t.onboardingGenderFemale;
+      case 'Male':
+        return context.t.onboardingGenderMale;
+      case 'Non-binary':
+        return context.t.onboardingGenderNonBinary;
+      case 'Other':
+        return context.t.onboardingGenderOther;
+      case 'Prefer not to say':
+        return context.t.editProfilePreferNotToSay;
+      default:
+        return value;
+    }
+  }
+
   String _normalizeUsername(String raw) => raw.trim().toLowerCase();
 
   bool _isValidUsername(String username) {
@@ -120,7 +139,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
+          SnackBar(content: Text(context.t.editProfileUploadFailed(e))),
         );
       }
     } finally {
@@ -148,7 +167,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Cover upload failed: $e')),
+          SnackBar(content: Text(context.t.editProfileCoverUploadFailed(e))),
         );
       }
     } finally {
@@ -161,22 +180,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final username = _normalizeUsername(_usernameController.text);
     if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Username can\'t be empty')),
+        SnackBar(content: Text(context.t.editProfileUsernameEmpty)),
       );
       return;
     }
     if (!_isValidUsername(username)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Username must be 3-24 chars and use only a-z, 0-9, . or _',
-          ),
+        SnackBar(
+          content: Text(context.t.editProfileUsernameInvalid),
         ),
       );
       return;
     }
 
     final messenger = ScaffoldMessenger.of(context);
+    final updatedMsg = context.t.editProfileUpdated;
+    final strings = context.t;
     setState(() => _saving = true);
     try {
       final uid = ref.read(authServiceProvider).currentUser!.uid;
@@ -190,7 +209,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         if (taken) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Username is already taken')),
+              SnackBar(content: Text(context.t.editProfileUsernameTaken)),
             );
           }
           return;
@@ -228,10 +247,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        AppFeedback.showSuccessOn(messenger, 'Profile updated');
+        AppFeedback.showSuccessOn(messenger, updatedMsg);
       }
     } catch (e) {
-      AppFeedback.showErrorOn(messenger, 'Could not save profile: $e');
+      AppFeedback.showErrorOn(
+          messenger, strings.editProfileCouldNotSave(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -246,10 +266,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       body: SafeArea(
         child: userAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (user) {
             if (user == null) {
-              return const Center(child: Text('No profile data'));
+              return Center(child: Text(context.t.profileNoProfileData));
             }
             _hydrate(user);
             return Column(
@@ -268,53 +288,53 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         _buildCoverAndAvatar(),
                         const SizedBox(height: 56),
                         _CenterEditLink(
-                          label: 'Change profile photo',
+                          label: context.t.editProfileChangePhoto,
                           onTap: _pickAndUploadAvatar,
                         ),
                         const SizedBox(height: 4),
                         _CenterEditLink(
-                          label: 'Change cover image',
+                          label: context.t.editProfileChangeCover,
                           onTap: _pickAndUploadCover,
                         ),
                         const SizedBox(height: 24),
-                        const _SectionLabel(text: 'About you'),
+                        _SectionLabel(text: context.t.onboardingAboutYou),
                         _LabeledInput(
-                          label: 'Name',
+                          label: context.t.editProfileName,
                           icon: Icons.person_outline,
                           controller: _nameController,
-                          hint: 'Your display name',
+                          hint: context.t.editProfileNameHint,
                           maxLength: 40,
                         ),
                         _LabeledInput(
-                          label: 'Username',
+                          label: context.t.username,
                           icon: Icons.alternate_email,
                           controller: _usernameController,
-                          hint: 'unique username',
+                          hint: context.t.editProfileUsernameHint,
                           maxLength: 24,
                         ),
                         _LabeledInput(
-                          label: 'Bio',
+                          label: context.t.bio,
                           icon: Icons.short_text,
                           controller: _bioController,
-                          hint: 'Tell people a little about you',
+                          hint: context.t.editProfileBioHint,
                           maxLines: 4,
                           maxLength: 160,
                         ),
                         _LabeledDropdown(
-                          label: 'Gender',
+                          label: context.t.onboardingGender,
                           icon: Icons.person_outline,
                           value: _gender,
                           options: _genderOptions,
+                          optionLabel: _genderLabel,
                           onChanged: (v) => setState(() => _gender = v),
-                          hint: 'Select gender',
+                          hint: context.t.editProfileSelectGender,
                         ),
                         const SizedBox(height: 8),
-                        const _SectionLabel(text: 'Interests & goals'),
+                        _SectionLabel(text: context.t.editProfileInterestsGoals),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                           child: Text(
-                            'Helps us surface events, scholarships and people '
-                            'relevant to you. All optional.',
+                            context.t.editProfileInterestsDesc,
                             style: TextStyle(
                               fontSize: 12,
                               color: context.textSecondary,
@@ -504,10 +524,11 @@ class _Header extends StatelessWidget {
             onPressed: onBack,
             icon: const Icon(Icons.arrow_back, size: 22),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Edit profile',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              context.t.editProfile,
+              style:
+                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
           ),
           TextButton(
@@ -525,9 +546,9 @@ class _Header extends StatelessWidget {
                       color: Color(0xFFB05ECC),
                     ),
                   )
-                : const Text(
-                    'Save',
-                    style: TextStyle(
+                : Text(
+                    context.t.save,
+                    style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -678,6 +699,9 @@ class _LabeledDropdown extends StatelessWidget {
   final List<String> options;
   final ValueChanged<String?> onChanged;
 
+  /// Optional mapping from a stable option value to a localized label.
+  final String Function(String)? optionLabel;
+
   const _LabeledDropdown({
     required this.label,
     required this.hint,
@@ -685,6 +709,7 @@ class _LabeledDropdown extends StatelessWidget {
     required this.value,
     required this.options,
     required this.onChanged,
+    this.optionLabel,
   });
 
   @override
@@ -748,7 +773,7 @@ class _LabeledDropdown extends StatelessWidget {
                 for (final opt in options)
                   DropdownMenuItem(
                     value: opt,
-                    child: Text(opt),
+                    child: Text(optionLabel?.call(opt) ?? opt),
                   ),
               ],
               onChanged: onChanged,

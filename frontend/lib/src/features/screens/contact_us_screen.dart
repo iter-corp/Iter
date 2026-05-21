@@ -765,7 +765,9 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final align = isMine ? Alignment.centerRight : Alignment.centerLeft;
+    final align = isMine
+        ? AlignmentDirectional.centerEnd
+        : AlignmentDirectional.centerStart;
     final color = isMine ? AppColors.purple : context.cardBg;
     final textColor = isMine ? Colors.white : context.textPrimary;
     final timeColor =

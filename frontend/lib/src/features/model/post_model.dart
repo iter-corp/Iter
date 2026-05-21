@@ -20,6 +20,15 @@ class Post {
   final double? travelDistanceKm;
   final String? travelDistanceLabel;
 
+  /// Set on a feed/travel post once it has been turned into a Discuss
+  /// topic — holds the id of that QA document. Null when the post has
+  /// no Discuss thread yet.
+  final String? discussTopicId;
+
+  /// Set on a Discuss (QA) post that was created *from* a feed/travel
+  /// post — holds the id of that original post.
+  final String? sourcePostId;
+
   Post({
     required this.id,
     required this.authorUid,
@@ -39,6 +48,8 @@ class Post {
     this.postLocationExact = false,
     this.travelDistanceKm,
     this.travelDistanceLabel,
+    this.discussTopicId,
+    this.sourcePostId,
   });
 
   factory Post.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
@@ -62,6 +73,8 @@ class Post {
       postLat: (postLocationMap?['lat'] as num?)?.toDouble(),
       postLng: (postLocationMap?['lng'] as num?)?.toDouble(),
       postLocationExact: (data['postLocationExact'] as bool?) ?? false,
+      discussTopicId: (data['discussTopicId'] as String?)?.trim(),
+      sourcePostId: (data['sourcePostId'] as String?)?.trim(),
     );
   }
 

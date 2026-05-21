@@ -228,6 +228,108 @@ class PostService {
     return ref.id;
   }
 
+  /// Turns an existing feed/travel post into a Discuss (Q&A) topic.
+  ///
+  /// [question] is the user's own question about the post — it becomes
+  /// the QA caption. `sourcePostId` records the original post so the
+  /// Discuss thread can embed it as a compact card. Returns the new
+  /// QA doc id.
+  ///
+  /// If the source post already has a Discuss topic, that existing
+  /// topic's id is returned instead — preventing duplicates.
+  Future<String> createQaPostFromPost(
+    Post source, {
+    required String question,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+
+    // Reuse an existing Discuss topic for this post if one exists.
+    final existing = await findDiscussTopicForPost(source.id);
+    if (existing != null) return existing;
+
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final username = userDoc.data()?['username'] as String? ?? 'user';
+    final avatar = userDoc.data()?['avatarUrl'] as String?;
+
+    final caption = question.trim().isEmpty
+        ? 'Discussion about a post'
+        : question.trim();
+
+    final ref = await _posts.add({
+      'authorUid': user.uid,
+      'authorUsername': username,
+      'authorAvatar': avatar,
+      'caption': caption,
+      'imageUrls': <String>[],
+      'likesCount': 0,
+      'commentsCount': 0,
+      'isPrivate': false,
+      'postType': 'qa',
+      'sourcePostId': source.id,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // Tag the original post so its menu can switch to "View in Discuss".
+    try {
+      await _posts.doc(source.id).update({'discussTopicId': ref.id});
+    } catch (_) {
+      // Non-fatal: the lookup-by-sourcePostId path still works.
+    }
+
+    return ref.id;
+  }
+
+  /// Fetches a single post (regular or QA) by id, or null if missing.
+  Future<Post?> getPostById(String postId) async {
+    final snap = await _posts.doc(postId).get();
+    if (!snap.exists) return null;
+    return Post.fromDoc(snap);
+  }
+
+  /// Returns the subset of [postIds] whose answers (comments) contain
+  /// [query] (case-insensitive substring).
+  ///
+  /// Firestore can't substring-search, so this fetches each post's
+  /// comments and filters client-side. Lookups run in parallel and the
+  /// input is expected to already be bounded (the visible Discuss
+  /// list, ~80 posts) so the cost stays reasonable.
+  Future<Set<String>> qaPostsWithMatchingAnswer(
+    Iterable<String> postIds,
+    String query,
+  ) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return <String>{};
+
+    final ids = postIds.toList();
+    final results = await Future.wait(ids.map((id) async {
+      try {
+        final snap =
+            await _db.collection('posts').doc(id).collection('comments').get();
+        final hit = snap.docs.any((d) {
+          final text = (d.data()['text'] as String? ?? '').toLowerCase();
+          return text.contains(q);
+        });
+        return hit ? id : null;
+      } catch (_) {
+        return null;
+      }
+    }));
+
+    return results.whereType<String>().toSet();
+  }
+
+  /// Returns the QA topic id created from [postId], or null if none.
+  Future<String?> findDiscussTopicForPost(String postId) async {
+    final snap = await _posts
+        .where('postType', isEqualTo: 'qa')
+        .where('sourcePostId', isEqualTo: postId)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return null;
+    return snap.docs.first.id;
+  }
+
   /// Q&A feed is isolated from normal posts by requiring postType == 'qa'.
   /// We sort client-side to avoid composite-index requirements.
   Stream<List<Post>> streamQaFeed({int limit = 80}) {

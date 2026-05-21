@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../services/admin_service.dart';
 import '../../../services/storage_service.dart';
@@ -25,7 +26,7 @@ class AdminEventsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Events'),
+        title: Text(context.t.events),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -37,15 +38,16 @@ class AdminEventsScreen extends ConsumerWidget {
         ),
         backgroundColor: const Color(0xFF7E3BE8),
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('New event', style: TextStyle(color: Colors.white)),
+        label: Text(context.t.adminNewEvent,
+            style: const TextStyle(color: Colors.white)),
       ),
       body: eventsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (events) {
           if (events.isEmpty) {
             return Center(
-              child: Text('No events yet. Tap "New event" to add one.',
+              child: Text(context.t.adminNoEventsYet,
                   style: TextStyle(color: context.textSecondary)),
             );
           }
@@ -109,7 +111,7 @@ class AdminEventsScreen extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
       }
     }
   }
@@ -126,26 +128,24 @@ class _DeleteEventDialogState extends State<_DeleteEventDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Delete event?'),
-      content: const Text(
-        'This permanently removes the event for everyone.',
-      ),
+      title: Text(context.t.adminDeleteEventTitle),
+      content: Text(context.t.adminDeleteEventBody),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(
             context,
             false,
           ),
-          child: const Text('Cancel'),
+          child: Text(context.t.cancel),
         ),
         TextButton(
           onPressed: () => Navigator.pop(
             context,
             true,
           ),
-          child: const Text(
-            'Delete',
-            style: TextStyle(color: Colors.red),
+          child: Text(
+            context.t.delete,
+            style: const TextStyle(color: Colors.red),
           ),
         ),
       ],
@@ -232,7 +232,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.adminUploadFailed(e))));
       }
     } finally {
       if (mounted) setState(() => _uploadingImage = false);
@@ -250,7 +250,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       initialDate: initial,
       firstDate: today,
       lastDate: DateTime(now.year + 20),
-      helpText: 'Select deadline',
+      helpText: context.t.adminSelectDeadline,
     );
     if (picked == null) return;
     setState(() => _deadlineAt = picked);
@@ -261,16 +261,16 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     // Validate every required field in one pass so the user sees all
     // problems at once instead of being snackbar-pinged one at a time.
     final titleError =
-        _titleCtrl.text.trim().isEmpty ? 'Title is required' : null;
+        _titleCtrl.text.trim().isEmpty ? context.t.adminTitleRequired : null;
     final eventTypeError =
-        _eventType.trim().isEmpty ? 'Pick an event type' : null;
+        _eventType.trim().isEmpty ? context.t.adminPickEventType : null;
     final countryError =
-        _country.trim().isEmpty ? 'Country is required' : null;
+        _country.trim().isEmpty ? context.t.adminCountryRequired : null;
     final descError = _descCtrl.text.trim().isEmpty
-        ? 'Description is required'
+        ? context.t.adminDescriptionRequired
         : null;
     final imagesError =
-        _imageUrls.isEmpty ? 'Add at least one image' : null;
+        _imageUrls.isEmpty ? context.t.adminAddAtLeastOneImage : null;
     setState(() {
       _titleError = titleError;
       _eventTypeError = eventTypeError;
@@ -283,8 +283,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         countryError != null ||
         descError != null ||
         imagesError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please fix the highlighted fields'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(context.t.adminFixHighlightedFields),
       ));
       return;
     }
@@ -326,7 +326,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Save failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.adminSaveFailed(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -350,7 +350,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: Text(isNew ? 'New event' : 'Edit event'),
+        title: Text(isNew ? context.t.adminNewEvent : context.t.adminEditEvent),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -369,7 +369,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(context.t.save),
           ),
         ],
       ),
@@ -379,9 +379,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset + 12),
           children: [
             _refinedField(
-              label: 'Title',
+              label: context.t.adminFieldTitle,
               controller: _titleCtrl,
-              hint: 'Enter event title',
+              hint: context.t.adminEnterEventTitle,
               required: true,
               errorText: _titleError,
               textInputAction: TextInputAction.next,
@@ -392,15 +392,15 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               },
             ),
             _refinedField(
-              label: 'Subtitle',
+              label: context.t.adminFieldSubtitle,
               controller: _subtitleCtrl,
-              hint: 'Short subtitle (optional)',
+              hint: context.t.adminShortSubtitleOptional,
               textInputAction: TextInputAction.next,
             ),
             _SearchablePickerField(
-              placeholder: 'Event type',
-              sheetTitle: 'Choose event type',
-              searchHint: 'Search event type...',
+              placeholder: context.t.adminFieldEventType,
+              sheetTitle: context.t.adminChooseEventType,
+              searchHint: context.t.adminSearchEventType,
               options: typeOptions,
               selected: _eventType.isEmpty ? null : _eventType,
               onChanged: (v) {
@@ -413,9 +413,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
             if (_eventTypeError != null)
               _FieldError(text: _eventTypeError!),
             _SearchablePickerField(
-              placeholder: 'Country',
-              sheetTitle: 'Choose country',
-              searchHint: 'Search country...',
+              placeholder: context.t.adminFieldCountry,
+              sheetTitle: context.t.adminChooseCountry,
+              searchHint: context.t.adminSearchCountry,
               options: countryOptions,
               selected: _country.isEmpty ? null : _country,
               onChanged: (v) {
@@ -434,9 +434,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                   : () => setState(() => _deadlineAt = null),
             ),
             _refinedField(
-              label: 'Description',
+              label: context.t.adminFieldDescription,
               controller: _descCtrl,
-              hint: 'Describe the event',
+              hint: context.t.adminDescribeTheEvent,
               maxLines: 4,
               required: true,
               errorText: _descError,
@@ -448,30 +448,30 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               },
             ),
             _refinedField(
-              label: 'Link',
+              label: context.t.adminFieldLink,
               controller: _linkCtrl,
-              hint: 'Registration or info link',
+              hint: context.t.adminRegistrationOrInfoLink,
               keyboardType: TextInputType.url,
               textInputAction: TextInputAction.next,
             ),
             _refinedField(
-              label: 'Phone',
+              label: context.t.adminFieldPhone,
               controller: _phoneCtrl,
-              hint: 'Contact phone (optional)',
+              hint: context.t.adminContactPhoneOptional,
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
             ),
             _refinedField(
-              label: 'Email',
+              label: context.t.adminFieldEmail,
               controller: _emailCtrl,
-              hint: 'Contact email (optional)',
+              hint: context.t.adminContactEmailOptional,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                Text('Images',
+                Text(context.t.adminFieldImages,
                     style: TextStyle(
                         color: context.textSecondary,
                         fontWeight: FontWeight.w600)),
@@ -581,8 +581,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
             errorText: errorText,
           ),
           validator: required
-              ? (v) =>
-                  (v == null || v.trim().isEmpty) ? '$label is required' : null
+              ? (v) => (v == null || v.trim().isEmpty)
+                  ? context.t.adminFieldIsRequired(label)
+                  : null
               : null,
         ),
       ),
@@ -601,7 +602,7 @@ class _FieldError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 4, bottom: 8),
+      padding: const EdgeInsetsDirectional.only(start: 12, top: 4, bottom: 8),
       child: Text(
         text,
         style: const TextStyle(
@@ -628,7 +629,7 @@ class _DeadlineField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = deadlineAt == null
-        ? 'Deadline'
+        ? context.t.adminFieldDeadline
         : MaterialLocalizations.of(context).formatMediumDate(deadlineAt!);
     return GestureDetector(
       onTap: onPick,
@@ -658,7 +659,7 @@ class _DeadlineField extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.close, size: 18),
                 onPressed: onClear,
-                tooltip: 'Clear deadline',
+                tooltip: context.t.adminClearDeadline,
               ),
             Icon(Icons.calendar_month, color: context.textSecondary),
           ],
@@ -862,7 +863,7 @@ class _PickerSheetState extends State<_PickerSheet> {
               child: _filtered.isEmpty
                   ? Center(
                       child: Text(
-                        'No results',
+                        context.t.adminNoResults,
                         style: TextStyle(color: context.textSecondary),
                       ),
                     )

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import 'camera_story_screen.dart';
 import 'create_post_screen.dart';
@@ -21,7 +22,7 @@ class AddToStoryScreen extends ConsumerStatefulWidget {
 class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
   int _bottomTab = 1;
   bool _loading = true;
-  String? _permissionMessage;
+  bool _permissionDenied = false;
   List<AssetEntity> _assets = const [];
 
   @override
@@ -36,8 +37,7 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _permissionMessage =
-              'Photo permission denied. Enable it in settings to pick photos.';
+          _permissionDenied = true;
         });
       }
       return;
@@ -113,11 +113,11 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
                         child: const Icon(Icons.close,
                             color: Colors.white, size: 26),
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Center(
                           child: Text(
-                            'Add to story',
-                            style: TextStyle(
+                            context.t.addToStory,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -146,9 +146,9 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildTab('Post', 0),
-                      _buildTab('Story', 1),
-                      _buildTab('Live', 2),
+                      _buildTab(context.t.post, 0),
+                      _buildTab(context.t.story, 1),
+                      _buildTab(context.t.live, 2),
                     ],
                   ),
                 ),
@@ -164,7 +164,7 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_permissionMessage != null) {
+    if (_permissionDenied) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -174,13 +174,13 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
               Icon(Icons.photo_library_outlined,
                   size: 48, color: context.textSecondary),
               const SizedBox(height: 12),
-              Text(_permissionMessage!,
+              Text(context.t.storyPhotoPermissionDenied,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: context.textSecondary)),
               const SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () => PhotoManager.openSetting(),
-                child: const Text('Open Settings'),
+                child: Text(context.t.storyOpenSettings),
               ),
             ],
           ),

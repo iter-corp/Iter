@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../theme/app_theme.dart';
 import 'admin_discuss_reports_screen.dart';
@@ -21,7 +22,7 @@ class AdminReportsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Reports'),
+        title: Text(context.t.reports),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -36,8 +37,8 @@ class AdminReportsScreen extends ConsumerWidget {
         children: [
           _ReportsTile(
             icon: Icons.flag_outlined,
-            title: 'Post reports',
-            subtitle: 'Review user-submitted reports on posts',
+            title: context.t.adminPostReports,
+            subtitle: context.t.adminPostReportsSubtitle,
             color: const Color(0xFFE04E5C),
             showNotificationDot: hasNewPostReports,
             onTap: () {
@@ -52,8 +53,8 @@ class AdminReportsScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _ReportsTile(
             icon: Icons.forum_outlined,
-            title: 'Discuss reports',
-            subtitle: 'Review reports on Discuss threads',
+            title: context.t.adminDiscussReports,
+            subtitle: context.t.adminDiscussReportsSubtitle,
             color: const Color(0xFFD044E8),
             showNotificationDot: hasNewDiscussReports,
             onTap: () {
@@ -70,8 +71,8 @@ class AdminReportsScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _ReportsTile(
             icon: Icons.person_search_outlined,
-            title: 'Profile reports',
-            subtitle: 'Review user profile abuse reports',
+            title: context.t.adminProfileReports,
+            subtitle: context.t.adminProfileReportsSubtitle,
             color: const Color(0xFFDE5D83),
             showNotificationDot: hasNewProfileReports,
             onTap: () {
@@ -88,8 +89,8 @@ class AdminReportsScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _ReportsTile(
             icon: Icons.bug_report_outlined,
-            title: 'Error reports',
-            subtitle: 'App-wide errors and crash diagnostics',
+            title: context.t.errorReports,
+            subtitle: context.t.adminErrorReportsSubtitle,
             color: const Color(0xFFE04E5C),
             showNotificationDot: hasNewErrorReports,
             onTap: () {

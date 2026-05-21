@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
@@ -31,20 +32,20 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete group?'),
+        title: Text(context.t.groupSettingsDeleteGroupTitle),
         content: Text(
-          'This will permanently delete the group "${widget.groupName}" and all its messages for all members. This cannot be undone.',
+          context.t.groupSettingsDeleteGroupBody(widget.groupName),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.t.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              context.t.delete,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -60,8 +61,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
         ..pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.groupSettingsFailedToDelete(e))));
     }
   }
 
@@ -84,12 +85,12 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved')),
+        SnackBar(content: Text(context.t.groupSettingsSaved)),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+          .showSnackBar(SnackBar(content: Text(context.t.groupSettingsError(e))));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -102,21 +103,20 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Leave group?'),
+        title: Text(context.t.groupSettingsLeaveGroupTitle),
         content: Text(
-          'You will stop receiving messages from "${widget.groupName}". '
-          'You can be added back by an admin.',
+          context.t.groupSettingsLeaveGroupBody(widget.groupName),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.t.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Leave',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              context.t.groupSettingsLeaveGroup,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -137,8 +137,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
         ..pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to leave: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.groupSettingsFailedToLeave(e))));
     }
   }
 
@@ -154,10 +154,10 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
       ),
       body: chatDocAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.groupSettingsError(e))),
         data: (data) {
           if (data == null) {
-            return const Center(child: Text('Group not found'));
+            return Center(child: Text(context.t.groupSettingsGroupNotFound));
           }
           final participants =
               List<String>.from(data['participants'] as List? ?? []);
@@ -195,7 +195,7 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                     ),
                     onPressed: _leaveGroup,
                     icon: const Icon(Icons.logout),
-                    label: const Text('Leave group'),
+                    label: Text(context.t.groupSettingsLeaveGroup),
                   ),
                 ),
               if (isAdmin) ...[
@@ -218,7 +218,7 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                     ),
                     onPressed: _deleteGroup,
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete group'),
+                    label: Text(context.t.groupSettingsDeleteGroup),
                   ),
                 ),
               ],
@@ -255,7 +255,7 @@ class _MembersHeader extends StatelessWidget {
           Icon(Icons.groups, size: 20, color: context.textSecondary),
           const SizedBox(width: 8),
           Text(
-            '$count ${count == 1 ? 'member' : 'members'}',
+            '$count ${count == 1 ? context.t.groupSettingsMember : context.t.groupSettingsMembers}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -308,7 +308,7 @@ class _MemberTile extends ConsumerWidget {
         children: [
           Flexible(
             child: Text(
-              username.isEmpty ? 'User' : username,
+              username.isEmpty ? context.t.groupSettingsUserFallback : username,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,
@@ -319,7 +319,7 @@ class _MemberTile extends ConsumerWidget {
           if (isMe) ...[
             const SizedBox(width: 6),
             Text(
-              '· You',
+              context.t.groupSettingsYouSuffix,
               style: TextStyle(color: context.textSecondary, fontSize: 12),
             ),
           ],
@@ -332,18 +332,18 @@ class _MemberTile extends ConsumerWidget {
                 color: context.purpleSoft,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.shield,
                     size: 12,
                     color: Color(0xFFB05ECC),
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
-                    'Admin',
-                    style: TextStyle(
+                    context.t.groupSettingsAdmin,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFFB05ECC),
@@ -414,15 +414,14 @@ class _PermissionsSectionState extends State<_PermissionsSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Messaging Permissions',
+            context.t.groupSettingsMessagingPermissions,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
           _PermissionCard(
             icon: Icons.lock_outline,
-            title: 'Restrict Messaging',
-            subtitle:
-                'Only group admins can send messages. Members can still view messages.',
+            title: context.t.groupSettingsRestrictMessaging,
+            subtitle: context.t.groupSettingsRestrictMessagingDesc,
             value: _restrict,
             onChanged: (v) => setState(() {
               _restrict = v;
@@ -432,9 +431,8 @@ class _PermissionsSectionState extends State<_PermissionsSection> {
           const SizedBox(height: 10),
           _PermissionCard(
             icon: Icons.admin_panel_settings_outlined,
-            title: 'Admin-Only Mode',
-            subtitle:
-                'Only group admins can send messages (alternative to restrict).',
+            title: context.t.groupSettingsAdminOnlyMode,
+            subtitle: context.t.groupSettingsAdminOnlyModeDesc,
             value: _adminOnly,
             onChanged: (v) => setState(() {
               _adminOnly = v;
@@ -444,8 +442,8 @@ class _PermissionsSectionState extends State<_PermissionsSection> {
           const SizedBox(height: 10),
           _PermissionCard(
             icon: Icons.image_outlined,
-            title: 'Enable Media Sharing',
-            subtitle: 'Allow members to share images and send voice messages.',
+            title: context.t.groupSettingsEnableMediaSharing,
+            subtitle: context.t.groupSettingsEnableMediaSharingDesc,
             value: _media,
             onChanged: (v) => setState(() => _media = v),
           ),
@@ -474,9 +472,9 @@ class _PermissionsSectionState extends State<_PermissionsSection> {
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Text(
-                      'Save Settings',
-                      style: TextStyle(
+                  : Text(
+                      context.t.groupSettingsSaveSettings,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

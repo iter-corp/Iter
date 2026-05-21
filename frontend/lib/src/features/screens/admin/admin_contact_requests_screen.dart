@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../providers/contact_request_providers.dart';
 import '../../../services/contact_request_service.dart';
@@ -33,9 +33,9 @@ class _AdminContactRequestsScreenState
     final isAdmin = ref.watch(isAdminProvider);
     if (!isAdmin) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Contact requests')),
+        appBar: AppBar(title: Text(context.t.contactRequests)),
         body: Center(
-          child: Text('You do not have admin access.',
+          child: Text(context.t.adminNoAccess,
               style: TextStyle(color: context.textSecondary)),
         ),
       );
@@ -44,7 +44,7 @@ class _AdminContactRequestsScreenState
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Contact requests'),
+        title: Text(context.t.contactRequests),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -63,7 +63,7 @@ class _AdminContactRequestsScreenState
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
                 error: (e, _) =>
-                    Center(child: Text('Could not load: $e')),
+                    Center(child: Text(context.t.adminCouldNotLoad(e))),
                 data: (all) {
                   final filtered = all.where((r) {
                     if (_typeFilter != null && r.type != _typeFilter) {
@@ -74,7 +74,7 @@ class _AdminContactRequestsScreenState
                   }).toList();
                   if (filtered.isEmpty) {
                     return Center(
-                      child: Text('No requests.',
+                      child: Text(context.t.adminNoRequests,
                           style: TextStyle(color: context.textSecondary)),
                     );
                   }
@@ -150,13 +150,13 @@ class _FilterBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
       child: Row(
         children: [
-          chip('All', typeFilter == null && !onlyUnread, () {
+          chip(context.t.adminFilterAll, typeFilter == null && !onlyUnread, () {
             onTypeChanged(null);
             onUnreadChanged(false);
           }),
           const SizedBox(width: 6),
           chip(
-            'Messages',
+            context.t.adminFilterMessages,
             typeFilter == ContactRequestType.message,
             () => onTypeChanged(typeFilter == ContactRequestType.message
                 ? null
@@ -164,7 +164,7 @@ class _FilterBar extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           chip(
-            'Organization',
+            context.t.adminFilterOrganization,
             typeFilter == ContactRequestType.organization,
             () => onTypeChanged(
                 typeFilter == ContactRequestType.organization
@@ -172,7 +172,7 @@ class _FilterBar extends StatelessWidget {
                     : ContactRequestType.organization),
           ),
           const SizedBox(width: 16),
-          chip('Awaiting reply', onlyUnread,
+          chip(context.t.adminFilterAwaitingReply, onlyUnread,
               () => onUnreadChanged(!onlyUnread)),
         ],
       ),
@@ -222,7 +222,9 @@ class _AdminRequestTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      isOrg ? 'ORGANIZATION' : 'MESSAGE',
+                      isOrg
+                          ? context.t.adminBadgeOrganization
+                          : context.t.adminBadgeMessage,
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -237,7 +239,7 @@ class _AdminRequestTile extends StatelessWidget {
                   _StatusPill(status: request.status),
                   const Spacer(),
                   Text(
-                    _formatRelative(
+                    context.t.timeAgo(
                         request.lastMessageAt ?? request.createdAt),
                     style: TextStyle(
                       fontSize: 11,
@@ -307,9 +309,15 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      ContactRequestStatus.open => ('OPEN', Colors.orange),
-      ContactRequestStatus.answered => ('ANSWERED', Colors.green),
-      ContactRequestStatus.promoted => ('APPROVED', AppColors.purple),
+      ContactRequestStatus.open => (context.t.adminStatusOpen, Colors.orange),
+      ContactRequestStatus.answered => (
+          context.t.adminStatusAnswered,
+          Colors.green
+        ),
+      ContactRequestStatus.promoted => (
+          context.t.adminStatusApproved,
+          AppColors.purple
+        ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -328,15 +336,4 @@ class _StatusPill extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatRelative(DateTime? time) {
-  if (time == null) return '';
-  final now = DateTime.now();
-  final diff = now.difference(time);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
-  return DateFormat.MMMd().format(time);
 }

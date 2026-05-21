@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../services/error_report_service.dart';
 import '../../../theme/app_theme.dart';
@@ -33,7 +34,7 @@ class _AdminErrorReportsScreenState
       child: Scaffold(
         backgroundColor: context.surfaceSoft,
         appBar: AppBar(
-          title: const Text('Error reports'),
+          title: Text(context.t.errorReports),
           backgroundColor: context.cardBg,
           foregroundColor: context.textPrimary,
           elevation: 0,
@@ -42,16 +43,17 @@ class _AdminErrorReportsScreenState
               onSelected: (v) async {
                 if (v == 'clear_resolved') {
                   final messenger = ScaffoldMessenger.of(context);
+                  final t = context.t;
                   final n =
                       await ref.read(errorReportAdminProvider).clearResolved();
                   AppFeedback.showInfoOn(
-                      messenger, 'Cleared $n solved report(s)');
+                      messenger, t.adminClearedSolvedReports(n));
                 }
               },
-              itemBuilder: (_) => const [
+              itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'clear_resolved',
-                  child: Text('Clear all solved reports'),
+                  child: Text(context.t.adminClearAllSolvedReports),
                 ),
               ],
             ),
@@ -61,26 +63,27 @@ class _AdminErrorReportsScreenState
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
             tabs: [
-              Tab(text: 'Unsolved (${unsolved.length})'),
-              Tab(text: 'Solved (${solved.length})'),
+              Tab(text: context.t.adminTabUnsolved(unsolved.length)),
+              Tab(text: context.t.adminTabSolved(solved.length)),
             ],
           ),
         ),
         body: reportsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (_) => TabBarView(
             children: [
               _ReportsList(
                 reports: unsolved,
-                emptyTitle:
-                    all.isEmpty ? 'No error reports' : 'No unsolved errors 🎉',
-                emptySubtitle: 'Captured app errors will appear here.',
+                emptyTitle: all.isEmpty
+                    ? context.t.adminNoErrorReports
+                    : context.t.adminNoUnsolvedErrors,
+                emptySubtitle: context.t.adminCapturedErrorsHere,
               ),
               _ReportsList(
                 reports: solved,
-                emptyTitle: 'Nothing solved yet',
-                emptySubtitle: 'Reports you mark as solved move here.',
+                emptyTitle: context.t.adminNothingSolvedYet,
+                emptySubtitle: context.t.adminSolvedReportsMoveHere,
               ),
             ],
           ),
@@ -174,7 +177,7 @@ class _RollupCard extends StatelessWidget {
                   size: 16, color: AppColors.purple),
               const SizedBox(width: 6),
               Text(
-                'Most frequent (current list)',
+                context.t.adminMostFrequent,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -234,26 +237,17 @@ class _ReportTile extends ConsumerWidget {
       dt == null ? 'unknown time' : DateFormat('MMM d, HH:mm').format(dt);
 
   // Full date + time for the expanded detail.
-  String _fullTime(DateTime? dt) {
+  String _fullTime(BuildContext context, DateTime? dt) {
     if (dt == null) return 'Unknown';
     final l = dt.toLocal();
     final stamp = DateFormat('EEE, MMM d, yyyy · HH:mm:ss').format(l);
-    return '$stamp  (${_ago(l)})';
-  }
-
-  String _ago(DateTime dt) {
-    final d = DateTime.now().difference(dt);
-    if (d.inSeconds < 60) return 'just now';
-    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
-    if (d.inHours < 24) return '${d.inHours}h ago';
-    if (d.inDays < 30) return '${d.inDays}d ago';
-    return '${(d.inDays / 30).floor()}mo ago';
+    return '$stamp  (${context.t.timeAgo(l)})';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final screen = (report.screen ?? '').trim().isEmpty
-        ? 'Unknown screen'
+        ? context.t.adminUnknownScreen
         : report.screen!.trim();
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -303,26 +297,27 @@ class _ReportTile extends ConsumerWidget {
           ),
           children: [
             // Full structured details.
-            _kv(context, 'When', _fullTime(report.createdAt)),
-            _kv(context, 'Page / screen', screen),
-            _kv(context, 'Type', report.kind),
-            _kv(context, 'Platform',
+            _kv(context, context.t.adminWhen,
+                _fullTime(context, report.createdAt)),
+            _kv(context, context.t.adminPageScreen, screen),
+            _kv(context, context.t.adminType, report.kind),
+            _kv(context, context.t.adminPlatform,
                 report.platform.isEmpty ? '—' : report.platform),
-            _kv(context, 'App version',
+            _kv(context, context.t.adminAppVersionLabel,
                 report.appVersion.isEmpty ? '—' : report.appVersion),
             _kv(
                 context,
-                'User',
+                context.t.user,
                 (report.uid ?? '').trim().isEmpty
-                    ? 'not signed in'
+                    ? context.t.adminNotSignedIn
                     : report.uid!.trim()),
             if (report.context != null && report.context!.trim().isNotEmpty)
-              _kv(context, 'Context', report.context!.trim()),
+              _kv(context, context.t.adminContext, report.context!.trim()),
             const SizedBox(height: 10),
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: Text(
-                'Error message',
+                context.t.adminErrorMessage,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -337,9 +332,9 @@ class _ReportTile extends ConsumerWidget {
             ),
             const SizedBox(height: 10),
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: Text(
-                'Stack trace',
+                context.t.adminStackTrace,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -356,7 +351,7 @@ class _ReportTile extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: SelectableText(
-                report.stack.isEmpty ? '(no stack)' : report.stack,
+                report.stack.isEmpty ? context.t.adminNoStack : report.stack,
                 style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 11,
@@ -370,26 +365,28 @@ class _ReportTile extends ConsumerWidget {
                 TextButton.icon(
                   onPressed: () {
                     Clipboard.setData(ClipboardData(
-                      text: 'When: ${_fullTime(report.createdAt)}\n'
+                      text: 'When: ${_fullTime(context, report.createdAt)}\n'
                           'Screen: $screen\n'
                           'Type: ${report.kind} · ${report.platform} · v${report.appVersion}\n'
                           'User: ${report.uid ?? "not signed in"}\n\n'
                           '${report.message}\n\n${report.stack}',
                     ));
-                    AppFeedback.showInfo(context, 'Copied to clipboard');
+                    AppFeedback.showInfo(context, context.t.adminCopiedToClipboard);
                   },
                   icon: const Icon(Icons.copy, size: 16),
-                  label: const Text('Copy'),
+                  label: Text(context.t.copy),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => ref
                       .read(errorReportAdminProvider)
                       .setResolved(report.id, !report.resolved),
-                  child: Text(report.resolved ? 'Reopen' : 'Mark resolved'),
+                  child: Text(report.resolved
+                      ? context.t.adminReopen
+                      : context.t.adminMarkResolved),
                 ),
                 IconButton(
-                  tooltip: 'Delete',
+                  tooltip: context.t.delete,
                   icon: const Icon(Icons.delete_outline,
                       size: 18, color: Colors.red),
                   onPressed: () =>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
@@ -23,7 +24,7 @@ class AdminUserReportsScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: context.surfaceSoft,
         appBar: AppBar(
-          title: const Text('Profile reports'),
+          title: Text(context.t.adminProfileReports),
           backgroundColor: context.cardBg,
           foregroundColor: context.textPrimary,
           elevation: 0,
@@ -34,18 +35,18 @@ class AdminUserReportsScreen extends ConsumerWidget {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Clear resolved reports?'),
+                      title: Text(context.t.adminClearResolvedTitle),
                       content: Text(
-                        'This will delete ${resolved.length} resolved report(s).',
+                        context.t.adminClearResolvedBody(resolved.length),
                       ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
+                          child: Text(context.t.cancel),
                         ),
                         FilledButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Clear'),
+                          child: Text(context.t.clear),
                         ),
                       ],
                     ),
@@ -60,10 +61,11 @@ class AdminUserReportsScreen extends ConsumerWidget {
                         .toList(),
                   );
                   if (!context.mounted) return;
-                  AppFeedback.showSuccess(context, 'Resolved reports cleared');
+                  AppFeedback.showSuccess(
+                      context, context.t.adminResolvedReportsCleared);
                 },
                 icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                label: const Text('Clear resolved'),
+                label: Text(context.t.adminClearResolved),
               ),
             const SizedBox(width: 8),
           ],
@@ -72,26 +74,27 @@ class AdminUserReportsScreen extends ConsumerWidget {
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
             tabs: [
-              Tab(text: 'Open (${unresolved.length})'),
-              Tab(text: 'Resolved (${resolved.length})'),
+              Tab(text: context.t.adminTabOpen(unresolved.length)),
+              Tab(text: context.t.adminTabResolved(resolved.length)),
             ],
           ),
         ),
         body: reportsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (_) => TabBarView(
             children: [
               _ReportsList(
                 reports: unresolved,
-                emptyTitle:
-                    all.isEmpty ? 'No profile reports' : 'No open reports',
-                emptySubtitle: 'Fresh reports from users will show here.',
+                emptyTitle: all.isEmpty
+                    ? context.t.adminNoProfileReports
+                    : context.t.adminNoOpenReports,
+                emptySubtitle: context.t.adminFreshReportsHere,
               ),
               _ReportsList(
                 reports: resolved,
-                emptyTitle: 'Nothing resolved yet',
-                emptySubtitle: 'Closed reports move here.',
+                emptyTitle: context.t.adminNothingResolvedYet,
+                emptySubtitle: context.t.adminClosedReportsMoveHere,
               ),
             ],
           ),
@@ -219,21 +222,21 @@ class _ReportTile extends ConsumerWidget {
           children: [
             _kv(
               context,
-              'Reported profile',
+              context.t.adminReportedProfile,
               report.targetUsername.isEmpty
                   ? report.targetUid
                   : '${report.targetUsername} (${report.targetUid})',
             ),
             _kv(
                 context,
-                'Reporter',
+                context.t.adminReporter,
                 report.reporterUsername.isEmpty
                     ? report.reporterUid
                     : '${report.reporterUsername} (${report.reporterUid})'),
-            _kv(context, 'Reason', report.reason),
-            _kv(context, 'When', _fullTime(report.createdAt)),
+            _kv(context, context.t.adminReason, report.reason),
+            _kv(context, context.t.adminWhen, _fullTime(report.createdAt)),
             if ((report.details ?? '').trim().isNotEmpty)
-              _kv(context, 'Details', report.details!.trim()),
+              _kv(context, context.t.adminDetails, report.details!.trim()),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -244,7 +247,9 @@ class _ReportTile extends ConsumerWidget {
                       .read(adminServiceProvider)
                       .setUserProfileReportResolved(
                           report.id, !report.resolved),
-                  child: Text(report.resolved ? 'Reopen' : 'Mark resolved'),
+                  child: Text(report.resolved
+                      ? context.t.adminReopen
+                      : context.t.adminMarkResolved),
                 ),
                 TextButton.icon(
                   onPressed: () => Navigator.push(
@@ -254,7 +259,7 @@ class _ReportTile extends ConsumerWidget {
                     ),
                   ),
                   icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('View profile'),
+                  label: Text(context.t.adminViewProfile),
                 ),
                 FilledButton.tonal(
                   style: FilledButton.styleFrom(
@@ -265,14 +270,12 @@ class _ReportTile extends ConsumerWidget {
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text('Remove user?'),
-                        content: const Text(
-                          'This will permanently remove this user account and their data. This action cannot be undone.',
-                        ),
+                        title: Text(context.t.adminRemoveUserTitle),
+                        content: Text(context.t.adminRemoveUserBody),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Cancel'),
+                            child: Text(context.t.cancel),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
@@ -287,15 +290,16 @@ class _ReportTile extends ConsumerWidget {
                                   .read(adminServiceProvider)
                                   .deleteUserProfileReport(report.id);
                               if (!context.mounted) return;
-                              AppFeedback.showSuccess(context, 'User removed');
+                              AppFeedback.showSuccess(
+                                  context, context.t.adminUserRemoved);
                             },
-                            child: const Text('Remove user'),
+                            child: Text(context.t.adminRemoveUser),
                           ),
                         ],
                       ),
                     );
                   },
-                  child: const Text('Remove user'),
+                  child: Text(context.t.adminRemoveUser),
                 ),
               ],
             ),

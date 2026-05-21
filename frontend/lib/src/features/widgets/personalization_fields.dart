@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 
 /// Canonical option lists for the optional "About you" personalization data
@@ -48,6 +49,69 @@ const List<String> kGoalOptions = [
 bool academicLevelAppliesTo(String? profession) =>
     profession != null && profession != 'Traveler';
 
+/// Maps a canonical "About you" option value (stored verbatim in
+/// Firestore) to its localized display label for the active language.
+/// Unknown values fall through to the original string.
+String localizeAboutYouOption(BuildContext context, String value) {
+  final t = context.t;
+  switch (value) {
+    // Profession
+    case 'Student':
+      return t.aboutOptionStudent;
+    case 'Researcher':
+      return t.aboutOptionResearcher;
+    case 'Professor':
+      return t.aboutOptionProfessor;
+    case 'Traveler':
+      return t.aboutOptionTraveler;
+    // Field
+    case 'Tech':
+      return t.aboutOptionTech;
+    case 'Medicine':
+      return t.aboutOptionMedicine;
+    case 'Law':
+      return t.aboutOptionLaw;
+    case 'Business':
+      return t.aboutOptionBusiness;
+    case 'Arts':
+      return t.aboutOptionArts;
+    case 'Engineering':
+      return t.aboutOptionEngineering;
+    case 'Science':
+      return t.aboutOptionScience;
+    case 'Education':
+      return t.aboutOptionEducation;
+    case 'Social sciences':
+      return t.aboutOptionSocialSciences;
+    case 'Other':
+      return t.aboutOptionOther;
+    // Academic level
+    case 'Undergraduate':
+      return t.aboutOptionUndergraduate;
+    case 'Masters':
+      return t.aboutOptionMasters;
+    case 'PhD':
+      return t.aboutOptionPhd;
+    case 'Faculty':
+      return t.aboutOptionFaculty;
+    // Goals
+    case 'Internships':
+      return t.aboutOptionInternships;
+    case 'Scholarships':
+      return t.aboutOptionScholarships;
+    case 'Conferences':
+      return t.aboutOptionConferences;
+    case 'Research':
+      return t.aboutOptionResearch;
+    case 'Networking':
+      return t.aboutOptionNetworking;
+    case 'Local events':
+      return t.aboutOptionLocalEvents;
+    default:
+      return value;
+  }
+}
+
 /// A labelled block of single-select choice chips.
 class SingleChoiceChips extends StatelessWidget {
   final String label;
@@ -83,7 +147,7 @@ class SingleChoiceChips extends StatelessWidget {
           children: options.map((o) {
             final isSel = o == selected;
             return ChoiceChip(
-              label: Text(o),
+              label: Text(localizeAboutYouOption(context, o)),
               selected: isSel,
               onSelected: (_) => onChanged(isSel ? null : o),
               selectedColor: AppColors.purple.withValues(alpha: 0.18),
@@ -137,7 +201,7 @@ class MultiChoiceChips extends StatelessWidget {
           children: options.map((o) {
             final isSel = selected.contains(o);
             return FilterChip(
-              label: Text(o),
+              label: Text(localizeAboutYouOption(context, o)),
               selected: isSel,
               onSelected: (_) {
                 final next = isSel
@@ -192,7 +256,7 @@ class AboutYouEditor extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SingleChoiceChips(
-          label: 'I am a…',
+          label: context.t.aboutEditorIAmA,
           options: kProfessionOptions,
           selected: profession,
           onChanged: (v) {
@@ -203,7 +267,7 @@ class AboutYouEditor extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SingleChoiceChips(
-          label: 'Field',
+          label: context.t.aboutEditorField,
           options: kFieldOptions,
           selected: field,
           onChanged: onFieldChanged,
@@ -211,7 +275,7 @@ class AboutYouEditor extends StatelessWidget {
         if (academicLevelAppliesTo(profession)) ...[
           const SizedBox(height: 16),
           SingleChoiceChips(
-            label: 'Academic level',
+            label: context.t.aboutEditorAcademicLevel,
             options: kAcademicLevelOptions,
             selected: academicLevel,
             onChanged: onAcademicLevelChanged,
@@ -219,7 +283,7 @@ class AboutYouEditor extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         MultiChoiceChips(
-          label: 'My goals',
+          label: context.t.aboutEditorMyGoals,
           options: kGoalOptions,
           selected: goals,
           onChanged: onGoalsChanged,

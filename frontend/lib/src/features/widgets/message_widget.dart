@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../services/chat_service.dart';
 import '../../theme/app_theme.dart';
@@ -27,9 +28,11 @@ class MessageTabBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Expanded(child: _tab(context, "All $allCount", 0)),
+          Expanded(child: _tab(context, context.t.allCount(allCount), 0)),
           const SizedBox(width: 8),
-          Expanded(child: _tab(context, "Requests $requestCount", 1)),
+          Expanded(
+              child: _tab(
+                  context, context.t.requestsCount(requestCount), 1)),
         ],
       ),
     );
@@ -94,7 +97,11 @@ class MessageTile extends ConsumerWidget {
       ),
       subtitle: Text(
         message.unreadCount > 0
-            ? '${message.unreadCount} new ${message.unreadCount == 1 ? 'message' : 'messages'}'
+            ? context.t.newMessagesCount(
+                message.unreadCount,
+                message.unreadCount == 1
+                    ? context.t.message
+                    : context.t.messages)
             : message.lastMessage,
         style: TextStyle(color: context.textSecondary, fontSize: 12),
       ),

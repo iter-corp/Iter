@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
+
 class EventUnavailableScreen extends StatelessWidget {
   const EventUnavailableScreen({super.key});
 
@@ -7,7 +9,7 @@ class EventUnavailableScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Event not available'),
+        title: Text(context.t.eventUnavailableTitle),
       ),
       body: Center(
         child: Padding(
@@ -20,23 +22,23 @@ class EventUnavailableScreen extends StatelessWidget {
                 size: 64,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Event not available',
+              Text(
+                context.t.eventUnavailableTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'This event was deleted or is no longer available.',
+              Text(
+                context.t.eventUnavailableBody,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).maybePop(),
-                child: const Text('Go back'),
+                child: Text(context.t.eventUnavailableGoBack),
               ),
             ],
           ),

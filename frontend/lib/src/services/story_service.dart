@@ -16,6 +16,11 @@ class Story {
   final int likesCount;
   final int commentsCount;
 
+  /// When this story was created by sharing a feed post, holds that
+  /// post's id. The viewer then renders the post as a card and tapping
+  /// it opens the original post. Null for normal photo stories.
+  final String? sharedPostId;
+
   const Story({
     required this.id,
     required this.authorUid,
@@ -26,6 +31,7 @@ class Story {
     required this.expiresAt,
     this.likesCount = 0,
     this.commentsCount = 0,
+    this.sharedPostId,
   });
 
   factory Story.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -40,6 +46,7 @@ class Story {
       expiresAt: (d['expiresAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       likesCount: (d['likesCount'] as int?) ?? 0,
       commentsCount: (d['commentsCount'] as int?) ?? 0,
+      sharedPostId: (d['sharedPostId'] as String?)?.trim(),
     );
   }
 }
@@ -76,7 +83,12 @@ class StoryService {
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('stories');
 
-  Future<String> createStory({required String imageUrl}) async {
+  /// Creates a story. Pass [sharedPostId] to make it a "shared post"
+  /// story — the viewer then renders that post as a tappable card.
+  Future<String> createStory({
+    required String imageUrl,
+    String? sharedPostId,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
 
@@ -90,6 +102,8 @@ class StoryService {
       'authorUsername': (userData['username'] as String?) ?? '',
       'authorAvatar': userData['avatarUrl'] as String?,
       'imageUrl': imageUrl,
+      if (sharedPostId != null && sharedPostId.isNotEmpty)
+        'sharedPostId': sharedPostId,
       'createdAt': FieldValue.serverTimestamp(),
       'expiresAt': Timestamp.fromDate(expires),
     });

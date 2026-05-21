@@ -1,14 +1,18 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/comment_providers.dart';
+import '../../providers/post_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../services/comment_service.dart';
+import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
+import 'post_detail_screen.dart';
 
 class QaThreadScreen extends ConsumerStatefulWidget {
   final Post post;
@@ -128,7 +132,7 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: const Text('Discuss Thread'),
+            title: Text(context.t.qaThreadTitle),
             foregroundColor: context.textPrimary,
           ),
           body: SafeArea(
@@ -150,7 +154,7 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                         _QuestionCard(post: post),
                         const SizedBox(height: 18),
                         Text(
-                          'Could not load answers: $e',
+                          context.t.qaCouldNotLoadAnswers(e),
                           style: TextStyle(color: context.textSecondary),
                         ),
                       ],
@@ -239,21 +243,27 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
   }
 }
 
-class _QuestionCard extends StatelessWidget {
+class _QuestionCard extends ConsumerWidget {
   final Post post;
 
   const _QuestionCard({required this.post});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final caption = post.caption.trim();
     final lines = caption
         .split('\n')
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    final title = lines.isEmpty ? 'Untitled question' : lines.first;
+    final title =
+        lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
     final body = lines.length > 1 ? lines.sublist(1).join('\n') : '';
+    final hasSourcePost =
+        post.sourcePostId != null && post.sourcePostId!.isNotEmpty;
+    // Only the question's author may edit it.
+    final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+    final isAuthor = currentUid != null && currentUid == post.authorUid;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -298,7 +308,7 @@ class _QuestionCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _formatTime(post.createdAt),
+                      context.t.timeAgo(post.createdAt),
                       style: TextStyle(
                         fontSize: 12,
                         color: context.textSecondary,
@@ -313,18 +323,46 @@ class _QuestionCard extends StatelessWidget {
                   color: context.purpleSoft,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
-                  'Question',
-                  style: TextStyle(
+                child: Text(
+                  context.t.qaQuestionLabel,
+                  style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF7E3BE8),
                   ),
                 ),
               ),
+              // 3-dot menu — only the question's author sees it, and
+              // it only offers "Edit question".
+              if (isAuthor)
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_horiz,
+                        size: 20, color: context.textSecondary),
+                    padding: EdgeInsets.zero,
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        _editQuestion(context, ref);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(children: [
+                          const Icon(Icons.edit_outlined, size: 18),
+                          const SizedBox(width: 8),
+                          Text(context.t.qaEditQuestion),
+                        ]),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
+          // ── The user's question — always shown on top ────────────
           Text(
             title,
             style: TextStyle(
@@ -344,9 +382,14 @@ class _QuestionCard extends StatelessWidget {
               ),
             ),
           ],
+          // ── The discussed post — embedded as a compact card ──────
+          if (hasSourcePost) ...[
+            const SizedBox(height: 12),
+            _EmbeddedPostCard(postId: post.sourcePostId!),
+          ],
           const SizedBox(height: 10),
           Text(
-            '${post.commentsCount} answers',
+            context.t.homeAnswersCount(post.commentsCount),
             style: TextStyle(
               fontSize: 12,
               color: context.textMuted,
@@ -354,6 +397,179 @@ class _QuestionCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Opens a dialog letting the question's author edit the question
+  /// text (stored as the QA post's caption).
+  Future<void> _editQuestion(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController(text: post.caption);
+    final strings = context.t;
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(strings.qaEditQuestion),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 5,
+          minLines: 1,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: strings.qaEditQuestionHint,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(strings.cancel),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogCtx, controller.text.trim()),
+            child: Text(strings.save),
+          ),
+        ],
+      ),
+    );
+
+    if (newText == null || newText.isEmpty || newText == post.caption.trim()) {
+      return;
+    }
+    try {
+      await ref.read(postServiceProvider).updatePost(
+            post.id,
+            caption: newText,
+          );
+    } catch (_) {
+      // Edit is best-effort; the thread re-streams on success.
+    }
+  }
+}
+
+/// Compact preview of the post a Discuss topic is about: author line,
+/// image (if any) and caption, inside a tappable bordered card that
+/// opens the full post.
+class _EmbeddedPostCard extends ConsumerWidget {
+  final String postId;
+
+  const _EmbeddedPostCard({required this.postId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postAsync = ref.watch(singlePostProvider(postId));
+
+    return postAsync.when(
+      loading: () => Container(
+        height: 70,
+        decoration: BoxDecoration(
+          color: context.surfaceSoft,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (src) {
+        if (src == null) return const SizedBox.shrink();
+        final hasImage = src.imageUrls.isNotEmpty;
+        final cap = src.caption.trim();
+
+        return Material(
+          color: context.surfaceSoft,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PostDetailScreen(postId: src.id),
+              ),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.borderColor),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Author line.
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: context.purpleSoft,
+                          backgroundImage: (src.authorAvatar != null &&
+                                  src.authorAvatar!.isNotEmpty)
+                              ? NetworkImage(src.authorAvatar!)
+                              : null,
+                          child: (src.authorAvatar == null ||
+                                  src.authorAvatar!.isEmpty)
+                              ? Icon(Icons.person,
+                                  size: 13, color: context.textSecondary)
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            src.authorUsername,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right,
+                            size: 18, color: context.textMuted),
+                      ],
+                    ),
+                  ),
+                  // Image (if any) — served from the shared media
+                  // cache so it isn't re-fetched on every open.
+                  if (hasImage)
+                    AspectRatio(
+                      aspectRatio: 16 / 10,
+                      child: CachedNetworkImage(
+                        imageUrl: src.imageUrls.first,
+                        cacheManager: MediaCache.images,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) =>
+                            Container(color: context.borderColor),
+                      ),
+                    ),
+                  // Caption.
+                  if (cap.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                      child: Text(
+                        cap,
+                        maxLines: hasImage ? 2 : 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.3,
+                          color: context.textSecondary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -368,7 +584,7 @@ class _AnswersHeader extends StatelessWidget {
     return Row(
       children: [
         Text(
-          'Answers',
+          context.t.qaAnswersLabel,
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
@@ -461,8 +677,8 @@ class _AnswerBlock extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       expanded
-                          ? '${replies.length} repl${replies.length == 1 ? 'y' : 'ies'} visible'
-                          : 'View ${replies.length} ${replies.length == 1 ? 'reply' : 'replies'}',
+                          ? context.t.commentHideReplies
+                          : '${context.t.viewComments} (${replies.length})',
                       style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 12,
@@ -475,9 +691,9 @@ class _AnswerBlock extends ConsumerWidget {
           ),
           if (expanded && replies.isNotEmpty) ...[
             Container(
-              margin: const EdgeInsets.only(
-                  left: 14, top: 6, right: 12, bottom: 10),
-              padding: const EdgeInsets.only(left: 10),
+              margin: const EdgeInsetsDirectional.only(
+                  start: 14, top: 6, end: 12, bottom: 10),
+              padding: const EdgeInsetsDirectional.only(start: 10),
               decoration: BoxDecoration(
                 border: Border(
                   left: BorderSide(color: context.borderColor),
@@ -545,7 +761,7 @@ class _AnswerReactionBar extends ConsumerWidget {
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save reaction: $e')),
+          SnackBar(content: Text(context.t.qaCouldNotSaveReaction(e))),
         );
       }
     }
@@ -684,18 +900,18 @@ class _ReplyReactionChip extends StatelessWidget {
             color: const Color(0xFF7E3BE8).withValues(alpha: 0.25),
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.reply_rounded,
               size: 13,
               color: Color(0xFF7E3BE8),
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Text(
-              'Reply',
-              style: TextStyle(
+              context.t.reply,
+              style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF7E3BE8),
@@ -826,7 +1042,7 @@ class _AnswerRow extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _formatTime(comment.createdAt),
+                        context.t.timeAgo(comment.createdAt),
                         style: TextStyle(
                           fontSize: 11,
                           color: context.textMuted,
@@ -916,7 +1132,7 @@ class _AnswerComposer extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Replying to @$replyTo',
+                        context.t.commentReplyingTo(replyTo!),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -947,8 +1163,8 @@ class _AnswerComposer extends StatelessWidget {
                     textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
                       hintText: replyTo == null
-                          ? 'Write your answer...'
-                          : 'Write your reply...',
+                          ? context.t.qaWriteAnswerHint
+                          : context.t.qaWriteReplyHint,
                     ),
                   ),
                 ),
@@ -961,7 +1177,9 @@ class _AnswerComposer extends StatelessWidget {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(replyTo == null ? 'Post' : 'Reply'),
+                      : Text(replyTo == null
+                          ? context.t.post
+                          : context.t.reply),
                 ),
               ],
             ),
@@ -970,15 +1188,4 @@ class _AnswerComposer extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatTime(DateTime? dt) {
-  if (dt == null) return 'just now';
-  final now = DateTime.now();
-  final d = now.difference(dt);
-  if (d.inSeconds < 60) return 'just now';
-  if (d.inMinutes < 60) return '${d.inMinutes}m ago';
-  if (d.inHours < 24) return '${d.inHours}h ago';
-  if (d.inDays < 7) return '${d.inDays}d ago';
-  return DateFormat('MMM d, y').format(dt);
 }

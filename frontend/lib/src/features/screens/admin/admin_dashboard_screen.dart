@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../providers/contact_request_providers.dart';
@@ -24,12 +25,12 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     if (!isAdmin) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Admin')),
+        appBar: AppBar(title: Text(context.t.admin)),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'You do not have admin access.',
+              context.t.adminNoAccess,
               style: TextStyle(fontSize: 16, color: context.textSecondary),
             ),
           ),
@@ -40,7 +41,7 @@ class AdminDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Admin dashboard'),
+        title: Text(context.t.adminDashboardTitle),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -55,8 +56,8 @@ class AdminDashboardScreen extends ConsumerWidget {
         children: [
           _AdminTile(
             icon: Icons.people_alt_outlined,
-            title: 'Users',
-            subtitle: 'Search, suspend, promote',
+            title: context.t.adminTileUsersTitle,
+            subtitle: context.t.adminTileUsersSubtitle,
             color: const Color(0xFF7E3BE8),
             onTap: () => Navigator.push(
               context,
@@ -66,8 +67,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.feed_outlined,
-            title: 'Posts',
-            subtitle: 'Review and delete posts',
+            title: context.t.adminTilePostsTitle,
+            subtitle: context.t.adminTilePostsSubtitle,
             color: const Color(0xFFD044E8),
             onTap: () => Navigator.push(
               context,
@@ -77,8 +78,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.assessment_outlined,
-            title: 'Reports',
-            subtitle: 'Post, discuss, profile, and error reports',
+            title: context.t.reports,
+            subtitle: context.t.adminTileReportsSubtitle,
             color: const Color(0xFFE04E5C),
             showNotificationDot: hasNewReports,
             onTap: () => Navigator.push(
@@ -89,8 +90,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.support_agent_outlined,
-            title: 'Contact requests',
-            subtitle: 'Inbox + history of messages and org applications',
+            title: context.t.contactRequests,
+            subtitle: context.t.adminTileContactSubtitle,
             color: AppColors.purple,
             showNotificationDot: hasUnreadContact,
             onTap: () => Navigator.push(
@@ -102,8 +103,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.event_outlined,
-            title: 'Events',
-            subtitle: 'Create / edit / delete events',
+            title: context.t.events,
+            subtitle: context.t.adminTileEventsSubtitle,
             color: const Color(0xFFFF6B35),
             onTap: () => Navigator.push(
               context,
@@ -113,8 +114,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.block_outlined,
-            title: 'Blacklisted emails',
-            subtitle: 'Deleted users who cannot re-register',
+            title: context.t.adminBlacklistedEmails,
+            subtitle: context.t.adminTileBlacklistSubtitle,
             color: Colors.red,
             onTap: () => Navigator.push(
               context,
@@ -126,8 +127,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.settings_outlined,
-            title: 'App settings',
-            subtitle: 'Feature flags, announcement, store links, maintenance',
+            title: context.t.adminAppSettings,
+            subtitle: context.t.adminTileSettingsSubtitle,
             color: const Color(0xFF3AB0FF),
             onTap: () => Navigator.push(
               context,

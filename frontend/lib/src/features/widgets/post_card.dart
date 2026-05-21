@@ -6,20 +6,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/story_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
+import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/image_viewer_screen.dart';
+import '../screens/qa_thread_screen.dart';
 import '../../navigation/user_profile_nav.dart';
 import 'location_map.dart';
 
@@ -86,14 +89,15 @@ class _PostCardState extends ConsumerState<PostCard> {
   Future<void> _toggleSave() async {
     final wasSaved = ref.read(isSavedProvider(widget.post.id)).value ?? false;
     final messenger = ScaffoldMessenger.of(context);
+    final t = context.t;
     try {
       await ref.read(postServiceProvider).toggleSave(widget.post.id);
       AppFeedback.showSuccessOn(
         messenger,
-        wasSaved ? 'Removed from saved' : 'Saved to your profile',
+        wasSaved ? t.postCardRemovedFromSaved : t.postCardSavedToProfile,
       );
     } catch (e) {
-      AppFeedback.showErrorOn(messenger, 'Could not save post: $e');
+      AppFeedback.showErrorOn(messenger, t.postCardCouldNotSave(e));
     }
   }
 
@@ -101,25 +105,16 @@ class _PostCardState extends ConsumerState<PostCard> {
     final wasReposted =
         ref.read(isRepostedProvider(widget.post.id)).value ?? false;
     final messenger = ScaffoldMessenger.of(context);
+    final t = context.t;
     try {
       await ref.read(postServiceProvider).toggleRepost(widget.post.id);
       AppFeedback.showSuccessOn(
         messenger,
-        wasReposted ? 'Repost removed' : 'Reposted to your profile',
+        wasReposted ? t.postCardRepostRemoved : t.postCardRepostedToProfile,
       );
     } catch (e) {
-      AppFeedback.showErrorOn(messenger, 'Could not repost: $e');
+      AppFeedback.showErrorOn(messenger, t.postCardCouldNotRepost(e));
     }
-  }
-
-  String _formatPostTimestamp(DateTime? dt) {
-    if (dt == null) return 'just now';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    if (diff.inDays < 7) return '${diff.inDays}d';
-    return DateFormat('MMM d, yyyy').format(dt);
   }
 
   @override
@@ -151,7 +146,7 @@ class _PostCardState extends ConsumerState<PostCard> {
         widget.travelMode && travelPlace != null && travelPlace.isNotEmpty;
     final captionPreview =
         hasCaption ? post.caption.trim() : (hasTravelPlace ? travelPlace : '');
-    final postTime = _formatPostTimestamp(post.createdAt);
+    final postTime = context.t.timeAgo(post.createdAt);
 
     final isDark = context.isDark;
     return Container(
@@ -208,6 +203,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                                   ),
                                   child: CachedNetworkImage(
                                     imageUrl: post.imageUrls[i],
+                                    cacheManager: MediaCache.images,
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -223,6 +219,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                                 ),
                                 child: CachedNetworkImage(
                                   imageUrl: post.imageUrls.first,
+                                  cacheManager: MediaCache.images,
                                   fit: BoxFit.cover,
                                 ),
                               ))
@@ -272,28 +269,32 @@ class _PostCardState extends ConsumerState<PostCard> {
                   ),
                 ),
               ),
-              Positioned(
+              PositionedDirectional(
                 top: 14,
-                left: 14,
+                start: 14,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => openUserProfile(context, uid: post.authorUid),
                   child: _frostedChip(
                     avatarUrl: avatarUrl,
-                    text: '$username • $postTime',
+                    // Both runs are isolated so the username and the
+                    // RTL time string each stay intact, and the
+                    // bullet sits between them per the chip direction.
+                    text: '${context.t.isolate(username)} • $postTime',
+                    textDirection: Directionality.of(context),
                   ),
                 ),
               ),
               if (isOwner)
-                Positioned(
+                PositionedDirectional(
                   top: 12,
-                  right: 12,
+                  end: 12,
                   child: _OwnerMenu(post: post, ref: ref),
                 )
               else
-                Positioned(
+                PositionedDirectional(
                   top: 12,
-                  right: 12,
+                  end: 12,
                   child: _ViewerMenu(post: post, ref: ref),
                 ),
               Positioned(
@@ -529,8 +530,12 @@ class _PostCardState extends ConsumerState<PostCard> {
                                                     widget.onTurnOnLocationTap,
                                                 child: _frostedChip(
                                                   icon: Icons.location_off,
-                                                  text: 'Turn on location',
+                                                  text: context
+                                                      .t.postCardTurnOnLocation,
                                                   compact: true,
+                                                  textDirection:
+                                                      Directionality.of(
+                                                          context),
                                                 ),
                                               )
                                             else if (travelDistance != null &&
@@ -539,6 +544,8 @@ class _PostCardState extends ConsumerState<PostCard> {
                                                 icon: Icons.route,
                                                 text: travelDistance,
                                                 compact: true,
+                                                textDirection:
+                                                    Directionality.of(context),
                                               ),
                                           ],
                                         ),
@@ -556,8 +563,8 @@ class _PostCardState extends ConsumerState<PostCard> {
                 ),
               ),
               if (_captionBoxLowered)
-                Positioned(
-                  right: 20,
+                PositionedDirectional(
+                  end: 20,
                   bottom: 14,
                   child: GestureDetector(
                     onTap: () =>
@@ -628,6 +635,7 @@ class _PostCardState extends ConsumerState<PostCard> {
     IconData? icon,
     required String text,
     bool compact = false,
+    TextDirection? textDirection,
   }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(compact ? 14 : 22),
@@ -655,6 +663,11 @@ class _PostCardState extends ConsumerState<PostCard> {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            // Render the avatar + label as one coherent directional
+            // unit. Without this, a mixed string like
+            // "username • ٣ ڕۆژ پێش ئێستا" is reordered by the bidi
+            // algorithm and the number/words split to opposite sides.
+            textDirection: textDirection,
             children: [
               if (avatarUrl != null)
                 CircleAvatar(
@@ -669,12 +682,16 @@ class _PostCardState extends ConsumerState<PostCard> {
                   size: compact ? 12 : 16,
                 ),
               SizedBox(width: compact ? 5 : 8),
-              Text(
-                text,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: compact ? 11 : 12,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  text,
+                  textDirection: textDirection,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: compact ? 11 : 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -742,7 +759,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                 TextButton.icon(
                   onPressed: () => _translateCaption(context),
                   icon: const Icon(Icons.translate, size: 18),
-                  label: const Text('Translate'),
+                  label: Text(context.t.translate),
                 ),
               ],
             ),
@@ -792,29 +809,58 @@ class _PostCardState extends ConsumerState<PostCard> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    const Padding(
-                      padding: EdgeInsets.all(16),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
                       child: Text(
-                        'Send to',
-                        style: TextStyle(
+                        context.t.postCardSendTo,
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                     const Divider(height: 1),
+                    // Share the post to the current user's story.
+                    ListTile(
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: const Icon(Icons.add,
+                            color: Colors.white, size: 22),
+                      ),
+                      title: Text(context.t.postCardAddToStory),
+                      subtitle: Text(
+                        context.t.postCardAddToStorySub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () async {
+                        await _shareToStory(ref2);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                    ),
+                    const Divider(height: 1),
                     Expanded(
                       child: inboxAsync.when(
                         loading: () =>
                             const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Center(child: Text('Error: $e')),
+                        error: (e, _) => Center(
+                            child: Text(context.t.homeErrorPrefix(e))),
                         data: (convs) {
                           if (convs.isEmpty) {
-                            return const Center(
+                            return Center(
                               child: Text(
-                                'No conversations yet.\nStart a chat first.',
+                                context.t.postCardNoConversations,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey),
+                                style: const TextStyle(color: Colors.grey),
                               ),
                             );
                           }
@@ -849,8 +895,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(
-                                            'Shared to ${c.otherUsername}'),
+                                        content: Text(context.t
+                                            .postCardSharedTo(
+                                                c.otherUsername)),
                                       ),
                                     );
                                   }
@@ -884,6 +931,31 @@ class _PostCardState extends ConsumerState<PostCard> {
           text: '',
           sharedPostId: widget.post.id,
         );
+  }
+
+  /// Adds the post to the current user's story as a "shared post"
+  /// story. The story carries `sharedPostId` so the viewer renders it
+  /// as a tappable card; the post's first image (if any) is used as
+  /// the story image so it still has a thumbnail.
+  Future<void> _shareToStory(WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.t;
+    try {
+      final storyImage = widget.post.imageUrls.isNotEmpty
+          ? widget.post.imageUrls.first
+          : '';
+      await ref.read(storyServiceProvider).createStory(
+            imageUrl: storyImage,
+            sharedPostId: widget.post.id,
+          );
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.postCardAddedToStory)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.postCardStoryFailed(e))),
+      );
+    }
   }
 
   Widget _miniIcon(String svgPath, String text) {
@@ -921,7 +993,7 @@ class _PostVideoPlayer extends StatefulWidget {
 }
 
 class _PostVideoPlayerState extends State<_PostVideoPlayer> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _muted = true;
   bool _showControls = true;
   bool _scrubbing = false;
@@ -934,16 +1006,43 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+    _setupController(widget.url);
+  }
+
+  /// Builds the controller for [url]. The video is first downloaded to
+  /// the disk cache (so it never re-streams from the server), then
+  /// played from that local file.
+  Future<void> _setupController(String url) async {
+    VideoPlayerController controller;
+    try {
+      final file = await MediaCache.videoFile(url);
+      if (!mounted) return;
+      controller = VideoPlayerController.file(file);
+    } catch (_) {
+      // Cache miss/failure — fall back to streaming the network URL.
+      if (!mounted) return;
+      controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    }
+
+    // The widget may have been swapped to another post while the
+    // cache download was in flight — bail if so.
+    if (!mounted || url != widget.url) {
+      controller.dispose();
+      return;
+    }
+
+    _controller = controller
       ..setLooping(true)
-      ..setVolume(0)
-      ..addListener(_onTick)
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() {});
-        _controller.play();
-        _scheduleHide();
-      });
+      ..setVolume(_muted ? 0 : 1)
+      ..addListener(_onTick);
+    await controller.initialize();
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
+    setState(() {});
+    controller.play();
+    _scheduleHide();
   }
 
   void _onTick() {
@@ -962,37 +1061,29 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
     // controllers so we don't keep showing the old video.
     if (oldWidget.url != widget.url) {
       final old = _controller;
-      old.removeListener(_onTick);
-      old.dispose();
+      old?.removeListener(_onTick);
+      old?.dispose();
+      _controller = null;
       _hideTimer?.cancel();
       _showControls = true;
       _scrubbing = false;
       _scrubPosition = Duration.zero;
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
-        ..setLooping(true)
-        ..setVolume(_muted ? 0 : 1)
-        ..addListener(_onTick)
-        ..initialize().then((_) {
-          if (!mounted) return;
-          setState(() {});
-          _controller.play();
-          _scheduleHide();
-        });
+      _setupController(widget.url);
     }
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
-    _controller.removeListener(_onTick);
-    _controller.dispose();
+    _controller?.removeListener(_onTick);
+    _controller?.dispose();
     super.dispose();
   }
 
   void _scheduleHide() {
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (mounted && _controller.value.isPlaying && !_scrubbing) {
+      if (mounted && (_controller?.value.isPlaying ?? false) && !_scrubbing) {
         setState(() => _showControls = false);
       }
     });
@@ -1004,15 +1095,16 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   }
 
   void _togglePlay() {
-    if (!_controller.value.isInitialized) return;
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
     setState(() {
-      if (_controller.value.isPlaying) {
-        _controller.pause();
+      if (c.value.isPlaying) {
+        c.pause();
         _userPaused = true;
         _showControls = true;
         _hideTimer?.cancel();
       } else {
-        _controller.play();
+        c.play();
         _userPaused = false;
         _showControlsThenAutoHide();
       }
@@ -1020,14 +1112,15 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
-    if (!mounted || !_controller.value.isInitialized) return;
+    final c = _controller;
+    if (!mounted || c == null || !c.value.isInitialized) return;
     // Pause once more than half the card leaves the viewport; resume only
     // when at least half is back in view AND the user hadn't tapped pause.
     if (info.visibleFraction < 0.5) {
-      if (_controller.value.isPlaying) _controller.pause();
+      if (c.value.isPlaying) c.pause();
     } else {
-      if (!_userPaused && !_controller.value.isPlaying) {
-        _controller.play();
+      if (!_userPaused && !c.value.isPlaying) {
+        c.play();
       }
     }
   }
@@ -1035,7 +1128,7 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   void _toggleMute() {
     setState(() {
       _muted = !_muted;
-      _controller.setVolume(_muted ? 0 : 1);
+      _controller?.setVolume(_muted ? 0 : 1);
     });
     _showControlsThenAutoHide();
   }
@@ -1049,12 +1142,13 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = _controller.value.isInitialized;
-    final isPlaying = ready && _controller.value.isPlaying;
-    final duration = ready ? _controller.value.duration : Duration.zero;
+    final c = _controller;
+    final ready = c != null && c.value.isInitialized;
+    final isPlaying = ready && c.value.isPlaying;
+    final duration = ready ? c.value.duration : Duration.zero;
     final position = _scrubbing
         ? _scrubPosition
-        : (ready ? _controller.value.position : Duration.zero);
+        : (ready ? c.value.position : Duration.zero);
     final maxMs = duration.inMilliseconds.toDouble();
     final posMs =
         position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
@@ -1078,9 +1172,9 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
             FittedBox(
               fit: BoxFit.cover,
               child: SizedBox(
-                width: _controller.value.size.width,
-                height: _controller.value.size.height,
-                child: VideoPlayer(_controller),
+                width: c.value.size.width,
+                height: c.value.size.height,
+                child: VideoPlayer(c),
               ),
             )
           else
@@ -1198,7 +1292,7 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                                     });
                                   },
                                   onChangeEnd: (v) async {
-                                    await _controller.seekTo(
+                                    await _controller?.seekTo(
                                         Duration(milliseconds: v.toInt()));
                                     _scrubbing = false;
                                     _scheduleHide();
@@ -1255,10 +1349,11 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   }
 
   Future<void> _openFullscreen() async {
-    if (!_controller.value.isInitialized) return;
-    final wasPlaying = _controller.value.isPlaying;
-    final startAt = _controller.value.position;
-    _controller.pause();
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final wasPlaying = c.value.isPlaying;
+    final startAt = c.value.position;
+    c.pause();
     _hideTimer?.cancel();
 
     final result = await Navigator.of(context).push<_FullscreenResult>(
@@ -1279,18 +1374,18 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
 
     if (!mounted) return;
     if (result != null) {
-      await _controller.seekTo(result.position);
+      await _controller?.seekTo(result.position);
       if (result.muted != _muted) {
         setState(() {
           _muted = result.muted;
-          _controller.setVolume(_muted ? 0 : 1);
+          _controller?.setVolume(_muted ? 0 : 1);
         });
       }
       if (result.wasPlaying) {
-        _controller.play();
+        _controller?.play();
       }
     } else if (wasPlaying) {
-      _controller.play();
+      _controller?.play();
     }
     _showControlsThenAutoHide();
   }
@@ -1692,6 +1787,134 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
   }
 }
 
+/// Turns [post] into a Discuss (Q&A) topic — or opens the existing
+/// one — and navigates to its thread. Shared by the owner and viewer
+/// post menus.
+///
+/// If the post already has a Discuss thread it just opens it. For a
+/// new topic it first asks the user to type their question about the
+/// post, then creates the topic (question + linked post) and opens it.
+Future<void> discussPost(
+  BuildContext context,
+  WidgetRef ref,
+  Post post,
+) async {
+  final postService = ref.read(postServiceProvider);
+  final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context);
+  // Capture the string table now so no BuildContext is used after an
+  // await (the catch block needs it for the error message).
+  final strings = context.t;
+  final createdMsg = strings.postCardDiscussCreated;
+
+  try {
+    // If a Discuss topic already exists, just open it.
+    var topicId =
+        post.discussTopicId ?? await postService.findDiscussTopicForPost(post.id);
+
+    if (topicId == null) {
+      // New topic — ask the user to type their question first.
+      if (!context.mounted) return;
+      final question = await _askDiscussQuestion(context);
+      if (question == null || question.trim().isEmpty) return;
+      topicId =
+          await postService.createQaPostFromPost(post, question: question);
+      messenger.showSnackBar(SnackBar(content: Text(createdMsg)));
+    }
+
+    final qaPost = await postService.getPostById(topicId);
+    if (qaPost == null) return;
+
+    navigator.push(
+      MaterialPageRoute(builder: (_) => QaThreadScreen(post: qaPost)),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(strings.postCardDiscussFailed(e))),
+    );
+  }
+}
+
+/// Bottom sheet asking the user to type a question about a post they
+/// are turning into a Discuss topic. Returns the question, or null if
+/// the user dismissed without posting.
+Future<String?> _askDiscussQuestion(BuildContext context) {
+  final controller = TextEditingController();
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.cardBg,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          16 + MediaQuery.of(sheetCtx).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              sheetCtx.t.discussAskTitle,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 3,
+              minLines: 1,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: sheetCtx.t.discussAskHint,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () =>
+                    Navigator.pop(sheetCtx, controller.text.trim()),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.purple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(sheetCtx.t.discussAskAction),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 class _OwnerMenu extends StatelessWidget {
   final Post post;
   final WidgetRef ref;
@@ -1713,17 +1936,19 @@ class _OwnerMenu extends StatelessWidget {
             await _edit(context);
           } else if (action == 'visibility') {
             await _toggleVisibility(context);
+          } else if (action == 'discuss') {
+            await discussPost(context, ref, post);
           } else if (action == 'delete') {
             await _delete(context);
           }
         },
         itemBuilder: (_) => [
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'edit',
             child: Row(children: [
-              Icon(Icons.edit_outlined, size: 18),
-              SizedBox(width: 8),
-              Text('Edit caption'),
+              const Icon(Icons.edit_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(context.t.postCardEditCaption),
             ]),
           ),
           PopupMenuItem(
@@ -1732,15 +1957,28 @@ class _OwnerMenu extends StatelessWidget {
               Icon(post.isPrivate ? Icons.public : Icons.lock_outline,
                   size: 18),
               const SizedBox(width: 8),
-              Text(post.isPrivate ? 'Make public' : 'Make followers-only'),
+              Text(post.isPrivate
+                  ? context.t.postCardMakePublic
+                  : context.t.postCardMakeFollowersOnly),
             ]),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
+            value: 'discuss',
+            child: Row(children: [
+              const Icon(Icons.forum_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(post.discussTopicId != null
+                  ? context.t.postCardViewInDiscuss
+                  : context.t.postCardDiscussThisPost),
+            ]),
+          ),
+          PopupMenuItem(
             value: 'delete',
             child: Row(children: [
-              Icon(Icons.delete_outline, size: 18, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Delete', style: TextStyle(color: Colors.red)),
+              const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(context.t.delete,
+                  style: const TextStyle(color: Colors.red)),
             ]),
           ),
         ],
@@ -1753,22 +1991,22 @@ class _OwnerMenu extends StatelessWidget {
     final newCaption = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Edit caption'),
+        title: Text(context.t.postCardEditCaption),
         content: TextField(
           controller: ctrl,
           maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Caption',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: context.t.postCardCaptionHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
+              child: Text(context.t.cancel)),
           TextButton(
               onPressed: () => Navigator.pop(context, ctrl.text.trim()),
-              child: const Text('Save')),
+              child: Text(context.t.save)),
         ],
       ),
     );
@@ -1781,7 +2019,7 @@ class _OwnerMenu extends StatelessWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Failed: $e')));
+              .showSnackBar(SnackBar(content: Text(context.t.postCardFailed(e))));
         }
       }
     }
@@ -1796,7 +2034,7 @@ class _OwnerMenu extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+            .showSnackBar(SnackBar(content: Text(context.t.postCardFailed(e))));
       }
     }
   }
@@ -1805,15 +2043,16 @@ class _OwnerMenu extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete post?'),
-        content: const Text('This cannot be undone.'),
+        title: Text(context.t.postCardDeletePostTitle),
+        content: Text(context.t.postCardCannotBeUndone),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: Text(context.t.cancel)),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+              child: Text(context.t.delete,
+                  style: const TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -1825,7 +2064,7 @@ class _OwnerMenu extends StatelessWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Failed: $e')));
+              .showSnackBar(SnackBar(content: Text(context.t.postCardFailed(e))));
         }
       }
     }
@@ -1861,15 +2100,28 @@ class _ViewerMenu extends StatelessWidget {
         onSelected: (action) async {
           if (action == 'report') {
             await _report(context);
+          } else if (action == 'discuss') {
+            await discussPost(context, ref, post);
           }
         },
-        itemBuilder: (_) => const [
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'discuss',
+            child: Row(children: [
+              const Icon(Icons.forum_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(post.discussTopicId != null
+                  ? context.t.postCardViewInDiscuss
+                  : context.t.postCardDiscussThisPost),
+            ]),
+          ),
           PopupMenuItem(
             value: 'report',
             child: Row(children: [
-              Icon(Icons.flag_outlined, size: 18, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Report', style: TextStyle(color: Colors.red)),
+              const Icon(Icons.flag_outlined, size: 18, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(context.t.report,
+                  style: const TextStyle(color: Colors.red)),
             ]),
           ),
         ],
@@ -1880,6 +2132,7 @@ class _ViewerMenu extends StatelessWidget {
   Future<void> _report(BuildContext context) async {
     final detailsCtrl = TextEditingController();
     var selectedReason = _reportReasons.first;
+    final reportSentMsg = context.t.postCardReportSentAdmins;
 
     try {
       final submitted = await showModalBottomSheet<bool>(
@@ -1909,7 +2162,7 @@ class _ViewerMenu extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                'Report post',
+                                context.t.postCardReportPost,
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -1925,7 +2178,7 @@ class _ViewerMenu extends StatelessWidget {
                           ],
                         ),
                         Text(
-                          'Pick the reason that best fits this post.',
+                          context.t.postCardPickReasonPost,
                           style: TextStyle(color: context.textSecondary),
                         ),
                         const SizedBox(height: 12),
@@ -1949,7 +2202,7 @@ class _ViewerMenu extends StatelessWidget {
                           controller: detailsCtrl,
                           maxLines: 4,
                           decoration: InputDecoration(
-                            hintText: 'Extra details (optional)',
+                            hintText: context.t.homeExtraDetailsOptional,
                             filled: true,
                             fillColor: context.inputFill,
                             border: OutlineInputBorder(
@@ -1966,7 +2219,7 @@ class _ViewerMenu extends StatelessWidget {
                               child: OutlinedButton(
                                 onPressed: () =>
                                     Navigator.pop(sheetContext, false),
-                                child: const Text('Cancel'),
+                                child: Text(context.t.cancel),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1974,7 +2227,7 @@ class _ViewerMenu extends StatelessWidget {
                               child: FilledButton(
                                 onPressed: () =>
                                     Navigator.pop(sheetContext, true),
-                                child: const Text('Send report'),
+                                child: Text(context.t.homeSendReport),
                               ),
                             ),
                           ],
@@ -1998,7 +2251,7 @@ class _ViewerMenu extends StatelessWidget {
             details: detailsCtrl.text,
           );
       if (context.mounted) {
-        AppFeedback.showInfoOn(messenger, 'Report sent to admins');
+        AppFeedback.showInfoOn(messenger, reportSentMsg);
       }
     } catch (e) {
       if (context.mounted) {
@@ -2106,7 +2359,9 @@ class _ExpandableCaptionState extends State<_ExpandableCaption> {
             GestureDetector(
               onTap: () => setState(() => _expanded = !_expanded),
               child: Text(
-                _expanded ? 'Show less' : 'Read more',
+                _expanded
+                    ? context.t.postCardShowLess
+                    : context.t.postCardReadMore,
                 style: TextStyle(
                   color: widget.toggleColor,
                   fontSize: (widget.style.fontSize ?? 14) - 2,
@@ -2196,7 +2451,7 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
                 const Icon(Icons.translate, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Translate to ${_labelOf(_target)}',
+                  context.t.commentTranslateTo(_labelOf(_target)),
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700),
                 ),
@@ -2260,18 +2515,19 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
                       : () {
                           Clipboard.setData(ClipboardData(text: _translated!));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Translation copied'),
+                            SnackBar(
+                              content:
+                                  Text(context.t.commentTranslationCopied),
                             ),
                           );
                         },
                   icon: const Icon(Icons.copy, size: 18),
-                  label: const Text('Copy'),
+                  label: Text(context.t.copy),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
+                  child: Text(context.t.close),
                 ),
               ],
             ),

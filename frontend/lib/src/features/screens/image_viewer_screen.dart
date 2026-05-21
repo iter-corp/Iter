@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 
+import '../../l10n/app_strings.dart';
+
 class ImageViewerScreen extends StatefulWidget {
   final List<String> urls;
   final int initialIndex;
@@ -44,7 +46,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
       if (!granted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permission denied')),
+            SnackBar(content: Text(context.t.permissionDenied)),
           );
         }
         return;
@@ -58,13 +60,13 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved to gallery')),
+          SnackBar(content: Text(context.t.savedToGallery)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e')),
+          SnackBar(content: Text(context.t.saveFailed(e))),
         );
       }
     } finally {

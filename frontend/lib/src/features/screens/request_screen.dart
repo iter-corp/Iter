@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../services/chat_service.dart';
 import '../../theme/app_theme.dart';
@@ -27,9 +28,10 @@ class HiddenRequestsScreen extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back, size: 22),
                   ),
-                  const Text(
-                    "Hidden Requests",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  Text(
+                    context.t.requestHiddenRequests,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -39,7 +41,7 @@ class HiddenRequestsScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Text(
-                "Requests containing messages that may be offensive or unwanted are moved to this folder.",
+                context.t.requestHiddenRequestsSubtitle,
                 style: TextStyle(color: context.textSecondary, fontSize: 13),
               ),
             ),
@@ -89,7 +91,11 @@ class HiddenRequestsScreen extends StatelessWidget {
                     ),
                     subtitle: Text(
                       msg.unreadCount > 0
-                          ? '${msg.unreadCount} new ${msg.unreadCount == 1 ? 'message' : 'messages'}'
+                          ? context.t.newMessagesCount(
+                              msg.unreadCount,
+                              msg.unreadCount == 1
+                                  ? context.t.message
+                                  : context.t.messages)
                           : msg.lastMessage,
                       style: TextStyle(color: context.textMuted, fontSize: 12),
                     ),
@@ -131,8 +137,8 @@ class RequestsTab extends StatelessWidget {
             ),
             child: const Icon(Icons.notifications_off_outlined, size: 24),
           ),
-          title: const Text("Hidden Requests",
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          title: Text(context.t.requestHiddenRequests,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.push(
             context,
@@ -177,7 +183,11 @@ class RequestsTab extends StatelessWidget {
                 ),
                 subtitle: Text(
                   msg.unreadCount > 0
-                      ? '${msg.unreadCount} new ${msg.unreadCount == 1 ? 'message' : 'messages'}'
+                      ? context.t.newMessagesCount(
+                          msg.unreadCount,
+                          msg.unreadCount == 1
+                              ? context.t.message
+                              : context.t.messages)
                       : msg.lastMessage,
                   style: TextStyle(color: context.textMuted, fontSize: 12),
                 ),

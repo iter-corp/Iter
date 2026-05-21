@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
@@ -162,8 +163,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: AlignmentDirectional.topStart,
+          end: AlignmentDirectional.bottomEnd,
           colors: context.isDark
               ? const [Color(0xFF101017), Color(0xFF171726), Color(0xFF11111A)]
               : const [Color(0xFFF8F5FF), Color(0xFFEFF6FF), Color(0xFFFDF7F2)],
@@ -218,7 +219,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                             controller: _searchCtrl,
                             onChanged: (v) => setState(() => _query = v),
                             decoration: InputDecoration(
-                              hintText: 'Search...',
+                              hintText: context.t.searchWithDots,
                               hintStyle: TextStyle(
                                   color: context.textMuted, fontSize: 14),
                               filled: false,
@@ -268,7 +269,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                       ? inboxAsync.when(
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(child: Text('Error: $e')),
+                          error: (e, _) => Center(
+                              child: Text(context.t.errorWithMessage(e))),
                           data: (_) {
                             // When the search box has a query, also surface
                             // followed users the user hasn't messaged yet so
@@ -293,7 +295,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                       : requestsAsync.when(
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(child: Text('Error: $e')),
+                          error: (e, _) => Center(
+                              child: Text(context.t.errorWithMessage(e))),
                           data: (_) {
                             return RequestsTab(
                               requests: requestConvs,
@@ -356,7 +359,7 @@ class _SearchableConvList extends ConsumerWidget {
     if (merged.isEmpty && !showFollowed) {
       return Center(
         child: Text(
-          'No messages yet',
+          context.t.noMessages,
           style: TextStyle(color: context.textSecondary),
         ),
       );
@@ -427,7 +430,7 @@ class _FollowedPeopleSection extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Center(
           child: Text(
-            'No matches',
+            context.t.noMatches,
             style: TextStyle(color: context.textSecondary),
           ),
         ),
@@ -441,7 +444,7 @@ class _FollowedPeopleSection extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
           child: Text(
-            'People you follow',
+            context.t.peopleYouFollow,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -497,7 +500,7 @@ class _FollowedUserTile extends ConsumerWidget {
       onTap: () => onTap(
         name: username.isNotEmpty
             ? username
-            : (fullName.isNotEmpty ? fullName : 'User'),
+            : (fullName.isNotEmpty ? fullName : context.t.user),
         avatar: avatar,
       ),
       leading: CircleAvatar(
@@ -509,7 +512,7 @@ class _FollowedUserTile extends ConsumerWidget {
             : null,
       ),
       title: Text(
-        username.isNotEmpty ? username : 'User',
+        username.isNotEmpty ? username : context.t.user,
         style: TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 14,
@@ -517,7 +520,7 @@ class _FollowedUserTile extends ConsumerWidget {
         ),
       ),
       subtitle: Text(
-        fullName.isNotEmpty ? fullName : 'Tap to start a chat',
+        fullName.isNotEmpty ? fullName : context.t.tapToStartChat,
         style: TextStyle(color: context.textSecondary, fontSize: 12),
       ),
       trailing: Icon(Icons.chat_bubble_outline,
@@ -660,9 +663,9 @@ class _ConvTile extends ConsumerWidget {
                   color: context.purpleSoft,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'GROUP',
-                  style: TextStyle(
+                child: Text(
+                  context.t.groupUppercase,
+                  style: const TextStyle(
                     fontSize: 9,
                     color: Color(0xFF7E3BE8),
                     fontWeight: FontWeight.w700,
@@ -684,7 +687,7 @@ class _ConvTile extends ConsumerWidget {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Text(
-            isTyping ? 'Typing…' : conv.lastMessage,
+            isTyping ? context.t.typing : conv.lastMessage,
             style: TextStyle(
               color: isTyping
                   ? const Color(0xFFB05ECC)
@@ -779,7 +782,7 @@ Future<void> _showChatActions({
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: Text(
                   displayName,
                   style: TextStyle(
@@ -799,7 +802,9 @@ Future<void> _showChatActions({
                 color: context.textPrimary,
               ),
               title: Text(
-                isMuted ? 'Unmute notifications' : 'Mute notifications',
+                isMuted
+                    ? context.t.unmuteNotifications
+                    : context.t.muteNotifications,
                 style: TextStyle(color: context.textPrimary),
               ),
               onTap: () async {
@@ -815,39 +820,39 @@ Future<void> _showChatActions({
                     SnackBar(
                       content: Text(
                         isMuted
-                            ? 'Notifications unmuted'
-                            : 'Notifications muted',
+                            ? context.t.notificationsUnmuted
+                            : context.t.notificationsMuted,
                       ),
                     ),
                   );
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed: $e')),
+                    SnackBar(content: Text(context.t.failedWithError(e))),
                   );
                 }
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text(
-                'Delete chat',
-                style: TextStyle(color: Colors.red),
+              title: Text(
+                context.t.deleteChat,
+                style: const TextStyle(color: Colors.red),
               ),
               subtitle: Text(
                 conv.isGroup
-                    ? 'Removes the group and all messages'
-                    : 'Removes the conversation for both of you',
+                    ? context.t.removesGroupAllMessages
+                    : context.t.removesConversationBoth,
                 style: TextStyle(fontSize: 12, color: context.textSecondary),
               ),
               onTap: () async {
                 Navigator.pop(sheetCtx);
                 final confirmed = await _confirmDestructive(
                   context: context,
-                  title: 'Delete this chat?',
+                  title: context.t.deleteThisChatQuestion,
                   body: conv.isGroup
-                      ? 'All messages in “$displayName” will be permanently deleted for every member. This cannot be undone.'
-                      : 'All messages with $displayName will be permanently deleted for both of you. This cannot be undone.',
+                      ? context.t.deleteChatGroupBody(displayName)
+                      : context.t.deleteChatOneToOneBody(displayName),
                 );
                 if (confirmed != true) return;
                 try {
@@ -858,12 +863,12 @@ Future<void> _showChatActions({
                   }
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Chat deleted')),
+                    SnackBar(content: Text(context.t.chatDeleted)),
                   );
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete: $e')),
+                    SnackBar(content: Text(context.t.failedToDelete(e))),
                   );
                 }
               },
@@ -909,7 +914,7 @@ Future<void> _showEventChatActions({
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: Text(
                   chat.eventTitle,
                   style: TextStyle(
@@ -929,7 +934,9 @@ Future<void> _showEventChatActions({
                 color: context.textPrimary,
               ),
               title: Text(
-                isMuted ? 'Unmute notifications' : 'Mute notifications',
+                isMuted
+                    ? context.t.unmuteNotifications
+                    : context.t.muteNotifications,
                 style: TextStyle(color: context.textPrimary),
               ),
               onTap: () async {
@@ -945,15 +952,15 @@ Future<void> _showEventChatActions({
                     SnackBar(
                       content: Text(
                         isMuted
-                            ? 'Notifications unmuted'
-                            : 'Notifications muted',
+                            ? context.t.notificationsUnmuted
+                            : context.t.notificationsMuted,
                       ),
                     ),
                   );
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed: $e')),
+                    SnackBar(content: Text(context.t.failedWithError(e))),
                   );
                 }
               },
@@ -961,33 +968,33 @@ Future<void> _showEventChatActions({
             if (isAdmin)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text(
-                  'Delete group',
-                  style: TextStyle(color: Colors.red),
+                title: Text(
+                  context.t.deleteGroup,
+                  style: const TextStyle(color: Colors.red),
                 ),
                 subtitle: Text(
-                  'Removes the group chat and all messages',
+                  context.t.removesGroupAndMessages,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
                 onTap: () async {
                   Navigator.pop(sheetCtx);
                   final confirmed = await _confirmDestructive(
                     context: context,
-                    title: 'Delete event group?',
+                    title: context.t.deleteEventGroupQuestion,
                     body:
-                        'All messages in “${chat.eventTitle}” will be permanently deleted for every member. This cannot be undone.',
+                        context.t.deleteEventGroupBody(chat.eventTitle),
                   );
                   if (confirmed != true) return;
                   try {
                     await svc.deleteEventGroup(chat.eventId);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Group deleted')),
+                      SnackBar(content: Text(context.t.groupDeleted)),
                     );
                   } catch (e) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to delete: $e')),
+                      SnackBar(content: Text(context.t.failedToDelete(e))),
                     );
                   }
                 },
@@ -1013,12 +1020,12 @@ Future<bool?> _confirmDestructive({
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogCtx, false),
-          child: const Text('Cancel'),
+          child: Text(context.t.cancel),
         ),
         TextButton(
           onPressed: () => Navigator.pop(dialogCtx, true),
           style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('Delete'),
+          child: Text(context.t.delete),
         ),
       ],
     ),
@@ -1038,7 +1045,8 @@ class _EventConvTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider).value?.uid;
-    final preview = chat.lastMessage.isEmpty ? 'Event group' : chat.lastMessage;
+    final preview =
+        chat.lastMessage.isEmpty ? context.t.eventGroup : chat.lastMessage;
     final isMuted = currentUid != null && chat.isMutedBy(currentUid);
     return _GlassChatCard(
       emphasize: chat.unreadCount > 0,
@@ -1079,9 +1087,9 @@ class _EventConvTile extends ConsumerWidget {
                 color: context.purpleSoft,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                'EVENT',
-                style: TextStyle(
+              child: Text(
+                context.t.eventUppercase,
+                style: const TextStyle(
                   fontSize: 9,
                   color: Color(0xFFB05ECC),
                   fontWeight: FontWeight.w700,
@@ -1101,7 +1109,11 @@ class _EventConvTile extends ConsumerWidget {
         ),
         subtitle: Text(
           chat.unreadCount > 0
-              ? '${chat.unreadCount} new ${chat.unreadCount == 1 ? 'message' : 'messages'}'
+              ? context.t.newMessagesCount(
+                  chat.unreadCount,
+                  chat.unreadCount == 1
+                      ? context.t.message
+                      : context.t.messages)
               : preview,
           style: TextStyle(color: context.textSecondary, fontSize: 12),
           maxLines: 1,

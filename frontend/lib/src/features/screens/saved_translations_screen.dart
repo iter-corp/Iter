@@ -107,7 +107,7 @@ class _SavedTile extends StatelessWidget {
       key: ValueKey(item.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        alignment: Alignment.centerRight,
+        alignment: AlignmentDirectional.centerEnd,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: Colors.red.shade400,

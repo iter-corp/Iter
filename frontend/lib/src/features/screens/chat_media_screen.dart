@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../services/chat_service.dart';
@@ -38,17 +39,19 @@ class ChatMediaScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text(chatTitle),
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.image_outlined), text: 'Images'),
-              Tab(icon: Icon(Icons.link), text: 'Links'),
-              Tab(icon: Icon(Icons.mic_none), text: 'Voices'),
+              Tab(
+                  icon: const Icon(Icons.image_outlined),
+                  text: context.t.images),
+              Tab(icon: const Icon(Icons.link), text: context.t.links),
+              Tab(icon: const Icon(Icons.mic_none), text: context.t.voices),
             ],
           ),
         ),
         body: messagesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (msgs) {
             final images =
                 msgs.where((m) => (m.imageUrl ?? '').isNotEmpty).toList()
@@ -118,9 +121,9 @@ class _ImagesGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (images.isEmpty) {
-      return const _EmptyState(
+      return _EmptyState(
         icon: Icons.image_outlined,
-        text: 'No images shared yet',
+        text: context.t.noImagesShared,
       );
     }
     return GridView.builder(
@@ -160,12 +163,12 @@ class _ImagesGrid extends ConsumerWidget {
             iconTheme: const IconThemeData(color: Colors.white),
             actions: [
               IconButton(
-                tooltip: 'Save to gallery',
+                tooltip: context.t.saveToGallery,
                 icon: const Icon(Icons.download),
                 onPressed: () => _saveImage(context, url),
               ),
               IconButton(
-                tooltip: 'Forward to another chat',
+                tooltip: context.t.forwardToAnotherChat,
                 icon: const Icon(Icons.forward),
                 onPressed: () => _forwardImage(context, ref, url),
               ),
@@ -190,7 +193,7 @@ class _ImagesGrid extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.download),
-              title: const Text('Save to gallery'),
+              title: Text(context.t.saveToGallery),
               onTap: () {
                 Navigator.pop(context);
                 _saveImage(context, url);
@@ -198,7 +201,7 @@ class _ImagesGrid extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.forward),
-              title: const Text('Forward to another chat'),
+              title: Text(context.t.forwardToAnotherChat),
               onTap: () {
                 Navigator.pop(context);
                 _forwardImage(context, ref, url);
@@ -213,16 +216,17 @@ class _ImagesGrid extends ConsumerWidget {
 
 Future<void> _saveImage(BuildContext context, String url) async {
   final messenger = ScaffoldMessenger.of(context);
-  messenger.showSnackBar(const SnackBar(
-    content: Text('Saving…'),
-    duration: Duration(milliseconds: 700),
+  final strings = context.t;
+  messenger.showSnackBar(SnackBar(
+    content: Text(strings.saving),
+    duration: const Duration(milliseconds: 700),
   ));
   try {
     if (!await Gal.hasAccess()) {
       final granted = await Gal.requestAccess();
       if (!granted) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Permission denied')),
+          SnackBar(content: Text(strings.permissionDenied)),
         );
         return;
       }
@@ -239,12 +243,12 @@ Future<void> _saveImage(BuildContext context, String url) async {
     await file.writeAsBytes(res.bodyBytes);
     await Gal.putImage(tempPath, album: 'Iter');
     messenger.showSnackBar(
-      const SnackBar(content: Text('Saved to gallery')),
+      SnackBar(content: Text(strings.savedToGallery)),
     );
   } catch (e) {
     debugPrint('[chat-media] save failed: $e');
     messenger.showSnackBar(
-      SnackBar(content: Text('Save failed: $e')),
+      SnackBar(content: Text(strings.saveFailed(e))),
     );
   }
 }
@@ -260,7 +264,7 @@ Future<void> _forwardImage(
   );
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Forwarded to ${target.title}')),
+    SnackBar(content: Text(context.t.forwardedTo(target.title))),
   );
 }
 
@@ -275,7 +279,7 @@ class _LinksList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (links.isEmpty) {
-      return const _EmptyState(icon: Icons.link, text: 'No links shared yet');
+      return _EmptyState(icon: Icons.link, text: context.t.noLinksShared);
     }
     return ListView.separated(
       itemCount: links.length,
@@ -300,7 +304,7 @@ class _LinksList extends ConsumerWidget {
                 await Clipboard.setData(ClipboardData(text: entry.url));
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Link copied')),
+                  SnackBar(content: Text(context.t.linkCopied)),
                 );
               } else if (value == 'forward') {
                 final target = await _pickForwardTarget(context, ref);
@@ -312,20 +316,20 @@ class _LinksList extends ConsumerWidget {
                 );
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Forwarded to ${target.title}')),
+                  SnackBar(content: Text(context.t.forwardedTo(target.title))),
                 );
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'copy', child: Text('Copy')),
-              PopupMenuItem(value: 'forward', child: Text('Forward')),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'copy', child: Text(context.t.copy)),
+              PopupMenuItem(value: 'forward', child: Text(context.t.forward)),
             ],
           ),
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: entry.url));
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Link copied')),
+              SnackBar(content: Text(context.t.linkCopied)),
             );
           },
         );
@@ -345,9 +349,9 @@ class _VoicesList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (voices.isEmpty) {
-      return const _EmptyState(
+      return _EmptyState(
         icon: Icons.mic_none,
-        text: 'No voice messages yet',
+        text: context.t.noVoiceMessages,
       );
     }
     return ListView.separated(
@@ -358,7 +362,9 @@ class _VoicesList extends ConsumerWidget {
         final secs = ((m.voiceDurationMs ?? 0) / 1000).round();
         return ListTile(
           leading: const CircleAvatar(child: Icon(Icons.mic)),
-          title: Text(secs > 0 ? '${secs}s voice message' : 'Voice message'),
+          title: Text(secs > 0
+              ? context.t.secsVoiceMessage(secs)
+              : context.t.voiceMessage),
           subtitle: Text(_formatTime(m.createdAt)),
           trailing: PopupMenuButton<String>(
             onSelected: (value) async {
@@ -375,13 +381,15 @@ class _VoicesList extends ConsumerWidget {
                 );
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Forwarded to ${target.title}')),
+                  SnackBar(content: Text(context.t.forwardedTo(target.title))),
                 );
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'open', child: Text('Go to message')),
-              PopupMenuItem(value: 'forward', child: Text('Forward')),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                  value: 'open', child: Text(context.t.goToMessage)),
+              PopupMenuItem(
+                  value: 'forward', child: Text(context.t.forward)),
             ],
           ),
         );
@@ -444,11 +452,11 @@ class _ForwardChatPicker extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'Forward to…',
-                style: TextStyle(
+                context.t.forwardTo,
+                style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
@@ -457,10 +465,11 @@ class _ForwardChatPicker extends ConsumerWidget {
               child: inbox.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) =>
+                    Center(child: Text(context.t.errorWithMessage(e))),
                 data: (chats) {
                   if (chats.isEmpty) {
-                    return const Center(child: Text('No chats yet'));
+                    return Center(child: Text(context.t.noChatsYet));
                   }
                   return ListView.separated(
                     controller: scrollController,

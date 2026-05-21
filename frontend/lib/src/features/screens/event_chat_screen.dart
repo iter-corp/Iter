@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_providers.dart';
@@ -93,7 +94,8 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
     final msgsAsync = ref.watch(eventChatMessagesProvider(widget.eventId));
     final adminLive = ref.watch(userByUidProvider(widget.adminUid)).valueOrNull;
     final adminAvatar = (adminLive?['avatarUrl'] as String?) ?? '';
-    final adminName = (adminLive?['username'] as String?) ?? 'Admin';
+    final adminName =
+        (adminLive?['username'] as String?) ?? context.t.adminLabel;
 
     ref.listen(eventChatMessagesProvider(widget.eventId), (_, __) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -149,7 +151,7 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                                 if (adminAvatar.isNotEmpty)
                                   const SizedBox(width: 4),
                                 Text(
-                                  'Admin: $adminName',
+                                  context.t.adminPrefix(adminName),
                                   style: const TextStyle(
                                     color: Color(0xFFB05ECC),
                                     fontSize: 12,
@@ -182,12 +184,13 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
             Expanded(
               child: msgsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) =>
+                    Center(child: Text(context.t.errorWithMessage(e))),
                 data: (msgs) {
                   if (msgs.isEmpty) {
                     return Center(
                       child: Text(
-                        'No messages yet.',
+                        context.t.noMessages,
                         style: TextStyle(color: context.textSecondary),
                       ),
                     );
@@ -232,7 +235,7 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                         child: TextField(
                           controller: _controller,
                           decoration: InputDecoration(
-                            hintText: 'Broadcast a message...',
+                            hintText: context.t.broadcastAMessage,
                             hintStyle: TextStyle(
                                 color: context.textMuted, fontSize: 14),
                             filled: false,
@@ -258,15 +261,15 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 color: context.purpleSoft,
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.lock_outline,
+                    const Icon(Icons.lock_outline,
                         size: 14, color: Color(0xFF8A3FB8)),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
-                      'Only the admin can send messages. You can react.',
-                      style: TextStyle(
+                      context.t.onlyAdminCanSend,
+                      style: const TextStyle(
                         color: Color(0xFF8A3FB8),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -304,7 +307,7 @@ class _EventMessageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final senderLive = ref.watch(userByUidProvider(msg.senderUid)).valueOrNull;
     final senderName = (senderLive?['username'] as String?) ??
-        (isFromAdmin ? 'Admin' : 'User');
+        (isFromAdmin ? context.t.adminLabel : context.t.user);
     final senderAvatar = (senderLive?['avatarUrl'] as String?) ?? '';
 
     return Padding(
@@ -336,9 +339,12 @@ class _EventMessageBubble extends ConsumerWidget {
               children: [
                 if (!isMe)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 2, left: 4),
+                    padding: const EdgeInsetsDirectional.only(
+                        bottom: 2, start: 4),
                     child: Text(
-                      isFromAdmin ? '$senderName · admin' : senderName,
+                      isFromAdmin
+                          ? context.t.senderAdmin(senderName)
+                          : senderName,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -446,7 +452,7 @@ class _EventChatNotEncryptedNotice extends StatelessWidget {
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              'Event group messages are not end-to-end encrypted.',
+              context.t.eventMessagesNotEncrypted,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

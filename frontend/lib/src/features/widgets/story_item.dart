@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 
 class StoryItem extends StatelessWidget {
@@ -35,9 +36,9 @@ class StoryItem extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            "User",
-            style: TextStyle(fontSize: 12),
+          Text(
+            context.t.user,
+            style: const TextStyle(fontSize: 12),
           ),
         ],
       ),

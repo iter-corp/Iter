@@ -10,6 +10,7 @@ import '../features/screens/auth/onboarding_screen.dart';
 import '../features/screens/auth/otp_screen.dart';
 import '../features/screens/auth/signup_screen.dart';
 import '../features/screens/auth/splash_screen.dart';
+import '../features/screens/language_screen.dart';
 import '../providers/auth_providers.dart';
 import '../services/error_report_service.dart';
 
@@ -88,6 +89,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const OnboardingScreen(),
       ),
       GoRoute(path: '/home', builder: (_, __) => const MainScreen()),
+      GoRoute(
+        path: '/language',
+        builder: (_, __) => const LanguageScreen(),
+      ),
       GoRoute(
         path: '/admin',
         builder: (_, __) => const AdminDashboardScreen(),

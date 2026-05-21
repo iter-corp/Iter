@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/edit_profile.dart';
@@ -214,11 +215,13 @@ class ProfileStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(_fmt(followers), "Followers", onFollowersTap, context),
+          _statItem(
+              _fmt(followers), context.t.followers, onFollowersTap, context),
           _divider(context),
-          _statItem(_fmt(following), "Following", onFollowingTap, context),
+          _statItem(
+              _fmt(following), context.t.following, onFollowingTap, context),
           _divider(context),
-          _statItem(_fmt(posts), "Posts", null, context),
+          _statItem(_fmt(posts), context.t.posts, null, context),
         ],
       ),
     );
@@ -288,7 +291,7 @@ class ProfileButtons extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(vertical: 11),
               ),
-              child: Text("Edit Profile",
+              child: Text(context.t.editProfile,
                   style: TextStyle(
                       color: context.textPrimary, fontWeight: FontWeight.w600)),
             ),
@@ -302,8 +305,8 @@ class ProfileButtons extends StatelessWidget {
                 children: [
                   Icon(Icons.settings, size: 16, color: context.textPrimary),
                   if (showSettingsNotificationDot)
-                    Positioned(
-                      right: -4,
+                    PositionedDirectional(
+                      end: -4,
                       top: -4,
                       child: Container(
                         width: 8,
@@ -317,7 +320,7 @@ class ProfileButtons extends StatelessWidget {
                     ),
                 ],
               ),
-              label: Text("Setting",
+              label: Text(context.t.settings,
                   style: TextStyle(
                       color: context.textPrimary, fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
@@ -331,7 +334,7 @@ class ProfileButtons extends StatelessWidget {
           if (onInvite != null) ...[
             const SizedBox(width: 10),
             Tooltip(
-              message: 'Invite friends',
+              message: context.t.profileInviteFriends,
               child: OutlinedButton(
                 onPressed: onInvite,
                 style: OutlinedButton.styleFrom(
@@ -381,10 +384,11 @@ class ProfileTabBar extends StatelessWidget {
           return Stack(
             children: [
               // Animated underline that slides between tabs.
-              AnimatedPositioned(
+              // `start` mirrors with the (auto-flipped) tab Row in RTL.
+              AnimatedPositionedDirectional(
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutCubic,
-                left: tabWidth * selectedTab,
+                start: tabWidth * selectedTab,
                 bottom: 0,
                 width: tabWidth,
                 height: 2,
@@ -455,13 +459,13 @@ class ProfileEmpty extends StatelessWidget {
           children: [
             Icon(Icons.image_outlined, size: 48, color: context.textSecondary),
             const SizedBox(height: 12),
-            Text("Create your first post",
+            Text(context.t.profileCreateFirstPost,
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                     color: context.textPrimary)),
             const SizedBox(height: 4),
-            Text("Share your content",
+            Text(context.t.profileShareYourContent,
                 style: TextStyle(color: context.textSecondary, fontSize: 13)),
             const SizedBox(height: 16),
             Builder(builder: (ctx) {
@@ -481,8 +485,8 @@ class ProfileEmpty extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
                 ),
-                child:
-                    const Text("Create", style: TextStyle(color: Colors.white)),
+                child: Text(ctx.t.profileCreate,
+                    style: const TextStyle(color: Colors.white)),
               );
             }),
           ],

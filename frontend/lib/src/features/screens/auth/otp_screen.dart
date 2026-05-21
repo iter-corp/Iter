@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../theme/app_theme.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -102,7 +103,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 28),
               Center(
                 child: Text(
-                  'Enter OTP code',
+                  context.t.otpEnterCode,
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
@@ -113,7 +114,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 10),
               Center(
                 child: Text(
-                  'OTP code has been send\nto$destination',
+                  context.t.otpCodeSentTo(destination),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -184,9 +185,9 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Verify',
-                    style: TextStyle(
+                  child: Text(
+                    context.t.verify,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -198,13 +199,13 @@ class _OtpScreenState extends State<OtpScreen> {
               Row(
                 children: [
                   Text(
-                    "Didn't get OTP? ",
+                    context.t.otpDidntGet,
                     style: TextStyle(fontSize: 13, color: context.textMuted),
                   ),
                   GestureDetector(
                     onTap: () {},
                     child: Text(
-                      'Resend OTP',
+                      context.t.otpResend,
                       style: TextStyle(
                         fontSize: 13,
                         color: context.textPrimary,

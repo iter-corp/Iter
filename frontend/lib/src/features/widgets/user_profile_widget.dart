@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 
 /// COVER + AVATAR — uses live profile data
@@ -73,14 +74,15 @@ class UserCoverAvatar extends StatelessWidget {
                     const Icon(Icons.more_vert, color: Colors.white, size: 20),
               ),
               itemBuilder: (context) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'report',
-                  child: Text('Report', style: TextStyle(color: Colors.red)),
+                  child: Text(context.t.report,
+                      style: const TextStyle(color: Colors.red)),
                 ),
                 PopupMenuItem(
                   value: 'block',
                   child: Text(
-                    isBlocked ? 'Unblock' : 'Block',
+                    isBlocked ? context.t.unblock : context.t.block,
                     style: const TextStyle(color: Colors.red),
                   ),
                 ),
@@ -367,14 +369,20 @@ class UserStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(context, isPrivateAndNotFollowing ? "—" : _fmt(followers),
-              "Followers", isPrivateAndNotFollowing ? null : onFollowersTap),
+          _statItem(
+              context,
+              isPrivateAndNotFollowing ? "—" : _fmt(followers),
+              context.t.followers,
+              isPrivateAndNotFollowing ? null : onFollowersTap),
           _divider(context),
-          _statItem(context, isPrivateAndNotFollowing ? "—" : _fmt(following),
-              "Following", isPrivateAndNotFollowing ? null : onFollowingTap),
+          _statItem(
+              context,
+              isPrivateAndNotFollowing ? "—" : _fmt(following),
+              context.t.following,
+              isPrivateAndNotFollowing ? null : onFollowingTap),
           _divider(context),
           _statItem(context, isPrivateAndNotFollowing ? "—" : _fmt(posts),
-              "Posts", null),
+              context.t.posts, null),
         ],
       ),
     );
@@ -430,8 +438,9 @@ class UserButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool active = isFollowing || isRequested;
-    final String text =
-        isFollowing ? "Following" : (isRequested ? "Requested" : "Follow");
+    final String text = isFollowing
+        ? context.t.following
+        : (isRequested ? context.t.requested : context.t.follow);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -490,7 +499,7 @@ class UserButtons extends StatelessWidget {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
-                    "Message",
+                    context.t.message,
                     style: TextStyle(
                       color: context.textPrimary,
                       fontWeight: FontWeight.w600,
@@ -579,7 +588,7 @@ class UserPrivateMessage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "This account is private",
+                    context.t.thisAccountIsPrivate,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -588,7 +597,7 @@ class UserPrivateMessage extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "Follow this account to see their contents.",
+                    context.t.userPrivateFollowPrompt,
                     style: TextStyle(
                       color: context.textSecondary,
                       fontSize: 12,

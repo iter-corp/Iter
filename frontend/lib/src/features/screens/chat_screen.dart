@@ -20,6 +20,7 @@ import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:video_player/video_player.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_providers.dart';
@@ -359,8 +360,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (restrictMessaging && !isAdmin) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Messaging is restricted in this group')),
+            SnackBar(
+                content: Text(context.t.messagingRestrictedGroup)),
           );
         }
         return;
@@ -368,8 +369,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (adminOnly && !isAdmin) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Only admins can message in this group')),
+            SnackBar(
+                content: Text(context.t.onlyAdminsCanMessage)),
           );
         }
         return;
@@ -404,7 +405,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             TextSelection.collapsed(offset: _controller.text.length);
         setState(() => _replyTarget = reply);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send message: $e')),
+          SnackBar(content: Text(context.t.failedToSendMessage(e))),
         );
       }
     } finally {
@@ -431,8 +432,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Media sharing is disabled in this group')),
+              SnackBar(
+                  content: Text(context.t.mediaSharingDisabledGroup)),
             );
           }
           return false;
@@ -440,8 +441,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if ((restrictMessaging || adminOnly) && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('You cannot send media in this group')),
+              SnackBar(
+                  content: Text(context.t.cannotSendMediaGroup)),
             );
           }
           return false;
@@ -481,32 +482,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ListTile(
               leading:
                   const Icon(Icons.image_outlined, color: Color(0xFFB05ECC)),
-              title: const Text('Photo'),
+              title: Text(context.t.photo),
               onTap: () => Navigator.pop(sheet, _AttachChoice.image),
             ),
             ListTile(
               leading:
                   const Icon(Icons.videocam_outlined, color: Color(0xFFB05ECC)),
-              title: const Text('Video'),
+              title: Text(context.t.video),
               onTap: () => Navigator.pop(sheet, _AttachChoice.video),
             ),
             ListTile(
               leading: const Icon(Icons.insert_drive_file_outlined,
                   color: Color(0xFFB05ECC)),
-              title: const Text('File'),
-              subtitle: const Text(
-                'PDF, document, archive, …',
-                style: TextStyle(fontSize: 12),
+              title: Text(context.t.fileLabel),
+              subtitle: Text(
+                context.t.fileSubtitle,
+                style: const TextStyle(fontSize: 12),
               ),
               onTap: () => Navigator.pop(sheet, _AttachChoice.file),
             ),
             ListTile(
               leading: const Icon(Icons.location_on_outlined,
                   color: Color(0xFFB05ECC)),
-              title: const Text('Location'),
-              subtitle: const Text(
-                'Share your current location',
-                style: TextStyle(fontSize: 12),
+              title: Text(context.t.locationLabel),
+              subtitle: Text(
+                context.t.locationSubtitle,
+                style: const TextStyle(fontSize: 12),
               ),
               onTap: () => Navigator.pop(sheet, _AttachChoice.location),
             ),
@@ -541,10 +542,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       final enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) {
-        AppFeedback.showErrorOn(
-          messenger,
-          'Location services are off. Enable them in device settings.',
-        );
+        if (mounted) {
+          AppFeedback.showErrorOn(
+            messenger,
+            context.t.locationServicesOff,
+          );
+        }
         return;
       }
       var perm = await Geolocator.checkPermission();
@@ -553,7 +556,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
-        AppFeedback.showErrorOn(messenger, 'Location permission denied.');
+        if (mounted) {
+          AppFeedback.showErrorOn(messenger, context.t.locationPermDenied);
+        }
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
@@ -591,14 +596,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               replyToSenderUid: reply?.senderUid,
             );
         if (mounted) setState(() => _replyTarget = null);
-        AppFeedback.showSuccessOn(messenger, 'Location shared');
+        if (mounted) {
+          AppFeedback.showSuccessOn(messenger, context.t.locationShared);
+        }
       } catch (e) {
         // Reply context is intentionally preserved so the user can retry
         // the location share with the same quote.
-        AppFeedback.showErrorOn(messenger, 'Could not share location: $e');
+        if (mounted) {
+          AppFeedback.showErrorOn(
+              messenger, context.t.couldNotShareLocation(e));
+        }
       }
     } catch (e) {
-      AppFeedback.showErrorOn(messenger, 'Could not share location: $e');
+      if (mounted) {
+        AppFeedback.showErrorOn(
+            messenger, context.t.couldNotShareLocation(e));
+      }
     }
   }
 
@@ -686,8 +699,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (videoSize > _kMaxAttachmentBytes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Video is too large. Max size is 1 GB.')),
+          SnackBar(
+              content: Text(context.t.videoTooLarge)),
         );
       }
       return;
@@ -774,7 +787,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open file picker: $e')),
+          SnackBar(content: Text(context.t.couldNotOpenFilePicker(e))),
         );
       }
       return;
@@ -785,7 +798,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (path == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not read selected file')),
+          SnackBar(content: Text(context.t.couldNotReadFile)),
         );
       }
       return;
@@ -793,7 +806,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (picked.size > _kMaxAttachmentBytes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File is too large. Max size is 1 GB.')),
+          SnackBar(content: Text(context.t.fileTooLarge)),
         );
       }
       return;
@@ -899,8 +912,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Media sharing is disabled in this group')),
+              SnackBar(
+                  content: Text(context.t.mediaSharingDisabledGroup)),
             );
           }
           return;
@@ -909,9 +922,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if ((restrictMessaging || adminOnly) && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content:
-                      Text('You cannot send voice messages in this group')),
+              SnackBar(
+                  content: Text(context.t.cannotSendVoiceGroup)),
             );
           }
           return;
@@ -924,7 +936,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!await _recorder.hasPermission()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Microphone permission denied')),
+          SnackBar(content: Text(context.t.microphonePermissionDenied)),
         );
       }
       return;
@@ -1019,7 +1031,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (path == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to record voice message')),
+          SnackBar(content: Text(context.t.failedToRecordVoice)),
         );
       }
       return;
@@ -1031,7 +1043,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       debugPrint('[chat-voice] file does not exist: $path');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Recording file not found')),
+          SnackBar(content: Text(context.t.recordingFileNotFound)),
         );
       }
       return;
@@ -1042,7 +1054,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (fileSize == 0) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Voice recording is empty')),
+          SnackBar(content: Text(context.t.voiceRecordingEmpty)),
         );
       }
       try {
@@ -1063,8 +1075,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         debugPrint('[chat-voice] too short, aborting');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Voice message too short (min 300ms)')),
+            SnackBar(
+                content: Text(context.t.voiceMessageTooShort)),
           );
         }
         try {
@@ -1081,8 +1093,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         debugPrint('[chat-voice] upload returned EMPTY url');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Failed to upload voice message - empty URL')),
+            SnackBar(
+                content: Text(context.t.failedUploadVoiceEmpty)),
           );
         }
         return;
@@ -1108,7 +1120,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       debugPrint('[chat-voice] FAILED: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Voice upload failed: $e')),
+          SnackBar(content: Text(context.t.voiceUploadFailed(e))),
         );
       }
     } finally {
@@ -1172,16 +1184,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Translation',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    Text(
+                      sheetContext.t.translation,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Automatically translate the other person\'s messages '
-                      'into your preferred language. You can still tap any '
-                      'message to see the original.',
+                      sheetContext.t.translationAutoDescription,
                       style: TextStyle(
                           color:
                               Theme.of(sheetContext).textTheme.bodySmall?.color,
@@ -1190,7 +1200,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     const SizedBox(height: 16),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Auto-translate incoming messages'),
+                      title: Text(sheetContext.t.autoTranslateIncoming),
                       value: _autoTranslate,
                       onChanged: (v) {
                         setSheetState(() {});
@@ -1217,9 +1227,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         }
                         return DropdownButtonFormField<String>(
                           initialValue: _autoTranslateTarget,
-                          decoration: const InputDecoration(
-                            labelText: 'Translate into',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: context.t.translateInto,
+                            border: const OutlineInputBorder(),
                           ),
                           items: items,
                           onChanged: (v) {
@@ -1433,7 +1443,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       // Keep reply context so the user can retry without re-quoting.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send sticker: $e')),
+          SnackBar(content: Text(context.t.failedToSendSticker(e))),
         );
       }
     }
@@ -1463,8 +1473,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         widget.otherUid.isNotEmpty &&
         (ref.watch(isBlockedByProvider(widget.otherUid)).value ?? false);
     final blockBannerLabel = iBlockedThem
-        ? 'You\'ve blocked this user. Unblock from their profile to send messages.'
-        : (theyBlockedMe ? 'You can\'t reply to this conversation.' : null);
+        ? context.t.youveBlockedUser
+        : (theyBlockedMe ? context.t.cantReplyConversation : null);
 
     // Mark-seen-on-update. Used to be paired with an unconditional
     // _scrollToBottom() here, but that auto-scrolled even when nothing
@@ -1557,12 +1567,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                           Text(
                             isGroup
-                                ? '$participantCount members'
+                                ? context.t.membersCount(participantCount)
                                 : (isTyping
-                                    ? 'Typing...'
+                                    ? context.t.typing
                                     : isOnline
-                                        ? 'Online'
-                                        : 'Offline'),
+                                        ? context.t.online
+                                        : context.t.offline),
                             style: TextStyle(
                               color: isTyping
                                   ? Colors.purple
@@ -1581,8 +1591,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   IconButton(
                     tooltip: _autoTranslate
-                        ? 'Auto-translate ON ($_autoTranslateTarget)'
-                        : 'Translation settings',
+                        ? context.t.autoTranslateOnTooltip(_autoTranslateTarget)
+                        : context.t.translationSettingsTooltip,
                     onPressed: _openTranslationSettings,
                     icon: Icon(
                       _autoTranslate
@@ -1595,7 +1605,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   if (isGroup)
                     IconButton(
-                      tooltip: 'Group settings',
+                      tooltip: context.t.groupSettings,
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -1612,7 +1622,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                   IconButton(
-                    tooltip: 'Shared media',
+                    tooltip: context.t.sharedMedia,
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -1629,7 +1639,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   PopupMenuButton<String>(
-                    tooltip: 'Chat options',
+                    tooltip: context.t.chatOptions,
                     icon: Icon(Icons.more_vert, color: context.textSecondary),
                     onSelected: (value) {
                       switch (value) {
@@ -1645,26 +1655,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       }
                     },
                     itemBuilder: (_) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'auto-delete',
                         child: Row(
                           children: [
-                            Icon(Icons.timer_outlined, size: 18),
-                            SizedBox(width: 8),
-                            Text('Auto-delete messages'),
+                            const Icon(Icons.timer_outlined, size: 18),
+                            const SizedBox(width: 8),
+                            Text(context.t.autoDeleteMessages),
                           ],
                         ),
                       ),
                       if (!isGroup)
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline,
+                              const Icon(Icons.delete_outline,
                                   size: 18, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Delete chat',
-                                  style: TextStyle(color: Colors.red)),
+                              const SizedBox(width: 8),
+                              Text(context.t.deleteChat,
+                                  style: const TextStyle(color: Colors.red)),
                             ],
                           ),
                         ),
@@ -1680,7 +1690,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Expanded(
               child: messagesAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) =>
+                    Center(child: Text(context.t.errorWithMessage(e))),
                 data: (msgs) {
                   final ids = msgs.map((m) => m.id).toList(growable: false);
                   _messageOrder
@@ -1692,7 +1703,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   final currentUid = _currentUid ?? '';
                   if (msgs.isEmpty && _pending.isEmpty) {
                     return Center(
-                      child: Text('Say hello!',
+                      child: Text(context.t.sayHello,
                           style: TextStyle(color: context.textSecondary)),
                     );
                   }
@@ -1823,7 +1834,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     : Row(
                         children: [
                           IconButton(
-                            tooltip: 'Attach',
+                            tooltip: context.t.attach,
                             onPressed: _showAttachMenu,
                             icon: Icon(Icons.attach_file,
                                 color: context.textSecondary),
@@ -1895,12 +1906,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     textInputAction: TextInputAction.newline,
                                     textDirection: dir,
                                     textAlign: dir == ui.TextDirection.rtl
-                                        ? TextAlign.right
-                                        : TextAlign.left,
+                                        ? TextAlign.end
+                                        : TextAlign.start,
                                     textCapitalization:
                                         TextCapitalization.sentences,
                                     decoration: InputDecoration(
-                                      hintText: 'Write a message',
+                                      hintText: context.t.writeAMessage,
                                       hintStyle: TextStyle(
                                         color: context.textMuted,
                                         fontSize: 14,
@@ -2016,11 +2027,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// deleted by this setting — only its messages are pruned by a
   /// scheduled job on the backend.
   Future<void> _showAutoDeletePicker({required int? currentSeconds}) async {
-    const options = <_AutoDeleteOption>[
-      _AutoDeleteOption('Off', null),
-      _AutoDeleteOption('1 day', Duration(days: 1)),
-      _AutoDeleteOption('1 week', Duration(days: 7)),
-      _AutoDeleteOption('1 month', Duration(days: 30)),
+    final options = <_AutoDeleteOption>[
+      _AutoDeleteOption(context.t.autoDeleteOff, null),
+      _AutoDeleteOption(context.t.autoDeleteOneDay, const Duration(days: 1)),
+      _AutoDeleteOption(context.t.autoDeleteOneWeek, const Duration(days: 7)),
+      _AutoDeleteOption(context.t.autoDeleteOneMonth, const Duration(days: 30)),
     ];
     final picked = await showModalBottomSheet<_AutoDeleteOption>(
       context: context,
@@ -2036,9 +2047,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: Text(
-                  'Auto-delete messages',
+                  context.t.autoDeleteMessages,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -2050,10 +2061,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: Text(
-                  'Messages older than the chosen period are removed. '
-                  'The chat itself stays in your inbox.',
+                  context.t.autoDeletePeriodDescription,
                   style: TextStyle(
                     fontSize: 12,
                     color: context.textSecondary,
@@ -2092,15 +2102,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         SnackBar(
           content: Text(
             picked.duration == null
-                ? 'Auto-delete turned off'
-                : 'Auto-delete: messages older than ${picked.label}',
+                ? context.t.autoDeleteTurnedOff
+                : context.t.autoDeleteSet(picked.label),
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+          .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
     }
   }
 
@@ -2108,22 +2118,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete chat?'),
-        content: const Text(
-          'This permanently removes every message in this chat for both '
-          'people. Photos and voice notes already uploaded won\'t be '
-          'recoverable from the chat. This cannot be undone.',
-        ),
+        title: Text(context.t.deleteChatQuestion),
+        content: Text(context.t.deleteChatBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.t.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              context.t.delete,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -2137,7 +2143,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+          .showSnackBar(SnackBar(content: Text(context.t.deleteFailed(e))));
     }
   }
 }
@@ -2263,7 +2269,7 @@ class _RecordingBarState extends State<_RecordingBar> {
                 const Icon(Icons.fiber_manual_record,
                     color: Colors.red, size: 14),
                 const SizedBox(width: 8),
-                Text('Recording… ${_elapsed()}',
+                Text(context.t.recordingElapsed(_elapsed()),
                     style: TextStyle(color: context.textPrimary, fontSize: 13)),
               ],
             ),
@@ -2414,7 +2420,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     if (msg.encryptedUnreadable) {
       // Legacy ciphertext from an older client; no key to decrypt it
       // with anymore.
-      return Text('Message unavailable', style: originalStyle);
+      return Text(context.t.messageUnavailable, style: originalStyle);
     }
     if (!widget.autoTranslate || isMe || msg.text.trim().isEmpty) {
       return Text(msg.text, style: originalStyle);
@@ -2468,12 +2474,12 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
               },
               child: Text(
                 _translateError != null
-                    ? 'Translation failed — tap to retry'
+                    ? context.t.translationFailedRetry
                     : _translating
-                        ? 'Translating…'
+                        ? context.t.translating
                         : _showOriginal
-                            ? 'Show translation'
-                            : 'Show original',
+                            ? context.t.showTranslation
+                            : context.t.showOriginal,
                 style: TextStyle(
                   color: hintColor,
                   fontSize: 11,
@@ -2550,8 +2556,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
         isGroup ? ref.watch(userByUidProvider(msg.senderUid)).value : null;
     final senderAvatar =
         isGroup ? ((senderLive?['avatarUrl'] as String?) ?? '') : otherAvatar;
-    final senderName =
-        isGroup ? ((senderLive?['username'] as String?) ?? 'Member') : '';
+    final senderName = isGroup
+        ? ((senderLive?['username'] as String?) ?? context.t.member)
+        : '';
     final senderUidForTap = isGroup ? msg.senderUid : otherUid;
 
     final hasReply = msg.replyToId != null && msg.replyToId!.isNotEmpty;
@@ -2585,7 +2592,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             children: [
               if (isGroup && !isMe)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 2, left: 4),
+                  padding: const EdgeInsetsDirectional.only(bottom: 2, start: 4),
                   child: Text(
                     senderName,
                     style: TextStyle(
@@ -2681,7 +2688,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     msg.fileUrl!.isNotEmpty) ...[
                                   _FileMessageBubble(
                                     url: msg.fileUrl!,
-                                    fileName: msg.fileName ?? 'Attachment',
+                                    fileName:
+                                        msg.fileName ?? context.t.attachmentDefaultName,
                                     mimeType: msg.fileMimeType,
                                     sizeBytes: msg.fileSizeBytes,
                                     isMe: isMe,
@@ -2798,7 +2806,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
 
   Widget _replySwipeBg(BuildContext context, {required bool alignLeft}) {
     return Align(
-      alignment: alignLeft ? Alignment.centerLeft : Alignment.centerRight,
+      alignment: alignLeft
+          ? AlignmentDirectional.centerStart
+          : AlignmentDirectional.centerEnd,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Icon(Icons.reply, color: context.textSecondary, size: 20),
@@ -2871,7 +2881,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.reply),
-              title: const Text('Reply'),
+              title: Text(context.t.reply),
               onTap: () {
                 Navigator.pop(sheet);
                 onReply();
@@ -2886,9 +2896,10 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                   final target = sheetRef.watch(preferredLanguageProvider);
                   return ListTile(
                     leading: const Icon(Icons.translate),
-                    title: Text('Translate to ${target.toUpperCase()}'),
+                    title: Text(
+                        context.t.translateToLang(target.toUpperCase())),
                     subtitle: Text(
-                      'Change in Settings → Preferred language',
+                      context.t.translateChangeInSettings,
                       style: TextStyle(
                         fontSize: 11,
                         color: context.textSecondary,
@@ -2912,11 +2923,11 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             if (msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty) ...[
               ListTile(
                 leading: const Icon(Icons.subtitles_outlined),
-                title: const Text('Show transcript'),
+                title: Text(context.t.showTranscript),
                 subtitle: (msg.voiceTranscript ?? '').trim().isEmpty
-                    ? const Text(
-                        'Transcript unavailable for this message',
-                        style: TextStyle(fontSize: 11),
+                    ? Text(
+                        context.t.transcriptUnavailable,
+                        style: const TextStyle(fontSize: 11),
                       )
                     : null,
                 enabled: (msg.voiceTranscript ?? '').trim().isNotEmpty,
@@ -2934,7 +2945,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                     final target = sheetRef.watch(preferredLanguageProvider);
                     return ListTile(
                       leading: const Icon(Icons.translate),
-                      title: Text('Translate voice to ${target.toUpperCase()}'),
+                      title: Text(
+                          context.t.translateVoiceToLang(target.toUpperCase())),
                       onTap: () {
                         Navigator.pop(sheet);
                         _showTranslationSheet(
@@ -2950,9 +2962,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
+              title: Text(
+                context.t.delete,
+                style: const TextStyle(color: Colors.red),
               ),
               onTap: () {
                 Navigator.pop(sheet);
@@ -2982,7 +2994,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.person_outline),
-              title: const Text('Delete for me'),
+              title: Text(context.t.deleteForMe),
               onTap: () => Navigator.pop(sheet, _DeleteMessageScope.mine),
             ),
             if (isMe)
@@ -2990,8 +3002,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                 leading: const Icon(Icons.delete_forever, color: Colors.red),
                 title: Text(
                   widget.isGroup
-                      ? 'Delete for everyone'
-                      : 'Delete for both people',
+                      ? context.t.deleteForEveryone
+                      : context.t.deleteForBoth,
                   style: const TextStyle(color: Colors.red),
                 ),
                 onTap: () => Navigator.pop(
@@ -3011,24 +3023,24 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
         title: Text(
           scope == _DeleteMessageScope.everyone
               ? (widget.isGroup
-                  ? 'Delete for everyone?'
-                  : 'Delete for both people?')
-              : 'Delete for me?',
+                  ? context.t.deleteForEveryoneQuestion
+                  : context.t.deleteForBothQuestion)
+              : context.t.deleteForMeQuestion,
         ),
         content: Text(
           scope == _DeleteMessageScope.everyone
-              ? 'This message will be removed for everyone in this chat.'
-              : 'This message will only be removed from your chat history.',
+              ? context.t.deleteForEveryoneBody
+              : context.t.deleteForMeBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.t.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
-              'Delete',
+              context.t.delete,
               style: TextStyle(
                 color:
                     scope == _DeleteMessageScope.everyone ? Colors.red : null,
@@ -3060,15 +3072,15 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
         SnackBar(
           content: Text(
             scope == _DeleteMessageScope.everyone
-                ? 'Message deleted for everyone'
-                : 'Message deleted for you',
+                ? context.t.messageDeletedEveryone
+                : context.t.messageDeletedYou,
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e')),
+        SnackBar(content: Text(context.t.deleteFailed(e))),
       );
     }
   }
@@ -3101,13 +3113,13 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.subtitles_outlined, size: 18),
-                  SizedBox(width: 8),
+                  const Icon(Icons.subtitles_outlined, size: 18),
+                  const SizedBox(width: 8),
                   Text(
-                    'Voice transcript',
-                    style: TextStyle(
+                    context.t.voiceTranscript,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
@@ -3121,10 +3133,10 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
               ),
               const SizedBox(height: 12),
               Align(
-                alignment: Alignment.centerRight,
+                alignment: AlignmentDirectional.centerEnd,
                 child: TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
+                  child: Text(context.t.close),
                 ),
               ),
             ],
@@ -3201,7 +3213,7 @@ class _MessageTranslationSheetState extends State<_MessageTranslationSheet> {
                 const Icon(Icons.translate, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Translation (${widget.target.toUpperCase()})',
+                  context.t.translationWithLang(widget.target.toUpperCase()),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -3224,10 +3236,10 @@ class _MessageTranslationSheetState extends State<_MessageTranslationSheet> {
               ),
             const SizedBox(height: 12),
             Align(
-              alignment: Alignment.centerRight,
+              alignment: AlignmentDirectional.centerEnd,
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+                child: Text(context.t.close),
               ),
             ),
           ],
@@ -3261,7 +3273,7 @@ class _RepliedQuote extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final who = ref.watch(userByUidProvider(senderUid)).value;
-    final name = (who?['username'] as String?) ?? 'Someone';
+    final name = (who?['username'] as String?) ?? context.t.someone;
     final bg = isMe
         ? Colors.white.withValues(alpha: 0.18)
         : Colors.black.withValues(alpha: 0.05);
@@ -3588,9 +3600,9 @@ class _SharedPostPreview extends StatelessWidget {
         }
 
         if (!doc.exists) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text('Original post unavailable'),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(context.t.originalPostUnavailable),
           );
         }
 
@@ -3645,7 +3657,9 @@ class _SharedPostPreview extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        post.caption.isEmpty ? 'Shared post' : post.caption,
+                        post.caption.isEmpty
+                            ? context.t.sharedPost
+                            : post.caption,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -3698,7 +3712,7 @@ class _SharedEventLabel extends ConsumerWidget {
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                'Member of $title',
+                context.t.memberOfEvent(title),
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Color(0xFFB05ECC),
@@ -3807,7 +3821,7 @@ class _StoryReplyBanner extends StatelessWidget {
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              'Replied to story',
+              context.t.repliedToStory,
               style: TextStyle(
                 color: fg,
                 fontSize: 11,
@@ -3854,7 +3868,9 @@ class _LocationMessageBubble extends StatelessWidget {
             lat: lat,
             lng: lng,
             height: 130,
-            label: (label ?? '').trim().isEmpty ? 'Shared location' : label,
+            label: (label ?? '').trim().isEmpty
+                ? context.t.sharedLocation
+                : label,
           ),
         ),
         const SizedBox(height: 6),
@@ -3865,7 +3881,7 @@ class _LocationMessageBubble extends StatelessWidget {
             Flexible(
               child: Text(
                 (label ?? '').trim().isEmpty
-                    ? 'Shared location'
+                    ? context.t.sharedLocation
                     : label!.trim(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -3884,7 +3900,7 @@ class _LocationMessageBubble extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: () => openDirectionsTo(context, lat: lat, lng: lng),
             icon: Icon(Icons.directions_rounded, size: 16, color: fg),
-            label: Text('Directions', style: TextStyle(color: fg)),
+            label: Text(context.t.directions, style: TextStyle(color: fg)),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: fg.withValues(alpha: 0.5)),
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -4136,13 +4152,13 @@ class _FileMessageBubbleState extends State<_FileMessageBubble> {
       if (result.type != ResultType.done) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Open failed: ${result.message}')),
+          SnackBar(content: Text(context.t.openFailed(result.message))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Open failed: $e')),
+          SnackBar(content: Text(context.t.openFailed(e))),
         );
       }
     } finally {
@@ -4383,7 +4399,7 @@ class _AttachmentPreviewScreenState extends State<_AttachmentPreviewScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: Text('Send to ${widget.recipient}'),
+        title: Text(context.t.sendToRecipient(widget.recipient)),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(false),
@@ -4406,7 +4422,7 @@ class _AttachmentPreviewScreenState extends State<_AttachmentPreviewScreen> {
                         side: const BorderSide(color: Colors.white24),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text('Cancel'),
+                      child: Text(context.t.cancel),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -4414,7 +4430,7 @@ class _AttachmentPreviewScreenState extends State<_AttachmentPreviewScreen> {
                     child: FilledButton.icon(
                       onPressed: () => Navigator.of(context).pop(true),
                       icon: const Icon(Icons.send),
-                      label: const Text('Send'),
+                      label: Text(context.t.send),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
@@ -4445,14 +4461,14 @@ class _PendingAttachmentBubble extends StatelessWidget {
     required this.onDismiss,
   });
 
-  String _statusLabel() {
+  String _statusLabel(BuildContext context) {
     switch (pending.status) {
       case _PendingStatus.uploading:
-        return 'Uploading…';
+        return context.t.uploading;
       case _PendingStatus.sending:
-        return 'Sending…';
+        return context.t.sending;
       case _PendingStatus.failed:
-        return 'Failed to send';
+        return context.t.failedToSend;
     }
   }
 
@@ -4578,7 +4594,7 @@ class _PendingAttachmentBubble extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      _statusLabel(),
+                      _statusLabel(context),
                       style: TextStyle(
                         color: isFailed ? Colors.red : Colors.white70,
                         fontSize: 11,
@@ -4594,8 +4610,8 @@ class _PendingAttachmentBubble extends StatelessWidget {
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child:
-                            const Text('Retry', style: TextStyle(fontSize: 12)),
+                        child: Text(context.t.retryLabel,
+                            style: const TextStyle(fontSize: 12)),
                       ),
                       TextButton(
                         onPressed: onDismiss,
@@ -4606,8 +4622,8 @@ class _PendingAttachmentBubble extends StatelessWidget {
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text('Dismiss',
-                            style: TextStyle(fontSize: 12)),
+                        child: Text(context.t.dismiss,
+                            style: const TextStyle(fontSize: 12)),
                       ),
                     ],
                   ],

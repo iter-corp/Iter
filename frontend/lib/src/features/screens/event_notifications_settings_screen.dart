@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/notification_providers.dart';
@@ -75,10 +76,12 @@ class _EventNotificationsSettingsScreenState
     try {
       await ref.read(userServiceProvider).setEventNotifPrefs(uid, _prefs);
       if (mounted) {
-        AppFeedback.showSuccess(context, 'Event notification settings saved');
+        AppFeedback.showSuccess(context, context.t.eventNotifSaved);
       }
     } catch (e) {
-      if (mounted) AppFeedback.showError(context, 'Could not save: $e');
+      if (mounted) {
+        AppFeedback.showError(context, context.t.eventNotifCouldNotSave(e));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -93,7 +96,7 @@ class _EventNotificationsSettingsScreenState
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Event notifications'),
+        title: Text(context.t.eventNotifTitle),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -106,13 +109,13 @@ class _EventNotificationsSettingsScreenState
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(context.t.save),
           ),
         ],
       ),
       body: prefsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (loaded) {
           _hydrate(loaded);
           final enabled = _prefs.mode != EventNotifMode.off;
@@ -120,20 +123,19 @@ class _EventNotificationsSettingsScreenState
             padding: const EdgeInsets.all(16),
             children: [
               _switchTile(
-                title: 'New-event notifications',
-                subtitle:
-                    'Get a push when a new event matching your filters is published.',
+                title: context.t.eventNotifNewEventNotifications,
+                subtitle: context.t.eventNotifNewEventSubtitle,
                 value: enabled,
                 onChanged: (v) => setState(() => _prefs = _prefs.copyWith(
                     mode: v ? EventNotifMode.all : EventNotifMode.off)),
               ),
               if (enabled) ...[
                 const SizedBox(height: 16),
-                _sectionLabel('Event types'),
+                _sectionLabel(context.t.eventNotifEventTypes),
                 Text(
                   _allTypes
-                      ? 'You\'ll be notified about every type of event.'
-                      : 'Only the types you picked. Tap "All types" to reset.',
+                      ? context.t.eventNotifAllTypesDesc
+                      : context.t.eventNotifCustomTypesDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
                 const SizedBox(height: 8),
@@ -142,7 +144,7 @@ class _EventNotificationsSettingsScreenState
                   runSpacing: 8,
                   children: [
                     _buildChoiceChip(
-                      label: 'All types',
+                      label: context.t.eventNotifAllTypes,
                       selected: _allTypes,
                       onSelected: (_) => _selectAllTypes(),
                     ),
@@ -158,11 +160,11 @@ class _EventNotificationsSettingsScreenState
                   ],
                 ),
                 const SizedBox(height: 20),
-                _sectionLabel('Countries'),
+                _sectionLabel(context.t.eventNotifCountries),
                 Text(
                   _allCountries
-                      ? 'You\'ll be notified about events in any country.'
-                      : 'Only events in the countries you picked. Tap "All countries" to reset.',
+                      ? context.t.eventNotifAllCountriesDesc
+                      : context.t.eventNotifCustomCountriesDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
                 const SizedBox(height: 8),
@@ -171,7 +173,7 @@ class _EventNotificationsSettingsScreenState
                   runSpacing: 8,
                   children: [
                     _buildChoiceChip(
-                      label: 'All countries',
+                      label: context.t.eventNotifAllCountries,
                       selected: _allCountries,
                       onSelected: (_) => _selectAllCountries(),
                     ),

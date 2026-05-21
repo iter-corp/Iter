@@ -162,15 +162,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         const bubbleSize = 34.0;
                         final slotWidth =
                             constraints.maxWidth / _navIcons.length;
-                        final bubbleLeft = (_selectedIndex * slotWidth) +
+                        // Distance of the selected slot from the *start*
+                        // edge. AnimatedPositionedDirectional resolves
+                        // `start` to left in LTR and right in RTL, so the
+                        // white bubble tracks the (auto-mirrored) icon Row
+                        // correctly in both directions.
+                        final bubbleStart = (_selectedIndex * slotWidth) +
                             ((slotWidth - bubbleSize) / 2);
 
                         return Stack(
                           children: [
-                            AnimatedPositioned(
+                            AnimatedPositionedDirectional(
                               duration: const Duration(milliseconds: 320),
                               curve: Curves.easeOutCubic,
-                              left: bubbleLeft,
+                              start: bubbleStart,
                               top: 0,
                               width: bubbleSize,
                               height: bubbleSize,
@@ -230,8 +235,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                                                     ),
                                                   ),
                                             if (showMessageBadge)
-                                              Positioned(
-                                                right: -2,
+                                              PositionedDirectional(
+                                                end: -2,
                                                 top: -2,
                                                 child: Container(
                                                   width: 9,

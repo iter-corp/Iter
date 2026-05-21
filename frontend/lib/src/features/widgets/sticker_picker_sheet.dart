@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../../services/sticker_data.dart';
 import '../../services/sticker_service.dart';
@@ -105,7 +106,9 @@ class _StickerPickerSheetState extends ConsumerState<StickerPickerSheet>
                 isFav ? Icons.star : Icons.star_outline,
                 color: const Color(0xFFB05ECC),
               ),
-              title: Text(isFav ? 'Remove from favorites' : 'Add to favorites'),
+              title: Text(isFav
+                  ? context.t.removeFromFavorites
+                  : context.t.addToFavorites),
               onTap: () async {
                 await svc.toggleFavorite(stickerUrl);
                 await _loadLocalData();
@@ -162,7 +165,7 @@ class _StickerPickerSheetState extends ConsumerState<StickerPickerSheet>
                   size: 48, color: context.textMuted),
               const SizedBox(height: 12),
               Text(
-                'No stickers here yet',
+                context.t.noStickersHere,
                 style: TextStyle(color: context.textSecondary, fontSize: 14),
               ),
             ],
@@ -298,7 +301,7 @@ class _StickerPickerSheetState extends ConsumerState<StickerPickerSheet>
                     color: context.textPrimary,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Search stickers...',
+                    hintText: context.t.searchStickers,
                     hintStyle:
                         TextStyle(color: context.textMuted, fontSize: 13),
                     prefixIcon: Icon(Icons.search,

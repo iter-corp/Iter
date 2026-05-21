@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../services/storage_service.dart';
 import '../../services/story_service.dart';
 import '../../utils/app_feedback.dart';
@@ -29,11 +30,11 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
       await StoryService().createStory(imageUrl: url);
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-      AppFeedback.showSuccessOn(messenger, 'Story published — content uploaded');
+      AppFeedback.showSuccessOn(messenger, context.t.storyPublishedUploaded);
     } catch (e) {
       if (!mounted) return;
       setState(() => _uploading = false);
-      AppFeedback.showErrorOn(messenger, 'Failed to publish story: $e');
+      AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
     }
   }
 
@@ -116,13 +117,13 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                   child: Row(
                     children: [
                       _PillButton(
-                        label: 'Cancel',
+                        label: context.t.cancel,
                         filled: false,
                         onTap: _cancel,
                       ),
                       const Spacer(),
                       _PillButton(
-                        label: 'Publish',
+                        label: context.t.storyPublish,
                         icon: Icons.send_rounded,
                         filled: true,
                         onTap: _publish,

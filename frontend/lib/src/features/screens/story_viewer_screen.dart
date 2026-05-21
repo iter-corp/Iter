@@ -4,10 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
+import '../../providers/post_providers.dart';
 import '../../services/story_service.dart';
+import '../../theme/app_theme.dart';
+import '../model/post_model.dart';
+import 'post_detail_screen.dart';
 
 const Duration _kStoryDuration = Duration(seconds: 5);
 
@@ -158,7 +163,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     if (user == null) {
       if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please sign in to like stories')),
+          SnackBar(content: Text(context.t.storySignInToLike)),
         );
       }
       return;
@@ -180,7 +185,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       debugPrint('[story-like] toggleLike failed: $e');
       if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle like: $e')),
+          SnackBar(content: Text(context.t.storyFailedToggleLike(e))),
         );
       }
     } finally {
@@ -200,7 +205,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       _commentController.clear();
       _commentFocusNode.unfocus();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reply sent')),
+        SnackBar(content: Text(context.t.storyReplySent)),
       );
     }
   }
@@ -223,7 +228,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         'storyId=${story.id} text="${trimmed.length > 30 ? "${trimmed.substring(0, 30)}…" : trimmed}"');
     if (me == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to reply to stories')),
+        SnackBar(content: Text(context.t.storySignInToReply)),
       );
       return false;
     }
@@ -254,7 +259,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       debugPrint('[story-reply] FAILED: $e\n$st');
       if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send reply: $e')),
+        SnackBar(content: Text(context.t.storyFailedSendReply(e))),
       );
       return false;
     }
@@ -373,16 +378,16 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete story?'),
-        content: const Text('This will remove the story for everyone.'),
+        title: Text(context.t.storyDeleteTitle),
+        content: Text(context.t.storyDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.t.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(context.t.delete),
           ),
         ],
       ),
@@ -425,18 +430,10 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e')),
+        SnackBar(content: Text(context.t.storyDeleteFailed(e))),
       );
       _progress.forward();
     }
-  }
-
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
   }
 
   @override
@@ -501,16 +498,21 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: CachedNetworkImage(
-                    imageUrl: story.imageUrl,
-                    fit: BoxFit.contain,
-                    placeholder: (_, __) => const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-                    errorWidget: (_, __, ___) => const Center(
-                      child: Icon(Icons.broken_image, color: Colors.white),
-                    ),
-                  ),
+                  child: story.sharedPostId != null &&
+                          story.sharedPostId!.isNotEmpty
+                      ? _SharedPostStoryView(postId: story.sharedPostId!)
+                      : CachedNetworkImage(
+                          imageUrl: story.imageUrl,
+                          fit: BoxFit.contain,
+                          placeholder: (_, __) => const Center(
+                            child: CircularProgressIndicator(
+                                color: Colors.white),
+                          ),
+                          errorWidget: (_, __, ___) => const Center(
+                            child:
+                                Icon(Icons.broken_image, color: Colors.white),
+                          ),
+                        ),
                 ),
                 Positioned(
                   top: 8,
@@ -533,7 +535,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                                   animation: _progress,
                                   builder: (context, _) =>
                                       FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
+                                    alignment: AlignmentDirectional.centerStart,
                                     widthFactor: _progress.value,
                                     child: Container(color: Colors.white),
                                   ),
@@ -585,7 +587,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _timeAgo(story.createdAt),
+                              context.t.timeAgo(story.createdAt),
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.8),
                                 fontSize: 12,
@@ -704,7 +706,9 @@ class _ViewsPill extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '$count ${count == 1 ? 'view' : 'views'}',
+                  count == 1
+                      ? context.t.storyViewCount(count)
+                      : context.t.storyViewsCount(count),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -766,7 +770,9 @@ class _LikesPill extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '$count ${count == 1 ? 'like' : 'likes'}',
+                  count == 1
+                      ? context.t.storyLikeCount(count)
+                      : context.t.storyLikesCount(count),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -786,15 +792,6 @@ class _LikersSheet extends ConsumerWidget {
   final String storyId;
   final StoryService service;
   const _LikersSheet({required this.storyId, required this.service});
-
-  String _ago(DateTime? dt) {
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -836,7 +833,9 @@ class _LikersSheet extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '$count ${count == 1 ? 'like' : 'likes'}',
+                          count == 1
+                              ? context.t.storyLikeCount(count)
+                              : context.t.storyLikesCount(count),
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
@@ -859,12 +858,12 @@ class _LikersSheet extends ConsumerWidget {
                     }
                     final likers = snapshot.data ?? const [];
                     if (likers.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
                           child: Text(
-                            'No likes yet',
-                            style: TextStyle(color: Colors.grey),
+                            context.t.storyNoLikesYet,
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ),
                       );
@@ -905,7 +904,7 @@ class _LikersSheet extends ConsumerWidget {
                                 const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           trailing: Text(
-                            _ago(v.viewedAt),
+                            context.t.timeAgo(v.viewedAt),
                             style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 12,
@@ -929,15 +928,6 @@ class _ViewersSheet extends ConsumerWidget {
   final String storyId;
   final StoryService service;
   const _ViewersSheet({required this.storyId, required this.service});
-
-  String _ago(DateTime? dt) {
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -979,7 +969,9 @@ class _ViewersSheet extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '$count ${count == 1 ? 'view' : 'views'}',
+                          count == 1
+                              ? context.t.storyViewCount(count)
+                              : context.t.storyViewsCount(count),
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
@@ -1002,12 +994,12 @@ class _ViewersSheet extends ConsumerWidget {
                     }
                     final viewers = snapshot.data ?? const [];
                     if (viewers.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
                           child: Text(
-                            'No views yet',
-                            style: TextStyle(color: Colors.grey),
+                            context.t.storyNoViewsYet,
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ),
                       );
@@ -1045,7 +1037,7 @@ class _ViewersSheet extends ConsumerWidget {
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           trailing: Text(
-                            _ago(v.viewedAt),
+                            context.t.timeAgo(v.viewedAt),
                             style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 12,
@@ -1150,7 +1142,7 @@ class _StoryReplyComposer extends StatelessWidget {
               onSubmitted: (_) => onSend(),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: 'Reply privately…',
+                hintText: context.t.storyReplyPrivatelyHint,
                 hintStyle: TextStyle(
                   color: Colors.white.withValues(alpha: 0.65),
                   fontSize: 14,
@@ -1206,11 +1198,190 @@ class _StorySignInBanner extends StatelessWidget {
           side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
         ),
       ),
-      child: const Center(
+      child: Center(
         child: Text(
-          'Sign in to reply to stories',
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+          context.t.storySignInBanner,
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
+      ),
+    );
+  }
+}
+
+/// Renders a "shared post" story: the original feed/travel post shown
+/// as a card centered on a brand-gradient background. Tapping the card
+/// opens the full post in [PostDetailScreen].
+class _SharedPostStoryView extends ConsumerStatefulWidget {
+  final String postId;
+
+  const _SharedPostStoryView({required this.postId});
+
+  @override
+  ConsumerState<_SharedPostStoryView> createState() =>
+      _SharedPostStoryViewState();
+}
+
+class _SharedPostStoryViewState extends ConsumerState<_SharedPostStoryView> {
+  late Future<Post?> _postFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _postFuture = ref.read(postServiceProvider).getPostById(widget.postId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF7E3BE8), Color(0xFFB05ECC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: FutureBuilder<Post?>(
+        future: _postFuture,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            );
+          }
+          final post = snap.data;
+          if (post == null) {
+            return Center(
+              child: Text(
+                context.t.postNotFound,
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
+          }
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PostDetailScreen(postId: post.id),
+                  ),
+                ),
+                child: _SharedPostCard(post: post),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The post rendered as a compact card for the story background.
+class _SharedPostCard extends StatelessWidget {
+  final Post post;
+
+  const _SharedPostCard({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = post.imageUrls.isNotEmpty;
+    final caption = post.caption.trim();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Author row.
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: context.purpleSoft,
+                  backgroundImage: (post.authorAvatar != null &&
+                          post.authorAvatar!.isNotEmpty)
+                      ? CachedNetworkImageProvider(post.authorAvatar!)
+                      : null,
+                  child: (post.authorAvatar == null ||
+                          post.authorAvatar!.isEmpty)
+                      ? Icon(Icons.person,
+                          size: 16, color: context.textSecondary)
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    post.authorUsername,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasImage)
+            AspectRatio(
+              aspectRatio: 1,
+              child: CachedNetworkImage(
+                imageUrl: post.imageUrls.first,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: context.surfaceSoft),
+                errorWidget: (_, __, ___) =>
+                    Container(color: context.surfaceSoft),
+              ),
+            ),
+          if (caption.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                caption,
+                maxLines: hasImage ? 3 : 8,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.35,
+                  color: context.textPrimary,
+                ),
+              ),
+            ),
+          // Tap hint.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Row(
+              children: [
+                const Icon(Icons.touch_app_outlined,
+                    size: 14, color: Color(0xFF7E3BE8)),
+                const SizedBox(width: 4),
+                Text(
+                  context.t.storyTapToViewPost,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF7E3BE8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

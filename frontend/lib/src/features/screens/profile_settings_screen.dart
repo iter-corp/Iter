@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/contact_request_providers.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../providers/profile_visitor_providers.dart';
 import '../../providers/theme_provider.dart';
@@ -37,32 +39,34 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
     final preferredLang = ref.watch(preferredLanguageProvider);
+    final uiLanguage = ref.watch(localeProvider);
     final visitorCount =
         ref.watch(myProfileVisitorCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
       backgroundColor: context.cardBg,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(context.t.settings),
         centerTitle: false,
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          const _SectionHeader(title: 'Account'),
+          _SectionHeader(title: context.t.account),
           ListTile(
             leading: const Icon(Icons.email_outlined, color: AppColors.purple),
-            title: const Text('Change email'),
+            title: Text(context.t.changeEmail),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _changeEmail(context),
           ),
           ListTile(
             leading: const Icon(Icons.lock_reset, color: AppColors.purple),
-            title: Text(
-                _isEmailPasswordUser() ? 'Change password' : 'Set a password'),
+            title: Text(_isEmailPasswordUser()
+                ? context.t.changePassword
+                : context.t.setPassword),
             subtitle: _isEmailPasswordUser()
                 ? null
-                : Text('Add a password so you can also sign in with email',
+                : Text(context.t.settingsSetPasswordSubtitle,
                     style:
                         TextStyle(fontSize: 12, color: context.textSecondary)),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
@@ -73,11 +77,11 @@ class ProfileSettingsScreen extends ConsumerWidget {
               isPrivate ? Icons.lock_outline : Icons.lock_open,
               color: AppColors.purple,
             ),
-            title: const Text('Private account'),
+            title: Text(context.t.privateAccount),
             subtitle: Text(
               isPrivate
-                  ? 'Only followers can see your posts'
-                  : 'Anyone can see your posts',
+                  ? context.t.profileOnlyFollowersCanSee
+                  : context.t.profileAnyoneCanSee,
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Switch.adaptive(
@@ -95,11 +99,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
           ListTile(
             leading:
                 const Icon(Icons.visibility_outlined, color: AppColors.purple),
-            title: const Text('Profile visitors'),
+            title: Text(context.t.profileVisitors),
             subtitle: Text(
               visitorCount == 0
-                  ? 'See who has opened your profile'
-                  : '$visitorCount ${visitorCount == 1 ? 'person has' : 'people have'} viewed your profile',
+                  ? context.t.settingsVisitorsSeeWho
+                  : (visitorCount == 1
+                      ? context.t.settingsVisitorsViewedOne
+                      : context.t.settingsVisitorsViewedMany(visitorCount)),
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Row(
@@ -107,7 +113,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
               children: [
                 if (visitorCount > 0)
                   Container(
-                    margin: const EdgeInsets.only(right: 6),
+                    margin: const EdgeInsetsDirectional.only(end: 6),
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -132,13 +138,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
-          const _SectionHeader(title: 'Notifications'),
+          _SectionHeader(title: context.t.settingsSectionNotifications),
           ListTile(
             leading: const Icon(Icons.event_available_outlined,
                 color: AppColors.purple),
-            title: const Text('Event notifications'),
+            title: Text(context.t.eventNotifTitle),
             subtitle: Text(
-              'Get notified about new events — all, by city, or off',
+              context.t.settingsEventNotifSubtitle,
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
@@ -148,12 +154,29 @@ class ProfileSettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
-          const _SectionHeader(title: 'Language'),
+          _SectionHeader(title: context.t.languageLabel),
+          ListTile(
+            leading: const Icon(Icons.language, color: AppColors.purple),
+            title: Text(context.t.appLanguage),
+            subtitle: Text(
+              context.t.settingsAppLanguageSubtitle,
+              style: TextStyle(fontSize: 12, color: context.textSecondary),
+            ),
+            trailing: Text(
+              uiLanguage.nativeName,
+              textDirection: uiLanguage.direction,
+              style: const TextStyle(
+                color: AppColors.purple,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onTap: () => context.push('/language'),
+          ),
           ListTile(
             leading: const Icon(Icons.translate, color: AppColors.purple),
-            title: const Text('Preferred language'),
+            title: Text(context.t.translationLanguage),
             subtitle: Text(
-              'Used when translating posts, messages, and voice notes',
+              context.t.settingsTranslationLanguageSubtitle,
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Text(
@@ -165,13 +188,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
             onTap: () => _pickLanguage(context, ref, current: preferredLang),
           ),
-          const _SectionHeader(title: 'Appearance'),
+          _SectionHeader(title: context.t.appearance),
           ListTile(
             leading: Icon(
               isDark ? Icons.dark_mode : Icons.light_mode,
               color: isDark ? Colors.amber : Colors.grey,
             ),
-            title: const Text('Dark mode'),
+            title: Text(context.t.darkMode),
             trailing: Switch.adaptive(
               value: isDark,
               activeTrackColor: AppColors.purple,
@@ -179,12 +202,12 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
           ),
-          const _SectionHeader(title: 'Invite'),
+          _SectionHeader(title: context.t.settingsSectionInvite),
           ListTile(
             leading: const Icon(Icons.ios_share, color: AppColors.purple),
-            title: const Text('Invite friends'),
+            title: Text(context.t.settingsInviteFriends),
             subtitle: Text(
-              'Share the Iter app link with your friends',
+              context.t.settingsInviteFriendsSubtitle,
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
@@ -194,13 +217,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
               shareInviteLink(context, cfg);
             },
           ),
-          const _SectionHeader(title: 'Support'),
+          _SectionHeader(title: context.t.settingsSectionSupport),
           ListTile(
             leading:
                 const Icon(Icons.support_agent_outlined, color: AppColors.purple),
-            title: const Text('Contact us'),
+            title: Text(context.t.contactUs),
             subtitle: Text(
-              'Send the Iter team a message or apply to publish events',
+              context.t.settingsContactUsSubtitle,
               style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             trailing: Row(
@@ -210,7 +233,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   Container(
                     width: 9,
                     height: 9,
-                    margin: const EdgeInsets.only(right: 8),
+                    margin: const EdgeInsetsDirectional.only(end: 8),
                     decoration: BoxDecoration(
                       color: AppColors.purple,
                       shape: BoxShape.circle,
@@ -224,10 +247,10 @@ class ProfileSettingsScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const ContactUsScreen()),
             ),
           ),
-          const _SectionHeader(title: 'Safety'),
+          _SectionHeader(title: context.t.safety),
           ListTile(
             leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
-            title: const Text('Blocked users'),
+            title: Text(context.t.blockedUsers),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _showBlockedUsers(context),
           ),
@@ -236,16 +259,16 @@ class ProfileSettingsScreen extends ConsumerWidget {
           // "Admin panel" entry below; this tile is for the limited
           // org_admin role granted via Contact us.
           if (isOrgAdmin && !isAdmin) ...[
-            const _SectionHeader(title: 'Organization'),
+            _SectionHeader(title: context.t.settingsSectionOrganization),
             ListTile(
               leading: const Icon(Icons.event_outlined,
                   color: AppColors.purple),
-              title: const Text('Manage events',
-                  style: TextStyle(
+              title: Text(context.t.manageEvents,
+                  style: const TextStyle(
                       color: AppColors.purple,
                       fontWeight: FontWeight.w600)),
               subtitle: Text(
-                'Create and edit events on behalf of your organization',
+                context.t.settingsManageEventsSubtitle,
                 style: TextStyle(fontSize: 12, color: context.textSecondary),
               ),
               trailing:
@@ -256,13 +279,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
           ],
           if (isAdmin) ...[
-            const _SectionHeader(title: 'Admin'),
+            _SectionHeader(title: context.t.admin),
             ListTile(
               leading:
                   const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
-              title: const Text(
-                'Admin panel',
-                style: TextStyle(
+              title: Text(
+                context.t.profileAdminPanel,
+                style: const TextStyle(
                   color: Color(0xFF7E3BE8),
                   fontWeight: FontWeight.w600,
                 ),
@@ -274,7 +297,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     Container(
                       width: 9,
                       height: 9,
-                      margin: const EdgeInsets.only(right: 8),
+                      margin: const EdgeInsetsDirectional.only(end: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE04E5C),
                         shape: BoxShape.circle,
@@ -287,10 +310,11 @@ class ProfileSettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/admin'),
             ),
           ],
-          const _SectionHeader(title: 'Danger zone'),
+          _SectionHeader(title: context.t.dangerZone),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Log out', style: TextStyle(color: Colors.red)),
+            title:
+                Text(context.t.logout, style: const TextStyle(color: Colors.red)),
             onTap: () async {
               await ref.read(authServiceProvider).signOut();
               ref.invalidate(adminConfigProvider);
@@ -304,12 +328,12 @@ class ProfileSettingsScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
-            title: const Text(
-              'Delete account',
-              style: TextStyle(color: Colors.redAccent),
+            title: Text(
+              context.t.deleteAccount,
+              style: const TextStyle(color: Colors.redAccent),
             ),
-            subtitle: const Text(
-              'Permanently remove your account and all your data.',
+            subtitle: Text(
+              context.t.profileDeleteAccountSubtitle,
             ),
             onTap: () => _confirmDeleteAccount(context, ref),
           ),
@@ -330,15 +354,14 @@ class ProfileSettingsScreen extends ConsumerWidget {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Cannot change email'),
-          content: const Text(
-            'Your email address is your Google account email. '
-            'It can only be changed from your Google account settings at myaccount.google.com.',
+          title: Text(ctx.t.settingsCannotChangeEmailTitle),
+          content: Text(
+            ctx.t.settingsCannotChangeEmailBody,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
+              child: Text(ctx.t.ok),
             ),
           ],
         ),
@@ -352,9 +375,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
     );
     if (verificationSent == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Verification email sent. Check your inbox to confirm the new address.',
+            context.t.settingsVerificationEmailSent,
           ),
         ),
       );
@@ -392,13 +415,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
           surfaceTintColor: Colors.transparent,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('Set a password'),
+          title: Text(ctx.t.setPassword),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Add a password to your account so you can also sign in with your email.',
+                ctx.t.settingsSetPasswordDialogBody,
                 style: TextStyle(fontSize: 13, color: context.textSecondary),
               ),
               const SizedBox(height: 16),
@@ -407,7 +430,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 obscureText: obscureNew,
                 decoration: _settingsInputDecoration(
                   context,
-                  label: 'New password',
+                  label: ctx.t.settingsNewPassword,
                   suffixIcon: IconButton(
                     icon: Icon(
                         obscureNew ? Icons.visibility_off : Icons.visibility),
@@ -421,7 +444,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 obscureText: obscureConfirm,
                 decoration: _settingsInputDecoration(
                   context,
-                  label: 'Confirm password',
+                  label: ctx.t.settingsConfirmPassword,
                   suffixIcon: IconButton(
                     icon: Icon(obscureConfirm
                         ? Icons.visibility_off
@@ -441,7 +464,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: loading ? null : () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(ctx.t.cancel),
             ),
             TextButton(
               onPressed: loading
@@ -450,16 +473,18 @@ class ProfileSettingsScreen extends ConsumerWidget {
                       final newPass = newPassCtrl.text;
                       final confirm = confirmPassCtrl.text;
                       if (newPass.isEmpty || confirm.isEmpty) {
-                        setState(() => error = 'All fields are required.');
+                        setState(() =>
+                            error = ctx.t.settingsAllFieldsRequired);
                         return;
                       }
                       if (newPass.length < 6) {
                         setState(() =>
-                            error = 'Password must be at least 6 characters.');
+                            error = ctx.t.settingsPasswordMin6);
                         return;
                       }
                       if (newPass != confirm) {
-                        setState(() => error = 'Passwords do not match.');
+                        setState(() =>
+                            error = ctx.t.settingsPasswordsDoNotMatch);
                         return;
                       }
                       setState(() {
@@ -476,9 +501,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(
-                                  'Password set. You can now sign in with your email and this password.'),
+                                  context.t.settingsPasswordSetSuccess),
                             ),
                           );
                         }
@@ -486,16 +511,17 @@ class ProfileSettingsScreen extends ConsumerWidget {
                         setState(() {
                           loading = false;
                           error = switch (e.code) {
-                            'weak-password' => 'Password is too weak.',
+                            'weak-password' => ctx.t.settingsPasswordTooWeak,
                             'provider-already-linked' =>
-                              'A password is already linked to this account.',
-                            _ => e.message ?? 'Something went wrong.',
+                              ctx.t.settingsPasswordAlreadyLinked,
+                            _ => e.message ??
+                                ctx.t.settingsSomethingWentWrong,
                           };
                         });
                       } catch (_) {
                         setState(() {
                           loading = false;
-                          error = 'Something went wrong. Please try again.';
+                          error = ctx.t.settingsSomethingWentWrongRetry;
                         });
                       }
                     },
@@ -504,8 +530,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Set password',
-                      style: TextStyle(color: AppColors.purple)),
+                  : Text(ctx.t.settingsSetPasswordButton,
+                      style: const TextStyle(color: AppColors.purple)),
             ),
           ],
         ),
@@ -524,7 +550,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
     );
     if (passwordUpdated == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password updated successfully.')),
+        SnackBar(content: Text(context.t.settingsPasswordUpdated)),
       );
     }
   }
@@ -575,9 +601,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(
-                      'Preferred language',
+                      sheet.t.settingsPreferredLanguage,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -639,21 +665,20 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete your account?'),
-        content: const Text(
-          'This permanently deletes your profile, posts, comments, stories, '
-          'followers, and notifications. This cannot be undone.',
+        title: Text(context.t.profileDeleteAccountTitle),
+        content: Text(
+          context.t.profileDeleteAccountBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.t.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete everything',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              context.t.profileDeleteEverything,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -662,7 +687,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Deleting your account...')),
+      SnackBar(content: Text(context.t.profileDeletingAccount)),
     );
 
     final authUser = FirebaseAuth.instance.currentUser;
@@ -676,9 +701,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
       if (e.code == 'requires-recent-login') {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'For security, please log out and log back in, then try again.',
+                context.t.settingsSecurityRelogin,
               ),
             ),
           );
@@ -687,14 +712,16 @@ class ProfileSettingsScreen extends ConsumerWidget {
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: ${e.message ?? e.code}')),
+          SnackBar(
+              content:
+                  Text(context.t.settingsDeleteFailed(e.message ?? e.code))),
         );
       }
       return;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
+          SnackBar(content: Text(context.t.settingsDeleteFailed(e))),
         );
       }
       return;
@@ -779,19 +806,19 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
     final newEmail = _emailCtrl.text.trim();
     final password = _passCtrl.text;
     if (newEmail.isEmpty || password.isEmpty) {
-      setState(() => _error = 'All fields are required.');
+      setState(() => _error = context.t.settingsAllFieldsRequired);
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.email == null) {
-      setState(() => _error = 'No signed-in email account found.');
+      setState(() => _error = context.t.settingsNoEmailAccount);
       return;
     }
 
     if (newEmail.toLowerCase() == user.email!.toLowerCase()) {
       setState(
-        () => _error = 'Please enter an email different from your current one.',
+        () => _error = context.t.settingsEmailMustDiffer,
       );
       return;
     }
@@ -828,25 +855,23 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
       setState(() {
         _loading = false;
         _error = switch (e.code) {
-          'wrong-password' || 'invalid-credential' => 'Incorrect password.',
-          'requires-recent-login' =>
-            'For security, please sign in again and retry.',
-          'email-already-in-use' => 'That email is already in use.',
-          'invalid-email' => 'That email address looks invalid.',
-          'too-many-requests' =>
-            'Too many attempts. Please wait and try again.',
-          'network-request-failed' =>
-            'Network error. Check your connection and try again.',
-          'operation-not-allowed' =>
-            'Email change is not enabled in Authentication settings.',
-          _ => e.message ?? 'Something went wrong.',
+          'wrong-password' ||
+          'invalid-credential' =>
+            context.t.settingsIncorrectPassword,
+          'requires-recent-login' => context.t.settingsSecurityReloginShort,
+          'email-already-in-use' => context.t.settingsEmailAlreadyInUse,
+          'invalid-email' => context.t.settingsEmailInvalid,
+          'too-many-requests' => context.t.settingsTooManyRequests,
+          'network-request-failed' => context.t.settingsNetworkError,
+          'operation-not-allowed' => context.t.settingsEmailChangeNotEnabled,
+          _ => e.message ?? context.t.settingsSomethingWentWrong,
         };
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Something went wrong. Please try again.';
+        _error = context.t.settingsSomethingWentWrongRetry;
       });
     }
   }
@@ -857,14 +882,15 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
       backgroundColor: context.cardBg,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: const Text('Change email'),
+      title: Text(context.t.changeEmail),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: _settingsInputDecoration(context, label: 'New email'),
+            decoration: _settingsInputDecoration(context,
+                label: context.t.settingsNewEmail),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -872,7 +898,7 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
             obscureText: _obscure,
             decoration: _settingsInputDecoration(
               context,
-              label: 'Current password',
+              label: context.t.settingsCurrentPassword,
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscure = !_obscure),
@@ -891,7 +917,7 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.t.cancel),
         ),
         TextButton(
           onPressed: _loading ? null : _save,
@@ -901,7 +927,8 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Save', style: TextStyle(color: AppColors.purple)),
+              : Text(context.t.save,
+                  style: const TextStyle(color: AppColors.purple)),
         ),
       ],
     );
@@ -942,21 +969,21 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final newPass = _newPassCtrl.text;
     final confirm = _confirmPassCtrl.text;
     if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
-      setState(() => _error = 'All fields are required.');
+      setState(() => _error = context.t.settingsAllFieldsRequired);
       return;
     }
     if (newPass.length < 6) {
-      setState(() => _error = 'Password must be at least 6 characters.');
+      setState(() => _error = context.t.settingsPasswordMin6);
       return;
     }
     if (newPass != confirm) {
-      setState(() => _error = 'Passwords do not match.');
+      setState(() => _error = context.t.settingsPasswordsDoNotMatch);
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.email == null) {
-      setState(() => _error = 'No signed-in email account found.');
+      setState(() => _error = context.t.settingsNoEmailAccount);
       return;
     }
 
@@ -984,22 +1011,19 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         _error = switch (e.code) {
           'wrong-password' ||
           'invalid-credential' =>
-            'Incorrect current password.',
-          'requires-recent-login' =>
-            'For security, please sign in again and retry.',
-          'weak-password' => 'New password is too weak.',
-          'too-many-requests' =>
-            'Too many attempts. Please wait and try again.',
-          'network-request-failed' =>
-            'Network error. Check your connection and try again.',
-          _ => e.message ?? 'Something went wrong.',
+            context.t.settingsIncorrectCurrentPassword,
+          'requires-recent-login' => context.t.settingsSecurityReloginShort,
+          'weak-password' => context.t.settingsNewPasswordTooWeak,
+          'too-many-requests' => context.t.settingsTooManyRequests,
+          'network-request-failed' => context.t.settingsNetworkError,
+          _ => e.message ?? context.t.settingsSomethingWentWrong,
         };
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Something went wrong. Please try again.';
+        _error = context.t.settingsSomethingWentWrongRetry;
       });
     }
   }
@@ -1009,7 +1033,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     if (userEmail == null || userEmail.isEmpty) {
       setState(() {
         _noticeIsError = true;
-        _notice = 'No signed-in email account found.';
+        _notice = context.t.settingsNoEmailAccount;
       });
       return;
     }
@@ -1026,7 +1050,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       setState(() {
         _sendingReset = false;
         _noticeIsError = false;
-        _notice = 'Password reset email sent to $userEmail';
+        _notice = context.t.settingsResetEmailSent(userEmail);
       });
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -1034,12 +1058,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         _sendingReset = false;
         _noticeIsError = true;
         _notice = switch (e.code) {
-          'too-many-requests' =>
-            'Too many attempts. Please wait and try again.',
-          'network-request-failed' =>
-            'Network error. Check your connection and try again.',
-          'invalid-email' => 'Your email address looks invalid.',
-          _ => e.message ?? 'Could not send reset email. Please try again.',
+          'too-many-requests' => context.t.settingsTooManyRequests,
+          'network-request-failed' => context.t.settingsNetworkError,
+          'invalid-email' => context.t.settingsEmailInvalidYours,
+          _ => e.message ?? context.t.settingsCouldNotSendReset,
         };
       });
     } catch (_) {
@@ -1047,7 +1069,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       setState(() {
         _sendingReset = false;
         _noticeIsError = true;
-        _notice = 'Could not send reset email. Please try again.';
+        _notice = context.t.settingsCouldNotSendReset;
       });
     }
   }
@@ -1058,7 +1080,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       backgroundColor: context.cardBg,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: const Text('Change password'),
+      title: Text(context.t.changePassword),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1067,7 +1089,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             obscureText: _obscureCurrent,
             decoration: _settingsInputDecoration(
               context,
-              label: 'Current password',
+              label: context.t.settingsCurrentPassword,
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureCurrent ? Icons.visibility_off : Icons.visibility,
@@ -1083,7 +1105,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             obscureText: _obscureNew,
             decoration: _settingsInputDecoration(
               context,
-              label: 'New password',
+              label: context.t.settingsNewPassword,
               suffixIcon: IconButton(
                 icon:
                     Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
@@ -1097,7 +1119,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             obscureText: _obscureConfirm,
             decoration: _settingsInputDecoration(
               context,
-              label: 'Confirm new password',
+              label: context.t.settingsConfirmNewPassword,
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureConfirm ? Icons.visibility_off : Icons.visibility,
@@ -1108,7 +1130,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             ),
           ),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerEnd,
             child: TextButton(
               onPressed: (_loading || _sendingReset) ? null : _sendResetEmail,
               child: _sendingReset
@@ -1117,7 +1139,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Forgot password?'),
+                  : Text(context.t.forgotPassword),
             ),
           ),
           if (_error != null) ...[
@@ -1144,7 +1166,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           onPressed: (_loading || _sendingReset)
               ? null
               : () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.t.cancel),
         ),
         TextButton(
           onPressed: (_loading || _sendingReset) ? null : _save,
@@ -1154,7 +1176,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Save', style: TextStyle(color: AppColors.purple)),
+              : Text(context.t.save,
+                  style: const TextStyle(color: AppColors.purple)),
         ),
       ],
     );
@@ -1183,7 +1206,7 @@ class _BlockedUsersSheet extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Blocked Users',
+                context.t.settingsBlockedUsersTitle,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -1211,7 +1234,7 @@ class _BlockedUsersList extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          'Open a user profile to block or unblock from there.',
+          context.t.settingsBlockedUsersHint,
           textAlign: TextAlign.center,
           style: TextStyle(color: context.textSecondary),
         ),

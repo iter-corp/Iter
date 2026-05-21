@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../model/post_model.dart';
 import '../../../services/admin_service.dart';
@@ -27,7 +28,7 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: context.surfaceSoft,
         appBar: AppBar(
-          title: const Text('Discuss reports'),
+          title: Text(context.t.adminDiscussReports),
           backgroundColor: context.cardBg,
           foregroundColor: context.textPrimary,
           elevation: 0,
@@ -38,18 +39,18 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Clear resolved reports?'),
+                      title: Text(context.t.adminClearResolvedTitle),
                       content: Text(
-                        'This will delete ${resolved.length} resolved report(s).',
+                        context.t.adminClearResolvedBody(resolved.length),
                       ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
+                          child: Text(context.t.cancel),
                         ),
                         FilledButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Clear'),
+                          child: Text(context.t.clear),
                         ),
                       ],
                     ),
@@ -64,10 +65,11 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
                         .toList(),
                   );
                   if (!context.mounted) return;
-                  AppFeedback.showSuccess(context, 'Resolved reports cleared');
+                  AppFeedback.showSuccess(
+                      context, context.t.adminResolvedReportsCleared);
                 },
                 icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                label: const Text('Clear resolved'),
+                label: Text(context.t.adminClearResolved),
               ),
             const SizedBox(width: 8),
           ],
@@ -76,26 +78,27 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
             tabs: [
-              Tab(text: 'Open (${unresolved.length})'),
-              Tab(text: 'Resolved (${resolved.length})'),
+              Tab(text: context.t.adminTabOpen(unresolved.length)),
+              Tab(text: context.t.adminTabResolved(resolved.length)),
             ],
           ),
         ),
         body: reportsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (_) => TabBarView(
             children: [
               _ReportsList(
                 reports: unresolved,
-                emptyTitle:
-                    all.isEmpty ? 'No discuss reports' : 'No open reports',
-                emptySubtitle: 'Fresh reports from users will show here.',
+                emptyTitle: all.isEmpty
+                    ? context.t.adminNoDiscussReports
+                    : context.t.adminNoOpenReports,
+                emptySubtitle: context.t.adminFreshReportsHere,
               ),
               _ReportsList(
                 reports: resolved,
-                emptyTitle: 'Nothing resolved yet',
-                emptySubtitle: 'Closed reports move here.',
+                emptyTitle: context.t.adminNothingResolvedYet,
+                emptySubtitle: context.t.adminClosedReportsMoveHere,
               ),
             ],
           ),
@@ -200,7 +203,7 @@ class _ReportTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final caption = report.postCaption.trim().isEmpty
-        ? '(no question text)'
+        ? context.t.adminNoQuestionText
         : report.postCaption.trim();
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -251,23 +254,23 @@ class _ReportTile extends ConsumerWidget {
             ),
           ),
           children: [
-            _kv(context, 'Reported thread', caption),
+            _kv(context, context.t.adminReportedThread, caption),
             _kv(
                 context,
-                'Thread author',
+                context.t.adminThreadAuthor,
                 report.postAuthorUsername.isEmpty
                     ? report.postAuthorUid
                     : '${report.postAuthorUsername} (${report.postAuthorUid})'),
             _kv(
                 context,
-                'Reporter',
+                context.t.adminReporter,
                 report.reporterUsername.isEmpty
                     ? report.reporterUid
                     : '${report.reporterUsername} (${report.reporterUid})'),
-            _kv(context, 'Reason', report.reason),
-            _kv(context, 'When', _fullTime(report.createdAt)),
+            _kv(context, context.t.adminReason, report.reason),
+            _kv(context, context.t.adminWhen, _fullTime(report.createdAt)),
             if ((report.details ?? '').trim().isNotEmpty)
-              _kv(context, 'Details', report.details!.trim()),
+              _kv(context, context.t.adminDetails, report.details!.trim()),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -277,12 +280,14 @@ class _ReportTile extends ConsumerWidget {
                   onPressed: () => ref
                       .read(adminServiceProvider)
                       .setDiscussReportResolved(report.id, !report.resolved),
-                  child: Text(report.resolved ? 'Reopen' : 'Mark resolved'),
+                  child: Text(report.resolved
+                      ? context.t.adminReopen
+                      : context.t.adminMarkResolved),
                 ),
                 TextButton.icon(
                   onPressed: () => _openReportedThread(context),
                   icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('View thread'),
+                  label: Text(context.t.adminViewThread),
                 ),
                 FilledButton.tonal(
                   style: FilledButton.styleFrom(
@@ -295,18 +300,18 @@ class _ReportTile extends ConsumerWidget {
                       builder: (ctx) => AlertDialog(
                         title: Text(
                           report.resolved
-                              ? 'Delete report?'
-                              : 'Take down thread?',
+                              ? context.t.adminDeleteReportTitle
+                              : context.t.adminTakeDownThreadTitle,
                         ),
                         content: Text(
                           report.resolved
-                              ? 'This will remove this report from the list.'
-                              : 'This will take down the reported thread and mark this report as resolved.',
+                              ? context.t.adminDeleteReportBody
+                              : context.t.adminTakeDownThreadBody,
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
+                            child: Text(context.t.cancel),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
@@ -315,8 +320,8 @@ class _ReportTile extends ConsumerWidget {
                             onPressed: () => Navigator.pop(ctx, true),
                             child: Text(
                               report.resolved
-                                  ? 'Delete report'
-                                  : 'Take down thread',
+                                  ? context.t.adminDeleteReport
+                                  : context.t.adminTakeDownThread,
                             ),
                           ),
                         ],
@@ -331,7 +336,8 @@ class _ReportTile extends ConsumerWidget {
                             .read(adminServiceProvider)
                             .deleteDiscussReport(report.id);
                         if (!context.mounted) return;
-                        AppFeedback.showSuccess(context, 'Report deleted');
+                        AppFeedback.showSuccess(
+                            context, context.t.adminReportDeleted);
                         return;
                       }
 
@@ -344,18 +350,20 @@ class _ReportTile extends ConsumerWidget {
                       if (!context.mounted) return;
                       AppFeedback.showSuccess(
                         context,
-                        'Thread taken down and report resolved',
+                        context.t.adminThreadTakenDown,
                       );
                     } catch (e) {
                       if (!context.mounted) return;
                       AppFeedback.showError(
                         context,
-                        'Action failed: $e',
+                        context.t.adminActionFailed(e),
                       );
                     }
                   },
                   child: Text(
-                    report.resolved ? 'Delete report' : 'Take down thread',
+                    report.resolved
+                        ? context.t.adminDeleteReport
+                        : context.t.adminTakeDownThread,
                   ),
                 ),
               ],
@@ -408,7 +416,7 @@ class _ReportTile extends ConsumerWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Copy',
+              tooltip: context.t.copy,
               onPressed: () => Clipboard.setData(ClipboardData(text: v)),
               icon: Icon(Icons.copy_rounded,
                   size: 15, color: context.textSecondary),

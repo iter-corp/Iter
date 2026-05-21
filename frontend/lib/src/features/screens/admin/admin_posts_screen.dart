@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 
@@ -14,18 +15,18 @@ class AdminPostsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Posts'),
+        title: Text(context.t.adminTilePostsTitle),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: postsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (posts) {
           if (posts.isEmpty) {
             return Center(
-                child: Text('No posts',
+                child: Text(context.t.noPosts,
                     style: TextStyle(color: context.textSecondary)));
           }
           return ListView.separated(
@@ -57,7 +58,8 @@ class AdminPostsScreen extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  'by ${p['authorUsername'] ?? 'unknown'}',
+                  context.t.adminPostByAuthor(
+                      p['authorUsername'] ?? context.t.adminUnknown),
                   style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
                 trailing: IconButton(
@@ -77,15 +79,16 @@ class AdminPostsScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete post?'),
-        content: const Text('This cannot be undone.'),
+        title: Text(context.t.postCardDeletePostTitle),
+        content: Text(context.t.postCardCannotBeUndone),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: Text(context.t.cancel)),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+              child: Text(context.t.delete,
+                  style: const TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -95,7 +98,7 @@ class AdminPostsScreen extends ConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Failed: $e')));
+              .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
         }
       }
     }
