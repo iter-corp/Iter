@@ -7,7 +7,6 @@ import 'post_service.dart';
 
 class AdminConfig {
   final bool storiesEnabled;
-  final bool liveEnabled;
   final bool repostsEnabled;
   final bool translateEnabled;
   final String announcement;
@@ -44,7 +43,6 @@ class AdminConfig {
 
   const AdminConfig({
     this.storiesEnabled = true,
-    this.liveEnabled = true,
     this.repostsEnabled = true,
     this.translateEnabled = true,
     this.announcement = '',
@@ -75,7 +73,6 @@ class AdminConfig {
 
     return AdminConfig(
       storiesEnabled: (m['storiesEnabled'] as bool?) ?? true,
-      liveEnabled: (m['liveEnabled'] as bool?) ?? true,
       repostsEnabled: (m['repostsEnabled'] as bool?) ?? true,
       translateEnabled: (m['translateEnabled'] as bool?) ?? true,
       announcement: (m['announcement'] as String?) ?? '',
@@ -100,7 +97,6 @@ class AdminConfig {
 
   Map<String, dynamic> toMap() => {
         'storiesEnabled': storiesEnabled,
-        'liveEnabled': liveEnabled,
         'repostsEnabled': repostsEnabled,
         'translateEnabled': translateEnabled,
         'announcement': announcement,
@@ -119,7 +115,6 @@ class AdminConfig {
 
   AdminConfig copyWith({
     bool? storiesEnabled,
-    bool? liveEnabled,
     bool? repostsEnabled,
     bool? translateEnabled,
     String? announcement,
@@ -138,7 +133,6 @@ class AdminConfig {
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
-      liveEnabled: liveEnabled ?? this.liveEnabled,
       repostsEnabled: repostsEnabled ?? this.repostsEnabled,
       translateEnabled: translateEnabled ?? this.translateEnabled,
       announcement: announcement ?? this.announcement,

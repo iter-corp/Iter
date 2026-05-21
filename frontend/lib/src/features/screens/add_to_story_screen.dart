@@ -9,7 +9,6 @@ import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import 'camera_story_screen.dart';
 import 'create_post_screen.dart';
-import 'live_screen.dart';
 import 'story_preview_screen.dart';
 
 class AddToStoryScreen extends ConsumerStatefulWidget {
@@ -148,7 +147,6 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
                     children: [
                       _buildTab(context.t.post, 0),
                       _buildTab(context.t.story, 1),
-                      _buildTab(context.t.live, 2),
                     ],
                   ),
                 ),
@@ -232,11 +230,6 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const CameraStoryScreen()),
-          );
-        } else if (index == 2) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const LiveScreen()),
           );
         }
       },

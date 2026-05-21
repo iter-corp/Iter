@@ -81,7 +81,6 @@ const Map<String, String> arStrings = {
   // ── Bottom navigation ─────────────────────────────────────────
   'nav_home': 'الرئيسية',
   'nav_events': 'الفعاليات',
-  'nav_live': 'مباشر',
   'nav_messages': 'الرسائل',
   'nav_profile': 'الملف الشخصي',
   'nav_notifications': 'الإشعارات',
@@ -185,16 +184,6 @@ const Map<String, String> arStrings = {
   'no_events': 'لا توجد فعاليات بعد',
   'event_unavailable': 'هذه الفعالية لم تعد متاحة',
   'join_event': 'انضمام للفعالية',
-
-  // ── Live ──────────────────────────────────────────────────────
-  'live': 'مباشر',
-  'go_live': 'بدء بث مباشر',
-  'live_now': 'مباشر الآن',
-  'join_live': 'انضمام',
-  'end_live': 'إنهاء البث',
-  'viewers': 'المشاهدون',
-  'no_live_streams': 'لا توجد عمليات بث مباشر حالياً',
-  'viewers_count': '{count} مشاهدين',
 
   // ── Notifications ─────────────────────────────────────────────
   'notifications': 'الإشعارات',
@@ -573,7 +562,7 @@ const Map<String, String> arStrings = {
   'error_with_message': 'خطأ: {error}',
   'failed_to_send_sticker': 'فشل إرسال الملصق: {error}',
 
-  // ── STORIES/LIVE/NOTIF SCREENS (added) ──
+  // ── STORIES/NOTIF SCREENS (added) ──
   'story_sign_in_to_like': 'يرجى تسجيل الدخول للإعجاب بالقصص',
   'story_failed_toggle_like': 'فشل تغيير الإعجاب: {error}',
   'story_reply_sent': 'تم إرسال الرد',
@@ -599,22 +588,6 @@ const Map<String, String> arStrings = {
   'camera_init_failed': 'فشل تهيئة الكاميرا: {error}',
   'camera_capture_failed': 'فشل الالتقاط: {error}',
   'feature_stories': 'القصص',
-  'feature_live_streaming': 'البث المباشر',
-  'live_list_unavailable': 'قائمة البث المباشر غير متاحة',
-  'live_no_one_live': 'لا أحد يبث بثاً مباشراً الآن',
-  'live_host_prefix': 'المضيف: {host}',
-  'live_add_title_hint': 'أضف عنواناً...',
-  'live_title_helper': 'سيشاهد متابعوك وأي شخص يتابع البث هذا العنوان.',
-  'live_go_live_button': 'بدء البث',
-  'live_permissions_required': 'أذونات الكاميرا والميكروفون مطلوبة لبدء البث المباشر.',
-  'live_unavailable_spark': 'البث المباشر غير متاح في وضع Spark. قم بتكوين خدمة رمز Agora الخارجية لتمكينه.',
-  'live_agora_error': 'خطأ في Agora: {error}',
-  'live_unable_to_start': 'تعذر بدء البث المباشر',
-  'live_unable_to_start_stream': 'تعذر بدء البث',
-  'live_end_button': 'إنهاء',
-  'live_unable_to_join': 'تعذر الانضمام للبث',
-  'live_waiting_host_video': 'بانتظار فيديو المضيف…',
-  'live_label_short': 'مباشر',
   'notif_no_activity': 'لا توجد إشعارات نشاط بعد',
   'notif_no_follow': 'لا توجد إشعارات متابعة بعد',
   'notif_no_event': 'لا توجد إشعارات فعاليات بعد',
@@ -982,7 +955,6 @@ const Map<String, String> arStrings = {
   'admin_saved': 'تم الحفظ',
   'admin_section_feature_flags': 'ميزات النظام',
   'admin_flag_stories': 'القصص مفعلة',
-  'admin_flag_live': 'البث المباشر مفعل',
   'admin_flag_reposts': 'إعادة النشر مفعلة',
   'admin_flag_translate': 'الترجمة مفعلة',
   'admin_section_announcement': 'إعلان',

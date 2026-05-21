@@ -85,7 +85,6 @@ const Map<String, String> enStrings = {
   // ── Bottom navigation ─────────────────────────────────────────
   'nav_home': 'Home',
   'nav_events': 'Events',
-  'nav_live': 'Live',
   'nav_messages': 'Messages',
   'nav_profile': 'Profile',
   'nav_notifications': 'Notifications',
@@ -189,16 +188,6 @@ const Map<String, String> enStrings = {
   'no_events': 'No events yet',
   'event_unavailable': 'This event is no longer available',
   'join_event': 'Join event',
-
-  // ── Live ──────────────────────────────────────────────────────
-  'live': 'Live',
-  'go_live': 'Go live',
-  'live_now': 'Live now',
-  'join_live': 'Join',
-  'end_live': 'End live',
-  'viewers': 'Viewers',
-  'no_live_streams': 'No live streams right now',
-  'viewers_count': '{count} viewers',
 
   // ── Notifications ─────────────────────────────────────────────
   'notifications': 'Notifications',
@@ -605,7 +594,7 @@ const Map<String, String> enStrings = {
   'error_with_message': 'Error: {error}',
   'failed_to_send_sticker': 'Failed to send sticker: {error}',
 
-  // ── STORIES/LIVE/NOTIF SCREENS (added) ──
+  // ── STORIES/NOTIF SCREENS (added) ──
   'story_sign_in_to_like': 'Please sign in to like stories',
   'story_failed_toggle_like': 'Failed to toggle like: {error}',
   'story_reply_sent': 'Reply sent',
@@ -632,25 +621,6 @@ const Map<String, String> enStrings = {
   'camera_init_failed': 'Camera init failed: {error}',
   'camera_capture_failed': 'Capture failed: {error}',
   'feature_stories': 'Stories',
-  'feature_live_streaming': 'Live streaming',
-  'live_list_unavailable': 'Live list unavailable',
-  'live_no_one_live': 'No one is live right now',
-  'live_host_prefix': 'Host: {host}',
-  'live_add_title_hint': 'Add a title...',
-  'live_title_helper':
-      'your follower and anyone watching will see this title.',
-  'live_go_live_button': 'Go Live',
-  'live_permissions_required':
-      'Camera and microphone permissions are required to go live.',
-  'live_unavailable_spark':
-      'Live streaming is unavailable in Spark mode. Configure external Agora token service to enable it.',
-  'live_agora_error': 'Agora error: {error}',
-  'live_unable_to_start': 'Unable to start live stream',
-  'live_unable_to_start_stream': 'Unable to start stream',
-  'live_end_button': 'End',
-  'live_unable_to_join': 'Unable to join stream',
-  'live_waiting_host_video': 'Waiting for host video…',
-  'live_label_short': 'LIVE',
   'notif_no_activity': 'No activity notifications yet',
   'notif_no_follow': 'No follow notifications yet',
   'notif_no_event': 'No event notifications yet',
@@ -1052,7 +1022,6 @@ const Map<String, String> enStrings = {
   'admin_saved': 'Saved',
   'admin_section_feature_flags': 'Feature flags',
   'admin_flag_stories': 'Stories enabled',
-  'admin_flag_live': 'Live streaming enabled',
   'admin_flag_reposts': 'Reposts enabled',
   'admin_flag_translate': 'Translate enabled',
   'admin_section_announcement': 'Announcement',

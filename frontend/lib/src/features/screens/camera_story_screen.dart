@@ -10,7 +10,6 @@ import '../../providers/admin_providers.dart';
 import '../widgets/feature_disabled_view.dart';
 import 'add_to_story_screen.dart';
 import 'create_post_screen.dart';
-import 'live_screen.dart';
 import 'story_preview_screen.dart';
 
 /// Distinguishes the two camera-setup failure modes so the message can be
@@ -170,12 +169,6 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
           MaterialPageRoute(builder: (_) => const CreatePostScreen()),
         );
         break;
-      case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LiveScreen()),
-        );
-        break;
       default:
         setState(() => _bottomTab = index);
     }
@@ -282,8 +275,6 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
                         _buildTab(context.t.post, 0),
                         const SizedBox(width: 24),
                         _buildTab(context.t.story, 1),
-                        const SizedBox(width: 24),
-                        _buildTab(context.t.live, 2),
                       ],
                     ),
                   ),

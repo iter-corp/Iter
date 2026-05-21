@@ -290,12 +290,6 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                     setState(() => _cfg = _cfg.copyWith(storiesEnabled: v)),
               ),
               _flag(
-                title: context.t.adminFlagLive,
-                value: _cfg.liveEnabled,
-                onChanged: (v) =>
-                    setState(() => _cfg = _cfg.copyWith(liveEnabled: v)),
-              ),
-              _flag(
                 title: context.t.adminFlagReposts,
                 value: _cfg.repostsEnabled,
                 onChanged: (v) =>

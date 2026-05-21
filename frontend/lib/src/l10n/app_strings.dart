@@ -126,7 +126,6 @@ class AppStrings {
   // ──────────────────────────────────────────────────────────────
   String get navHome => _get('nav_home');
   String get navEvents => _get('nav_events');
-  String get navLive => _get('nav_live');
   String get navMessages => _get('nav_messages');
   String get navProfile => _get('nav_profile');
   String get navNotifications => _get('nav_notifications');
@@ -242,18 +241,6 @@ class AppStrings {
   String get noEvents => _get('no_events');
   String get eventUnavailable => _get('event_unavailable');
   String get joinEvent => _get('join_event');
-
-  // ──────────────────────────────────────────────────────────────
-  // Live
-  // ──────────────────────────────────────────────────────────────
-  String get live => _get('live');
-  String get goLive => _get('go_live');
-  String get liveNow => _get('live_now');
-  String get joinLive => _get('join_live');
-  String get endLive => _get('end_live');
-  String get viewers => _get('viewers');
-  String get noLiveStreams => _get('no_live_streams');
-  String viewersCount(Object count) => _fmt('viewers_count', {'count': count});
 
   // ──────────────────────────────────────────────────────────────
   // Notifications
@@ -740,7 +727,7 @@ class AppStrings {
   String failedToSendSticker(Object error) =>
       _fmt('failed_to_send_sticker', {'error': error});
 
-  // ── STORIES/LIVE/NOTIF SCREENS (added) ──
+  // ── STORIES/NOTIF SCREENS (added) ──
   String get storySignInToLike => _get('story_sign_in_to_like');
   String storyFailedToggleLike(Object error) =>
       _fmt('story_failed_toggle_like', {'error': error});
@@ -778,24 +765,6 @@ class AppStrings {
   String cameraCaptureFailed(Object error) =>
       _fmt('camera_capture_failed', {'error': error});
   String get featureStories => _get('feature_stories');
-  String get featureLiveStreaming => _get('feature_live_streaming');
-  String get liveListUnavailable => _get('live_list_unavailable');
-  String get liveNoOneLive => _get('live_no_one_live');
-  String liveHostPrefix(Object host) =>
-      _fmt('live_host_prefix', {'host': host});
-  String get liveAddTitleHint => _get('live_add_title_hint');
-  String get liveTitleHelper => _get('live_title_helper');
-  String get liveGoLiveButton => _get('live_go_live_button');
-  String get livePermissionsRequired => _get('live_permissions_required');
-  String get liveUnavailableSpark => _get('live_unavailable_spark');
-  String liveAgoraError(Object error) =>
-      _fmt('live_agora_error', {'error': error});
-  String get liveUnableToStart => _get('live_unable_to_start');
-  String get liveUnableToStartStream => _get('live_unable_to_start_stream');
-  String get liveEndButton => _get('live_end_button');
-  String get liveUnableToJoin => _get('live_unable_to_join');
-  String get liveWaitingHostVideo => _get('live_waiting_host_video');
-  String get liveLabelShort => _get('live_label_short');
   String get notifNoActivity => _get('notif_no_activity');
   String get notifNoFollow => _get('notif_no_follow');
   String get notifNoEvent => _get('notif_no_event');
@@ -1276,7 +1245,6 @@ class AppStrings {
   String get adminSaved => _get('admin_saved');
   String get adminSectionFeatureFlags => _get('admin_section_feature_flags');
   String get adminFlagStories => _get('admin_flag_stories');
-  String get adminFlagLive => _get('admin_flag_live');
   String get adminFlagReposts => _get('admin_flag_reposts');
   String get adminFlagTranslate => _get('admin_flag_translate');
   String get adminSectionAnnouncement => _get('admin_section_announcement');
