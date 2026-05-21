@@ -43,6 +43,17 @@ exports.onMessageCreate = (0, firestore_1.onDocumentCreated)('chats/{chatId}/mes
     if (!msg)
         return;
     const senderUid = String(msg.senderUid ?? '');
+    const visibility = String(msg.visibility ?? '');
+    const visibleToUids = Array.isArray(msg.visibleToUids)
+        ? msg.visibleToUids.map((v) => String(v)).filter((v) => v.length > 0)
+        : [];
+    // Sender-only moderated messages should never trigger receiver unread
+    // increments or push notifications.
+    if (visibility === 'sender_only' ||
+        msg.profanityFiltered === true ||
+        (visibleToUids.length === 1 && visibleToUids[0] === senderUid)) {
+        return;
+    }
     let receiverUid = String(msg.receiverUid ?? '');
     if (receiverUid.length === 0) {
         const chatSnap = await db.collection('chats').doc(chatId).get();

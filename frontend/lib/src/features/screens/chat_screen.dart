@@ -350,8 +350,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // user doesn't lose what they typed.
     final chatDoc = ref.read(chatDocProvider(widget.chatId)).value;
     if (chatDoc != null && (chatDoc['kind'] as String?) == 'group') {
-      final restrictMessaging =
-          chatDoc['restrictMessaging'] as bool? ?? false;
+      final restrictMessaging = chatDoc['restrictMessaging'] as bool? ?? false;
       final adminOnly = chatDoc['adminOnly'] as bool? ?? false;
       final admins = (chatDoc['admins'] as List<dynamic>?) ?? [];
       final isAdmin = admins.contains(uid);
@@ -1549,7 +1548,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 child: Text(
                                   isGroup ? groupName : widget.otherName,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.w600, fontSize: 15),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -2356,6 +2356,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
       msg.text.trim().isNotEmpty &&
       !_showOriginal;
 
+  bool get _isSenderOnlyProfanity => isMe && msg.profanityFiltered;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -2424,8 +2426,11 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
         ? msg.text
         : (_translated ?? msg.text); // until translation arrives, show original
 
-    final hintColor =
-        isMe ? Colors.white.withValues(alpha: 0.85) : const Color(0xFFB05ECC);
+    final hintColor = _isSenderOnlyProfanity
+        ? const Color(0xFFB00020)
+        : (isMe
+            ? Colors.white.withValues(alpha: 0.85)
+            : const Color(0xFFB05ECC));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2557,6 +2562,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     final hasReply = msg.replyToId != null && msg.replyToId!.isNotEmpty;
     final hasVoice = msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty;
     final hasSticker = msg.stickerUrl != null && msg.stickerUrl!.isNotEmpty;
+    final outgoingBodyColor =
+        _isSenderOnlyProfanity ? const Color(0xFFB00020) : Colors.white;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2622,8 +2629,16 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                   ? const Color(0xFFB05ECC)
                                       .withValues(alpha: 0.85)
                                   : (isMe
-                                      ? const Color(0xFFB05ECC)
+                                      ? (_isSenderOnlyProfanity
+                                          ? const Color(0xFFFFE5E5)
+                                          : const Color(0xFFB05ECC))
                                       : context.inputFill),
+                              border: _isSenderOnlyProfanity
+                                  ? Border.all(
+                                      color: const Color(0xFFF28B82),
+                                      width: 1,
+                                    )
+                                  : null,
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(16),
                                 topRight: const Radius.circular(16),
@@ -2673,7 +2688,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     const SizedBox(height: 6),
                                     _buildBody(
                                       textColor: isMe
-                                          ? Colors.white
+                                          ? outgoingBodyColor
                                           : context.textPrimary,
                                     ),
                                   ],
@@ -2690,7 +2705,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     const SizedBox(height: 6),
                                     _buildBody(
                                       textColor: isMe
-                                          ? Colors.white
+                                          ? outgoingBodyColor
                                           : context.textPrimary,
                                     ),
                                   ],
@@ -2711,7 +2726,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     const SizedBox(height: 6),
                                     _buildBody(
                                       textColor: isMe
-                                          ? Colors.white
+                                          ? outgoingBodyColor
                                           : context.textPrimary,
                                     ),
                                   ],
@@ -2736,14 +2751,14 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     const SizedBox(height: 6),
                                     _buildBody(
                                       textColor: isMe
-                                          ? Colors.white
+                                          ? outgoingBodyColor
                                           : context.textPrimary,
                                     ),
                                   ],
                                 ] else
                                   _buildBody(
                                     textColor: isMe
-                                        ? Colors.white
+                                        ? outgoingBodyColor
                                         : context.textPrimary,
                                   ),
                               ],
@@ -2752,6 +2767,18 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                   ),
                 ),
               ),
+              if (_isSenderOnlyProfanity)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, right: 4),
+                  child: Text(
+                    'Visible only to you',
+                    style: TextStyle(
+                      color: const Color(0xFFB00020),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               MessageReactionsRow(
                 parentPath: 'chats/${widget.chatId}/messages',
                 messageId: msg.id,

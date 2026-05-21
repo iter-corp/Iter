@@ -180,6 +180,17 @@ service cloud.firestore {
         }
       }
 
+      match /privateComments/{uid} {
+        allow read, write: if isSelf(uid) || isAdmin();
+
+        match /items/{commentId} {
+          allow read: if isSelf(uid) || isAdmin();
+          allow create: if isSelf(uid) && request.resource.data.authorUid == request.auth.uid;
+          allow update: if false;
+          allow delete: if isSelf(uid) || isAdmin();
+        }
+      }
+
       match /reposts/{uid} {
         allow read: if signedIn();
         allow create: if isSelf(uid);

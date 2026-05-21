@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/admin_service.dart';
 import '../../theme/app_theme.dart';
 
 /// Canonical option lists for the optional "About you" personalization data
@@ -8,42 +9,6 @@ import '../../theme/app_theme.dart';
 /// NOTE: these are intentionally stored under `users/{uid}.profession`,
 /// `.field`, `.academicLevel`, `.goals` — the existing `role` field is the
 /// RBAC `'user' | 'admin'` flag and must not be reused.
-const List<String> kProfessionOptions = [
-  'Student',
-  'Researcher',
-  'Professor',
-  'Traveler',
-];
-
-const List<String> kFieldOptions = [
-  'Tech',
-  'Medicine',
-  'Law',
-  'Business',
-  'Arts',
-  'Engineering',
-  'Science',
-  'Education',
-  'Social sciences',
-  'Other',
-];
-
-const List<String> kAcademicLevelOptions = [
-  'Undergraduate',
-  'Masters',
-  'PhD',
-  'Faculty',
-];
-
-const List<String> kGoalOptions = [
-  'Internships',
-  'Scholarships',
-  'Conferences',
-  'Research',
-  'Networking',
-  'Local events',
-];
-
 /// True when an academic level question is relevant for the chosen profession.
 bool academicLevelAppliesTo(String? profession) =>
     profession != null && profession != 'Traveler';
@@ -169,6 +134,10 @@ class AboutYouEditor extends StatelessWidget {
   final String? field;
   final String? academicLevel;
   final List<String> goals;
+  final List<String> professionOptions;
+  final List<String> fieldOptions;
+  final List<String> academicLevelOptions;
+  final List<String> goalOptions;
   final ValueChanged<String?> onProfessionChanged;
   final ValueChanged<String?> onFieldChanged;
   final ValueChanged<String?> onAcademicLevelChanged;
@@ -180,6 +149,10 @@ class AboutYouEditor extends StatelessWidget {
     required this.field,
     required this.academicLevel,
     required this.goals,
+    this.professionOptions = kProfileProfessionOptions,
+    this.fieldOptions = kProfileFieldOptions,
+    this.academicLevelOptions = kProfileAcademicLevelOptions,
+    this.goalOptions = kProfileGoalOptions,
     required this.onProfessionChanged,
     required this.onFieldChanged,
     required this.onAcademicLevelChanged,
@@ -193,7 +166,7 @@ class AboutYouEditor extends StatelessWidget {
       children: [
         SingleChoiceChips(
           label: 'I am a…',
-          options: kProfessionOptions,
+          options: professionOptions,
           selected: profession,
           onChanged: (v) {
             onProfessionChanged(v);
@@ -204,7 +177,7 @@ class AboutYouEditor extends StatelessWidget {
         const SizedBox(height: 16),
         SingleChoiceChips(
           label: 'Field',
-          options: kFieldOptions,
+          options: fieldOptions,
           selected: field,
           onChanged: onFieldChanged,
         ),
@@ -212,7 +185,7 @@ class AboutYouEditor extends StatelessWidget {
           const SizedBox(height: 16),
           SingleChoiceChips(
             label: 'Academic level',
-            options: kAcademicLevelOptions,
+            options: academicLevelOptions,
             selected: academicLevel,
             onChanged: onAcademicLevelChanged,
           ),
@@ -220,7 +193,7 @@ class AboutYouEditor extends StatelessWidget {
         const SizedBox(height: 16),
         MultiChoiceChips(
           label: 'My goals',
-          options: kGoalOptions,
+          options: goalOptions,
           selected: goals,
           onChanged: onGoalsChanged,
         ),

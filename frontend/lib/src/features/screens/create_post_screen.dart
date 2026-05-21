@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:country_state_city/country_state_city.dart' as csc;
+import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
@@ -8,12 +10,35 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../services/post_service.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
 import '../widgets/location_map.dart';
 import 'camera_story_screen.dart';
 import 'live_screen.dart';
+
+String _normalizeCitySearch(String input) {
+  var out = removeDiacritics(input).toLowerCase().trim();
+  const replacements = {
+    'ı': 'i',
+    'İ': 'i',
+    'ñ': 'n',
+    'ç': 'c',
+    'ş': 's',
+    'ğ': 'g',
+    'ý': 'y',
+    'ÿ': 'y',
+    'æ': 'ae',
+    'œ': 'oe',
+  };
+  replacements.forEach((from, to) {
+    out = out.replaceAll(from, to);
+  });
+  out = out.replaceAll(RegExp(r"[^a-z0-9\s-]"), ' ');
+  out = out.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return out;
+}
 
 class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
@@ -27,6 +52,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _placeNameCtrl = TextEditingController();
   final _placeCityCtrl = TextEditingController();
   final List<File> _pickedImages = [];
+  static List<_CityOption>? _cachedWorldCities;
+  List<_CityOption> _worldCities = const [];
+  bool _worldCitiesLoading = false;
   bool _isPrivate = false;
   bool _posting = false;
   double? _placeLat;
@@ -34,11 +62,69 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   bool _placeFromCurrentLocation = false;
 
   @override
+  void initState() {
+    super.initState();
+    _ensureWorldCitiesLoaded();
+  }
+
+  @override
   void dispose() {
     _captionCtrl.dispose();
     _placeNameCtrl.dispose();
     _placeCityCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _ensureWorldCitiesLoaded() async {
+    if (_cachedWorldCities != null) {
+      _worldCities = _cachedWorldCities!;
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _worldCitiesLoading = true);
+    }
+    try {
+      final all = await csc.getAllCities();
+      final dedup = <String, _CityOption>{};
+      for (final city in all) {
+        final name = city.name.trim();
+        if (name.isEmpty) continue;
+        final country = city.countryCode.trim();
+        final state = city.stateCode.trim();
+        final key =
+            '${name.toLowerCase()}|${country.toLowerCase()}|${state.toLowerCase()}';
+        final normalizedName = _normalizeCitySearch(name);
+        final searchHaystack = _normalizeCitySearch('$name $country $state');
+        dedup[key] = _CityOption(
+          name: name,
+          countryCode: country,
+          stateCode: state,
+          normalizedName: normalizedName,
+          searchHaystack: searchHaystack,
+        );
+      }
+      final out = dedup.values.toList()
+        ..sort((a, b) {
+          final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          if (byName != 0) return byName;
+          final byCountry = a.countryCode
+              .toLowerCase()
+              .compareTo(b.countryCode.toLowerCase());
+          if (byCountry != 0) return byCountry;
+          return a.stateCode.toLowerCase().compareTo(b.stateCode.toLowerCase());
+        });
+      _cachedWorldCities = out;
+      if (!mounted) return;
+      setState(() => _worldCities = out);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _worldCities = const []);
+    } finally {
+      if (mounted) {
+        setState(() => _worldCitiesLoading = false);
+      }
+    }
   }
 
   Future<void> _useCurrentLocationForPlace() async {
@@ -154,6 +240,31 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     setState(() => _pickedImages.add(File(picked.path)));
   }
 
+  Future<void> _openCityPicker() async {
+    if (_cachedWorldCities == null && !_worldCitiesLoading) {
+      await _ensureWorldCitiesLoaded();
+    }
+
+    final selectedCity = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _CityPickerSheet(
+        initialQuery: _placeCityCtrl.text.trim(),
+        cities: _cachedWorldCities ?? _worldCities,
+        loading: _worldCitiesLoading,
+      ),
+    );
+
+    if (!mounted || selectedCity == null) return;
+    setState(() {
+      _placeCityCtrl.text = selectedCity;
+      if (_placeFromCurrentLocation) {
+        _placeFromCurrentLocation = false;
+      }
+    });
+  }
+
   void _removeImage(int i) {
     setState(() => _pickedImages.removeAt(i));
   }
@@ -218,6 +329,26 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         );
       }
     } catch (e) {
+      if (e is PostBlockedException) {
+        if (mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Post blocked'),
+              content: const Text(
+                'You cannot publish this post because its caption or place fields contain blocked words.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
       if (mounted) {
         AppFeedback.showError(context, 'Could not publish post: $e');
       }
@@ -368,15 +499,18 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                               },
                             ),
                             const SizedBox(height: 10),
-                            _PostFormField(
+                            _CityDropdownField(
                               controller: _placeCityCtrl,
-                              hintText: 'City (optional)',
+                              hintText: 'Select city (optional)',
                               icon: Icons.location_city_outlined,
-                              onChanged: (_) {
-                                if (_placeFromCurrentLocation) {
-                                  setState(
-                                      () => _placeFromCurrentLocation = false);
-                                }
+                              onTap: _openCityPicker,
+                              onClear: () {
+                                setState(() {
+                                  _placeCityCtrl.clear();
+                                  if (_placeFromCurrentLocation) {
+                                    _placeFromCurrentLocation = false;
+                                  }
+                                });
                               },
                             ),
                             const SizedBox(height: 8),
@@ -385,8 +519,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                                 Expanded(
                                   child: TextButton.icon(
                                     onPressed: _useCurrentLocationForPlace,
-                                    icon: const Icon(
-                                        Icons.my_location_rounded),
+                                    icon: const Icon(Icons.my_location_rounded),
                                     label: const Text(
                                       'Use current location',
                                       overflow: TextOverflow.ellipsis,
@@ -465,7 +598,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       children: [
                         _bottomTab('Post', 0, true),
                         _bottomTab('Story', 1, false),
-                        _bottomTab('Live', 2, false),
                       ],
                     ),
                   ),
@@ -485,11 +617,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CameraStoryScreen()),
-          );
-        } else if (index == 2) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const LiveScreen()),
           );
         }
       },
@@ -652,6 +779,252 @@ class _PostFormField extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CityDropdownField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final IconData icon;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  const _CityDropdownField({
+    required this.controller,
+    required this.hintText,
+    required this.icon,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final value = controller.text.trim();
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: context.inputFill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: const Color(0xFF7E3BE8)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  value.isEmpty ? hintText : value,
+                  style: TextStyle(
+                    color: value.isEmpty
+                        ? context.textSecondary
+                        : context.textPrimary,
+                  ),
+                ),
+              ),
+              if (value.isNotEmpty)
+                GestureDetector(
+                  onTap: onClear,
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: context.textSecondary,
+                  ),
+                ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: context.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CityPickerSheet extends StatefulWidget {
+  final String initialQuery;
+  final List<_CityOption> cities;
+  final bool loading;
+
+  const _CityPickerSheet({
+    required this.initialQuery,
+    required this.cities,
+    required this.loading,
+  });
+
+  @override
+  State<_CityPickerSheet> createState() => _CityPickerSheetState();
+}
+
+class _CityPickerSheetState extends State<_CityPickerSheet> {
+  late final TextEditingController _searchCtrl;
+  List<_CityOption> _filteredCities = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl = TextEditingController(text: widget.initialQuery);
+    _filterCities();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _filterCities() {
+    final rawQuery = _searchCtrl.text;
+    final q = _normalizeCitySearch(rawQuery);
+    if (q.isEmpty) {
+      setState(() => _filteredCities = widget.cities);
+      return;
+    }
+
+    final ranked = <({int score, int lenDelta, _CityOption city})>[];
+    for (final city in widget.cities) {
+      if (!city.searchHaystack.contains(q)) continue;
+
+      int score;
+      if (city.normalizedName == q) {
+        score = 0;
+      } else if (city.normalizedName.startsWith(q)) {
+        score = 1;
+      } else if (city.normalizedName
+          .split(RegExp(r'[\s-]+'))
+          .any((part) => part.startsWith(q))) {
+        score = 2;
+      } else {
+        score = 3;
+      }
+
+      ranked.add((
+        score: score,
+        lenDelta: (city.normalizedName.length - q.length).abs(),
+        city: city,
+      ));
+    }
+
+    ranked.sort((a, b) {
+      final byScore = a.score.compareTo(b.score);
+      if (byScore != 0) return byScore;
+      final byLen = a.lenDelta.compareTo(b.lenDelta);
+      if (byLen != 0) return byLen;
+      final byName =
+          a.city.name.toLowerCase().compareTo(b.city.name.toLowerCase());
+      if (byName != 0) return byName;
+      return a.city.countryCode
+          .toLowerCase()
+          .compareTo(b.city.countryCode.toLowerCase());
+    });
+
+    setState(
+      () => _filteredCities = ranked.map((item) => item.city).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (_) => _filterCities(),
+                decoration: InputDecoration(
+                  hintText: 'Search city',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: context.inputFill,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 320,
+                child: widget.loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredCities.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No cities found',
+                              style: TextStyle(color: context.textSecondary),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _filteredCities.length,
+                            separatorBuilder: (_, __) => Divider(
+                              height: 1,
+                              color: context.borderColor,
+                            ),
+                            itemBuilder: (_, index) {
+                              final city = _filteredCities[index];
+                              return ListTile(
+                                title: Text(city.name),
+                                subtitle: city.countryCode.isEmpty &&
+                                        city.stateCode.isEmpty
+                                    ? null
+                                    : Text(
+                                        [city.stateCode, city.countryCode]
+                                            .where((s) => s.isNotEmpty)
+                                            .join(' • '),
+                                      ),
+                                onTap: () => Navigator.pop(context, city.name),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CityOption {
+  final String name;
+  final String countryCode;
+  final String stateCode;
+  final String normalizedName;
+  final String searchHaystack;
+
+  const _CityOption({
+    required this.name,
+    required this.countryCode,
+    required this.stateCode,
+    required this.normalizedName,
+    required this.searchHaystack,
+  });
 }
 
 class _ImageGrid extends StatelessWidget {

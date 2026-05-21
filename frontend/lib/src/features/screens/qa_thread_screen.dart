@@ -365,33 +365,13 @@ class _AnswersHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          'Answers',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimary,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: context.inputFill,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: context.textSecondary,
-            ),
-          ),
-        ),
-      ],
+    return Text(
+      'Answers',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: context.textPrimary,
+      ),
     );
   }
 }
@@ -455,6 +435,7 @@ class _AnswerBlock extends ConsumerWidget {
                   postId: postId,
                   answer: answer,
                   onReply: () => onReply(answer),
+                  enabled: !answer.senderOnly,
                 ),
                 if (replies.isNotEmpty)
                   Padding(
@@ -501,6 +482,7 @@ class _AnswerBlock extends ConsumerWidget {
                                 answer: r,
                                 onReply: () => onReply(r),
                                 compact: true,
+                                enabled: !r.senderOnly,
                               ),
                             ],
                           ),
@@ -520,16 +502,29 @@ class _AnswerReactionBar extends ConsumerWidget {
   final Comment answer;
   final VoidCallback onReply;
   final bool compact;
+  final bool enabled;
 
   const _AnswerReactionBar({
     required this.postId,
     required this.answer,
     required this.onReply,
     this.compact = false,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!enabled) {
+      return Text(
+        'Visible only to you',
+        style: TextStyle(
+          fontSize: compact ? 11 : 12,
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFFB00020),
+        ),
+      );
+    }
+
     final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final service = ref.read(commentServiceProvider);
 
@@ -859,13 +854,27 @@ class _AnswerRow extends StatelessWidget {
                     text: comment.text,
                     style: TextStyle(
                       fontSize: compact ? 12 : 14,
-                      color: context.textSecondary,
+                      color: comment.profanityFiltered
+                          ? const Color(0xFFB00020)
+                          : context.textSecondary,
                       height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
+            if (comment.senderOnly)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Visible only to you',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFB00020),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

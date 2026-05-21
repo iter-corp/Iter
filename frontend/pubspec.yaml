@@ -69,6 +69,8 @@ dependencies:
   crypto: ^3.0.7
   shared_preferences: ^2.3.2
   package_info_plus: ^8.0.0
+  country_state_city: ^0.1.6
+  diacritic: ^0.1.6
 
   # End-to-end encryption (1:1 chats)
   # X25519 + AES-GCM via the dart:cryptography package, hardware-accelerated

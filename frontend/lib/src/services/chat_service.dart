@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import 'message_cache.dart';
+import 'profanity_filter_service.dart';
 
 // ─────────────────────────────────────────────
 // Models
@@ -51,6 +52,7 @@ class ChatMessage {
 
   final DateTime? createdAt;
   final List<String> seenBy;
+  final bool profanityFiltered;
 
   bool get hasLocation => locationLat != null && locationLng != null;
 
@@ -80,6 +82,7 @@ class ChatMessage {
     this.locationLabel,
     this.createdAt,
     required this.seenBy,
+    this.profanityFiltered = false,
     this.encryptedUnreadable = false,
   });
 
@@ -117,7 +120,13 @@ class ChatMessage {
     return ChatMessage(
       id: doc.id,
       senderUid: (d['senderUid'] as String?) ?? '',
-      text: pickStr('t', 'text'),
+      text: (() {
+        final senderOnly = d['senderOnlyText'] as String?;
+        if (senderOnly != null && senderOnly.trim().isNotEmpty) {
+          return senderOnly;
+        }
+        return pickStr('t', 'text');
+      })(),
       imageUrl: d['imageUrl'] as String?,
       videoUrl: d['videoUrl'] as String?,
       fileUrl: d['fileUrl'] as String?,
@@ -140,6 +149,8 @@ class ChatMessage {
       locationLabel: pickOptStr('ll', 'locationLabel'),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       seenBy: List<String>.from(d['seenBy'] as List? ?? []),
+      profanityFiltered: d['profanityFiltered'] == true ||
+          (((d['moderation'] as Map?)?['type'] as String?) == 'profanity'),
       encryptedUnreadable: decryptionFailed,
     );
   }
@@ -174,6 +185,7 @@ class ChatMessage {
         if (locationLabel != null) 'locationLabel': locationLabel,
         if (createdAt != null) 'createdAtMs': createdAt!.millisecondsSinceEpoch,
         'seenBy': seenBy,
+        if (profanityFiltered) 'profanityFiltered': true,
       };
 
   /// Rebuild a [ChatMessage] from a [toCacheJson] map. The snapshot path
@@ -204,9 +216,11 @@ class ChatMessage {
         locationLng: (m['locationLng'] as num?)?.toDouble(),
         locationLabel: m['locationLabel'] as String?,
         createdAt: (m['createdAtMs'] as num?) != null
-            ? DateTime.fromMillisecondsSinceEpoch((m['createdAtMs'] as num).toInt())
+            ? DateTime.fromMillisecondsSinceEpoch(
+                (m['createdAtMs'] as num).toInt())
             : null,
         seenBy: List<String>.from((m['seenBy'] as List?) ?? const []),
+        profanityFiltered: m['profanityFiltered'] == true,
       );
 }
 
@@ -364,6 +378,7 @@ class ChatService {
   }
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final ProfanityFilterService _profanityFilter = ProfanityFilterService();
 
   DocumentReference<Map<String, dynamic>> _chatDoc(String chatId) =>
       _db.collection('chats').doc(chatId);
@@ -382,9 +397,22 @@ class ChatService {
   }
 
   bool _isVisibleToUser(Map<String, dynamic> data, String uid) =>
-      !_isDeletedForEveryone(data) && !_isDeletedForUser(data, uid);
+      !_isDeletedForEveryone(data) &&
+      !_isDeletedForUser(data, uid) &&
+      (() {
+        final visibleTo = List<String>.from(
+          data['visibleToUids'] as List? ?? const [],
+        );
+        // Backward-compatible: if the field is absent we keep old behavior.
+        if (visibleTo.isEmpty) return true;
+        return visibleTo.contains(uid);
+      })();
 
   String _previewTextForMessage(Map<String, dynamic> data) {
+    if (data['profanityFiltered'] == true ||
+        (((data['moderation'] as Map?)?['type'] as String?) == 'profanity')) {
+      return 'Message visible only to sender';
+    }
     final text = (data['text'] as String? ?? '').trim();
     if (text.isNotEmpty) return text;
     // Legacy ciphertext from before the encryption stack was removed —
@@ -608,6 +636,8 @@ class ChatService {
         normalizedStickerUrl != null && normalizedStickerUrl.isNotEmpty;
     final hasLocation = locationLat != null && locationLng != null;
     final normalizedLocationLabel = locationLabel?.trim();
+    final profanityMatches = await _profanityFilter.findMatches(trimmedText);
+    final isProfanityFiltered = profanityMatches.isNotEmpty;
     if (trimmedText.isEmpty &&
         !hasImage &&
         !hasVideo &&
@@ -640,34 +670,62 @@ class ChatService {
                 orElse: () => '',
               ),
           ];
+    final visibleTo = isProfanityFiltered
+        ? <String>[senderUid]
+        : <String>{
+            senderUid,
+            ...recipients.where((u) => u.isNotEmpty),
+          }.toList();
+    final unreadRecipients =
+        isProfanityFiltered ? const <String>[] : recipients;
 
     final batch = _db.batch();
     final msgRef = _messagesCol(chatId).doc();
     final chatRef = _chatDoc(chatId);
     // Inbox preview text — falls back to a structural label when the
     // message is just media.
-    final lastMessage = trimmedText.isNotEmpty
-        ? trimmedText
-        : hasSticker
-            ? 'Sent a sticker'
-            : hasSharedPost
-                ? 'Shared a post'
-                : hasVoice
-                    ? 'Voice message'
-                    : hasVideo
-                        ? 'Sent a video'
-                        : hasFile
-                            ? 'Sent a file'
-                            : hasImage
-                                ? 'Sent a photo'
-                                : hasLocation
-                                    ? '📍 Shared a location'
-                                    : '';
+    final lastMessage = isProfanityFiltered
+        ? 'Message visible only to sender'
+        : trimmedText.isNotEmpty
+            ? trimmedText
+            : hasSticker
+                ? 'Sent a sticker'
+                : hasSharedPost
+                    ? 'Shared a post'
+                    : hasVoice
+                        ? 'Voice message'
+                        : hasVideo
+                            ? 'Sent a video'
+                            : hasFile
+                                ? 'Sent a file'
+                                : hasImage
+                                    ? 'Sent a photo'
+                                    : hasLocation
+                                        ? '📍 Shared a location'
+                                        : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,
-      if (!isGroup) 'receiverUid': receiverUid,
-      'text': trimmedText,
+      // Spark compatibility: if a legacy onCreate function is still active,
+      // this prevents accidental receiver fanout for sender-only messages.
+      'receiverUid': isProfanityFiltered
+          ? senderUid
+          : (receiverUid.trim().isNotEmpty
+              ? receiverUid.trim()
+              : allParticipants.firstWhere(
+                  (u) => u != senderUid,
+                  orElse: () => '',
+                )),
+      'text': isProfanityFiltered ? '' : trimmedText,
+      if (isProfanityFiltered) 'senderOnlyText': trimmedText,
+      'visibleToUids': visibleTo,
+      if (isProfanityFiltered) 'visibility': 'sender_only',
+      if (isProfanityFiltered) 'profanityFiltered': true,
+      if (isProfanityFiltered)
+        'moderation': {
+          'type': 'profanity',
+          'matched': profanityMatches,
+        },
       'imageUrl': normalizedImageUrl,
       if (hasVideo) 'videoUrl': normalizedVideoUrl,
       if (hasFile) 'fileUrl': normalizedFileUrl,
@@ -715,8 +773,8 @@ class ChatService {
     // message in their Requests tab even though they've already opted
     // into each other's content.
     final acceptedUids = <String>{senderUid};
-    if (!isGroup && recipients.length == 1) {
-      final receiver = recipients.first;
+    if (!isGroup && unreadRecipients.length == 1) {
+      final receiver = unreadRecipients.first;
       if (receiver.isNotEmpty && await _isMutualFollow(senderUid, receiver)) {
         acceptedUids.add(receiver);
       }
@@ -729,7 +787,7 @@ class ChatService {
       'acceptedBy': FieldValue.arrayUnion(acceptedUids.toList()),
       'unread.$senderUid': 0,
     };
-    for (final uid in recipients) {
+    for (final uid in unreadRecipients) {
       if (uid.isEmpty) continue;
       summary['unread.$uid'] = FieldValue.increment(1);
     }

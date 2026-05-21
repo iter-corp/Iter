@@ -49,45 +49,58 @@ class AdminEventsScreen extends ConsumerWidget {
                   style: TextStyle(color: context.textSecondary)),
             );
           }
-          return ListView.separated(
-            padding: EdgeInsets.only(bottom: bottomInset + 12),
+          return ListView.builder(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
             itemCount: events.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final e = events[i];
               final url = e.imageUrls.isNotEmpty ? e.imageUrls.first : null;
-              return ListTile(
-                leading: SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: url != null
-                        ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)
-                        : Container(
-                            color: context.inputFill,
-                            child:
-                                Icon(Icons.event, color: context.textSecondary),
-                          ),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: context.cardBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: context.borderColor),
                   ),
-                ),
-                title:
-                    Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                  e.location,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.textSecondary, fontSize: 12),
-                ),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => _EventEditorScreen(existing: e),
+                  child: ListTile(
+                    leading: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: url != null
+                            ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)
+                            : Container(
+                                color: context.inputFill,
+                                child: Icon(Icons.event,
+                                    color: context.textSecondary),
+                              ),
+                      ),
+                    ),
+                    title: Text(
+                      e.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      e.location,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(color: context.textSecondary, fontSize: 12),
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => _EventEditorScreen(existing: e),
+                      ),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _confirmDelete(context, ref, e.id),
+                    ),
                   ),
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _confirmDelete(context, ref, e.id),
                 ),
               );
             },

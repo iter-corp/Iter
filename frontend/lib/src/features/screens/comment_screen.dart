@@ -121,11 +121,12 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
     // (e.g. older posts from before client-side increment was wired), bring
     // it in sync with the actual comments subcollection length.
     commentsAsync.whenData((list) {
-      if (list.length != widget.post.commentsCount) {
+      final publicCount = list.where((c) => !c.senderOnly).length;
+      if (publicCount != widget.post.commentsCount) {
         FirebaseFirestore.instance
             .collection('posts')
             .doc(widget.post.id)
-            .update({'commentsCount': list.length}).catchError((_) {});
+            .update({'commentsCount': publicCount}).catchError((_) {});
       }
     });
 
@@ -165,7 +166,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${commentsAsync.value?.length ?? widget.post.commentsCount}',
+                    '${(commentsAsync.valueOrNull ?? const <Comment>[]).where((c) => !c.senderOnly).length}',
                     style:
                         TextStyle(color: context.textSecondary, fontSize: 14),
                   ),
@@ -466,6 +467,7 @@ class _CommentTile extends ConsumerWidget {
         ? 'deleted user'
         : ((liveUser?['username'] as String?) ?? comment.authorUsername);
     final hasAvatar = avatar != null && avatar.isNotEmpty;
+    final senderOnlyLabel = comment.senderOnly;
     final avatarRadius = comment.isReply ? 14.0 : 16.0;
     final commentService = ref.read(commentServiceProvider);
     final likesCountStream = commentService.streamCommentLikesCount(
@@ -483,6 +485,7 @@ class _CommentTile extends ConsumerWidget {
     Future<void> onToggleLike() async {
       final uid = currentUid;
       if (uid == null) return;
+      if (comment.senderOnly) return;
       await commentService.toggleLikeComment(
         postId: post.id,
         commentId: comment.id,
@@ -553,8 +556,12 @@ class _CommentTile extends ConsumerWidget {
                   const SizedBox(height: 2),
                   RichText(
                     text: TextSpan(
-                      style:
-                          TextStyle(fontSize: 13, color: context.textPrimary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: comment.profanityFiltered
+                            ? const Color(0xFFB00020)
+                            : context.textPrimary,
+                      ),
                       children: [
                         if (comment.replyToUsername != null &&
                             comment.replyToUsername!.isNotEmpty)
@@ -569,78 +576,75 @@ class _CommentTile extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      StreamBuilder<bool>(
-                        stream: isLikedStream,
-                        builder: (context, likeSnap) {
-                          final isLiked = likeSnap.data ?? false;
-                          return GestureDetector(
-                            onTap: onToggleLike,
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    isLiked
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    size: 14,
-                                    color: isLiked
-                                        ? const Color(0xFFFF4D6D)
-                                        : context.textSecondary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  StreamBuilder<int>(
-                                    stream: likesCountStream,
-                                    builder: (context, countSnap) {
-                                      final count = countSnap.data ?? 0;
-                                      return Text(
-                                        count > 0 ? '$count' : 'Like',
-                                        style: TextStyle(
-                                          color: isLiked
-                                              ? const Color(0xFFFF4D6D)
-                                              : context.textSecondary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 14),
-                      GestureDetector(
-                        onTap: onReply,
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            'Reply',
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                  if (senderOnlyLabel)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Visible only to you',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFB00020),
                         ),
                       ),
-                      if (comment.text.trim().isNotEmpty) ...[
+                    ),
+                  const SizedBox(height: 2),
+                  if (!comment.senderOnly)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        StreamBuilder<bool>(
+                          stream: isLikedStream,
+                          builder: (context, likeSnap) {
+                            final isLiked = likeSnap.data ?? false;
+                            return GestureDetector(
+                              onTap: onToggleLike,
+                              behavior: HitTestBehavior.opaque,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isLiked
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      size: 14,
+                                      color: isLiked
+                                          ? const Color(0xFFFF4D6D)
+                                          : context.textSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    StreamBuilder<int>(
+                                      stream: likesCountStream,
+                                      builder: (context, countSnap) {
+                                        final count = countSnap.data ?? 0;
+                                        return Text(
+                                          count > 0 ? '$count' : 'Like',
+                                          style: TextStyle(
+                                            color: isLiked
+                                                ? const Color(0xFFFF4D6D)
+                                                : context.textSecondary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(width: 14),
                         GestureDetector(
-                          onTap: () => _translateCommentToEnglish(context),
+                          onTap: onReply,
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 2),
                             child: Text(
-                              'Translate',
+                              'Reply',
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -649,18 +653,38 @@ class _CommentTile extends ConsumerWidget {
                             ),
                           ),
                         ),
+                        if (comment.text.trim().isNotEmpty) ...[
+                          const SizedBox(width: 14),
+                          GestureDetector(
+                            onTap: () => _translateCommentToEnglish(context),
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text(
+                                'Translate',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),
             if (canDelete)
               GestureDetector(
                 onTap: () async {
-                  await ref
-                      .read(commentServiceProvider)
-                      .deleteComment(postId: post.id, commentId: comment.id);
+                  await ref.read(commentServiceProvider).deleteComment(
+                        postId: post.id,
+                        commentId: comment.id,
+                        senderOnly: comment.senderOnly,
+                        currentUid: currentUid,
+                      );
                 },
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8),

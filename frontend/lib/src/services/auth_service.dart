@@ -33,6 +33,11 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  /// Set to true only when the current session started via sign-up so the
+  /// router knows to send the user to onboarding. Cleared on login or
+  /// sign-out so returning users always land on /home.
+  bool justSignedUp = false;
+
   Map<String, dynamic> _defaultUserDoc(User user, {String? avatarUrl}) {
     return {
       'uid': user.uid,
@@ -71,6 +76,7 @@ class AuthService {
     );
     final user = cred.user;
     if (user != null) {
+      justSignedUp = true;
       await _db.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'email': user.email,
@@ -97,6 +103,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    justSignedUp = false;
     final cred = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -130,6 +137,7 @@ class AuthService {
     // Validate intent BEFORE _ensureUserDoc and before the router can react
     // to auth state changes, so there is no visible login flash.
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
+    justSignedUp = isNew;
     if (intent == GoogleAuthIntent.login && isNew) {
       try {
         await user.delete();
@@ -202,6 +210,7 @@ class AuthService {
     await _ensureUserDoc(user);
 
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
+    justSignedUp = isNew;
     if (isNew) {
       final displayName = [
         appleCredential.givenName,
@@ -243,6 +252,7 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    justSignedUp = false;
     try {
       await _googleSignIn.signOut();
     } catch (_) {}

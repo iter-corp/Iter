@@ -1172,13 +1172,8 @@ class _QaThreadCard extends ConsumerWidget {
                   runSpacing: 8,
                   children: [
                     _QaMeta(
-                      icon: Icons.chat_bubble_outline,
-                      label: '${post.commentsCount} answers',
-                      onTap: openThread,
-                    ),
-                    _QaMeta(
                       icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                      label: '${post.likesCount} helpful',
+                      label: '${post.likesCount}',
                       highlighted: isLiked,
                       onTap: () async {
                         try {
@@ -1195,8 +1190,8 @@ class _QaThreadCard extends ConsumerWidget {
                       },
                     ),
                     _QaMeta(
-                      icon: Icons.edit_outlined,
-                      label: 'Write answer',
+                      icon: Icons.chat_bubble_outline,
+                      label: '${post.commentsCount} Answers',
                       onTap: openThread,
                     ),
                   ],
@@ -1800,6 +1795,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
 
   Future<void> _submit() async {
     final question = _questionCtrl.text.trim();
+    final details = _detailsCtrl.text.trim();
     if (question.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Write your question first')));
@@ -1809,12 +1805,31 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
     try {
       await ref.read(postServiceProvider).createQaPost(
             question: question,
-            details: _detailsCtrl.text.trim(),
+            details: details,
           );
       if (!mounted) return;
       Navigator.pop(context);
       widget.onPosted();
     } catch (e) {
+      if (e is DiscussPostBlockedException) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Question blocked'),
+            content: const Text(
+              'You cannot post this Discuss question because it contains blocked words.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Error: $e')));

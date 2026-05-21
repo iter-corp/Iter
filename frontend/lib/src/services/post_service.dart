@@ -5,6 +5,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../features/model/post_model.dart';
 import 'notification_service.dart';
+import 'profanity_filter_service.dart';
+
+class DiscussPostBlockedException implements Exception {
+  final List<String> matchedWords;
+
+  const DiscussPostBlockedException(this.matchedWords);
+
+  @override
+  String toString() =>
+      'This discuss question contains blocked words and cannot be posted.';
+}
+
+class PostBlockedException implements Exception {
+  final List<String> matchedWords;
+
+  const PostBlockedException(this.matchedWords);
+
+  @override
+  String toString() =>
+      'This post contains blocked words and cannot be published.';
+}
 
 class TravelPlaceResult {
   final String name;
@@ -24,6 +45,7 @@ class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notifications = NotificationService();
+  final ProfanityFilterService _profanityFilter = ProfanityFilterService();
 
   CollectionReference<Map<String, dynamic>> get _posts =>
       _db.collection('posts');
@@ -48,6 +70,14 @@ class PostService {
     final placeName = (postPlaceName ?? '').trim();
     final placeCity = (postPlaceCity ?? '').trim();
     final hasLocation = postLat != null && postLng != null;
+
+    final moderationText = [caption.trim(), placeName, placeCity]
+        .where((part) => part.isNotEmpty)
+        .join('\n');
+    final matches = await _profanityFilter.findMatches(moderationText);
+    if (matches.isNotEmpty) {
+      throw PostBlockedException(matches);
+    }
 
     final ref = await _posts.add({
       'authorUid': user.uid,
@@ -189,6 +219,11 @@ class PostService {
     final caption = details.trim().isEmpty
         ? question.trim()
         : '${question.trim()}\n${details.trim()}';
+
+    final matches = await _profanityFilter.findMatches(caption);
+    if (matches.isNotEmpty) {
+      throw DiscussPostBlockedException(matches);
+    }
 
     final ref = await _posts.add({
       'authorUid': user.uid,

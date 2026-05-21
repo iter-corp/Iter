@@ -20,10 +20,31 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   final _iosUrlCtrl = TextEditingController();
   final _androidUrlCtrl = TextEditingController();
   final _newTypeCtrl = TextEditingController();
-  final _newCountryCtrl = TextEditingController();
+  final _newProfessionCtrl = TextEditingController();
+  final _newFieldCtrl = TextEditingController();
+  final _newAcademicLevelCtrl = TextEditingController();
+  final _newGoalCtrl = TextEditingController();
+  final _newProfanityCtrl = TextEditingController();
+  String? _newTypeError;
+  String? _newProfessionError;
+  String? _newFieldError;
+  String? _newAcademicLevelError;
+  String? _newGoalError;
+  String? _newProfanityError;
   bool _hydrated = false;
   bool _saving = false;
   AdminConfig _cfg = const AdminConfig();
+
+  String? _validateBadgeInput({
+    required String value,
+    required List<String> existing,
+  }) {
+    if (value.isEmpty) return 'You must write something.';
+    if (existing.any((x) => x.toLowerCase() == value.toLowerCase())) {
+      return 'The badge you are adding already exists.';
+    }
+    return null;
+  }
 
   void _hydrate(AdminConfig cfg) {
     if (_hydrated) return;
@@ -44,18 +65,23 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     _iosUrlCtrl.dispose();
     _androidUrlCtrl.dispose();
     _newTypeCtrl.dispose();
-    _newCountryCtrl.dispose();
+    _newProfessionCtrl.dispose();
+    _newFieldCtrl.dispose();
+    _newAcademicLevelCtrl.dispose();
+    _newGoalCtrl.dispose();
+    _newProfanityCtrl.dispose();
     super.dispose();
   }
 
   void _addEventType() {
     final v = _newTypeCtrl.text.trim();
-    if (v.isEmpty) return;
-    if (_cfg.eventTypes.any((t) => t.toLowerCase() == v.toLowerCase())) {
-      _newTypeCtrl.clear();
+    final error = _validateBadgeInput(value: v, existing: _cfg.eventTypes);
+    if (error != null) {
+      setState(() => _newTypeError = error);
       return;
     }
     setState(() {
+      _newTypeError = null;
       _cfg = _cfg.copyWith(eventTypes: [..._cfg.eventTypes, v]);
       _newTypeCtrl.clear();
     });
@@ -67,23 +93,129 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         eventTypes: _cfg.eventTypes.where((x) => x != t).toList()));
   }
 
-  void _addCountry() {
-    final v = _newCountryCtrl.text.trim();
-    if (v.isEmpty) return;
-    if (_cfg.eventCountries.any((c) => c.toLowerCase() == v.toLowerCase())) {
-      _newCountryCtrl.clear();
+  void _addProfession() {
+    final v = _newProfessionCtrl.text.trim();
+    final error = _validateBadgeInput(
+      value: v,
+      existing: _cfg.profileProfessionOptions,
+    );
+    if (error != null) {
+      setState(() => _newProfessionError = error);
       return;
     }
     setState(() {
-      _cfg = _cfg.copyWith(eventCountries: [..._cfg.eventCountries, v]);
-      _newCountryCtrl.clear();
+      _newProfessionError = null;
+      _cfg = _cfg.copyWith(
+        profileProfessionOptions: [..._cfg.profileProfessionOptions, v],
+      );
+      _newProfessionCtrl.clear();
     });
   }
 
-  void _removeCountry(String c) {
-    if (_cfg.eventCountries.length <= 1) return;
+  void _removeProfession(String v) {
+    if (_cfg.profileProfessionOptions.length <= 1) return;
     setState(() => _cfg = _cfg.copyWith(
-        eventCountries: _cfg.eventCountries.where((x) => x != c).toList()));
+          profileProfessionOptions:
+              _cfg.profileProfessionOptions.where((x) => x != v).toList(),
+        ));
+  }
+
+  void _addField() {
+    final v = _newFieldCtrl.text.trim();
+    final error =
+        _validateBadgeInput(value: v, existing: _cfg.profileFieldOptions);
+    if (error != null) {
+      setState(() => _newFieldError = error);
+      return;
+    }
+    setState(() {
+      _newFieldError = null;
+      _cfg = _cfg.copyWith(
+        profileFieldOptions: [..._cfg.profileFieldOptions, v],
+      );
+      _newFieldCtrl.clear();
+    });
+  }
+
+  void _removeField(String v) {
+    if (_cfg.profileFieldOptions.length <= 1) return;
+    setState(() => _cfg = _cfg.copyWith(
+          profileFieldOptions:
+              _cfg.profileFieldOptions.where((x) => x != v).toList(),
+        ));
+  }
+
+  void _addAcademicLevel() {
+    final v = _newAcademicLevelCtrl.text.trim();
+    final error = _validateBadgeInput(
+      value: v,
+      existing: _cfg.profileAcademicLevelOptions,
+    );
+    if (error != null) {
+      setState(() => _newAcademicLevelError = error);
+      return;
+    }
+    setState(() {
+      _newAcademicLevelError = null;
+      _cfg = _cfg.copyWith(
+        profileAcademicLevelOptions: [..._cfg.profileAcademicLevelOptions, v],
+      );
+      _newAcademicLevelCtrl.clear();
+    });
+  }
+
+  void _removeAcademicLevel(String v) {
+    if (_cfg.profileAcademicLevelOptions.length <= 1) return;
+    setState(() => _cfg = _cfg.copyWith(
+          profileAcademicLevelOptions:
+              _cfg.profileAcademicLevelOptions.where((x) => x != v).toList(),
+        ));
+  }
+
+  void _addGoal() {
+    final v = _newGoalCtrl.text.trim();
+    final error =
+        _validateBadgeInput(value: v, existing: _cfg.profileGoalOptions);
+    if (error != null) {
+      setState(() => _newGoalError = error);
+      return;
+    }
+    setState(() {
+      _newGoalError = null;
+      _cfg = _cfg.copyWith(profileGoalOptions: [..._cfg.profileGoalOptions, v]);
+      _newGoalCtrl.clear();
+    });
+  }
+
+  void _removeGoal(String v) {
+    if (_cfg.profileGoalOptions.length <= 1) return;
+    setState(() => _cfg = _cfg.copyWith(
+          profileGoalOptions:
+              _cfg.profileGoalOptions.where((x) => x != v).toList(),
+        ));
+  }
+
+  void _addProfanity() {
+    final v = _newProfanityCtrl.text.trim().toLowerCase();
+    final error =
+        _validateBadgeInput(value: v, existing: _cfg.profanityWordsEn);
+    if (error != null) {
+      setState(() => _newProfanityError = error);
+      return;
+    }
+    setState(() {
+      _newProfanityError = null;
+      _cfg = _cfg.copyWith(
+          profanityWordsEn: [..._cfg.profanityWordsEn, v]..sort());
+      _newProfanityCtrl.clear();
+    });
+  }
+
+  void _removeProfanity(String v) {
+    if (_cfg.profanityWordsEn.length <= 1) return;
+    setState(() => _cfg = _cfg.copyWith(
+          profanityWordsEn: _cfg.profanityWordsEn.where((x) => x != v).toList(),
+        ));
   }
 
   Future<void> _save() async {
@@ -95,7 +227,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         contactEmail: _contactEmailCtrl.text.trim(),
         iosAppStoreUrl: _iosUrlCtrl.text.trim(),
         androidPlayStoreUrl: _androidUrlCtrl.text.trim(),
-        // _cfg already carries the edited eventTypes / eventCountries lists.
+        // _cfg already carries the edited list fields.
       );
       await ref.read(adminServiceProvider).saveConfig(next);
       if (mounted) {
@@ -239,25 +371,121 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                 items: _cfg.eventTypes,
                 controller: _newTypeCtrl,
                 hint: 'Add an event type',
+                errorText: _newTypeError,
+                onInputChanged: (_) {
+                  if (_newTypeError != null)
+                    setState(() => _newTypeError = null);
+                },
                 onAdd: _addEventType,
                 onRemove: _removeEventType,
               ),
               const SizedBox(height: 16),
-              _section('Event countries'),
+              _section('Profile professions'),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Countries admins tag events with, and users filter '
-                  'notifications by.',
+                  'Choices shown in profile setup/edit for profession.',
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
-                items: _cfg.eventCountries,
-                controller: _newCountryCtrl,
-                hint: 'Add a country',
-                onAdd: _addCountry,
-                onRemove: _removeCountry,
+                items: _cfg.profileProfessionOptions,
+                controller: _newProfessionCtrl,
+                hint: 'Add a profession',
+                errorText: _newProfessionError,
+                onInputChanged: (_) {
+                  if (_newProfessionError != null) {
+                    setState(() => _newProfessionError = null);
+                  }
+                },
+                onAdd: _addProfession,
+                onRemove: _removeProfession,
+              ),
+              const SizedBox(height: 16),
+              _section('Profile fields'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Choices shown in profile setup/edit for field.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              _editableList(
+                items: _cfg.profileFieldOptions,
+                controller: _newFieldCtrl,
+                hint: 'Add a field',
+                errorText: _newFieldError,
+                onInputChanged: (_) {
+                  if (_newFieldError != null)
+                    setState(() => _newFieldError = null);
+                },
+                onAdd: _addField,
+                onRemove: _removeField,
+              ),
+              const SizedBox(height: 16),
+              _section('Profile academic levels'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Choices shown in profile setup/edit for academic level.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              _editableList(
+                items: _cfg.profileAcademicLevelOptions,
+                controller: _newAcademicLevelCtrl,
+                hint: 'Add an academic level',
+                errorText: _newAcademicLevelError,
+                onInputChanged: (_) {
+                  if (_newAcademicLevelError != null) {
+                    setState(() => _newAcademicLevelError = null);
+                  }
+                },
+                onAdd: _addAcademicLevel,
+                onRemove: _removeAcademicLevel,
+              ),
+              const SizedBox(height: 16),
+              _section('Profile goals'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Choices shown in profile setup/edit for goals.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              _editableList(
+                items: _cfg.profileGoalOptions,
+                controller: _newGoalCtrl,
+                hint: 'Add a goal',
+                errorText: _newGoalError,
+                onInputChanged: (_) {
+                  if (_newGoalError != null)
+                    setState(() => _newGoalError = null);
+                },
+                onAdd: _addGoal,
+                onRemove: _removeGoal,
+              ),
+              const SizedBox(height: 16),
+              _section('Profanity words (English)'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  'Words that trigger sender-only moderation in direct and group chat.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ),
+              _editableList(
+                items: _cfg.profanityWordsEn,
+                controller: _newProfanityCtrl,
+                hint: 'Add a profanity word',
+                errorText: _newProfanityError,
+                onInputChanged: (_) {
+                  if (_newProfanityError != null) {
+                    setState(() => _newProfanityError = null);
+                  }
+                },
+                onAdd: _addProfanity,
+                onRemove: _removeProfanity,
               ),
               const SizedBox(height: 24),
             ],
@@ -271,6 +499,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     required List<String> items,
     required TextEditingController controller,
     required String hint,
+    String? errorText,
+    ValueChanged<String>? onInputChanged,
     required VoidCallback onAdd,
     required ValueChanged<String> onRemove,
   }) {
@@ -280,9 +510,24 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         _FocusInputRow(
           controller: controller,
           hintText: hint,
+          errorText: errorText,
+          onChanged: onInputChanged,
           onAdd: onAdd,
           decoration: _inputDecoration(hint),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              errorText,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -437,12 +682,16 @@ class _FocusInputCardState extends State<_FocusInputCard> {
 class _FocusInputRow extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
   final VoidCallback onAdd;
   final InputDecoration decoration;
 
   const _FocusInputRow({
     required this.controller,
     required this.hintText,
+    this.errorText,
+    this.onChanged,
     required this.onAdd,
     required this.decoration,
   });
@@ -480,9 +729,11 @@ class _FocusInputRowState extends State<_FocusInputRow> {
         color: context.inputFill,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _focusNode.hasFocus
-              ? AppColors.purple.withValues(alpha: 0.55)
-              : context.borderColor,
+          color: widget.errorText != null
+              ? Theme.of(context).colorScheme.error
+              : _focusNode.hasFocus
+                  ? AppColors.purple.withValues(alpha: 0.55)
+                  : context.borderColor,
           width: _focusNode.hasFocus ? 1.4 : 1,
         ),
       ),
@@ -494,6 +745,7 @@ class _FocusInputRowState extends State<_FocusInputRow> {
               focusNode: _focusNode,
               controller: widget.controller,
               textInputAction: TextInputAction.done,
+              onChanged: widget.onChanged,
               onSubmitted: (_) => widget.onAdd(),
               decoration: widget.decoration,
             ),

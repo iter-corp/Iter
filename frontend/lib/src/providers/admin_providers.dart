@@ -36,7 +36,14 @@ final adminUsersProvider =
 final adminPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
-  return ref.watch(adminServiceProvider).streamAllPosts();
+  return ref.watch(adminServiceProvider).streamRegularPosts();
+});
+
+final adminDiscussPostsProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamDiscussPosts();
 });
 
 final postReportsProvider = StreamProvider<List<PostReport>>((ref) {
@@ -89,9 +96,7 @@ final manageableEventsProvider = StreamProvider<List<AdminEvent>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
   if (ref.watch(isOrgAdminProvider) && !ref.watch(isAdminProvider)) {
-    return ref
-        .watch(adminServiceProvider)
-        .streamEventsCreatedBy(user.uid);
+    return ref.watch(adminServiceProvider).streamEventsCreatedBy(user.uid);
   }
   return ref.watch(adminServiceProvider).streamEvents();
 });

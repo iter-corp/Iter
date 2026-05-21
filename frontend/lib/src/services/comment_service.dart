@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'notification_service.dart';
+import 'profanity_filter_service.dart';
 
 class Comment {
   final String id;
@@ -13,6 +16,8 @@ class Comment {
   final String? replyToUsername;
   final int helpfulCount;
   final int unhelpfulCount;
+  final bool profanityFiltered;
+  final bool senderOnly;
 
   const Comment({
     required this.id,
@@ -25,6 +30,8 @@ class Comment {
     this.replyToUsername,
     this.helpfulCount = 0,
     this.unhelpfulCount = 0,
+    this.profanityFiltered = false,
+    this.senderOnly = false,
   });
 
   bool get isReply => parentCommentId != null;
@@ -42,6 +49,8 @@ class Comment {
       replyToUsername: d['replyToUsername'] as String?,
       helpfulCount: (d['helpfulCount'] as num?)?.toInt() ?? 0,
       unhelpfulCount: (d['unhelpfulCount'] as num?)?.toInt() ?? 0,
+      profanityFiltered: d['profanityFiltered'] == true,
+      senderOnly: d['senderOnly'] == true,
     );
   }
 }
@@ -49,9 +58,21 @@ class Comment {
 class CommentService {
   final _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
+  final ProfanityFilterService _profanityFilter = ProfanityFilterService();
 
   CollectionReference<Map<String, dynamic>> _comments(String postId) =>
       _db.collection('posts').doc(postId).collection('comments');
+
+  CollectionReference<Map<String, dynamic>> _privateComments(
+    String postId,
+    String uid,
+  ) =>
+      _db
+          .collection('posts')
+          .doc(postId)
+          .collection('privateComments')
+          .doc(uid)
+          .collection('items');
 
   CollectionReference<Map<String, dynamic>> _likes(
     String postId,
@@ -68,11 +89,50 @@ class CommentService {
   ) =>
       _comments(postId).doc(commentId).collection('reactions');
 
-  Stream<List<Comment>> streamComments(String postId) {
-    return _comments(postId)
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .map((snap) => snap.docs.map(Comment.fromDoc).toList());
+  Stream<List<Comment>> streamComments(
+    String postId, {
+    required String viewerUid,
+  }) {
+    final controller = StreamController<List<Comment>>();
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? publicSub;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? privateSub;
+    List<Comment> publicComments = const [];
+    List<Comment> privateComments = const [];
+
+    void emitMerged() {
+      final merged = [...publicComments, ...privateComments]
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      if (!controller.isClosed) controller.add(merged);
+    }
+
+    controller.onListen = () {
+      publicSub = _comments(postId)
+          .orderBy('createdAt', descending: false)
+          .snapshots()
+          .listen((snap) {
+        publicComments = snap.docs.map(Comment.fromDoc).toList();
+        emitMerged();
+      }, onError: (Object e, StackTrace st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      });
+
+      privateSub = _privateComments(postId, viewerUid)
+          .orderBy('createdAt', descending: false)
+          .snapshots()
+          .listen((snap) {
+        privateComments = snap.docs.map(Comment.fromDoc).toList();
+        emitMerged();
+      }, onError: (Object e, StackTrace st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      });
+    };
+
+    controller.onCancel = () async {
+      await publicSub?.cancel();
+      await privateSub?.cancel();
+    };
+
+    return controller.stream;
   }
 
   Future<void> addComment({
@@ -84,23 +144,40 @@ class CommentService {
     String? parentCommentId,
     String? replyToUsername,
   }) async {
-    final commentRef = _comments(postId).doc();
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    final profanityMatches = await _profanityFilter.findMatches(trimmed);
+    final isProfanityFiltered = profanityMatches.isNotEmpty;
+
+    final commentRef = isProfanityFiltered
+        ? _privateComments(postId, authorUid).doc()
+        : _comments(postId).doc();
     final batch = _db.batch();
     batch.set(commentRef, {
       'authorUid': authorUid,
       'authorUsername': authorUsername,
       'authorAvatar': authorAvatar,
-      'text': text,
+      'text': trimmed,
       'createdAt': FieldValue.serverTimestamp(),
       'helpfulCount': 0,
       'unhelpfulCount': 0,
+      if (isProfanityFiltered) 'profanityFiltered': true,
+      if (isProfanityFiltered) 'senderOnly': true,
       if (parentCommentId != null) 'parentCommentId': parentCommentId,
       if (replyToUsername != null) 'replyToUsername': replyToUsername,
     });
-    batch.update(_postRef(postId), {
-      'commentsCount': FieldValue.increment(1),
-    });
+    if (!isProfanityFiltered) {
+      batch.update(_postRef(postId), {
+        'commentsCount': FieldValue.increment(1),
+      });
+    }
     await batch.commit();
+
+    if (isProfanityFiltered) {
+      // Sender-only moderated comments never fan out notifications.
+      return;
+    }
 
     // Spark-safe fallback: generate notifications from the client for Q&A
     // events and replies when backend functions are unavailable.
@@ -159,7 +236,17 @@ class CommentService {
   Future<void> deleteComment({
     required String postId,
     required String commentId,
+    bool senderOnly = false,
+    String? currentUid,
   }) async {
+    if (senderOnly) {
+      if (currentUid == null || currentUid.isEmpty) {
+        throw ArgumentError('currentUid is required for sender-only deletes');
+      }
+      await _privateComments(postId, currentUid).doc(commentId).delete();
+      return;
+    }
+
     final batch = _db.batch();
     batch.delete(_comments(postId).doc(commentId));
     batch.update(_postRef(postId), {

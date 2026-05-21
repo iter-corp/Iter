@@ -57,7 +57,9 @@ final commentsProvider =
   final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
   final service = ref.watch(commentServiceProvider);
-  return _retryStream(() => service.streamComments(postId));
+  return _retryStream(
+    () => service.streamComments(postId, viewerUid: user.uid),
+  );
 });
 
 typedef UserAnswerReactionArgs = ({

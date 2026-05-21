@@ -27,10 +27,20 @@ class AdminConfig {
   /// [kEventTypes] when unset/empty.
   final List<String> eventTypes;
 
-  /// Country options admins tag events with and users filter notifications by.
-  /// Editable from the admin dashboard; falls back to [kEventCountries] when
-  /// unset/empty.
+  /// Country options used for event tagging/filtering. This list is static
+  /// (all countries + Online) and is not editable from the admin dashboard.
   final List<String> eventCountries;
+
+  /// Profile personalization options shown in onboarding/edit profile.
+  /// Editable from admin settings; each list falls back to canonical defaults
+  /// when unset/empty.
+  final List<String> profileProfessionOptions;
+  final List<String> profileFieldOptions;
+  final List<String> profileAcademicLevelOptions;
+  final List<String> profileGoalOptions;
+
+  /// English profanity words used by chat moderation.
+  final List<String> profanityWordsEn;
 
   const AdminConfig({
     this.storiesEnabled = true,
@@ -45,6 +55,11 @@ class AdminConfig {
     this.androidPlayStoreUrl = '',
     this.eventTypes = kEventTypes,
     this.eventCountries = kEventCountries,
+    this.profileProfessionOptions = kProfileProfessionOptions,
+    this.profileFieldOptions = kProfileFieldOptions,
+    this.profileAcademicLevelOptions = kProfileAcademicLevelOptions,
+    this.profileGoalOptions = kProfileGoalOptions,
+    this.profanityWordsEn = kProfanityWordsEn,
   });
 
   factory AdminConfig.fromMap(Map<String, dynamic>? d) {
@@ -70,7 +85,16 @@ class AdminConfig {
       iosAppStoreUrl: (m['iosAppStoreUrl'] as String?) ?? '',
       androidPlayStoreUrl: (m['androidPlayStoreUrl'] as String?) ?? '',
       eventTypes: cleanList(m['eventTypes'], kEventTypes),
-      eventCountries: cleanList(m['eventCountries'], kEventCountries),
+      eventCountries: kEventCountries,
+      profileProfessionOptions:
+          cleanList(m['profileProfessionOptions'], kProfileProfessionOptions),
+      profileFieldOptions:
+          cleanList(m['profileFieldOptions'], kProfileFieldOptions),
+      profileAcademicLevelOptions: cleanList(
+          m['profileAcademicLevelOptions'], kProfileAcademicLevelOptions),
+      profileGoalOptions:
+          cleanList(m['profileGoalOptions'], kProfileGoalOptions),
+      profanityWordsEn: cleanList(m['profanityWordsEn'], kProfanityWordsEn),
     );
   }
 
@@ -86,7 +110,11 @@ class AdminConfig {
         'iosAppStoreUrl': iosAppStoreUrl,
         'androidPlayStoreUrl': androidPlayStoreUrl,
         'eventTypes': eventTypes,
-        'eventCountries': eventCountries,
+        'profileProfessionOptions': profileProfessionOptions,
+        'profileFieldOptions': profileFieldOptions,
+        'profileAcademicLevelOptions': profileAcademicLevelOptions,
+        'profileGoalOptions': profileGoalOptions,
+        'profanityWordsEn': profanityWordsEn,
       };
 
   AdminConfig copyWith({
@@ -102,6 +130,11 @@ class AdminConfig {
     String? androidPlayStoreUrl,
     List<String>? eventTypes,
     List<String>? eventCountries,
+    List<String>? profileProfessionOptions,
+    List<String>? profileFieldOptions,
+    List<String>? profileAcademicLevelOptions,
+    List<String>? profileGoalOptions,
+    List<String>? profanityWordsEn,
   }) {
     return AdminConfig(
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
@@ -116,9 +149,80 @@ class AdminConfig {
       androidPlayStoreUrl: androidPlayStoreUrl ?? this.androidPlayStoreUrl,
       eventTypes: eventTypes ?? this.eventTypes,
       eventCountries: eventCountries ?? this.eventCountries,
+      profileProfessionOptions:
+          profileProfessionOptions ?? this.profileProfessionOptions,
+      profileFieldOptions: profileFieldOptions ?? this.profileFieldOptions,
+      profileAcademicLevelOptions:
+          profileAcademicLevelOptions ?? this.profileAcademicLevelOptions,
+      profileGoalOptions: profileGoalOptions ?? this.profileGoalOptions,
+      profanityWordsEn: profanityWordsEn ?? this.profanityWordsEn,
     );
   }
 }
+
+/// Canonical personalization options shown in onboarding/edit-profile. Admins
+/// can override these lists from App settings.
+const List<String> kProfileProfessionOptions = [
+  'Student',
+  'Researcher',
+  'Professor',
+  'Traveler',
+];
+
+const List<String> kProfileFieldOptions = [
+  'Tech',
+  'Medicine',
+  'Law',
+  'Business',
+  'Arts',
+  'Engineering',
+  'Science',
+  'Education',
+  'Social sciences',
+  'Other',
+];
+
+const List<String> kProfileAcademicLevelOptions = [
+  'Undergraduate',
+  'Masters',
+  'PhD',
+  'Faculty',
+];
+
+const List<String> kProfileGoalOptions = [
+  'Internships',
+  'Scholarships',
+  'Conferences',
+  'Research',
+  'Networking',
+  'Local events',
+];
+
+const List<String> kProfanityWordsEn = [
+  'arse',
+  'asshole',
+  'bastard',
+  'bitch',
+  'bloody',
+  'bollocks',
+  'bullshit',
+  'crap',
+  'damn',
+  'dick',
+  'freaking',
+  'fuck',
+  'fucker',
+  'fucking',
+  'goddamn',
+  'hell',
+  'motherfucker',
+  'piss',
+  'prick',
+  'shit',
+  'slut',
+  'whore',
+  'wanker',
+];
 
 /// Canonical event-type options. Admins pick one when creating an event;
 /// users can filter event notifications by these.
@@ -134,30 +238,206 @@ const List<String> kEventTypes = [
   'other',
 ];
 
-/// Canonical country options. Admins tag an event with the country it takes
-/// place in; users filter event notifications by these. Keeping a curated
-/// list (instead of free text) means the user's picks always match what the
-/// admin chose. Stored lower-cased on the event doc as `locationCountry`.
+/// Canonical static country options used for event tagging/filtering.
+/// Kept comprehensive (all countries + Online) so admins do not need to
+/// maintain this list from settings. Stored lower-cased on event docs as
+/// `locationCountry`.
 const List<String> kEventCountries = [
-  'Iraq',
-  'Kurdistan Region',
-  'Turkey',
-  'Jordan',
-  'Lebanon',
+  'Afghanistan',
+  'Albania',
+  'Algeria',
+  'Andorra',
+  'Angola',
+  'Antigua and Barbuda',
+  'Argentina',
+  'Armenia',
+  'Australia',
+  'Austria',
+  'Azerbaijan',
+  'Bahamas',
+  'Bahrain',
+  'Bangladesh',
+  'Barbados',
+  'Belarus',
+  'Belgium',
+  'Belize',
+  'Benin',
+  'Bhutan',
+  'Bolivia',
+  'Bosnia and Herzegovina',
+  'Botswana',
+  'Brazil',
+  'Brunei',
+  'Bulgaria',
+  'Burkina Faso',
+  'Burundi',
+  'Cabo Verde',
+  'Cambodia',
+  'Cameroon',
+  'Canada',
+  'Central African Republic',
+  'Chad',
+  'Chile',
+  'China',
+  'Colombia',
+  'Comoros',
+  'Congo',
+  'Costa Rica',
+  'Cote d\'Ivoire',
+  'Croatia',
+  'Cuba',
+  'Cyprus',
+  'Czechia',
+  'Democratic Republic of the Congo',
+  'Denmark',
+  'Djibouti',
+  'Dominica',
+  'Dominican Republic',
+  'Ecuador',
   'Egypt',
-  'United Arab Emirates',
-  'Saudi Arabia',
+  'El Salvador',
+  'Equatorial Guinea',
+  'Eritrea',
+  'Estonia',
+  'Eswatini',
+  'Ethiopia',
+  'Fiji',
+  'Finland',
+  'France',
+  'Gabon',
+  'Gambia',
+  'Georgia',
+  'Germany',
+  'Ghana',
+  'Greece',
+  'Grenada',
+  'Guatemala',
+  'Guinea',
+  'Guinea-Bissau',
+  'Guyana',
+  'Haiti',
+  'Honduras',
+  'Hungary',
+  'Iceland',
+  'India',
+  'Indonesia',
+  'Iran',
+  'Iraq',
+  'Ireland',
+  'Israel',
+  'Italy',
+  'Jamaica',
+  'Japan',
+  'Jordan',
+  'Kazakhstan',
+  'Kenya',
+  'Kiribati',
+  'Kuwait',
+  'Kyrgyzstan',
+  'Laos',
+  'Latvia',
+  'Lebanon',
+  'Lesotho',
+  'Liberia',
+  'Libya',
+  'Liechtenstein',
+  'Lithuania',
+  'Luxembourg',
+  'Madagascar',
+  'Malawi',
+  'Malaysia',
+  'Maldives',
+  'Mali',
+  'Malta',
+  'Marshall Islands',
+  'Mauritania',
+  'Mauritius',
+  'Mexico',
+  'Micronesia',
+  'Moldova',
+  'Monaco',
+  'Mongolia',
+  'Montenegro',
+  'Morocco',
+  'Mozambique',
+  'Myanmar',
+  'Namibia',
+  'Nauru',
+  'Nepal',
+  'Netherlands',
+  'New Zealand',
+  'Nicaragua',
+  'Niger',
+  'Nigeria',
+  'North Korea',
+  'North Macedonia',
+  'Norway',
+  'Oman',
+  'Pakistan',
+  'Palau',
+  'Palestine',
+  'Panama',
+  'Papua New Guinea',
+  'Paraguay',
+  'Peru',
+  'Philippines',
+  'Poland',
+  'Portugal',
   'Qatar',
+  'Romania',
+  'Russia',
+  'Rwanda',
+  'Saint Kitts and Nevis',
+  'Saint Lucia',
+  'Saint Vincent and the Grenadines',
+  'Samoa',
+  'San Marino',
+  'Sao Tome and Principe',
+  'Saudi Arabia',
+  'Senegal',
+  'Serbia',
+  'Seychelles',
+  'Sierra Leone',
+  'Singapore',
+  'Slovakia',
+  'Slovenia',
+  'Solomon Islands',
+  'Somalia',
+  'South Africa',
+  'South Korea',
+  'South Sudan',
+  'Spain',
+  'Sri Lanka',
+  'Sudan',
+  'Suriname',
+  'Sweden',
+  'Switzerland',
+  'Syria',
+  'Tajikistan',
+  'Tanzania',
+  'Thailand',
+  'Timor-Leste',
+  'Togo',
+  'Tonga',
+  'Trinidad and Tobago',
+  'Tunisia',
+  'Turkey',
+  'Turkmenistan',
+  'Tuvalu',
+  'Uganda',
+  'Ukraine',
+  'United Arab Emirates',
   'United Kingdom',
   'United States',
-  'Germany',
-  'France',
-  'Italy',
-  'Spain',
-  'Netherlands',
-  'Sweden',
-  'Canada',
-  'Australia',
+  'Uruguay',
+  'Uzbekistan',
+  'Vanuatu',
+  'Vatican City',
+  'Venezuela',
+  'Vietnam',
+  'Yemen',
+  'Zambia',
+  'Zimbabwe',
   'Online',
 ];
 
@@ -571,6 +851,43 @@ class AdminService {
         .limit(limit)
         .snapshots()
         .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+  }
+
+  /// Normal social posts only (excludes discuss/Q&A posts where postType=qa).
+  Stream<List<Map<String, dynamic>>> streamRegularPosts({int limit = 100}) {
+    return _db
+        .collection('posts')
+        .orderBy('createdAt', descending: true)
+        .limit(limit * 4)
+        .snapshots()
+        .map((s) {
+      final filtered = s.docs
+          .where((d) => (d.data()['postType'] as String?) != 'qa')
+          .map((d) => {...d.data(), 'id': d.id})
+          .toList();
+      if (filtered.length <= limit) return filtered;
+      return filtered.take(limit).toList();
+    });
+  }
+
+  /// Discuss/Q&A posts only (postType == qa).
+  Stream<List<Map<String, dynamic>>> streamDiscussPosts({int limit = 100}) {
+    return _db
+        .collection('posts')
+        .where('postType', isEqualTo: 'qa')
+        .limit(limit)
+        .snapshots()
+        .map((s) {
+      final out = s.docs.map((d) => {...d.data(), 'id': d.id}).toList()
+        ..sort((a, b) {
+          final at = (a['createdAt'] as Timestamp?)?.toDate();
+          final bt = (b['createdAt'] as Timestamp?)?.toDate();
+          if (at == null) return 1;
+          if (bt == null) return -1;
+          return bt.compareTo(at);
+        });
+      return out;
+    });
   }
 
   /// Delete a post as admin, properly updating author's postsCount.

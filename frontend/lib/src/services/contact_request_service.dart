@@ -219,6 +219,12 @@ class ContactRequestService {
     }
   }
 
+  /// Permanently deletes a contact thread and all its messages.
+  Future<void> deleteRequest(String requestId) async {
+    await _deleteCollectionDocs(_col.doc(requestId).collection('messages'));
+    await _col.doc(requestId).delete();
+  }
+
   /// Creates a new contact thread and posts the user's first message.
   /// Returns the new request id.
   Future<String> submit({

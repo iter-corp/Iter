@@ -6,6 +6,7 @@ import '../../../providers/admin_providers.dart';
 import '../../../providers/contact_request_providers.dart';
 import '../../../services/contact_request_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/app_feedback.dart';
 import '../contact_us_screen.dart';
 
 /// Admin-side list of every contact-us thread. Tapping a row opens [ContactThreadScreen], which the
@@ -143,14 +144,14 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-class _AdminRequestTile extends StatelessWidget {
+class _AdminRequestTile extends ConsumerWidget {
   final ContactRequest request;
   final VoidCallback onTap;
 
   const _AdminRequestTile({required this.request, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isOrg = request.type == ContactRequestType.organization;
     final unread = request.unreadByAdmin;
     return Material(
@@ -159,7 +160,7 @@ class _AdminRequestTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
           decoration: BoxDecoration(
             color: context.cardBg,
             borderRadius: BorderRadius.circular(14),
@@ -170,87 +171,137 @@ class _AdminRequestTile extends StatelessWidget {
               width: unread ? 1.5 : 1,
             ),
           ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isOrg
-                          ? AppColors.purple.withValues(alpha: 0.12)
-                          : context.surfaceSoft,
-                      borderRadius: BorderRadius.circular(6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isOrg
+                                ? AppColors.purple.withValues(alpha: 0.12)
+                                : context.surfaceSoft,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isOrg ? 'EVENT MANAGER' : 'MESSAGE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.6,
+                              color: isOrg
+                                  ? AppColors.purple
+                                  : context.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _StatusPill(status: request.status),
+                        const Spacer(),
+                        Text(
+                          _formatRelative(
+                              request.lastMessageAt ?? request.createdAt),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: context.textSecondary,
+                          ),
+                        ),
+                        if (unread) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 9,
+                            height: 9,
+                            decoration: const BoxDecoration(
+                              color: AppColors.purple,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    child: Text(
-                      isOrg ? 'EVENT MANAGER' : 'MESSAGE',
+                    const SizedBox(height: 10),
+                    Text(
+                      request.userName.isNotEmpty
+                          ? request.userName
+                          : request.userEmail,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                        color: isOrg ? AppColors.purple : context.textSecondary,
+                        color: context.textPrimary,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _StatusPill(status: request.status),
-                  const Spacer(),
-                  Text(
-                    _formatRelative(request.lastMessageAt ?? request.createdAt),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.textSecondary,
-                    ),
-                  ),
-                  if (unread) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(
-                        color: AppColors.purple,
-                        shape: BoxShape.circle,
+                    if (request.userName.isNotEmpty &&
+                        request.userEmail.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        request.userEmail,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      request.lastMessagePreview.isNotEmpty
+                          ? request.lastMessagePreview
+                          : request.subject,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.textPrimary,
+                        height: 1.35,
                       ),
                     ),
                   ],
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                request.userName.isNotEmpty
-                    ? request.userName
-                    : request.userEmail,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: context.textPrimary,
                 ),
               ),
-              if (request.userName.isNotEmpty &&
-                  request.userEmail.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  request.userEmail,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.textSecondary,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                request.lastMessagePreview.isNotEmpty
-                    ? request.lastMessagePreview
-                    : request.subject,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.textPrimary,
-                  height: 1.35,
-                ),
+              IconButton(
+                tooltip: 'Delete conversation',
+                icon: const Icon(Icons.delete_outline,
+                    size: 18, color: Colors.red),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete conversation?'),
+                      content: const Text(
+                        'This will permanently remove this contact thread and all its messages.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  try {
+                    await ref
+                        .read(contactRequestServiceProvider)
+                        .deleteRequest(request.id);
+                    if (!context.mounted) return;
+                    AppFeedback.showSuccess(context, 'Conversation deleted');
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    AppFeedback.showError(context, 'Failed: \$e');
+                  }
+                },
               ),
             ],
           ),

@@ -9,6 +9,19 @@ export const onMessageCreate = onDocumentCreated('chats/{chatId}/messages/{messa
   if (!msg) return;
 
   const senderUid = String(msg.senderUid ?? '');
+  const visibility = String(msg.visibility ?? '');
+  const visibleToUids = Array.isArray(msg.visibleToUids)
+    ? msg.visibleToUids.map((v: unknown) => String(v)).filter((v: string) => v.length > 0)
+    : [];
+
+  // Sender-only moderated messages should never trigger receiver unread
+  // increments or push notifications.
+  if (visibility === 'sender_only' ||
+      msg.profanityFiltered === true ||
+      (visibleToUids.length === 1 && visibleToUids[0] === senderUid)) {
+    return;
+  }
+
   let receiverUid = String(msg.receiverUid ?? '');
 
   if (receiverUid.length === 0) {
