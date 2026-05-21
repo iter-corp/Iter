@@ -299,7 +299,7 @@ class _AdminRequestTile extends ConsumerWidget {
                     AppFeedback.showSuccess(context, 'Conversation deleted');
                   } catch (e) {
                     if (!context.mounted) return;
-                    AppFeedback.showError(context, 'Failed: \$e');
+                    AppFeedback.showError(context, 'Failed: $e');
                   }
                 },
               ),

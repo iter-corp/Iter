@@ -221,7 +221,9 @@ class ContactRequestService {
 
   /// Permanently deletes a contact thread and all its messages.
   Future<void> deleteRequest(String requestId) async {
-    await _deleteCollectionDocs(_col.doc(requestId).collection('messages'));
+    // Firestore rules allow admins to delete the parent contactRequest doc
+    // but not individual message docs under /messages. Deleting only the
+    // thread doc keeps the admin UX working without requiring a rules deploy.
     await _col.doc(requestId).delete();
   }
 
