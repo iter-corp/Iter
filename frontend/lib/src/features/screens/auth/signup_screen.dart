@@ -18,13 +18,43 @@ class SignupScreen extends ConsumerStatefulWidget {
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
   bool _loading = false;
   bool _googleLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   String? _error;
+
+  // Per-field "touched" flags — a field becomes touched the first time it
+  // loses focus or the user submits the form. Validation errors only render
+  // once a field is touched, so users don't see red text while they're still
+  // typing their first attempt.
+  bool _emailTouched = false;
+  bool _passTouched = false;
+  bool _confirmTouched = false;
+
+  // RFC-5322-lite email check: local@domain.tld with at least one dot in
+  // the domain part. Catches the common "text@" / "text@x" mistakes that a
+  // bare `contains('@')` would miss without going so strict that valid
+  // addresses fail.
+  static final _emailRegex = RegExp(
+    r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$',
+  );
+
+  /// Password rule: at least 8 characters, with both a letter and a digit.
+  /// Stronger than Firebase's default 6-char floor — keeps validation in sync
+  /// with what we tell the user via the helper text below the field.
+  String? _validatePassword(String? value, AppStrings t) {
+    final v = value ?? '';
+    if (v.isEmpty) return t.signupEnterPassword;
+    if (v.length < 8) return t.signupPasswordMinLength;
+    final hasLetter = v.contains(RegExp(r'[A-Za-z]'));
+    final hasDigit = v.contains(RegExp(r'\d'));
+    if (!hasLetter || !hasDigit) return t.signupPasswordLetterNumber;
+    return null;
+  }
 
   String _friendlyError(FirebaseAuthException e,
       {String fallback = 'Signup failed'}) {
@@ -43,14 +73,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Rebuild as the user edits the password so the red "min 8 chars" pill
+    // appears / disappears live once the field has been touched. Without
+    // this listener the helper would only re-evaluate on blur.
+    _passCtrl.addListener(_onPassChanged);
+  }
+
+  void _onPassChanged() {
+    if (_passTouched && mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
-    _usernameCtrl.dispose();
+    _passCtrl.removeListener(_onPassChanged);
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    // On submit, treat every field as touched so any errors render even
+    // for fields the user never focused (e.g. tapping Sign Up with empty
+    // form). Validation then runs through the normal autovalidateMode path.
+    setState(() {
+      _emailTouched = true;
+      _passTouched = true;
+      _confirmTouched = true;
+    });
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
@@ -99,7 +151,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Widget build(BuildContext context) {
     final hPad = context.scaleW(16, 24);
     final vPad = context.scaleW(20, 32);
-    final iconCircle = context.scaleW(60, 72);
+    final logoSize = context.scaleW(72, 84);
+    final t = context.t;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -107,26 +160,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           child: Form(
             key: _formKey,
+            // No form-level autovalidate: each field opts in via its own
+            // `touched` flag so errors only appear after the user leaves the
+            // field (or taps Sign Up), not while they're still typing.
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 SizedBox(height: context.scaleW(16, 30)),
-                Container(
-                  width: iconCircle,
-                  height: iconCircle,
-                  decoration: BoxDecoration(
-                    color: context.purpleSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.send_rounded,
-                    color: const Color(0xFFCE5DE5),
-                    size: context.scaleW(26, 30),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assets/img/app_icon.png',
+                    width: logoSize,
+                    height: logoSize,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  context.t.signUp,
+                  t.signUp,
                   style: TextStyle(
                     fontSize: context.scaleW(20, 24),
                     fontWeight: FontWeight.bold,
@@ -135,7 +187,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  context.t.signupSubtitle,
+                  t.signupSubtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -145,32 +197,69 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 30),
                 _buildTextField(
-                  controller: _usernameCtrl,
-                  hint: context.t.username,
-                  prefixIcon: Icons.person_2_outlined,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? context.t.signupEnterUsername
-                      : null,
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
                   controller: _emailCtrl,
-                  hint: context.t.email,
+                  hint: t.email,
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) => value == null || !value.contains('@')
-                      ? context.t.signupEnterValidEmail
-                      : null,
+                  touched: _emailTouched,
+                  onBlur: () {
+                    if (!_emailTouched) setState(() => _emailTouched = true);
+                  },
+                  validator: (value) {
+                    final v = value?.trim() ?? '';
+                    if (v.isEmpty || !_emailRegex.hasMatch(v)) {
+                      return t.signupEnterValidEmail;
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
                 _buildTextField(
                   controller: _passCtrl,
-                  hint: context.t.password,
+                  hint: t.password,
                   prefixIcon: Icons.lock_outline,
                   isPassword: true,
-                  validator: (value) => value == null || value.length < 6
-                      ? context.t.loginMin6Chars
+                  obscured: _obscurePassword,
+                  onToggleObscure: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                  // Only surface the red "min 8 chars" pill once the user
+                  // has left the field with a too-short value. Hidden by
+                  // default and as soon as they type the 8th character.
+                  helperText: (_passTouched && _passCtrl.text.length < 8)
+                      ? t.signupPasswordMinLength
                       : null,
+                  touched: _passTouched,
+                  onBlur: () {
+                    if (!_passTouched) setState(() => _passTouched = true);
+                    // Surface a mismatch error on the confirm field as soon
+                    // as the user finishes typing the password — otherwise
+                    // they'd need to re-focus the confirm field to see it.
+                    if (_confirmTouched) setState(() {});
+                  },
+                  validator: (value) => _validatePassword(value, t),
+                ),
+                const SizedBox(height: 14),
+                _buildTextField(
+                  controller: _confirmCtrl,
+                  hint: t.confirmPassword,
+                  prefixIcon: Icons.lock_outline,
+                  isPassword: true,
+                  obscured: _obscureConfirm,
+                  onToggleObscure: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
+                  touched: _confirmTouched,
+                  onBlur: () {
+                    if (!_confirmTouched) {
+                      setState(() => _confirmTouched = true);
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return t.signupEnterPassword;
+                    }
+                    if (value != _passCtrl.text) return t.passwordsDontMatch;
+                    return null;
+                  },
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -247,12 +336,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       : _buildSocialBadge('G', const Color(0xFF4285F4)),
                   onTap: _googleLoading ? () {} : _signInWithGoogle,
                 ),
-                const SizedBox(height: 12),
-                _buildSocialButton(
-                  label: context.t.signupSignInWithFacebook,
-                  icon: _buildSocialBadge('f', const Color(0xFF1877F2)),
-                  onTap: () {},
-                ),
                 SizedBox(height: context.scaleW(20, 30)),
                 Wrap(
                   alignment: WrapAlignment.center,
@@ -292,29 +375,85 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     required String? Function(String?) validator,
     TextInputType? keyboardType,
     bool isPassword = false,
+    String? helperText,
+    // `touched` flips to true after the field's first blur (or after a
+    // submit attempt). While false the field never shows validation errors;
+    // once true we autovalidate so corrections update live as the user fixes
+    // the input. `onBlur` is invoked the first time focus is lost so the
+    // parent can flip its `touched` flag.
+    bool touched = false,
+    VoidCallback? onBlur,
+    // Password fields each own their own obscure state — pass the current
+    // value via `obscured` and a toggle via `onToggleObscure` so the eye
+    // icon flips just this field. For non-password fields these are ignored.
+    bool? obscured,
+    VoidCallback? onToggleObscure,
   }) {
-    return TextFormField(
+    final isObscured = isPassword ? (obscured ?? true) : false;
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (!hasFocus) onBlur?.call();
+      },
+      // `canRequestFocus: false` keeps this wrapper from stealing focus from
+      // the inner TextFormField — we only want it for the blur callback.
+      canRequestFocus: false,
+      child: TextFormField(
       controller: controller,
       validator: validator,
+      autovalidateMode:
+          touched ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
       keyboardType: keyboardType,
-      obscureText: isPassword ? _obscurePassword : false,
+      obscureText: isObscured,
+      // Autofill hints help password managers offer to generate / save a
+      // strong password on the signup flow.
+      autofillHints: isPassword
+          ? const [AutofillHints.newPassword]
+          : keyboardType == TextInputType.emailAddress
+              ? const [AutofillHints.email]
+              : null,
       style: TextStyle(fontSize: 14, color: context.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+        // Render the helper as a custom widget so we can give it a red
+        // pill background with white text — calls out the password rule
+        // more clearly than the default muted-text helper.
+        helper: helperText == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE53935),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      helperText,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+        helperMaxLines: 2,
         prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  _obscurePassword
+                  isObscured
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 20,
                   color: context.textMuted,
                 ),
-                onPressed: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
+                onPressed: onToggleObscure,
               )
             : null,
         border: OutlineInputBorder(
@@ -324,6 +463,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         filled: true,
         fillColor: context.cardBg,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
+      ),
       ),
     );
   }

@@ -287,6 +287,24 @@ class AppStrings {
   String get showOriginal => _get('show_original');
   String get savedTranslations => _get('saved_translations');
   String get seeTranslation => _get('see_translation');
+  // ── Translate screen (input/output UI strings) ──
+  String get translateEnterText => _get('translate_enter_text');
+  String get translateSearchLanguages => _get('translate_search_languages');
+  String get translateNoLanguagesMatch => _get('translate_no_languages_match');
+  String get translateCopied => _get('translate_copied');
+  String get translateSaved => _get('translate_saved');
+  String get translateRemovedFromSaved => _get('translate_removed_from_saved');
+  String get translateUnavailable => _get('translate_unavailable');
+  String get translateMicNotAvailable => _get('translate_mic_not_available');
+  String translateSttUnsupported(String lang) =>
+      _fmt('translate_stt_unsupported', {'lang': lang});
+  String get translateSttNoMatch => _get('translate_stt_no_match');
+  String get translateSttNoSpeech => _get('translate_stt_no_speech');
+  String get translateSttAudio => _get('translate_stt_audio');
+  String get translateSttNetwork => _get('translate_stt_network');
+  String get translateSttPermission => _get('translate_stt_permission');
+  String translateSttGeneric(String code) =>
+      _fmt('translate_stt_generic', {'code': code});
 
   // ──────────────────────────────────────────────────────────────
   // Admin
@@ -327,6 +345,10 @@ class AppStrings {
   String get signupSubtitle => _get('signup_subtitle');
   String get signupEnterUsername => _get('signup_enter_username');
   String get signupEnterValidEmail => _get('signup_enter_valid_email');
+  String get signupEnterPassword => _get('signup_enter_password');
+  String get signupPasswordMinLength => _get('signup_password_min_length');
+  String get signupPasswordLetterNumber =>
+      _get('signup_password_letter_number');
   String get signupSignInWithFacebook =>
       _get('signup_sign_in_with_facebook');
   String get forgotPasswordSubtitle => _get('forgot_password_subtitle');
@@ -1091,6 +1113,16 @@ class AppStrings {
   String get adminNewEvent => _get('admin_new_event');
   String get adminEditEvent => _get('admin_edit_event');
   String get adminNoEventsYet => _get('admin_no_events_yet');
+  String get adminEventsSearchHint => _get('admin_events_search_hint');
+  String get adminFilters => _get('admin_filters');
+  String get adminFilterType => _get('admin_filter_type');
+  String get adminFilterCountry => _get('admin_filter_country');
+  String get adminFilterFunding => _get('admin_filter_funding');
+  String get adminFilterAny => _get('admin_filter_any');
+  String get adminFilterClear => _get('admin_filter_clear');
+  String get adminFilterApply => _get('admin_filter_apply');
+  String get adminFilterWithDeadline => _get('admin_filter_with_deadline');
+  String get adminFilterExpired => _get('admin_filter_expired');
   String get adminDeleteEventTitle => _get('admin_delete_event_title');
   String get adminDeleteEventBody => _get('admin_delete_event_body');
   String adminUploadFailed(Object error) =>
@@ -1138,6 +1170,66 @@ class AppStrings {
   String get adminDiscussReports => _get('admin_discuss_reports');
   String get adminDiscussReportsSubtitle =>
       _get('admin_discuss_reports_subtitle');
+  // ── Admin > Discuss posts list screen ──
+  String get adminDiscussPosts => _get('admin_discuss_posts');
+  String get adminDiscussPostsSubtitle =>
+      _get('admin_discuss_posts_subtitle');
+  String get adminDiscussSearchHint => _get('admin_discuss_search_hint');
+  String get adminDiscussNoPosts => _get('admin_discuss_no_posts');
+  String get adminDiscussNoPostsMatch => _get('admin_discuss_no_posts_match');
+  String get adminDiscussNoQuestionText =>
+      _get('admin_discuss_no_question_text');
+  String adminDiscussByAuthor(String name) =>
+      _fmt('admin_discuss_by_author', {'name': name});
+  String get adminDiscussDeleteTitle => _get('admin_discuss_delete_title');
+  String get adminDiscussDeleteBody => _get('admin_discuss_delete_body');
+  // ── Reports toolbar (post / discuss / profile / error) ──
+  String get adminReportsSearchHint => _get('admin_reports_search_hint');
+  String get adminReportsSelect => _get('admin_reports_select');
+  String get adminReportsSelectAll => _get('admin_reports_select_all');
+  String get adminReportsSelectNone => _get('admin_reports_select_none');
+  String get adminReportsCancelSelection =>
+      _get('admin_reports_cancel_selection');
+  String adminReportsSelectedCount(int count) =>
+      _fmt('admin_reports_selected_count', {'count': count});
+  String adminReportsDeleteSelectedTitle(int count) =>
+      _fmt('admin_reports_delete_selected_title', {'count': count});
+  String get adminReportsDeleteSelectedBody =>
+      _get('admin_reports_delete_selected_body');
+  String get adminReportsDeleteAll => _get('admin_reports_delete_all');
+  String get adminReportsDeleteAllTitle =>
+      _get('admin_reports_delete_all_title');
+  String adminReportsDeleteAllBody(int count) =>
+      _fmt('admin_reports_delete_all_body', {'count': count});
+  String get adminReportsFilterStatus => _get('admin_reports_filter_status');
+  String get adminReportsFilterReason => _get('admin_reports_filter_reason');
+  // ── Admin > Users (tabs + role labels) ──
+  String adminUsersTabAll(int count) =>
+      _fmt('admin_users_tab_all', {'count': count});
+  String adminUsersTabAdmins(int count) =>
+      _fmt('admin_users_tab_admins', {'count': count});
+  String adminUsersTabEventManagers(int count) =>
+      _fmt('admin_users_tab_event_managers', {'count': count});
+  String adminUsersTabRegular(int count) =>
+      _fmt('admin_users_tab_regular', {'count': count});
+  String adminUsersTabSuspended(int count) =>
+      _fmt('admin_users_tab_suspended', {'count': count});
+  String get adminUsersEventManagerBadge =>
+      _get('admin_users_event_manager_badge');
+  String get adminUsersRevokeEventManager =>
+      _get('admin_users_revoke_event_manager');
+  String get adminUsersGrantEventManager =>
+      _get('admin_users_grant_event_manager');
+  String get adminUsersRevokeEventManagerTitle =>
+      _get('admin_users_revoke_event_manager_title');
+  String get adminUsersGrantEventManagerTitle =>
+      _get('admin_users_grant_event_manager_title');
+  String get adminUsersRevokeEventManagerBody =>
+      _get('admin_users_revoke_event_manager_body');
+  String get adminUsersGrantEventManagerBody =>
+      _get('admin_users_grant_event_manager_body');
+  String get adminUsersRevoke => _get('admin_users_revoke');
+  String get adminUsersGrant => _get('admin_users_grant');
   String get adminProfileReports => _get('admin_profile_reports');
   String get adminProfileReportsSubtitle =>
       _get('admin_profile_reports_subtitle');
@@ -1163,6 +1255,7 @@ class AppStrings {
       _get('admin_closed_reports_move_here');
   String get adminNoCaption => _get('admin_no_caption');
   String get adminNoQuestionText => _get('admin_no_question_text');
+  String get adminUsersNoEmail => _get('admin_users_no_email');
   String get adminReportedPost => _get('admin_reported_post');
   String get adminReportedThread => _get('admin_reported_thread');
   String get adminReportedProfile => _get('admin_reported_profile');

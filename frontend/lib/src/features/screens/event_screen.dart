@@ -160,10 +160,17 @@ class _EventBodyState extends ConsumerState<EventBody> {
   }
 
   Future<void> _maybeShowEventsQuickStart() async {
+    // Scope the "seen" flag by uid so each user sees the quick-start exactly
+    // once, even if multiple accounts use the same device. The old key was
+    // device-wide so users B, C... never got the guide after user A had
+    // dismissed it, and a new user on a freshly-installed app would still
+    // see it. Falls back to a `_anon` bucket only if no user is signed in.
+    final uid = ref.read(authStateProvider).value?.uid ?? '_anon';
+    final prefKey = 'events_quickstart_seen_$uid';
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('events_quickstart_seen') ?? false) return;
+    if (prefs.getBool(prefKey) ?? false) return;
     if (!mounted) return;
-    await prefs.setBool('events_quickstart_seen', true);
+    await prefs.setBool(prefKey, true);
     if (!mounted) return;
     await showTravelQuickStartSheet(context);
   }
@@ -1856,6 +1863,7 @@ class _EventCardState extends State<_EventCard> {
           link: e.link,
           phone: e.phone,
           email: e.email,
+          createdByUid: e.createdByUid,
         ),
       ),
     );
@@ -2830,6 +2838,7 @@ class _EventMapSheet extends StatelessWidget {
                           link: event.link,
                           phone: event.phone,
                           email: event.email,
+                          createdByUid: event.createdByUid,
                         ),
                       ),
                     );

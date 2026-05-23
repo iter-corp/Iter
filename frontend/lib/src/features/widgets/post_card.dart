@@ -53,24 +53,32 @@ class PostCard extends ConsumerStatefulWidget {
   ConsumerState<PostCard> createState() => _PostCardState();
 }
 
-class _PostCardState extends ConsumerState<PostCard> {
+class _PostCardState extends ConsumerState<PostCard>
+    with SingleTickerProviderStateMixin {
   // Optimistic UI: non-null while a like toggle is in-flight.
   bool? _pendingLike;
-  // null = follow the default (lowered for video posts so the caption/actions
-  // panel doesn't sit on top of the video, raised for everything else).
-  // Once the user taps the chevron we honor their choice via this override.
+  // null = follow the default (raised for all post types so the caption is
+  // visible). Once the user taps the chevron we honor their choice via this
+  // override — they can lower it on video posts to see the video unobstructed.
   bool? _captionBoxLoweredOverride;
 
-  bool get _captionBoxLowered =>
-      _captionBoxLoweredOverride ?? widget.post.videoUrls.isNotEmpty;
+  bool get _captionBoxLowered => _captionBoxLoweredOverride ?? false;
 
   // Carousel state for multi-image posts.
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
+  // Double-tap-to-like heart burst animation. Driven once per double tap;
+  // a value of 0 means the overlay is hidden.
+  late final AnimationController _heartBurst = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+
   @override
   void dispose() {
     _pageController.dispose();
+    _heartBurst.dispose();
     super.dispose();
   }
 
@@ -79,6 +87,24 @@ class _PostCardState extends ConsumerState<PostCard> {
         ref.read(isLikedProvider(widget.post.id)).value ?? false;
     if (_pendingLike != null) return; // already in-flight, ignore tap
     setState(() => _pendingLike = !currentLiked);
+    try {
+      await ref.read(postServiceProvider).toggleLike(widget.post.id);
+    } finally {
+      if (mounted) setState(() => _pendingLike = null);
+    }
+  }
+
+  /// Double-tap on the media area always *likes* (never unlikes) and plays
+  /// a heart-burst animation so the user gets clear feedback. If the post is
+  /// already liked we still play the animation as a confirmation but don't
+  /// flip the state — Instagram-style.
+  Future<void> _likeFromDoubleTap() async {
+    HapticFeedback.lightImpact();
+    _heartBurst.forward(from: 0);
+    final currentLiked =
+        ref.read(isLikedProvider(widget.post.id)).value ?? false;
+    if (currentLiked || _pendingLike != null) return;
+    setState(() => _pendingLike = true);
     try {
       await ref.read(postServiceProvider).toggleLike(widget.post.id);
     } finally {
@@ -180,9 +206,16 @@ class _PostCardState extends ConsumerState<PostCard> {
             children: [
               Positioned.fill(
                 child: hasVideo
-                    ? _PostVideoPlayer(
-                        url: post.videoUrls.first,
-                        captionPanelLowered: _captionBoxLowered,
+                    ? GestureDetector(
+                        // Double-tap to like, layered on top of the video so
+                        // single taps (play/pause / show-controls) still reach
+                        // the player below.
+                        behavior: HitTestBehavior.deferToChild,
+                        onDoubleTap: _likeFromDoubleTap,
+                        child: _PostVideoPlayer(
+                          url: post.videoUrls.first,
+                          captionPanelLowered: _captionBoxLowered,
+                        ),
                       )
                     : hasImage
                         ? (isMulti
@@ -192,6 +225,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                                 onPageChanged: (i) =>
                                     setState(() => _currentPage = i),
                                 itemBuilder: (_, i) => GestureDetector(
+                                  onDoubleTap: _likeFromDoubleTap,
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -209,6 +243,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                                 ),
                               )
                             : GestureDetector(
+                                onDoubleTap: _likeFromDoubleTap,
                                 onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -223,28 +258,35 @@ class _PostCardState extends ConsumerState<PostCard> {
                                   fit: BoxFit.cover,
                                 ),
                               ))
-                        : Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF4A3A68), Color(0xFF1F1D30)],
+                        : GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onDoubleTap: _likeFromDoubleTap,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF4A3A68),
+                                    Color(0xFF1F1D30),
+                                  ],
+                                ),
                               ),
-                            ),
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(28),
-                                child: _ExpandableCaption(
-                                  text: post.caption,
-                                  collapsedMaxLines: 4,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.3,
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(28),
+                                  child: _ExpandableCaption(
+                                    text: post.caption,
+                                    collapsedMaxLines: 4,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.3,
+                                    ),
+                                    toggleColor: Colors.white,
+                                    textAlign: TextAlign.center,
                                   ),
-                                  toggleColor: Colors.white,
-                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),
@@ -265,6 +307,51 @@ class _PostCardState extends ConsumerState<PostCard> {
                         ],
                         stops: const [0.0, 0.35, 1.0],
                       ),
+                    ),
+                  ),
+                ),
+              ),
+              // Double-tap-to-like heart burst. Pops in, holds, then fades
+              // out — sized to the card so it reads as the primary feedback.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: _heartBurst,
+                      builder: (context, _) {
+                        final v = _heartBurst.value;
+                        if (v == 0) return const SizedBox.shrink();
+                        // 0..0.35 pop in, 0.35..0.65 hold, 0.65..1 fade out.
+                        final scale = v < 0.35
+                            ? Curves.easeOutBack.transform(v / 0.35) * 1.0
+                            : v < 0.65
+                                ? 1.0
+                                : 1.0 -
+                                    0.1 * ((v - 0.65) / 0.35);
+                        final opacity = v < 0.35
+                            ? (v / 0.35).clamp(0.0, 1.0)
+                            : v < 0.65
+                                ? 1.0
+                                : (1.0 - (v - 0.65) / 0.35).clamp(0.0, 1.0);
+                        return Opacity(
+                          opacity: opacity,
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Icon(
+                              Icons.favorite,
+                              color: Colors.white,
+                              size: 130,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),

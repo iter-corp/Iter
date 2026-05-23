@@ -62,8 +62,41 @@ class AuthService {
   Future<void> _ensureUserDoc(User user, {String? avatarUrl}) async {
     final ref = _db.collection('users').doc(user.uid);
     final snap = await ref.get();
-    if (snap.exists) return;
-    await ref.set(_defaultUserDoc(user, avatarUrl: avatarUrl));
+    if (!snap.exists) {
+      await ref.set(_defaultUserDoc(user, avatarUrl: avatarUrl));
+      return;
+    }
+    // Doc exists — backfill any identity fields the doc is missing.
+    //
+    // Background: older docs (and one race-prone code path that's since
+    // been fixed) sometimes ended up with `email: null` even though
+    // Firebase Auth had the address. The admin users list reads the doc,
+    // not the Auth user, so those users showed "No email on file" despite
+    // logging in fine. We can't `set(merge: true)` the email blindly —
+    // that would also overwrite a perfectly-good email with null if the
+    // Auth user's email happened to be null for any reason. So we only
+    // patch fields that are missing *and* have a non-empty Auth-side
+    // value to fill them with.
+    final data = snap.data() ?? {};
+    final patch = <String, dynamic>{};
+
+    final docEmail = (data['email'] as String?)?.trim() ?? '';
+    final authEmail = (user.email ?? '').trim();
+    if (docEmail.isEmpty && authEmail.isNotEmpty) {
+      patch['email'] = authEmail;
+    }
+
+    // Avatar follows the same idempotent rule — if the caller passed one
+    // (Google/Apple flows do) and the doc doesn't already have one, fill
+    // it. We never overwrite an avatar the user has customized.
+    final docAvatar = (data['avatarUrl'] as String?)?.trim() ?? '';
+    if (docAvatar.isEmpty && (avatarUrl ?? '').trim().isNotEmpty) {
+      patch['avatarUrl'] = avatarUrl;
+    }
+
+    if (patch.isNotEmpty) {
+      await ref.set(patch, SetOptions(merge: true));
+    }
   }
 
   Future<User?> signUp({
@@ -137,6 +170,10 @@ class AuthService {
     // Validate intent BEFORE _ensureUserDoc and before the router can react
     // to auth state changes, so there is no visible login flash.
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
+    // Treat "Continue with Google" on signup as a unified entry point: if the
+    // Google account already exists we silently log them in instead of
+    // erroring out. Otherwise tapping the signup-page Google button for a
+    // returning user would briefly land on /home then bounce to /login.
     justSignedUp = isNew;
     if (intent == GoogleAuthIntent.login && isNew) {
       try {
@@ -148,15 +185,6 @@ class AuthService {
       await _auth.signOut();
       throw const GoogleAuthFlowException(
         'No account found for this Google email. Please sign up first.',
-      );
-    }
-    if (intent == GoogleAuthIntent.signup && !isNew) {
-      try {
-        await _googleSignIn.signOut();
-      } catch (_) {}
-      await _auth.signOut();
-      throw const GoogleAuthFlowException(
-        'An account with this Google email already exists. Please log in instead.',
       );
     }
 

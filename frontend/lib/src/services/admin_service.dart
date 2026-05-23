@@ -469,6 +469,11 @@ class AdminEvent {
   final double? lat;
   final double? lng;
 
+  /// UID of the admin who created the event. Used to render the
+  /// author profile chip on the event detail screen. Empty on
+  /// legacy docs that pre-date the field.
+  final String createdByUid;
+
   const AdminEvent({
     required this.id,
     required this.title,
@@ -486,6 +491,7 @@ class AdminEvent {
     this.funds = '',
     this.lat,
     this.lng,
+    this.createdByUid = '',
   });
 
   factory AdminEvent.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -513,6 +519,7 @@ class AdminEvent {
       funds: (d['funds'] as String?) ?? '',
       lat: (geoMap?['lat'] as num?)?.toDouble(),
       lng: (geoMap?['lng'] as num?)?.toDouble(),
+      createdByUid: (d['createdByUid'] as String?) ?? '',
     );
   }
 }
@@ -761,12 +768,27 @@ class AdminService {
         'deletedAt': FieldValue.serverTimestamp(),
       });
     }
+
+    // NOTE: the target user's Firebase Auth record cannot be deleted from
+    // the client SDK (only the user themselves can call user.delete()).
+    // Until the project is on the Blaze plan and the adminDeleteUser Cloud
+    // Function is deployed, the Auth record remains and the email stays
+    // locked. The blacklist write above lets the signup flow surface a
+    // clear "this email was deleted" message.
   }
 
   /// Best-effort self-delete: the user removes their own data (what Firestore
   /// rules permit) and their Firebase Auth user. Leaves cross-user traces
   /// (followers on others, likes on others' posts) since collection-group
   /// writes aren't permitted for non-admin callers.
+  ///
+  /// Without Cloud Functions (Spark plan), the Firebase Auth record cannot
+  /// be deleted reliably — `user.delete()` requires a recent login. To still
+  /// free up the email so the user can re-register, we first rename the Auth
+  /// account's email to a junk address on the reserved `.invalid` TLD
+  /// (RFC 2606), then attempt the delete. Even if the delete fails, the
+  /// real email is no longer attached to any Auth record, so the next
+  /// `createUserWithEmailAndPassword` with that email will succeed.
   Future<void> selfDeleteCurrentUser(String uid) async {
     // Capture the email FIRST so we can blacklist it even if some downstream
     // step fails. This is what stops the user from signing back in (via
@@ -815,6 +837,60 @@ class AdminService {
         _db.collection('notifications').doc(uid), 'items');
 
     await userRef.delete();
+
+    // Free the email in Firebase Auth by renaming the account to a junk
+    // address on the reserved .invalid TLD. This works without Cloud
+    // Functions and survives session-age constraints differently than
+    // delete: only email/password users can re-auth in-app, but the
+    // rename itself frees the email even if a subsequent delete fails.
+    await _freeAuthEmail(uid: uid, originalEmail: email);
+  }
+
+  /// Renames the current user's Auth email to a junk address so the real
+  /// email is freed for re-signup, then attempts to delete the Auth user.
+  /// Caller is responsible for any UI re-auth flow before invoking this.
+  Future<void> _freeAuthEmail({
+    required String uid,
+    required String originalEmail,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.uid != uid) return;
+
+    // .invalid is a reserved TLD (RFC 2606) — guaranteed to not exist and
+    // not collide with any real user. Including the uid keeps each junk
+    // address unique so multiple deleted accounts don't clash with each
+    // other on Firebase Auth's email-uniqueness constraint.
+    final junkEmail = 'deleted+$uid@coil.invalid';
+    try {
+      // verifyBeforeUpdateEmail is the modern API but it sends a
+      // confirmation email and doesn't apply the change until the user
+      // clicks the link — useless here since we want the rename to take
+      // effect immediately. updateEmail applies the change synchronously
+      // (deprecated but still functional on current SDK versions).
+      // ignore: deprecated_member_use
+      await user.updateEmail(junkEmail);
+    } on FirebaseAuthException catch (e) {
+      // `requires-recent-login` is the common failure here — surface it
+      // so the UI can prompt re-auth. Other codes get logged for triage.
+      debugPrint(
+        'Could not rename Auth email for $uid ($originalEmail): '
+        '${e.code} ${e.message}',
+      );
+      rethrow;
+    }
+
+    // With the real email freed, try to delete the Auth record too. If
+    // this fails (e.g. requires-recent-login), the user still benefits:
+    // the orphan record only carries the .invalid email and no real
+    // address is blocked.
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      debugPrint(
+        'Auth user.delete() failed for $uid (email already freed): '
+        '${e.code} ${e.message}',
+      );
+    }
   }
 
   Future<void> _deleteSubcollection(

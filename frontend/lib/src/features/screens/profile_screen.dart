@@ -536,27 +536,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final uid = authUser.uid;
 
     try {
+      // selfDeleteCurrentUser renames the Auth email to a junk .invalid
+      // address so the real email is freed for re-signup, then attempts
+      // to delete the Auth record. The rename requires a recent login;
+      // we prompt for re-auth and retry once if needed.
       await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
-      await authUser.delete();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
+        if (!context.mounted) return;
+        final reAuthed = await _reauthBeforeDelete(context, authUser);
+        if (!reAuthed) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.profileReauthRequired)),
+            );
+          }
+          return;
+        }
+        try {
+          await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
+        } catch (e2) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.deleteFailed(e2))),
+            );
+          }
+          return;
+        }
+      } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(context.t.profileReauthRequired),
-            ),
+                content:
+                    Text(context.t.deleteFailed(e.message ?? e.code))),
           );
         }
         return;
       }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(context.t.deleteFailed(e.message ?? e.code))),
-        );
-      }
-      return;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -578,6 +594,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (context.mounted) {
       Navigator.of(context).popUntil((r) => r.isFirst);
       context.go('/login');
+    }
+  }
+
+  /// Prompts a password user for their current password and re-authenticates
+  /// so the Auth-email rename inside selfDeleteCurrentUser can proceed.
+  /// Returns true on success, false if the user cancelled or re-auth failed.
+  /// For non-password accounts (Google / Apple) returns false — they'd need
+  /// a different OAuth re-auth flow that we don't trigger from here.
+  Future<bool> _reauthBeforeDelete(BuildContext context, User user) async {
+    final isPasswordUser =
+        user.providerData.any((p) => p.providerId == 'password');
+    if (!isPasswordUser || user.email == null) return false;
+
+    final passCtrl = TextEditingController();
+    final password = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.t.settingsCurrentPassword),
+        content: TextField(
+          controller: passCtrl,
+          obscureText: true,
+          autofocus: true,
+          decoration: InputDecoration(hintText: ctx.t.settingsCurrentPassword),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ctx.t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, passCtrl.text),
+            child: Text(ctx.t.ok),
+          ),
+        ],
+      ),
+    );
+    passCtrl.dispose();
+    if (password == null || password.isEmpty) return false;
+
+    try {
+      final cred = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(cred);
+      return true;
+    } on FirebaseAuthException {
+      return false;
     }
   }
 }

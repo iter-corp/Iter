@@ -213,6 +213,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           link: event.link,
           phone: event.phone,
           email: event.email,
+          createdByUid: event.createdByUid,
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../model/post_model.dart';
@@ -26,7 +27,7 @@ class _AdminDiscussPostsScreenState
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Discuss posts'),
+        title: Text(context.t.adminDiscussPosts),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -39,7 +40,7 @@ class _AdminDiscussPostsScreenState
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
-                hintText: 'Search by username or question',
+                hintText: context.t.adminDiscussSearchHint,
                 filled: true,
                 fillColor: context.cardBg,
                 border: OutlineInputBorder(
@@ -52,7 +53,8 @@ class _AdminDiscussPostsScreenState
           Expanded(
             child: postsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) =>
+                  Center(child: Text(context.t.errorWithMessage(e))),
               data: (allPosts) {
                 final q = _query.trim().toLowerCase();
                 final posts = q.isEmpty
@@ -67,7 +69,9 @@ class _AdminDiscussPostsScreenState
                 if (posts.isEmpty) {
                   return Center(
                     child: Text(
-                      q.isEmpty ? 'No discuss posts' : 'No discuss posts match',
+                      q.isEmpty
+                          ? context.t.adminDiscussNoPosts
+                          : context.t.adminDiscussNoPostsMatch,
                       style: TextStyle(color: context.textSecondary),
                     ),
                   );
@@ -123,12 +127,15 @@ class _AdminDiscussPostsScreenState
                             ),
                           ),
                           title: Text(
-                            caption.isEmpty ? '(No question text)' : caption,
+                            caption.isEmpty
+                                ? context.t.adminDiscussNoQuestionText
+                                : caption,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            'by ${p['authorUsername'] ?? 'unknown'}',
+                            context.t.adminDiscussByAuthor(
+                                (p['authorUsername'] as String?) ?? '—'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -156,16 +163,17 @@ class _AdminDiscussPostsScreenState
       BuildContext context, WidgetRef ref, String postId) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete discuss post?'),
-        content: const Text('This cannot be undone.'),
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.t.adminDiscussDeleteTitle),
+        content: Text(ctx.t.adminDiscussDeleteBody),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ctx.t.cancel)),
           TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(ctx.t.delete,
+                  style: const TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -174,8 +182,8 @@ class _AdminDiscussPostsScreenState
         await ref.read(adminServiceProvider).deletePost(postId);
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Failed: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.failedWithError(e))));
         }
       }
     }

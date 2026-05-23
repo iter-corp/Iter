@@ -224,6 +224,28 @@ const Map<String, String> ckbStrings = {
   'show_original': 'بینینی ڕەسەن',
   'saved_translations': 'وەرگێڕانە پاشەکەوتکراوەکان',
   'see_translation': 'بینینی وەرگێڕان',
+  'translate_enter_text': 'دەقەکە بنووسە...',
+  'translate_search_languages': 'گەڕان بەدوای زمانەکان',
+  'translate_no_languages_match': 'هیچ زمانێک بەرابەر نییە',
+  'translate_copied': 'کۆپی کرا بۆ کلیپبۆرد',
+  'translate_saved': 'وەرگێڕان پاشەکەوت کرا!',
+  'translate_removed_from_saved': 'وەرگێڕان لە پاشەکەوتکراوەکان لابرا',
+  'translate_unavailable': 'وەرگێڕان بەردەست نییە',
+  'translate_mic_not_available':
+      'مایکرۆفۆن بەردەست نییە. ڕێگەپێدانەکە بپشکنە.',
+  'translate_stt_unsupported':
+      'گواستنەوەی دەنگ بۆ نووسین بۆ {lang} لەسەر ئەم ئامێرە پشتگیری ناکرێت.',
+  'translate_stt_no_match':
+      'نەتوانرا دەنگەکە بناسرێتەوە. دڵنیابە لەوەی زمانی سەرچاوە لەگەڵ ئەوەی دەیڵێیت یەکدەگرێتەوە.',
+  'translate_stt_no_speech':
+      'هیچ دەنگێک نەدۆزرایەوە. دووبارە هەوڵبدە و نزیکتر بە مایکرۆفۆنەکە قسە بکە.',
+  'translate_stt_audio':
+      'هەڵەی دەنگی مایکرۆفۆن. ئەو ئەپانە دابخە کە مایکرۆفۆن بەکاردەهێنن و دووبارە هەوڵبدە.',
+  'translate_stt_network':
+      'هەڵەی تۆڕ. ناسینەوەی دەنگ پێویستی بە ئینتەرنێت هەیە.',
+  'translate_stt_permission':
+      'ڕێگەپێدانی مایکرۆفۆن ڕەتکرایەوە. لە ڕێکخستنەکانی ئامێرەکە چالاکی بکە.',
+  'translate_stt_generic': 'هەڵەی مایکرۆفۆن: {code}',
 
   // ── Admin ─────────────────────────────────────────────────────
   'admin': 'بەڕێوەبەر',
@@ -257,6 +279,11 @@ const Map<String, String> ckbStrings = {
   'signup_subtitle': 'تکایە ئەو کۆدە بنووسە کە ئێستا ناردمان\nبۆ ئیمەیڵەکەت',
   'signup_enter_username': 'ناوی بەکارهێنەرێک بنووسە',
   'signup_enter_valid_email': 'ئیمەیڵێکی دروست بنووسە',
+  'signup_enter_password': 'وشەی نهێنی بنووسە',
+  'signup_password_min_length':
+      'پێویستە وشەی نهێنی لانیکەم ٨ پیت بێت',
+  'signup_password_letter_number':
+      'پێویستە وشەی نهێنی پیت و ژمارەی تێدا بێت',
   'signup_sign_in_with_facebook': 'چوونەژوورەوە بە فەیسبووک',
   'forgot_password_subtitle': "نیگەران مەبە! ئەو ئیمەیڵە بنووسە کە پەیوەستە بە\nهەژمارەکەتەوە و لینکی گۆڕینت بۆ دەنێرین.",
   'forgot_password_email_sent': 'ئیمەیڵ نێردرا!',
@@ -820,6 +847,16 @@ const Map<String, String> ckbStrings = {
   'admin_new_event': 'بۆنەی نوێ',
   'admin_edit_event': 'دەستکاری بۆنە',
   'admin_no_events_yet': 'هیچ بۆنەیەک نییە هێشتا. پەنجە بنێ بە "بۆنەی نوێ" بۆ زیادکردنی یەکێک.',
+  'admin_events_search_hint': 'گەڕان بە ناونیشان، نووسەر، شوێن…',
+  'admin_filters': 'فلتەرەکان',
+  'admin_filter_type': 'جۆر',
+  'admin_filter_country': 'وڵات',
+  'admin_filter_funding': 'دارایی',
+  'admin_filter_any': 'هەموو',
+  'admin_filter_clear': 'سڕینەوەی فلتەرەکان',
+  'admin_filter_apply': 'جێبەجێکردن',
+  'admin_filter_with_deadline': 'کاتی کۆتایی هەیە',
+  'admin_filter_expired': 'بەسەرچوو',
   'admin_delete_event_title': 'بۆنەکە بسڕێتەوە؟',
   'admin_delete_event_body': 'ئەمە بە یەکجاری بۆنەکە بۆ هەمووان دەسڕێتەوە.',
   'admin_upload_failed': 'بارکردن شکستی هێنا: {error}',
@@ -857,6 +894,50 @@ const Map<String, String> ckbStrings = {
   'admin_post_reports': 'ڕاپۆرتەکانی پۆست',
   'admin_post_reports_subtitle': 'پێداچوونەوە بۆ ڕاپۆرتەکانی بەکارهێنەران لەسەر پۆستەکان',
   'admin_discuss_reports': 'ڕاپۆرتەکانی گفتوگۆ',
+  'admin_discuss_posts': 'پۆستەکانی گفتوگۆ',
+  'admin_discuss_posts_subtitle':
+      'پێداچوونەوە و سڕینەوەی پۆستەکانی گفتوگۆ/پرسیار و وەڵام',
+  'admin_discuss_search_hint': 'گەڕان بە ناوی بەکارهێنەر یان پرسیار',
+  'admin_discuss_no_posts': 'هیچ پۆستێکی گفتوگۆ نییە',
+  'admin_discuss_no_posts_match': 'هیچ پۆستێکی گفتوگۆ بەرابەر نییە',
+  'admin_discuss_no_question_text': '(دەقی پرسیار نییە)',
+  'admin_discuss_by_author': 'لەلایەن {name}',
+  'admin_discuss_delete_title': 'پۆستی گفتوگۆ بسڕیتەوە؟',
+  'admin_discuss_delete_body': 'ئەمە ناتوانرێت پاشگەزی لێبکرێتەوە.',
+  'admin_reports_search_hint': 'گەڕان لە ڕاپۆرتەکان…',
+  'admin_reports_select': 'دیاریکردن',
+  'admin_reports_select_all': 'دیاریکردنی هەموو',
+  'admin_reports_select_none': 'لابردنی دیاریکردن',
+  'admin_reports_cancel_selection': 'پاشگەزبوونەوە',
+  'admin_reports_selected_count': '{count} دیاریکراوە',
+  'admin_reports_delete_selected_title':
+      'سڕینەوەی {count} ڕاپۆرت؟',
+  'admin_reports_delete_selected_body':
+      'ڕاپۆرتە دیاریکراوەکان بە یەکجاری دەسڕێنەوە. کاریگەری لەسەر پۆست/بەکارهێنەرە بنەڕەتییەکان نییە.',
+  'admin_reports_delete_all': 'سڕینەوەی هەموو',
+  'admin_reports_delete_all_title': 'هەموو ڕاپۆرتەکان بسڕیتەوە؟',
+  'admin_reports_delete_all_body':
+      'ئەمە هەموو {count} ڕاپۆرتی دەرکەوتوو بە یەکجاری دەسڕێتەوە. ئەم کردارە ناتوانرێت پاشگەزی لێبکرێتەوە.',
+  'admin_reports_filter_status': 'بار',
+  'admin_reports_filter_reason': 'هۆکار',
+  'admin_users_tab_all': 'هەموو ({count})',
+  'admin_users_tab_admins': 'بەڕێوەبەرەکان ({count})',
+  'admin_users_tab_event_managers': 'بەڕێوەبەری بۆنە ({count})',
+  'admin_users_tab_regular': 'بەکارهێنەرەکان ({count})',
+  'admin_users_tab_suspended': 'ڕاگیراوەکان ({count})',
+  'admin_users_event_manager_badge': 'بەڕێوەبەری بۆنە',
+  'admin_users_revoke_event_manager': 'هەڵگرتنی بەڕێوەبەری بۆنە',
+  'admin_users_grant_event_manager': 'پێدانی بەڕێوەبەری بۆنە',
+  'admin_users_revoke_event_manager_title':
+      'دەسەڵاتی بەڕێوەبەری بۆنە هەڵبگیرێت؟',
+  'admin_users_grant_event_manager_title':
+      'دەسەڵاتی بەڕێوەبەری بۆنە بدرێت؟',
+  'admin_users_revoke_event_manager_body':
+      'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە لادەبات و ڕۆڵەکە دەکات بە بەکارهێنەر.',
+  'admin_users_grant_event_manager_body':
+      'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە دەدات بە کردنی ئەم بەکارهێنەرە بە بەڕێوەبەری بۆنە.',
+  'admin_users_revoke': 'هەڵگرتن',
+  'admin_users_grant': 'پێدان',
   'admin_discuss_reports_subtitle': 'پێداچوونەوە بۆ ڕاپۆرتەکان لەسەر بابەتەکانی گفتوگۆ',
   'admin_profile_reports': 'ڕاپۆرتەکانی پڕۆفایل',
   'admin_profile_reports_subtitle': 'پێداچوونەوە بۆ ڕاپۆرتەکانی پێشێلکاری لە پڕۆفایلەکان',
@@ -876,6 +957,7 @@ const Map<String, String> ckbStrings = {
   'admin_closed_reports_move_here': 'ڕاپۆرتە داخراوەکان دەگوازرێنەوە بۆ ئێرە.',
   'admin_no_caption': '(بێ کاپشن)',
   'admin_no_question_text': '(بێ دەقی پرسیار)',
+  'admin_users_no_email': 'هیچ ئیمەیڵێک تۆمارنەکراوە',
   'admin_reported_post': 'پۆستی ڕاپۆرتکراو',
   'admin_reported_thread': 'بابەتی ڕاپۆرتکراو',
   'admin_reported_profile': 'پڕۆفایلی ڕاپۆرتکراو',

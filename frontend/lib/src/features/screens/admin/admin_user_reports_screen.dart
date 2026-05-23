@@ -8,6 +8,7 @@ import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
 import '../user_screen.dart';
+import 'admin_reports_toolbar.dart';
 
 class AdminUserReportsScreen extends ConsumerWidget {
   const AdminUserReportsScreen({super.key});
@@ -104,7 +105,9 @@ class AdminUserReportsScreen extends ConsumerWidget {
   }
 }
 
-class _ReportsList extends StatelessWidget {
+/// Stateful list with shared toolbar (search + bulk-delete). See
+/// admin_post_reports_screen.dart for the rationale.
+class _ReportsList extends ConsumerStatefulWidget {
   final List<UserProfileReport> reports;
   final String emptyTitle;
   final String emptySubtitle;
@@ -116,47 +119,152 @@ class _ReportsList extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    if (reports.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.flag_outlined, size: 48, color: context.textMuted),
-              const SizedBox(height: 12),
-              Text(
-                emptyTitle,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: context.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                emptySubtitle,
-                style: TextStyle(color: context.textSecondary, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+  ConsumerState<_ReportsList> createState() => _ReportsListState();
+}
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      itemCount: reports.length,
-      itemBuilder: (_, i) => _ReportTile(report: reports[i]),
+class _ReportsListState extends ConsumerState<_ReportsList> {
+  final ReportsToolbarController _toolbar = ReportsToolbarController.create();
+  String _query = '';
+  final Set<String> _selectedIds = <String>{};
+
+  @override
+  void dispose() {
+    _toolbar.dispose();
+    super.dispose();
+  }
+
+  List<UserProfileReport> get _filtered {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return widget.reports;
+    return widget.reports.where((r) {
+      final hay = [
+        r.targetUsername,
+        r.targetUid,
+        r.reporterUsername,
+        r.reporterUid,
+        r.reason,
+        r.details ?? '',
+      ].join(' ').toLowerCase();
+      return hay.contains(q);
+    }).toList();
+  }
+
+  Future<void> _deleteByIds(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final admin = ref.read(adminServiceProvider);
+    try {
+      await Future.wait(
+          ids.map((id) => admin.deleteUserProfileReport(id)));
+      if (!mounted) return;
+      AppFeedback.showSuccess(context, context.t.adminReportDeleted);
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.showError(context, context.t.adminActionFailed(e));
+    } finally {
+      if (mounted) {
+        setState(_selectedIds.clear);
+        _toolbar.exitSelectionMode();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _filtered;
+    return Column(
+      children: [
+        ReportsToolbar(
+          controller: _toolbar,
+          selectedCount: _selectedIds.length,
+          visibleCount: visible.length,
+          onQueryChanged: (v) => setState(() => _query = v),
+          onSelectAll: () => setState(() {
+            _selectedIds
+              ..clear()
+              ..addAll(visible.map((r) => r.id));
+          }),
+          onClearSelection: () => setState(_selectedIds.clear),
+          onDeleteSelected: () => _deleteByIds(_selectedIds.toList()),
+          onDeleteAll: () => _deleteByIds(visible.map((r) => r.id).toList()),
+        ),
+        Expanded(
+          child: visible.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.flag_outlined,
+                            size: 48, color: context.textMuted),
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.reports.isEmpty
+                              ? widget.emptyTitle
+                              : context.t.adminNoResults,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.emptySubtitle,
+                          style: TextStyle(
+                              color: context.textSecondary, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  itemCount: visible.length,
+                  itemBuilder: (_, i) {
+                    final r = visible[i];
+                    return _ReportTile(
+                      report: r,
+                      selecting: _toolbar.isSelecting,
+                      selected: _selectedIds.contains(r.id),
+                      onSelectedChanged: (sel) {
+                        setState(() {
+                          if (sel) {
+                            _selectedIds.add(r.id);
+                          } else {
+                            _selectedIds.remove(r.id);
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        if (!_toolbar.isSelecting) {
+                          _toolbar.enterSelectionMode();
+                          setState(() => _selectedIds.add(r.id));
+                        }
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
 
 class _ReportTile extends ConsumerWidget {
   final UserProfileReport report;
+  final bool selecting;
+  final bool selected;
+  final ValueChanged<bool> onSelectedChanged;
+  final VoidCallback onLongPress;
 
-  const _ReportTile({required this.report});
+  const _ReportTile({
+    required this.report,
+    this.selecting = false,
+    this.selected = false,
+    required this.onSelectedChanged,
+    required this.onLongPress,
+  });
 
   String _shortTime(DateTime? dt) =>
       dt == null ? 'unknown time' : DateFormat('MMM d, HH:mm').format(dt);
@@ -169,7 +277,47 @@ class _ReportTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
+    if (selecting) {
+      final title = report.targetUsername.isEmpty
+          ? report.targetUid
+          : report.targetUsername;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? const Color(0xFF7E3BE8) : context.borderColor,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: CheckboxListTile(
+          value: selected,
+          onChanged: (v) => onSelectedChanged(v ?? false),
+          title: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: context.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            '${report.reason} · ${report.reporterUsername.isEmpty ? report.reporterUid : report.reporterUsername}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: context.textSecondary, fontSize: 12),
+          ),
+          activeColor: const Color(0xFF7E3BE8),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+      );
+    }
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: context.cardBg,
@@ -345,6 +493,7 @@ class _ReportTile extends ConsumerWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

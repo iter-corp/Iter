@@ -17,77 +17,179 @@ class AdminUsersScreen extends ConsumerStatefulWidget {
 class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
   String _query = '';
 
+  /// Partition users into the tab buckets. We compute these once per build
+  /// so each tab gets its filtered list without re-walking the source.
+  ({
+    List<Map<String, dynamic>> all,
+    List<Map<String, dynamic>> admins,
+    List<Map<String, dynamic>> eventManagers,
+    List<Map<String, dynamic>> regular,
+    List<Map<String, dynamic>> suspended,
+  }) _bucket(List<Map<String, dynamic>> users) {
+    final admins = <Map<String, dynamic>>[];
+    final eventManagers = <Map<String, dynamic>>[];
+    final regular = <Map<String, dynamic>>[];
+    final suspended = <Map<String, dynamic>>[];
+    for (final u in users) {
+      final role = u['role'] as String? ?? 'user';
+      // Suspended users get their own bucket regardless of role so they
+      // surface in one place; the admin can still see them in the All tab.
+      if ((u['suspended'] as bool?) ?? false) {
+        suspended.add(u);
+      }
+      if (role == 'admin') {
+        admins.add(u);
+      } else if (role == 'org_admin') {
+        eventManagers.add(u);
+      } else {
+        regular.add(u);
+      }
+    }
+    return (
+      all: users,
+      admins: admins,
+      eventManagers: eventManagers,
+      regular: regular,
+      suspended: suspended,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Pass the query down to the server-side provider so the filter applies
+    // across all tabs. The buckets below then slice the already-filtered
+    // list by role/suspended state.
     final usersAsync = ref.watch(adminUsersProvider(_query));
-    return Scaffold(
-      backgroundColor: context.surfaceSoft,
-      appBar: AppBar(
-        title: Text(context.t.adminTileUsersTitle),
-        backgroundColor: context.cardBg,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              onChanged: (v) => setState(() => _query = v),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: context.t.adminUsersSearchHint,
-                filled: true,
-                fillColor: context.cardBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.borderColor),
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
+        backgroundColor: context.surfaceSoft,
+        appBar: AppBar(
+          title: Text(context.t.adminTileUsersTitle),
+          backgroundColor: context.cardBg,
+          foregroundColor: context.textPrimary,
+          elevation: 0,
+        ),
+        body: Column(
+          children: [
+            // One shared search field above the tabs so the query persists
+            // and applies to whichever tab is active.
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextField(
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: context.t.adminUsersSearchHint,
+                  filled: true,
+                  fillColor: context.cardBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: context.borderColor),
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: usersAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-              data: (users) {
-                if (users.isEmpty) {
-                  return Center(
-                      child: Text(context.t.adminNoUsersMatch,
-                          style: TextStyle(color: context.textSecondary)));
-                }
-                final sorted = [...users]..sort((a, b) {
-                    final aRole = (a['role'] as String? ?? 'user');
-                    final bRole = (b['role'] as String? ?? 'user');
-                    if (aRole == bRole) {
-                      final aName = (a['username'] as String? ??
-                              a['email'] as String? ??
-                              '')
-                          .toLowerCase();
-                      final bName = (b['username'] as String? ??
-                              b['email'] as String? ??
-                              '')
-                          .toLowerCase();
-                      return aName.compareTo(bName);
-                    }
-                    if (aRole == 'admin') return -1;
-                    if (bRole == 'admin') return 1;
-                    if (aRole == 'org_admin') return -1;
-                    if (bRole == 'org_admin') return 1;
-                    return 0;
-                  });
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  itemCount: sorted.length,
-                  itemBuilder: (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _UserTile(user: sorted[i]),
-                  ),
-                );
-              },
+            Expanded(
+              child: usersAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) =>
+                    Center(child: Text(context.t.errorWithMessage(e))),
+                data: (users) {
+                  final b = _bucket(users);
+                  return Column(
+                    children: [
+                      // Scrollable so longer translated labels (Arabic /
+                      // Kurdish) don't crowd or clip on small screens.
+                      Material(
+                        color: context.surfaceSoft,
+                        child: TabBar(
+                          isScrollable: true,
+                          labelColor: AppColors.purple,
+                          unselectedLabelColor: context.textSecondary,
+                          indicatorColor: AppColors.purple,
+                          tabs: [
+                            Tab(text: context.t.adminUsersTabAll(b.all.length)),
+                            Tab(
+                                text: context.t
+                                    .adminUsersTabAdmins(b.admins.length)),
+                            Tab(
+                                text: context.t.adminUsersTabEventManagers(
+                                    b.eventManagers.length)),
+                            Tab(
+                                text: context.t
+                                    .adminUsersTabRegular(b.regular.length)),
+                            Tab(
+                                text: context.t.adminUsersTabSuspended(
+                                    b.suspended.length)),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _UsersList(users: b.all),
+                            _UsersList(users: b.admins),
+                            _UsersList(users: b.eventManagers),
+                            _UsersList(users: b.regular),
+                            _UsersList(users: b.suspended),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders one tab's worth of users. Sorts admins → event managers →
+/// users so the All tab keeps the previous "role first, then name"
+/// ordering even after the bucket split.
+class _UsersList extends StatelessWidget {
+  final List<Map<String, dynamic>> users;
+  const _UsersList({required this.users});
+
+  @override
+  Widget build(BuildContext context) {
+    if (users.isEmpty) {
+      return Center(
+        child: Text(context.t.adminNoUsersMatch,
+            style: TextStyle(color: context.textSecondary)),
+      );
+    }
+    final sorted = [...users]..sort((a, b) {
+        final aRole = (a['role'] as String? ?? 'user');
+        final bRole = (b['role'] as String? ?? 'user');
+        if (aRole == bRole) {
+          final aName = (a['username'] as String? ??
+                  a['email'] as String? ??
+                  '')
+              .toLowerCase();
+          final bName = (b['username'] as String? ??
+                  b['email'] as String? ??
+                  '')
+              .toLowerCase();
+          return aName.compareTo(bName);
+        }
+        if (aRole == 'admin') return -1;
+        if (bRole == 'admin') return 1;
+        if (aRole == 'org_admin') return -1;
+        if (bRole == 'org_admin') return 1;
+        return 0;
+      });
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      itemCount: sorted.length,
+      itemBuilder: (_, i) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _UserTile(user: sorted[i]),
       ),
     );
   }
@@ -100,13 +202,33 @@ class _UserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = user['uid'] as String? ?? '';
-    final username = user['username'] as String? ?? '';
-    final email = user['email'] as String? ?? '';
+    final username = (user['username'] as String? ?? '').trim();
+    final email = (user['email'] as String? ?? '').trim();
     final avatar = user['avatarUrl'] as String?;
     final role = user['role'] as String? ?? 'user';
     final suspended = (user['suspended'] as bool?) ?? false;
     final isAdmin = role == 'admin';
     final isOrgAdmin = role == 'org_admin';
+
+    // Title prefers username, then email, then the uid so the row never
+    // renders blank. Subtitle then shows the email — but if we already
+    // promoted the email up to the title (because no username was set)
+    // we'd otherwise duplicate it on every row. Show "no email" in that
+    // case so the admin can tell the difference between a user whose
+    // email simply isn't on file (Apple hide-my-email, legacy docs,
+    // anonymous sign-in) and the duplicate-display bug.
+    final String title;
+    final String subtitle;
+    if (username.isNotEmpty) {
+      title = username;
+      subtitle = email.isEmpty ? context.t.adminUsersNoEmail : email;
+    } else if (email.isNotEmpty) {
+      title = email;
+      subtitle = context.t.adminUsersNoEmail;
+    } else {
+      title = uid.isEmpty ? '—' : uid;
+      subtitle = context.t.adminUsersNoEmail;
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -138,7 +260,7 @@ class _UserTile extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                username.isEmpty ? email : username,
+                title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -151,7 +273,7 @@ class _UserTile extends ConsumerWidget {
               ),
             if (isOrgAdmin)
               _RoleChip(
-                label: 'EVENT MANAGER',
+                label: context.t.adminUsersEventManagerBadge,
                 background: Colors.blue.shade50,
                 foreground: Colors.blue.shade700,
               ),
@@ -163,7 +285,7 @@ class _UserTile extends ConsumerWidget {
               ),
           ],
         ),
-        subtitle: Text(email,
+        subtitle: Text(subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: context.textSecondary, fontSize: 12)),
@@ -182,8 +304,8 @@ class _UserTile extends ConsumerWidget {
               PopupMenuItem(
                 value: 'orgRole',
                 child: Text(isOrgAdmin
-                    ? 'Revoke event manager'
-                    : 'Grant event manager'),
+                    ? context.t.adminUsersRevokeEventManager
+                    : context.t.adminUsersGrantEventManager),
               ),
             PopupMenuItem(
               value: 'suspend',
@@ -211,21 +333,23 @@ class _UserTile extends ConsumerWidget {
         final isRevoking = role == 'org_admin';
         final ok = await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+          builder: (ctx) => AlertDialog(
             title: Text(isRevoking
-                ? 'Revoke event manager access?'
-                : 'Grant event manager access?'),
+                ? ctx.t.adminUsersRevokeEventManagerTitle
+                : ctx.t.adminUsersGrantEventManagerTitle),
             content: Text(isRevoking
-                ? 'This will remove event posting permissions and set role to user.'
-                : 'This will grant event posting permissions by making this user an event manager.'),
+                ? ctx.t.adminUsersRevokeEventManagerBody
+                : ctx.t.adminUsersGrantEventManagerBody),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(ctx.t.cancel),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(isRevoking ? 'Revoke' : 'Grant'),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(isRevoking
+                    ? ctx.t.adminUsersRevoke
+                    : ctx.t.adminUsersGrant),
               ),
             ],
           ),

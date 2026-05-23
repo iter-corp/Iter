@@ -817,6 +817,7 @@ class _NotificationItem extends ConsumerWidget {
           link: e.link,
           phone: e.phone,
           email: e.email,
+          createdByUid: e.createdByUid,
         ),
       ),
     );

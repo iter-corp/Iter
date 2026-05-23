@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
@@ -66,22 +67,22 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
     super.dispose();
   }
 
-  String _friendlySttError(String code) {
+  String _friendlySttError(AppStrings t, String code) {
     switch (code) {
       case 'error_no_match':
-        return "Couldn't recognize speech. Make sure the source language matches what you're saying.";
+        return t.translateSttNoMatch;
       case 'error_speech_timeout':
       case 'error_no_speech':
-        return 'No speech detected. Try again and speak closer to the mic.';
+        return t.translateSttNoSpeech;
       case 'error_audio':
-        return 'Mic audio error. Close other apps using the mic and retry.';
+        return t.translateSttAudio;
       case 'error_network':
       case 'error_network_timeout':
-        return 'Network error. Speech recognition needs internet.';
+        return t.translateSttNetwork;
       case 'error_permission':
-        return 'Mic permission denied. Enable it in device settings.';
+        return t.translateSttPermission;
       default:
-        return 'Mic error: $code';
+        return t.translateSttGeneric(code);
     }
   }
 
@@ -104,16 +105,16 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
           if (!mounted) return;
           setState(() => _isRecording = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_friendlySttError(err.errorMsg))),
+            SnackBar(
+              content: Text(_friendlySttError(context.t, err.errorMsg)),
+            ),
           );
         },
       );
       if (!_sttInitialized) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Microphone not available. Check permission.'),
-            ),
+            SnackBar(content: Text(context.t.translateMicNotAvailable)),
           );
         }
         return;
@@ -146,8 +147,8 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                'Speech-to-text not supported for $_sourceLang on this device.'),
+            content:
+                Text(context.t.translateSttUnsupported(_sourceLang)),
           ),
         );
       }
@@ -219,12 +220,12 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Translation unavailable'),
+          title: Text(dialogContext.t.translateUnavailable),
           content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
+              child: Text(dialogContext.t.ok),
             ),
           ],
         ),
@@ -238,9 +239,9 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
     if (_translatedText.isEmpty) return;
     Clipboard.setData(ClipboardData(text: _translatedText));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied to clipboard'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(context.t.translateCopied),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -289,9 +290,9 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       if (!mounted) return;
       setState(() => _isBookmarked = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Translation removed from saved'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(context.t.translateRemovedFromSaved),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -309,9 +310,9 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       if (!mounted) return;
       setState(() => _isBookmarked = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Translation saved!'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(context.t.translateSaved),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -341,7 +342,7 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
                 Row(
                   children: [
                     Text(
-                      'Translate',
+                      context.t.translate,
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -350,7 +351,7 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: 'Saved translations',
+                      tooltip: context.t.savedTranslations,
                       onPressed: _openSaved,
                       icon: Icon(Icons.bookmarks_outlined,
                           color: context.textPrimary),
@@ -402,9 +403,9 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Translate',
-                              style: TextStyle(
+                          : Text(
+                              context.t.translate,
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
@@ -582,7 +583,7 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
                   prefixIcon: Icon(Icons.search, color: context.textSecondary),
-                  hintText: 'Search languages',
+                  hintText: context.t.translateSearchLanguages,
                   hintStyle: TextStyle(color: context.textMuted),
                   filled: true,
                   fillColor: context.inputFill,
@@ -600,7 +601,7 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
               child: filtered.isEmpty
                   ? Center(
                       child: Text(
-                        'No languages match',
+                        context.t.translateNoLanguagesMatch,
                         style: TextStyle(color: context.textSecondary),
                       ),
                     )
@@ -668,7 +669,7 @@ class _InputBox extends StatelessWidget {
             textAlignVertical: TextAlignVertical.top,
             decoration: InputDecoration(
               border: InputBorder.none,
-              hintText: 'Enter text...',
+              hintText: context.t.translateEnterText,
               hintStyle: TextStyle(fontSize: 15, color: context.textMuted),
               isDense: true,
               contentPadding: EdgeInsets.zero,

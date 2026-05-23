@@ -79,8 +79,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           _AdminTile(
             icon: Icons.forum_outlined,
-            title: 'Discuss posts',
-            subtitle: 'Review and delete discuss/Q&A posts',
+            title: context.t.adminDiscussPosts,
+            subtitle: context.t.adminDiscussPostsSubtitle,
             color: const Color(0xFF9C6ADE),
             onTap: () => Navigator.push(
               context,

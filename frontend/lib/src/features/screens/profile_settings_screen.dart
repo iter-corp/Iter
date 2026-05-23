@@ -17,6 +17,7 @@ import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/share_app.dart';
 import 'admin/admin_events_screen.dart';
+import 'change_password_screen.dart';
 import 'contact_us_screen.dart';
 import 'event_notifications_settings_screen.dart';
 import 'profile_visitors_screen.dart';
@@ -60,19 +61,19 @@ class ProfileSettingsScreen extends ConsumerWidget {
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
             onTap: () => _changeEmail(context),
           ),
-          ListTile(
-            leading: const Icon(Icons.lock_reset, color: AppColors.purple),
-            title: Text(_isEmailPasswordUser()
-                ? context.t.changePassword
-                : context.t.setPassword),
-            subtitle: _isEmailPasswordUser()
-                ? null
-                : Text(context.t.settingsSetPasswordSubtitle,
-                    style:
-                        TextStyle(fontSize: 12, color: context.textSecondary)),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-            onTap: () => _changePassword(context),
-          ),
+          // Only users who actually have a password to change see this row.
+          // Pure-Google (or pure-Apple) accounts manage their password
+          // through the provider, not in this app — exposing a "Set
+          // password" entry here was confusing and the resulting screen
+          // had no "current password" to verify against.
+          if (_isEmailPasswordUser())
+            ListTile(
+              leading: const Icon(Icons.lock_reset, color: AppColors.purple),
+              title: Text(context.t.changePassword),
+              trailing:
+                  Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () => _changePassword(context),
+            ),
           ListTile(
             leading: Icon(
               isPrivate ? Icons.lock_outline : Icons.lock_open,
@@ -384,169 +385,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
     }
   }
 
+  /// Opens the full-page change-password screen. Only reachable when the
+  /// settings row is shown, which is gated on the user actually having a
+  /// password credential to change — so the social-user "set password"
+  /// branch that used to live here is no longer needed.
   Future<void> _changePassword(BuildContext context) async {
-    final hasPassword = _isEmailPasswordUser();
-    // Google users who haven't set a password yet link a new credential.
-    // Google users who already linked a password, or plain email users,
-    // go through the normal current-password verification flow.
-    if (!hasPassword) {
-      await _setPasswordForSocialUser(context);
-    } else {
-      await _changePasswordForEmailUser(context);
-    }
-  }
-
-  /// Google (or other social) users who have no password yet.
-  /// Links an EmailAuthProvider credential so they can also sign in
-  /// with email + password going forward.
-  Future<void> _setPasswordForSocialUser(BuildContext context) async {
-    final newPassCtrl = TextEditingController();
-    final confirmPassCtrl = TextEditingController();
-    bool obscureNew = true;
-    bool obscureConfirm = true;
-    String? error;
-    bool loading = false;
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          backgroundColor: context.cardBg,
-          surfaceTintColor: Colors.transparent,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Text(ctx.t.setPassword),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                ctx.t.settingsSetPasswordDialogBody,
-                style: TextStyle(fontSize: 13, color: context.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: newPassCtrl,
-                obscureText: obscureNew,
-                decoration: _settingsInputDecoration(
-                  context,
-                  label: ctx.t.settingsNewPassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        obscureNew ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => obscureNew = !obscureNew),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmPassCtrl,
-                obscureText: obscureConfirm,
-                decoration: _settingsInputDecoration(
-                  context,
-                  label: ctx.t.settingsConfirmPassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureConfirm
-                        ? Icons.visibility_off
-                        : Icons.visibility),
-                    onPressed: () =>
-                        setState(() => obscureConfirm = !obscureConfirm),
-                  ),
-                ),
-              ),
-              if (error != null) ...[
-                const SizedBox(height: 10),
-                Text(error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: loading ? null : () => Navigator.pop(ctx),
-              child: Text(ctx.t.cancel),
-            ),
-            TextButton(
-              onPressed: loading
-                  ? null
-                  : () async {
-                      final newPass = newPassCtrl.text;
-                      final confirm = confirmPassCtrl.text;
-                      if (newPass.isEmpty || confirm.isEmpty) {
-                        setState(() =>
-                            error = ctx.t.settingsAllFieldsRequired);
-                        return;
-                      }
-                      if (newPass.length < 6) {
-                        setState(() =>
-                            error = ctx.t.settingsPasswordMin6);
-                        return;
-                      }
-                      if (newPass != confirm) {
-                        setState(() =>
-                            error = ctx.t.settingsPasswordsDoNotMatch);
-                        return;
-                      }
-                      setState(() {
-                        loading = true;
-                        error = null;
-                      });
-                      try {
-                        final user = FirebaseAuth.instance.currentUser!;
-                        final cred = EmailAuthProvider.credential(
-                          email: user.email!,
-                          password: newPass,
-                        );
-                        await user.linkWithCredential(cred);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  context.t.settingsPasswordSetSuccess),
-                            ),
-                          );
-                        }
-                      } on FirebaseAuthException catch (e) {
-                        setState(() {
-                          loading = false;
-                          error = switch (e.code) {
-                            'weak-password' => ctx.t.settingsPasswordTooWeak,
-                            'provider-already-linked' =>
-                              ctx.t.settingsPasswordAlreadyLinked,
-                            _ => e.message ??
-                                ctx.t.settingsSomethingWentWrong,
-                          };
-                        });
-                      } catch (_) {
-                        setState(() {
-                          loading = false;
-                          error = ctx.t.settingsSomethingWentWrongRetry;
-                        });
-                      }
-                    },
-              child: loading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(ctx.t.settingsSetPasswordButton,
-                      style: const TextStyle(color: AppColors.purple)),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    newPassCtrl.dispose();
-    confirmPassCtrl.dispose();
-  }
-
-  /// Email+password users, or social users who already linked a password.
-  Future<void> _changePasswordForEmailUser(BuildContext context) async {
-    final passwordUpdated = await showDialog<bool>(
-      context: context,
-      builder: (_) => const _ChangePasswordDialog(),
+    final passwordUpdated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
     );
     if (passwordUpdated == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -696,28 +541,41 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
     try {
       await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
-      await authUser.delete();
     } on FirebaseAuthException catch (e) {
+      // The Auth-email-rename step inside selfDeleteCurrentUser is the
+      // most common failure point — it requires a recent login. Try to
+      // re-auth and retry once if the user is a password account.
       if (e.code == 'requires-recent-login') {
+        if (!context.mounted) return;
+        final reAuthed = await _reauthBeforeDelete(context, authUser);
+        if (!reAuthed) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.settingsSecurityRelogin)),
+            );
+          }
+          return;
+        }
+        try {
+          await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
+        } catch (e2) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.settingsDeleteFailed(e2))),
+            );
+          }
+          return;
+        }
+      } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                context.t.settingsSecurityRelogin,
-              ),
-            ),
+                content: Text(
+                    context.t.settingsDeleteFailed(e.message ?? e.code))),
           );
         }
         return;
       }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(context.t.settingsDeleteFailed(e.message ?? e.code))),
-        );
-      }
-      return;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -727,8 +585,61 @@ class ProfileSettingsScreen extends ConsumerWidget {
       return;
     }
 
+    // Sign out locally so the cached credential doesn't linger.
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+
     if (context.mounted) {
       context.go('/login');
+    }
+  }
+
+  /// Prompts a password user for their current password and re-authenticates
+  /// so a subsequent privileged operation (email rename, delete) can proceed.
+  /// Returns true on success, false if the user cancelled or re-auth failed.
+  /// For non-password accounts (Google / Apple) returns false immediately —
+  /// they need a different re-auth flow we don't trigger from here.
+  Future<bool> _reauthBeforeDelete(BuildContext context, User user) async {
+    final isPasswordUser =
+        user.providerData.any((p) => p.providerId == 'password');
+    if (!isPasswordUser || user.email == null) return false;
+
+    final passCtrl = TextEditingController();
+    final password = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.t.settingsCurrentPassword),
+        content: TextField(
+          controller: passCtrl,
+          obscureText: true,
+          autofocus: true,
+          decoration: InputDecoration(hintText: ctx.t.settingsCurrentPassword),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ctx.t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, passCtrl.text),
+            child: Text(ctx.t.ok),
+          ),
+        ],
+      ),
+    );
+    passCtrl.dispose();
+    if (password == null || password.isEmpty) return false;
+
+    try {
+      final cred = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(cred);
+      return true;
+    } on FirebaseAuthException {
+      return false;
     }
   }
 }
@@ -935,255 +846,6 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
   }
 }
 
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog();
-
-  @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
-  final _currentPassCtrl = TextEditingController();
-  final _newPassCtrl = TextEditingController();
-  final _confirmPassCtrl = TextEditingController();
-
-  bool _obscureCurrent = true;
-  bool _obscureNew = true;
-  bool _obscureConfirm = true;
-  bool _loading = false;
-  bool _sendingReset = false;
-  String? _error;
-  String? _notice;
-  bool _noticeIsError = false;
-
-  @override
-  void dispose() {
-    _currentPassCtrl.dispose();
-    _newPassCtrl.dispose();
-    _confirmPassCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final current = _currentPassCtrl.text;
-    final newPass = _newPassCtrl.text;
-    final confirm = _confirmPassCtrl.text;
-    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
-      setState(() => _error = context.t.settingsAllFieldsRequired);
-      return;
-    }
-    if (newPass.length < 6) {
-      setState(() => _error = context.t.settingsPasswordMin6);
-      return;
-    }
-    if (newPass != confirm) {
-      setState(() => _error = context.t.settingsPasswordsDoNotMatch);
-      return;
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.email == null) {
-      setState(() => _error = context.t.settingsNoEmailAccount);
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-      _error = null;
-      _notice = null;
-    });
-
-    try {
-      final cred = EmailAuthProvider.credential(
-        email: user.email!,
-        password: current,
-      );
-      await user.reauthenticateWithCredential(cred);
-      await user.updatePassword(newPass);
-
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = switch (e.code) {
-          'wrong-password' ||
-          'invalid-credential' =>
-            context.t.settingsIncorrectCurrentPassword,
-          'requires-recent-login' => context.t.settingsSecurityReloginShort,
-          'weak-password' => context.t.settingsNewPasswordTooWeak,
-          'too-many-requests' => context.t.settingsTooManyRequests,
-          'network-request-failed' => context.t.settingsNetworkError,
-          _ => e.message ?? context.t.settingsSomethingWentWrong,
-        };
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = context.t.settingsSomethingWentWrongRetry;
-      });
-    }
-  }
-
-  Future<void> _sendResetEmail() async {
-    final userEmail = FirebaseAuth.instance.currentUser?.email;
-    if (userEmail == null || userEmail.isEmpty) {
-      setState(() {
-        _noticeIsError = true;
-        _notice = context.t.settingsNoEmailAccount;
-      });
-      return;
-    }
-
-    setState(() {
-      _sendingReset = true;
-      _error = null;
-      _notice = null;
-    });
-
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: userEmail);
-      if (!mounted) return;
-      setState(() {
-        _sendingReset = false;
-        _noticeIsError = false;
-        _notice = context.t.settingsResetEmailSent(userEmail);
-      });
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _sendingReset = false;
-        _noticeIsError = true;
-        _notice = switch (e.code) {
-          'too-many-requests' => context.t.settingsTooManyRequests,
-          'network-request-failed' => context.t.settingsNetworkError,
-          'invalid-email' => context.t.settingsEmailInvalidYours,
-          _ => e.message ?? context.t.settingsCouldNotSendReset,
-        };
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _sendingReset = false;
-        _noticeIsError = true;
-        _notice = context.t.settingsCouldNotSendReset;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: context.cardBg,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: Text(context.t.changePassword),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _currentPassCtrl,
-            obscureText: _obscureCurrent,
-            decoration: _settingsInputDecoration(
-              context,
-              label: context.t.settingsCurrentPassword,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscureCurrent ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: () =>
-                    setState(() => _obscureCurrent = !_obscureCurrent),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _newPassCtrl,
-            obscureText: _obscureNew,
-            decoration: _settingsInputDecoration(
-              context,
-              label: context.t.settingsNewPassword,
-              suffixIcon: IconButton(
-                icon:
-                    Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscureNew = !_obscureNew),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _confirmPassCtrl,
-            obscureText: _obscureConfirm,
-            decoration: _settingsInputDecoration(
-              context,
-              label: context.t.settingsConfirmNewPassword,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscureConfirm ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: () =>
-                    setState(() => _obscureConfirm = !_obscureConfirm),
-              ),
-            ),
-          ),
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: TextButton(
-              onPressed: (_loading || _sendingReset) ? null : _sendResetEmail,
-              child: _sendingReset
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(context.t.forgotPassword),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _error!,
-              style: const TextStyle(color: Colors.red, fontSize: 13),
-            ),
-          ],
-          if (_notice != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _notice!,
-              style: TextStyle(
-                color: _noticeIsError ? Colors.red : Colors.green,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: (_loading || _sendingReset)
-              ? null
-              : () => Navigator.of(context).pop(false),
-          child: Text(context.t.cancel),
-        ),
-        TextButton(
-          onPressed: (_loading || _sendingReset) ? null : _save,
-          child: _loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(context.t.save,
-                  style: const TextStyle(color: AppColors.purple)),
-        ),
-      ],
-    );
-  }
-}
-
 class _BlockedUsersSheet extends ConsumerWidget {
   const _BlockedUsersSheet();
 
@@ -1242,3 +904,4 @@ class _BlockedUsersList extends ConsumerWidget {
     );
   }
 }
+

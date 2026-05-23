@@ -50,16 +50,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      final authService = ref.read(authServiceProvider);
-
+      // Onboarding is gated on the persisted user-doc state, NOT on the
+      // in-memory `justSignedUp` session flag. The flag is lost when the
+      // user kills the app — so a user who signed up, closed before
+      // saving their profile, and reopened would otherwise land on /home
+      // without ever completing the required onboarding step.
+      // The signup flow always writes `username: null`; onboarding writes
+      // the real value. So "doc exists with username == null" is the
+      // durable signal that profile setup is still pending. We also treat
+      // a missing doc as needing onboarding so a freshly-created auth
+      // user whose Firestore doc write hasn't propagated yet doesn't
+      // briefly flash through /home.
       final userDoc = userDocAsync.value;
-      if (userDoc == null && authService.justSignedUp) {
-        if (loc == '/onboarding' || loc == '/otp') return null;
-        return '/onboarding';
-      }
-
-      final needsOnboarding =
-          authService.justSignedUp && (userDoc?['username'] == null);
+      final username = userDoc?['username'] as String?;
+      final needsOnboarding = userDoc == null ||
+          username == null ||
+          username.trim().isEmpty;
 
       if (needsOnboarding) {
         if (loc == '/onboarding' || loc == '/otp') return null;
@@ -126,22 +132,22 @@ class _AuthListenable extends ChangeNotifier {
 
   final Ref _ref;
 
-  // Selector that only emits when values that affect routing actually change
+  // Selector that only emits when values that affect routing actually change.
+  // The needsOnboarding signal mirrors the redirect's gate exactly (doc
+  // missing OR username empty) so the router refreshes the instant the
+  // onboarding screen writes the chosen username back to Firestore.
   static final _routingStateSelector = Provider((ref) {
     final authAsync = ref.watch(authStateProvider);
     final userDocAsync = ref.watch(currentUserDocProvider);
-    final justSignedUp = ref.watch(
-      Provider((r) => r.read(authServiceProvider).justSignedUp),
-    );
+    final doc = userDocAsync.value;
+    final username = doc?['username'] as String?;
 
-    // Return a tuple of only the values that matter for routing decisions
     return (
       isAuthLoading: authAsync.isLoading,
       user: authAsync.value?.uid, // Only compare UIDs, not whole User objects
       isUserDocLoading: userDocAsync.isLoading,
-      needsOnboarding: justSignedUp &&
-          (userDocAsync.value == null ||
-              userDocAsync.value!['username'] == null),
+      needsOnboarding:
+          doc == null || username == null || username.trim().isEmpty,
     );
   });
 

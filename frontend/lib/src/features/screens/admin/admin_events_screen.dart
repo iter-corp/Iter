@@ -7,15 +7,120 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
+import '../../../providers/auth_providers.dart';
 import '../../../services/admin_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../theme/app_theme.dart';
 
-class AdminEventsScreen extends ConsumerWidget {
+class AdminEventsScreen extends ConsumerStatefulWidget {
   const AdminEventsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminEventsScreen> createState() => _AdminEventsScreenState();
+}
+
+class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  // Active filter selections — null means "Any" / no filter for that facet.
+  String? _typeFilter;
+  String? _countryFilter;
+  String? _fundingFilter;
+  // Special bool filters keyed on the event's deadline field.
+  bool _onlyWithDeadline = false;
+  bool _onlyExpired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() {
+      final next = _searchCtrl.text.trim().toLowerCase();
+      if (next != _query) setState(() => _query = next);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Number of active filters — shown as a badge on the filter button so
+  /// the admin sees at a glance whether the visible list is filtered.
+  int get _activeFilterCount {
+    int n = 0;
+    if (_typeFilter != null) n++;
+    if (_countryFilter != null) n++;
+    if (_fundingFilter != null) n++;
+    if (_onlyWithDeadline) n++;
+    if (_onlyExpired) n++;
+    return n;
+  }
+
+  bool _matches(AdminEvent e, Map<String, String> authorNames) {
+    if (_typeFilter != null && e.eventType != _typeFilter) return false;
+    if (_countryFilter != null && e.country != _countryFilter) return false;
+    if (_fundingFilter != null && e.funds != _fundingFilter) return false;
+    if (_onlyWithDeadline && e.deadlineAt == null) return false;
+    if (_onlyExpired) {
+      final d = e.deadlineAt;
+      if (d == null || !d.isBefore(DateTime.now())) return false;
+    }
+    if (_query.isEmpty) return true;
+    // Search across every text field the admin might recognise the event
+    // by — title, subtitle, location, description, contact, and the
+    // author's username if we've already streamed their user doc.
+    final author = authorNames[e.createdByUid]?.toLowerCase() ?? '';
+    final haystack = [
+      e.title,
+      e.subtitle,
+      e.location,
+      e.country,
+      e.eventType,
+      e.funds,
+      e.description,
+      e.phone,
+      e.email,
+      e.link,
+      author,
+    ].join(' ').toLowerCase();
+    return haystack.contains(_query);
+  }
+
+  Future<void> _openFilterSheet({
+    required Set<String> typeOptions,
+    required Set<String> countryOptions,
+    required Set<String> fundingOptions,
+  }) async {
+    final result = await showModalBottomSheet<_EventFilterState>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EventFiltersSheet(
+        initial: _EventFilterState(
+          type: _typeFilter,
+          country: _countryFilter,
+          funding: _fundingFilter,
+          withDeadline: _onlyWithDeadline,
+          expired: _onlyExpired,
+        ),
+        typeOptions: typeOptions.toList()..sort(),
+        countryOptions: countryOptions.toList()..sort(),
+        fundingOptions: fundingOptions.toList()..sort(),
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _typeFilter = result.type;
+      _countryFilter = result.country;
+      _fundingFilter = result.funding;
+      _onlyWithDeadline = result.withDeadline;
+      _onlyExpired = result.expired;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Use the role-scoped provider so an org_admin sees only their
     // own events here. Full admins see everything (same result as
     // adminEventsProvider). The public events page keeps using the
@@ -45,67 +150,165 @@ class AdminEventsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (events) {
-          if (events.isEmpty) {
-            return Center(
-              child: Text(context.t.adminNoEventsYet,
-                  style: TextStyle(color: context.textSecondary)),
-            );
+          // Build option sets from the actual data so the filter sheet
+          // only ever offers values that exist on real events.
+          final typeOptions = <String>{
+            for (final e in events)
+              if (e.eventType.isNotEmpty) e.eventType,
+          };
+          final countryOptions = <String>{
+            for (final e in events)
+              if (e.country.isNotEmpty) e.country,
+          };
+          final fundingOptions = <String>{
+            for (final e in events)
+              if (e.funds.isNotEmpty) e.funds,
+          };
+
+          // Collect author usernames so search can match by author name.
+          // Watching one provider per author would cause N rebuilds on
+          // every cache fire, so we collect a snapshot once per build.
+          final authorNames = <String, String>{};
+          for (final e in events) {
+            if (e.createdByUid.isEmpty) continue;
+            final doc = ref.watch(userByUidProvider(e.createdByUid)).value;
+            final name = (doc?['username'] as String?)?.trim() ?? '';
+            if (name.isNotEmpty) authorNames[e.createdByUid] = name;
           }
-          return ListView.builder(
-            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
-            itemCount: events.length,
-            itemBuilder: (_, i) {
-              final e = events[i];
-              final url = e.imageUrls.isNotEmpty ? e.imageUrls.first : null;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: context.cardBg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: context.borderColor),
-                  ),
-                  child: ListTile(
-                    leading: SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: url != null
-                            ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)
-                            : Container(
-                                color: context.inputFill,
-                                child: Icon(Icons.event,
-                                    color: context.textSecondary),
-                              ),
+
+          final filtered =
+              events.where((e) => _matches(e, authorNames)).toList();
+
+          return Column(
+            children: [
+              // Search + filter toolbar. Kept above the list so the user
+              // can refine the visible set without scrolling.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        textInputAction: TextInputAction.search,
+                        decoration: InputDecoration(
+                          hintText: context.t.adminEventsSearchHint,
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: _searchCtrl.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: context.t.clear,
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () => _searchCtrl.clear(),
+                                ),
+                          filled: true,
+                          fillColor: context.cardBg,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
                     ),
-                    title: Text(
-                      e.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      e.location,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(color: context.textSecondary, fontSize: 12),
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => _EventEditorScreen(existing: e),
+                    const SizedBox(width: 8),
+                    _FilterChipButton(
+                      activeCount: _activeFilterCount,
+                      onTap: () => _openFilterSheet(
+                        typeOptions: typeOptions,
+                        countryOptions: countryOptions,
+                        fundingOptions: fundingOptions,
                       ),
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _confirmDelete(context, ref, e.id),
-                    ),
-                  ),
+                  ],
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          events.isEmpty
+                              ? context.t.adminNoEventsYet
+                              : context.t.adminNoResults,
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding:
+                            EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final e = filtered[i];
+                          final url =
+                              e.imageUrls.isNotEmpty ? e.imageUrls.first : null;
+                          final authorName = authorNames[e.createdByUid];
+                          // Subtitle line: prefer "author · location" when
+                          // we know the author, fall back to location so
+                          // legacy events keep their old presentation.
+                          final subtitle = authorName != null &&
+                                  authorName.isNotEmpty
+                              ? (e.location.isEmpty
+                                  ? authorName
+                                  : '$authorName · ${e.location}')
+                              : e.location;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: context.cardBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.borderColor),
+                              ),
+                              child: ListTile(
+                                leading: SizedBox(
+                                  width: 56,
+                                  height: 56,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: url != null
+                                        ? CachedNetworkImage(
+                                            imageUrl: url, fit: BoxFit.cover)
+                                        : Container(
+                                            color: context.inputFill,
+                                            child: Icon(Icons.event,
+                                                color: context.textSecondary),
+                                          ),
+                                  ),
+                                ),
+                                title: Text(
+                                  e.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(
+                                  subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 12),
+                                ),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        _EventEditorScreen(existing: e),
+                                  ),
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
+                                  onPressed: () =>
+                                      _confirmDelete(context, ref, e.id),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -127,6 +330,279 @@ class AdminEventsScreen extends ConsumerWidget {
             .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
       }
     }
+  }
+}
+
+/// Compact rounded button that opens the filter bottom sheet and shows a
+/// badge with the number of active filters. Stays visually quiet when
+/// no filters are applied so it doesn't compete with the search field.
+class _FilterChipButton extends StatelessWidget {
+  final int activeCount;
+  final VoidCallback onTap;
+
+  const _FilterChipButton({
+    required this.activeCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = activeCount > 0;
+    return Material(
+      color: active ? const Color(0xFF7E3BE8) : context.cardBg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.tune,
+                size: 18,
+                color: active ? Colors.white : context.textPrimary,
+              ),
+              if (active) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '$activeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Immutable bundle of the current filter selections. Passed between the
+/// screen and the filter sheet so the sheet's local edits don't leak out
+/// until the user taps Apply.
+class _EventFilterState {
+  final String? type;
+  final String? country;
+  final String? funding;
+  final bool withDeadline;
+  final bool expired;
+
+  const _EventFilterState({
+    this.type,
+    this.country,
+    this.funding,
+    this.withDeadline = false,
+    this.expired = false,
+  });
+}
+
+class _EventFiltersSheet extends StatefulWidget {
+  final _EventFilterState initial;
+  final List<String> typeOptions;
+  final List<String> countryOptions;
+  final List<String> fundingOptions;
+
+  const _EventFiltersSheet({
+    required this.initial,
+    required this.typeOptions,
+    required this.countryOptions,
+    required this.fundingOptions,
+  });
+
+  @override
+  State<_EventFiltersSheet> createState() => _EventFiltersSheetState();
+}
+
+class _EventFiltersSheetState extends State<_EventFiltersSheet> {
+  late String? _type = widget.initial.type;
+  late String? _country = widget.initial.country;
+  late String? _funding = widget.initial.funding;
+  late bool _withDeadline = widget.initial.withDeadline;
+  late bool _expired = widget.initial.expired;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text(
+                    context.t.adminFilters,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _type = null;
+                      _country = null;
+                      _funding = null;
+                      _withDeadline = false;
+                      _expired = false;
+                    }),
+                    child: Text(context.t.adminFilterClear),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FilterFacet(
+                      label: context.t.adminFilterType,
+                      options: widget.typeOptions,
+                      selected: _type,
+                      onChanged: (v) => setState(() => _type = v),
+                    ),
+                    _FilterFacet(
+                      label: context.t.adminFilterCountry,
+                      options: widget.countryOptions,
+                      selected: _country,
+                      onChanged: (v) => setState(() => _country = v),
+                    ),
+                    _FilterFacet(
+                      label: context.t.adminFilterFunding,
+                      options: widget.fundingOptions,
+                      selected: _funding,
+                      onChanged: (v) => setState(() => _funding = v),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(context.t.adminFilterWithDeadline),
+                      value: _withDeadline,
+                      onChanged: (v) => setState(() => _withDeadline = v),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(context.t.adminFilterExpired),
+                      value: _expired,
+                      onChanged: (v) => setState(() => _expired = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7E3BE8),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(
+                    _EventFilterState(
+                      type: _type,
+                      country: _country,
+                      funding: _funding,
+                      withDeadline: _withDeadline,
+                      expired: _expired,
+                    ),
+                  ),
+                  child: Text(context.t.adminFilterApply),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Facet of choices rendered as a horizontally-scrolling chip row.
+/// Tapping the currently-selected chip clears it, so the user can
+/// remove an individual filter without opening the chosen value's
+/// search again.
+class _FilterFacet extends StatelessWidget {
+  final String label;
+  final List<String> options;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  const _FilterFacet({
+    required this.label,
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (options.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: context.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: Text(context.t.adminFilterAny),
+                selected: selected == null,
+                onSelected: (_) => onChanged(null),
+              ),
+              for (final opt in options)
+                ChoiceChip(
+                  label: Text(opt),
+                  selected: selected == opt,
+                  onSelected: (sel) => onChanged(sel ? opt : null),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

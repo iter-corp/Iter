@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../providers/auth_providers.dart';
 import '../../providers/event_registration_providers.dart';
 import '../../services/event_registration_service.dart';
 import '../../theme/app_theme.dart';
@@ -21,6 +22,10 @@ class EventDetailScreen extends ConsumerStatefulWidget {
   final String link;
   final String phone;
   final String email;
+  // UID of the admin/user who created the event. Used to render the
+  // author profile chip at the top of the page. Empty means we fall
+  // back to a generic placeholder.
+  final String createdByUid;
 
   const EventDetailScreen({
     super.key,
@@ -36,6 +41,7 @@ class EventDetailScreen extends ConsumerStatefulWidget {
     required this.link,
     required this.phone,
     required this.email,
+    this.createdByUid = '',
   });
 
   @override
@@ -121,129 +127,140 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               ),
               const SizedBox(height: 6),
 
-              // 📌 SECTION: Header — avatar + title + @subtitle
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // 🔹 Circular avatar
-                    ClipOval(
-                      child: widget.imageUrls.isEmpty
-                          ? Container(
-                              width: 44,
-                              height: 44,
-                              color: context.borderColor,
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.event,
-                                color: context.textSecondary,
-                                size: 22,
-                              ),
-                            )
-                          : Image.network(
-                              widget.imageUrls.first,
-                              width: 44,
-                              height: 44,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 44,
-                                height: 44,
-                                color: context.borderColor,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: context.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              // 📌 SECTION: Author chip — the user who created the event.
+              // Watches the user doc so the avatar/username stay live
+              // even if the author updates their profile after publish.
+              _EventAuthorHeader(
+                createdByUid: widget.createdByUid,
+                fallbackTitle: widget.title,
+                fallbackSubtitle: widget.subtitle,
               ),
 
               const SizedBox(height: 14),
 
-              // 📌 SECTION: Full-width image carousel (zero horizontal padding, no border radius)
+              // 📌 SECTION: Big banner image with title + subtitle overlay.
+              // The previous design showed a small 210-tall carousel after
+              // the header. We now use a 320-tall banner so the image is
+              // the visual hero, with the title and subtitle floated on
+              // top of a dark-to-transparent bottom gradient so they stay
+              // legible across any image content.
               if (widget.imageUrls.isNotEmpty)
-                SizedBox(
-                  width: double.infinity,
-                  height: 210,
-                  child: Stack(
-                    children: [
-                      // 🔹 PageView — full bleed
-                      Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                              20), // 🔹 change value as needed
-                          child: PageView.builder(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 320,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          PageView.builder(
                             controller: _pageController,
                             itemCount: widget.imageUrls.length,
                             onPageChanged: (i) =>
                                 setState(() => _currentImage = i),
                             itemBuilder: (_, i) => Image.network(
                               widget.imageUrls[i],
-                              width: double.infinity,
-                              height: 210,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
                                   Container(color: context.borderColor),
                             ),
                           ),
-                        ),
+                          // Dark gradient at the bottom so the white
+                          // title/subtitle stay readable over any image.
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.55),
+                                    ],
+                                    stops: const [0.45, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Title + subtitle overlay, anchored to the
+                          // start side so it works in RTL too.
+                          PositionedDirectional(
+                            start: 16,
+                            end: 16,
+                            bottom: 16,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.title,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    height: 1.2,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black54,
+                                        blurRadius: 6,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (widget.subtitle.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.subtitle,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white70,
+                                      height: 1.35,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (widget.imageUrls.length > 1)
+                            PositionedDirectional(
+                              start: 12,
+                              top: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: _ArrowButton(
+                                  icon: Icons.chevron_left,
+                                  flipForRtl: true,
+                                  onTap: _prev,
+                                ),
+                              ),
+                            ),
+                          if (widget.imageUrls.length > 1)
+                            PositionedDirectional(
+                              end: 12,
+                              top: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: _ArrowButton(
+                                  icon: Icons.chevron_right,
+                                  flipForRtl: true,
+                                  onTap: _next,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      // 🔹 Previous arrow — on the start side, points
-                      //    toward the start. PositionedDirectional +
-                      //    the directional chevron keep it correct in
-                      //    both LTR and RTL.
-                      if (widget.imageUrls.length > 1)
-                        PositionedDirectional(
-                          start: 12,
-                          top: 0,
-                          bottom: 0,
-                          child: Center(
-                            child: _ArrowButton(
-                              icon: Icons.chevron_left,
-                              flipForRtl: true,
-                              onTap: _prev,
-                            ),
-                          ),
-                        ),
-
-                      // 🔹 Next arrow — on the end side
-                      if (widget.imageUrls.length > 1)
-                        PositionedDirectional(
-                          end: 12,
-                          top: 0,
-                          bottom: 0,
-                          child: Center(
-                            child: _ArrowButton(
-                              icon: Icons.chevron_right,
-                              flipForRtl: true,
-                              onTap: _next,
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                 ),
 
@@ -595,6 +612,109 @@ class _RegistrationButton extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Header showing the author of an event — avatar, username, handle.
+///
+/// Reads the author's live user doc so updates to their profile are
+/// reflected on existing event pages. When [createdByUid] is empty
+/// (legacy events that pre-date the field) or the user doc is missing,
+/// falls back to the event's own title/subtitle so the row never
+/// renders as an empty placeholder.
+class _EventAuthorHeader extends ConsumerWidget {
+  final String createdByUid;
+  final String fallbackTitle;
+  final String fallbackSubtitle;
+
+  const _EventAuthorHeader({
+    required this.createdByUid,
+    required this.fallbackTitle,
+    required this.fallbackSubtitle,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authorAsync = createdByUid.isEmpty
+        ? null
+        : ref.watch(userByUidProvider(createdByUid));
+    final author = authorAsync?.value;
+
+    final username = (author?['username'] as String?)?.trim();
+    final handle = (author?['handle'] as String?)?.trim();
+    final avatarUrl = (author?['avatarUrl'] as String?)?.trim();
+
+    final primary =
+        (username != null && username.isNotEmpty) ? username : fallbackTitle;
+    final secondary = (handle != null && handle.isNotEmpty)
+        ? '@$handle'
+        : fallbackSubtitle;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ClipOval(
+            child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                ? Image.network(
+                    avatarUrl,
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _avatarPlaceholder(context),
+                  )
+                : _avatarPlaceholder(context),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  primary,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimary,
+                  ),
+                ),
+                if (secondary.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    secondary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avatarPlaceholder(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      color: context.borderColor,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.person_outline,
+        color: context.textSecondary,
+        size: 22,
       ),
     );
   }
