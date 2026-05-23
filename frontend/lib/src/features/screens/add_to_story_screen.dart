@@ -22,7 +22,13 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
   int _bottomTab = 1;
   bool _loading = true;
   bool _permissionDenied = false;
+  List<AssetPathEntity> _albums = const [];
+  AssetPathEntity? _activeAlbum;
   List<AssetEntity> _assets = const [];
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _page = 0;
+  static const int _pageSize = 90;
 
   @override
   void initState() {
@@ -42,9 +48,12 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
       return;
     }
 
+    // List every album the OS exposes (Recent, Camera, Screenshots, Downloads,
+    // user-created folders, etc.) instead of only the "All" bucket. Lets the
+    // user actually browse the full gallery.
     final albums = await PhotoManager.getAssetPathList(
       type: RequestType.image,
-      onlyAll: true,
+      onlyAll: false,
     );
     if (albums.isEmpty) {
       if (mounted) {
@@ -55,14 +64,63 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
       }
       return;
     }
-    final recent = albums.first;
-    final assets = await recent.getAssetListPaged(page: 0, size: 100);
+    _albums = albums;
+    _activeAlbum = albums.first;
+    await _loadAssetsForActiveAlbum();
+  }
+
+  Future<void> _loadAssetsForActiveAlbum() async {
+    final album = _activeAlbum;
+    if (album == null) return;
+    final assets = await album.getAssetListPaged(page: 0, size: _pageSize);
     if (mounted) {
       setState(() {
         _assets = assets;
+        _page = 0;
+        _hasMore = assets.length == _pageSize;
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    final album = _activeAlbum;
+    if (album == null) return;
+    _loadingMore = true;
+    final next = await album
+        .getAssetListPaged(page: _page + 1, size: _pageSize);
+    if (!mounted) {
+      _loadingMore = false;
+      return;
+    }
+    setState(() {
+      _page += 1;
+      _assets = [..._assets, ...next];
+      _hasMore = next.length == _pageSize;
+      _loadingMore = false;
+    });
+  }
+
+  Future<void> _pickAlbum() async {
+    final selected = await showModalBottomSheet<AssetPathEntity>(
+      context: context,
+      backgroundColor: const Color(0xFF1E1F22),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AlbumPickerSheet(
+        albums: _albums,
+        activeId: _activeAlbum?.id,
+      ),
+    );
+    if (selected == null || selected.id == _activeAlbum?.id) return;
+    setState(() {
+      _activeAlbum = selected;
+      _loading = true;
+      _assets = const [];
+    });
+    await _loadAssetsForActiveAlbum();
   }
 
   Future<void> _pickFromCamera() async {
@@ -70,6 +128,20 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
     final picked = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+    _openPreview(File(picked.path));
+  }
+
+  /// Opens the OS-native gallery picker as a fallback for users who'd rather
+  /// browse photos in the system UI (Files app, Google Photos, etc.) than
+  /// the in-app grid.
+  Future<void> _pickFromSystemGallery() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
       maxWidth: 1600,
     );
     if (picked == null) return;
@@ -112,19 +184,41 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
                         child: const Icon(Icons.close,
                             color: Colors.white, size: 26),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Center(
-                          child: Text(
-                            context.t.addToStory,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        child: GestureDetector(
+                          onTap: _albums.isEmpty ? null : _pickAlbum,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _activeAlbum?.name.isNotEmpty == true
+                                      ? _activeAlbum!.name
+                                      : context.t.addToStory,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (_albums.isNotEmpty) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.keyboard_arrow_down,
+                                    color: Colors.white, size: 22),
+                              ],
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 26),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _pickFromSystemGallery,
+                        child: const Icon(Icons.folder_open_outlined,
+                            color: Colors.white, size: 24),
+                      ),
                     ],
                   ),
                 ),
@@ -185,34 +279,42 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
         ),
       );
     }
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 80),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 4,
-        crossAxisSpacing: 4,
-        childAspectRatio: 0.76,
-      ),
-      itemCount: _assets.length + 1,
-      itemBuilder: (_, index) {
-        if (index == 0) {
-          return GestureDetector(
-            onTap: _pickFromCamera,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                color: const Color(0xFF3A3C3F),
-                child: const Center(
-                  child: Icon(Icons.photo_camera_outlined,
-                      color: Colors.white, size: 32),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n.metrics.pixels >= n.metrics.maxScrollExtent - 400) {
+          _loadMore();
+        }
+        return false;
+      },
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 80),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          childAspectRatio: 0.76,
+        ),
+        itemCount: _assets.length + 1,
+        itemBuilder: (_, index) {
+          if (index == 0) {
+            return GestureDetector(
+              onTap: _pickFromCamera,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  color: const Color(0xFF3A3C3F),
+                  child: const Center(
+                    child: Icon(Icons.photo_camera_outlined,
+                        color: Colors.white, size: 32),
+                  ),
                 ),
               ),
-            ),
-          );
-        }
-        final asset = _assets[index - 1];
-        return _AssetThumbCell(asset: asset, onTap: () => _pickAsset(asset));
-      },
+            );
+          }
+          final asset = _assets[index - 1];
+          return _AssetThumbCell(asset: asset, onTap: () => _pickAsset(asset));
+        },
+      ),
     );
   }
 
@@ -247,6 +349,97 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AlbumPickerSheet extends StatelessWidget {
+  final List<AssetPathEntity> albums;
+  final String? activeId;
+  const _AlbumPickerSheet({required this.albums, this.activeId});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: albums.length,
+                itemBuilder: (_, i) {
+                  final a = albums[i];
+                  final selected = a.id == activeId;
+                  return ListTile(
+                    leading: _AlbumCover(album: a),
+                    title: Text(
+                      a.name.isEmpty ? 'Album' : a.name,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check, color: Colors.white)
+                        : null,
+                    onTap: () => Navigator.pop(context, a),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AlbumCover extends StatelessWidget {
+  final AssetPathEntity album;
+  const _AlbumCover({required this.album});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: FutureBuilder<List<AssetEntity>>(
+          future: album.getAssetListPaged(page: 0, size: 1),
+          builder: (context, snap) {
+            final first = (snap.data ?? const []).isNotEmpty
+                ? snap.data!.first
+                : null;
+            if (first == null) {
+              return Container(color: const Color(0xFF3A3C3F));
+            }
+            return FutureBuilder(
+              future:
+                  first.thumbnailDataWithSize(const ThumbnailSize(96, 96)),
+              builder: (context, thumb) {
+                final bytes = thumb.data;
+                if (bytes == null) {
+                  return Container(color: const Color(0xFF3A3C3F));
+                }
+                return Image.memory(bytes, fit: BoxFit.cover);
+              },
+            );
+          },
         ),
       ),
     );
