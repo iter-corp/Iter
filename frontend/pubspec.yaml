@@ -80,12 +80,6 @@ dependencies:
   country_state_city: ^0.1.6
   diacritic: ^0.1.6
 
-  # End-to-end encryption (1:1 chats)
-  # X25519 + AES-GCM via the dart:cryptography package, hardware-accelerated
-  # on iOS/Android. Private keys live in Keychain / Android Keystore.
-  cryptography: ^2.7.0
-  flutter_secure_storage: ^9.2.2
-
 dependency_overrides:
   # record 5.1.2 transitively pulls record_linux 0.7.2, which is incompatible
   # with record_platform_interface 1.5.0 (missing startStream, changed

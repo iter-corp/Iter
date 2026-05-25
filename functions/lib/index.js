@@ -33,10 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.translate = exports.posts = exports.notifications = exports.messages = exports.live = exports.likes = exports.follows = exports.events = exports.comments = exports.adminUsers = void 0;
+exports.translate = exports.posts = exports.notifications = exports.messages = exports.live = exports.likes = exports.follows = exports.events = exports.comments = exports.auth = exports.adminUsers = void 0;
 const admin = __importStar(require("firebase-admin"));
 const adminUsers = __importStar(require("./adminUsers"));
 exports.adminUsers = adminUsers;
+const auth = __importStar(require("./auth"));
+exports.auth = auth;
 const comments = __importStar(require("./comments"));
 exports.comments = comments;
 const events = __importStar(require("./events"));
