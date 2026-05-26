@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'notification_service.dart';
 import 'profanity_filter_service.dart';
@@ -220,17 +221,66 @@ class CommentService {
         final parentSnap = await _comments(postId).doc(parentCommentId).get();
         final parentAuthorUid = parentSnap.data()?['authorUid'] as String?;
         if (parentAuthorUid != null && parentAuthorUid != authorUid) {
+          // Pass `commentId` (the new reply's id) so tapping the
+          // notification lands directly on the reply, scrolls to it,
+          // and highlights it for ~3s — matching how `comment_like`
+          // and the QA `qa_reply` flows already behave.
           await _notifications.createNotification(
             targetUid: parentAuthorUid,
             type: 'reply',
             actorUid: authorUid,
             targetId: postId,
+            commentId: commentRef.id,
           );
         }
+      } else {
+        // Top-level comment on a regular (non-QA) post — notify the
+        // post's author so they hear about new comments. This branch
+        // was missing, which is why the post author got nothing when
+        // someone commented on their post (only `like`, `comment_like`
+        // and `reply` were firing).
+        final postAuthorUid = postData['authorUid'] as String?;
+        debugPrint('[CommentNotif] top-level non-QA comment: '
+            'postAuthorUid=$postAuthorUid actorUid=$authorUid '
+            'postId=$postId commentId=${commentRef.id}');
+        if (postAuthorUid != null && postAuthorUid != authorUid) {
+          try {
+            await _notifications.createNotification(
+              targetUid: postAuthorUid,
+              type: 'comment',
+              actorUid: authorUid,
+              targetId: postId,
+              commentId: commentRef.id,
+            );
+            debugPrint('[CommentNotif] notification written OK');
+          } catch (e) {
+            debugPrint('[CommentNotif] write FAILED: $e');
+            rethrow;
+          }
+        } else {
+          debugPrint('[CommentNotif] skipped (self-comment or missing '
+              'postAuthorUid)');
+        }
       }
-    } catch (_) {
+    } catch (e) {
       // Notification is best-effort — comment was already saved.
+      debugPrint('[CommentNotif] outer catch: $e');
     }
+  }
+
+  /// Updates the text of an existing comment / answer. Stamps an
+  /// `editedAt` server timestamp so UI can render an "edited" hint if
+  /// it wants to. Caller is responsible for authz (UI gates the edit
+  /// button to the author).
+  Future<void> editComment({
+    required String postId,
+    required String commentId,
+    required String newText,
+  }) async {
+    await _comments(postId).doc(commentId).update({
+      'text': newText,
+      'editedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> deleteComment({

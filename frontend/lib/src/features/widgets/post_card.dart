@@ -64,6 +64,24 @@ class _PostCardState extends ConsumerState<PostCard>
 
   bool get _captionBoxLowered => _captionBoxLoweredOverride ?? false;
 
+  /// Measured height of the caption / action panel — fed to the video
+  /// player so it can position its scrubber bar above the panel
+  /// instead of letting them collide. The key is attached to the
+  /// panel's outermost positioned box; a post-frame callback reads
+  /// `RenderBox.size.height` and stores it here.
+  final GlobalKey _captionPanelKey = GlobalKey();
+  double _captionPanelHeight = 0;
+
+  void _measureCaptionPanel() {
+    final ctx = _captionPanelKey.currentContext;
+    if (ctx == null) return;
+    final box = ctx.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final h = box.size.height;
+    if ((h - _captionPanelHeight).abs() < 0.5) return;
+    setState(() => _captionPanelHeight = h);
+  }
+
   // Carousel state for multi-image posts.
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -173,6 +191,11 @@ class _PostCardState extends ConsumerState<PostCard>
     final captionPreview =
         hasCaption ? post.caption.trim() : (hasTravelPlace ? travelPlace : '');
     final postTime = context.t.timeAgo(post.createdAt);
+    // Measure the caption panel after the frame so the video player
+    // can position its scrubber above it on the next paint. The
+    // measure is cheap (single RenderBox read) and short-circuits
+    // when the height hasn't changed.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureCaptionPanel());
 
     final isDark = context.isDark;
     return Container(
@@ -215,6 +238,7 @@ class _PostCardState extends ConsumerState<PostCard>
                         child: _PostVideoPlayer(
                           url: post.videoUrls.first,
                           captionPanelLowered: _captionBoxLowered,
+                          captionPanelHeight: _captionPanelHeight,
                         ),
                       )
                     : hasImage
@@ -389,6 +413,7 @@ class _PostCardState extends ConsumerState<PostCard>
                 right: 12,
                 bottom: 12,
                 child: Column(
+                  key: _captionPanelKey,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AnimatedSlide(
@@ -1091,9 +1116,16 @@ class _PostVideoPlayer extends StatefulWidget {
   // up to clear it. When the panel is lowered, the controls sit near the
   // bottom edge of the card.
   final bool captionPanelLowered;
+  // Measured height of the caption / action panel that sits at the
+  // bottom of the post card. The scrubber bar is positioned at
+  // `captionPanelHeight + a small gap` from the bottom so longer
+  // captions (2 lines) no longer push the panel over the controls.
+  // The post card writes this on every paint via a GlobalKey.
+  final double captionPanelHeight;
   const _PostVideoPlayer({
     required this.url,
     required this.captionPanelLowered,
+    required this.captionPanelHeight,
   });
 
   @override
@@ -1318,17 +1350,28 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                 ),
               ),
             ),
-          // Bottom control bar (scrub + times). For video posts the
-          // caption/action panel is collapsed by default, so the controls
-          // sit near the bottom edge of the card. When the user raises the
-          // panel via the chevron, this bar slides up to clear it.
+          // Bottom control bar (scrub + times). Positioned just above
+          // the measured caption / action panel so multi-line captions
+          // can't push the panel over the scrubber. When the user
+          // lowers the panel (chevron tap), it shifts off-screen and
+          // the scrubber drops near the bottom edge.
           if (ready)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 260),
               curve: Curves.easeOutCubic,
               left: 12,
               right: 12,
-              bottom: widget.captionPanelLowered ? 48 : 105,
+              bottom: widget.captionPanelLowered
+                  // Lowered: panel is hidden, scrubber sits near the
+                  // bottom edge with just enough room for a finger.
+                  ? 48
+                  // Raised: clear the panel + 12 px gap + the panel's
+                  // own 12 px bottom offset. Falls back to 105 (the
+                  // old static value) before the post-frame measure
+                  // has populated the height.
+                  : (widget.captionPanelHeight > 0
+                      ? widget.captionPanelHeight + 24
+                      : 105),
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
                 opacity: _showControls ? 1 : 0,

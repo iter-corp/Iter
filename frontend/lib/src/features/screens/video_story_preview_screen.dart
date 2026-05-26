@@ -33,6 +33,15 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
   String? _initError;
   bool _tooLong = false;
 
+  // Trim window. The uploaded file isn't re-encoded — only `_trimStart`
+  // and `_trimEnd` are persisted on the Story doc. The viewer clamps
+  // playback to that window. The preview clamps it here too so the user
+  // sees exactly what their followers will see.
+  Duration _videoDuration = Duration.zero;
+  Duration _trimStart = Duration.zero;
+  Duration _trimEnd = Duration.zero;
+  bool _seekingTrim = false;
+
   // Draggable text overlays placed on top of the video. Same model the
   // image-story preview uses; persisted as Firestore docs on the story
   // so the viewer can re-render them.
@@ -110,21 +119,34 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
         return;
       }
       _controller = c;
-      _tooLong = c.value.duration > _maxStoryDuration;
-      debugPrint('[VideoStorySetup] _tooLong=$_tooLong '
-          'maxDuration=$_maxStoryDuration');
+      _videoDuration = c.value.duration;
+      // Default trim window: full video if it fits, else clipped to the
+      // 30s cap so the user lands on a usable selection they can refine
+      // with the range slider instead of being told "video is too long".
+      _trimStart = Duration.zero;
+      _trimEnd = _videoDuration > _maxStoryDuration
+          ? _maxStoryDuration
+          : _videoDuration;
+      // _tooLong only flips true if the user has somehow chosen a
+      // window > 30s after the fact (shouldn't happen since the slider
+      // is clamped, but keep the guard).
+      _tooLong = (_trimEnd - _trimStart) > _maxStoryDuration;
+      debugPrint('[VideoStorySetup] _videoDuration=$_videoDuration '
+          'initial trim=$_trimStart..$_trimEnd _tooLong=$_tooLong');
       try {
-        await c.setLooping(true);
+        // Disable native looping — the position listener seeks back to
+        // _trimStart manually when playback reaches _trimEnd.
+        await c.setLooping(false);
       } catch (e) {
         debugPrint('[VideoStorySetup] setLooping failed: $e');
       }
-      if (!_tooLong) {
-        try {
-          await c.play();
-          debugPrint('[VideoStorySetup] play() OK');
-        } catch (e) {
-          debugPrint('[VideoStorySetup] play() failed: $e');
-        }
+      c.addListener(_onPositionTick);
+      try {
+        await c.seekTo(_trimStart);
+        await c.play();
+        debugPrint('[VideoStorySetup] play() OK');
+      } catch (e) {
+        debugPrint('[VideoStorySetup] play() failed: $e');
       }
       if (mounted) setState(() {});
     } catch (e, st) {
@@ -139,8 +161,71 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _controller?.removeListener(_onPositionTick);
     _controller?.dispose();
     super.dispose();
+  }
+
+  /// Keeps preview playback inside the chosen trim window: whenever the
+  /// position passes [_trimEnd], seek back to [_trimStart] and continue
+  /// playing. Re-entrancy guard prevents stacked seeks while one is in
+  /// flight.
+  void _onPositionTick() {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || _seekingTrim) return;
+    final pos = c.value.position;
+    if (pos < _trimStart - const Duration(milliseconds: 250) ||
+        pos >= _trimEnd) {
+      _seekingTrim = true;
+      c.seekTo(_trimStart).whenComplete(() {
+        _seekingTrim = false;
+        if (mounted) c.play();
+      });
+      return;
+    }
+    // Force a rebuild a few times a second so the trim slider can
+    // render the playhead marker.
+    if (mounted) {
+      // Only setState when something visible would change to avoid
+      // flooding the frame budget.
+      setState(() {});
+    }
+  }
+
+  void _onTrimChanged(RangeValues v) {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final totalMs = _videoDuration.inMilliseconds;
+    if (totalMs == 0) return;
+    var startMs = (v.start * totalMs).round();
+    var endMs = (v.end * totalMs).round();
+    // Cap the window at the 30s story limit.
+    final maxMs = _maxStoryDuration.inMilliseconds;
+    if (endMs - startMs > maxMs) {
+      // Determine which handle moved by comparing to the existing
+      // values; freeze the other so the window slides instead of
+      // stretching past the cap.
+      final movedStart =
+          (startMs - _trimStart.inMilliseconds).abs() >
+              (endMs - _trimEnd.inMilliseconds).abs();
+      if (movedStart) {
+        endMs = startMs + maxMs;
+      } else {
+        startMs = endMs - maxMs;
+      }
+    }
+    setState(() {
+      _trimStart = Duration(milliseconds: startMs.clamp(0, totalMs));
+      _trimEnd = Duration(milliseconds: endMs.clamp(0, totalMs));
+      _tooLong = (_trimEnd - _trimStart) > _maxStoryDuration;
+    });
+    // Snap the preview to the start handle so the user can see what
+    // their first frame will be.
+    _seekingTrim = true;
+    c.seekTo(_trimStart).whenComplete(() {
+      _seekingTrim = false;
+      if (mounted) c.play();
+    });
   }
 
   Future<void> _toggleMute() async {
@@ -211,9 +296,16 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     try {
       debugPrint('[VideoStoryPublish] -> StoryService.createStory() '
           'videoUrl.len=${url.length} overlays=${_overlays.length}');
+      // Persist the chosen trim window. The uploaded file is the full
+      // video; the viewer clamps playback to this range so re-encoding
+      // isn't needed.
+      final hasTrim = _trimStart > Duration.zero ||
+          _trimEnd < _videoDuration;
       final storyId = await StoryService().createStory(
         imageUrl: '',
         videoUrl: url,
+        videoTrimStartMs: hasTrim ? _trimStart.inMilliseconds : null,
+        videoTrimEndMs: hasTrim ? _trimEnd.inMilliseconds : null,
         overlays: _overlays,
       );
       final elapsed = DateTime.now().difference(docStart);
@@ -480,6 +572,17 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
                         ),
                       ),
                     ),
+                  if (!_draggingOverlay &&
+                      (_controller?.value.isInitialized ?? false) &&
+                      _videoDuration.inMilliseconds > 0)
+                    _TrimBar(
+                      duration: _videoDuration,
+                      start: _trimStart,
+                      end: _trimEnd,
+                      position: _controller?.value.position ?? Duration.zero,
+                      maxWindow: _maxStoryDuration,
+                      onChanged: _onTrimChanged,
+                    ),
                   if (!_draggingOverlay)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -652,6 +755,113 @@ class _PillButton extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(icon, color: Colors.white, size: 18),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dual-handle trim bar shown above the publish row. Values are
+/// expressed as fractions of the full video duration so the
+/// [RangeSlider] (which clamps to 0..1) stays straightforward; the
+/// parent converts to `Duration` when persisting.
+class _TrimBar extends StatelessWidget {
+  final Duration duration;
+  final Duration start;
+  final Duration end;
+  final Duration position;
+  final Duration maxWindow;
+  final ValueChanged<RangeValues> onChanged;
+
+  const _TrimBar({
+    required this.duration,
+    required this.start,
+    required this.end,
+    required this.position,
+    required this.maxWindow,
+    required this.onChanged,
+  });
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '${m.toString().padLeft(1, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalMs = duration.inMilliseconds;
+    if (totalMs <= 0) return const SizedBox.shrink();
+    final startFrac = (start.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final endFrac = (end.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final selected = end - start;
+    final maxedOut = selected >= maxWindow;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(18),
+          border:
+              Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.content_cut,
+                    color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  _fmt(start),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  // Selected window length, e.g. "0:08 / 0:30 max".
+                  '${_fmt(selected)} / ${_fmt(maxWindow)}',
+                  style: TextStyle(
+                    color: maxedOut
+                        ? const Color(0xFFFFB454)
+                        : Colors.white.withValues(alpha: 0.8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _fmt(end),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: const Color(0xFFB05ECC),
+                inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
+                rangeThumbShape: const RoundRangeSliderThumbShape(
+                    enabledThumbRadius: 9),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                trackHeight: 4,
+              ),
+              child: RangeSlider(
+                min: 0,
+                max: 1,
+                values: RangeValues(startFrac, endFrac),
+                onChanged: onChanged,
+              ),
+            ),
           ],
         ),
       ),

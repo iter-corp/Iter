@@ -293,11 +293,28 @@ service cloud.firestore {
         allow delete: if signedIn() && (
           resource.data.authorUid == request.auth.uid || isAdmin()
         );
-        allow update: if signedIn() &&
+        // Two kinds of updates are allowed:
+        //   1. Any signed-in user can bump reaction counters on the
+        //      comment (helpfulCount / unhelpfulCount).
+        //   2. The comment's own author (or an admin) can edit the
+        //      text. `affectedKeys().hasOnly([...])` already implies
+        //      `authorUid` is untouched, so no need to also assert
+        //      that it's unchanged — that extra check was causing
+        //      legacy docs (with no `authorUid` initially missing) to
+        //      fail the equality even though the field never moved.
+        allow update: if signedIn() && (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'helpfulCount',
             'unhelpfulCount'
-          ]);
+          ]) ||
+          (
+            (resource.data.authorUid == request.auth.uid || isAdmin()) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'text',
+              'editedAt'
+            ])
+          )
+        );
 
         match /likes/{uid} {
           allow read: if signedIn();

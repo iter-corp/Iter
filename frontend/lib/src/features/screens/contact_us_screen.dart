@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/contact_request_providers.dart';
@@ -22,10 +23,10 @@ class ContactUsScreen extends ConsumerWidget {
     final myThreads = ref.watch(myContactRequestsProvider);
     if (auth == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Contact us')),
+        appBar: AppBar(title: Text(context.t.contactUs)),
         body: Center(
           child: Text(
-            'You need to sign in first.',
+            context.t.contactNeedSignIn,
             style: TextStyle(color: context.textSecondary),
           ),
         ),
@@ -33,12 +34,12 @@ class ContactUsScreen extends ConsumerWidget {
     }
     return myThreads.when(
       loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Contact us')),
+        appBar: AppBar(title: Text(context.t.contactUs)),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('Contact us')),
-        body: Center(child: Text('Could not open chat: $e')),
+        appBar: AppBar(title: Text(context.t.contactUs)),
+        body: Center(child: Text('${context.t.contactCouldNotOpen}: $e')),
       ),
       data: (threads) {
         final active = threads.isNotEmpty
@@ -88,13 +89,13 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
   Future<void> _submit() async {
     final body = _bodyCtrl.text.trim();
     if (body.isEmpty) {
-      setState(() => _error = 'Please write a message.');
+      setState(() => _error = context.t.contactPleaseWriteMessage);
       return;
     }
     final auth = ref.read(authStateProvider).value;
     final profile = ref.read(currentUserDocProvider).valueOrNull;
     if (auth == null) {
-      setState(() => _error = 'Not signed in.');
+      setState(() => _error = context.t.contactNotSignedIn);
       return;
     }
     setState(() {
@@ -144,7 +145,7 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Could not submit: $e';
+        _error = context.t.contactCouldNotSubmit(e);
       });
     }
   }
@@ -155,14 +156,14 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
     final profile = ref.watch(currentUserDocProvider).valueOrNull;
     final email = (profile?['email'] as String?) ?? auth?.email ?? '';
     return Scaffold(
-      appBar: AppBar(title: const Text('New request')),
+      appBar: AppBar(title: Text(context.t.contactNewRequest)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('From',
+              Text(context.t.contactFromLabel,
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -178,12 +179,12 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                   border: Border.all(color: context.borderColor),
                 ),
                 child: Text(
-                  email.isNotEmpty ? email : '(no email on account)',
+                  email.isNotEmpty ? email : context.t.contactNoEmail,
                   style: TextStyle(color: context.textPrimary, fontSize: 14),
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Type',
+              Text(context.t.contactTypeLabel,
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -194,7 +195,7 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                 onChanged: (v) => setState(() => _type = v),
               ),
               const SizedBox(height: 16),
-              Text('Message',
+              Text(context.t.contactMessageLabel,
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -207,9 +208,8 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   hintText: _type == ContactRequestType.organization
-                      ? 'Tell us about your event plans, what you manage, '
-                          'why you want to post events, any links.'
-                      : 'How can we help?',
+                      ? context.t.contactOrgHint
+                      : context.t.contactHowCanWeHelp,
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -234,7 +234,7 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Send request'),
+                      : Text(context.t.contactSendRequest),
                 ),
               ),
             ],
@@ -300,13 +300,13 @@ class _TypeChoice extends StatelessWidget {
 
     return Row(
       children: [
-        tile(ContactRequestType.message, 'Message',
-            'Question, feedback, or report a problem.', Icons.chat_outlined),
+        tile(ContactRequestType.message, context.t.contactTypeMessage,
+            context.t.contactTypeMessageDesc, Icons.chat_outlined),
         const SizedBox(width: 10),
         tile(
             ContactRequestType.organization,
-            'Event manager',
-            'Get approved to manage and post events on Iter.',
+            context.t.contactTypeOrg,
+            context.t.contactTypeOrgDesc,
             Icons.apartment_outlined),
       ],
     );
@@ -389,7 +389,7 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send: $e')),
+        SnackBar(content: Text(context.t.contactFailedSend(e))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -410,7 +410,7 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
       if (!mounted) return;
       setState(() => _requestType = previousType);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update request type: $e')),
+        SnackBar(content: Text(context.t.contactCouldNotUpdateType(e))),
       );
     }
   }
@@ -432,19 +432,21 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
           context: context,
           builder: (_) => AlertDialog(
             title: Text(isRevoking
-                ? 'Revoke event manager access?'
-                : 'Grant event manager access?'),
+                ? context.t.contactRevokeOrgTitle
+                : context.t.contactGrantOrgTitle),
             content: Text(isRevoking
-                ? 'This will remove event posting permissions and set role to user.'
-                : 'This will grant event posting permissions by making this user an event manager.'),
+                ? context.t.contactRevokeOrgBody
+                : context.t.contactGrantOrgBody),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(context.t.cancel),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: Text(isRevoking ? 'Revoke' : 'Grant'),
+                child: Text(isRevoking
+                    ? context.t.contactRevoke
+                    : context.t.contactGrant),
               ),
             ],
           ),
@@ -461,8 +463,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
               }
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Event manager access revoked.'),
+                  SnackBar(
+                    content: Text(context.t.contactOrgRevoked),
                   ),
                 );
               }
@@ -476,8 +478,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
               }
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Event manager approved.'),
+                  SnackBar(
+                    content: Text(context.t.contactOrgApproved),
                   ),
                 );
               }
@@ -492,20 +494,18 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
         final ok = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('Delete user permanently?'),
-            content: const Text(
-              'This will delete ALL user data: posts, comments, stories, chats, followers, and notifications. Their email will be blacklisted.\n\nThis cannot be undone.',
-            ),
+            title: Text(context.t.contactDeleteUserTitle),
+            content: Text(context.t.contactDeleteUserBody),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(context.t.cancel),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  'Delete everything',
-                  style: TextStyle(color: Colors.red),
+                child: Text(
+                  context.t.contactDeleteEverything,
+                  style: const TextStyle(color: Colors.red),
                 ),
               ),
             ],
@@ -514,13 +514,13 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
         if (ok == true) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Deleting all user data...')),
+              SnackBar(content: Text(context.t.contactDeletingAll)),
             );
           }
           await admin.deleteUser(uid);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('User deleted and blacklisted')),
+              SnackBar(content: Text(context.t.contactUserDeleted)),
             );
           }
         }
@@ -528,7 +528,7 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+          .showSnackBar(SnackBar(content: Text(context.t.contactGenericFailed(e))));
     }
   }
 
@@ -629,7 +629,7 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                   ],
                 ),
               )
-            : const Text('Iter Team'),
+            : Text(context.t.contactIterTeam),
         actions: [
           if (canManageRequester)
             PopupMenuButton<String>(
@@ -646,8 +646,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                   value: 'role',
                   child: Text(
                     requesterRole == 'admin'
-                        ? 'Demote to user'
-                        : 'Promote to admin',
+                        ? context.t.contactDemoteToUser
+                        : context.t.contactPromoteToAdmin,
                   ),
                 ),
                 if (requesterRole != 'admin')
@@ -655,21 +655,23 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                     value: 'orgRole',
                     child: Text(
                       requesterRole == 'org_admin'
-                          ? 'Revoke event manager'
-                          : 'Grant event manager',
+                          ? context.t.contactRevokeEventManager
+                          : context.t.contactGrantEventManager,
                     ),
                   ),
                 PopupMenuItem(
                   value: 'suspend',
                   child: Text(
-                    requesterSuspended ? 'Unsuspend' : 'Suspend',
+                    requesterSuspended
+                        ? context.t.contactUnsuspend
+                        : context.t.contactSuspend,
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: Text(
-                    'Delete user',
-                    style: TextStyle(color: Colors.red),
+                    context.t.contactDeleteUser,
+                    style: const TextStyle(color: Colors.red),
                   ),
                 ),
               ],
@@ -690,7 +692,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
             Expanded(
               child: msgsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) =>
+                    Center(child: Text(context.t.contactErrorPrefix(e))),
                 data: (messages) {
                   if (messages.isEmpty) {
                     return Center(
@@ -698,8 +701,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                         child: Text(
                           _requestType == ContactRequestType.organization
-                              ? 'Tell Iter Team why you should be approved as an event manager and what events you want to post.'
-                              : 'Start the conversation with Iter Team. Your replies will stay in this one chat.',
+                              ? context.t.contactEmptyOrgMessage
+                              : context.t.contactEmptyMessage,
                           textAlign: TextAlign.center,
                           style: TextStyle(color: context.textSecondary),
                         ),
@@ -753,10 +756,10 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
                         hintText: isAdmin
-                            ? 'Reply to user…'
+                            ? context.t.contactReplyToUser
                             : _requestType == ContactRequestType.organization
-                                ? 'Tell Iter Team about your event plans…'
-                                : 'Type a reply…',
+                                ? context.t.contactReplyOrgHint
+                                : context.t.contactReplyTypeReply,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -838,8 +841,8 @@ class _Bubble extends StatelessWidget {
           children: [
             if (!isMine && fromAdmin) ...[
               Text(
-                'Iter support',
-                style: TextStyle(
+                context.t.contactIterSupport,
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: AppColors.purple,
@@ -858,7 +861,7 @@ class _Bubble extends StatelessWidget {
             if (time != null) ...[
               const SizedBox(height: 4),
               Text(
-                _formatTime(time),
+                _formatTime(context, time),
                 style: TextStyle(fontSize: 10, color: timeColor),
               ),
             ],
@@ -922,11 +925,12 @@ class _ThreadTypeBar extends StatelessWidget {
 
     return Row(
       children: [
-        chip(ContactRequestType.message, 'Message', Icons.chat_outlined),
+        chip(ContactRequestType.message, context.t.contactTypeMessage,
+            Icons.chat_outlined),
         const SizedBox(width: 10),
         chip(
           ContactRequestType.organization,
-          'Event manager',
+          context.t.contactTypeOrg,
           Icons.apartment_outlined,
         ),
       ],
@@ -934,14 +938,16 @@ class _ThreadTypeBar extends StatelessWidget {
   }
 }
 
-String _formatTime(DateTime? time) {
+String _formatTime(BuildContext context, DateTime? time) {
   if (time == null) return '';
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final that = DateTime(time.year, time.month, time.day);
   final daysAgo = today.difference(that).inDays;
   if (daysAgo == 0) return DateFormat.jm().format(time);
-  if (daysAgo == 1) return 'Yesterday, ${DateFormat.jm().format(time)}';
+  if (daysAgo == 1) {
+    return '${context.t.contactYesterday}, ${DateFormat.jm().format(time)}';
+  }
   if (daysAgo < 7) {
     return '${DateFormat.E().format(time)}, ${DateFormat.jm().format(time)}';
   }

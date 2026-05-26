@@ -115,11 +115,18 @@ class NotificationService {
     required String type,
     required String actorUid,
     String? targetId,
+    // Optional pointer to the specific comment/reply this notification
+    // is about. When present, tapping the notification opens the post
+    // and scrolls to + highlights that comment for ~3s. Set for `reply`
+    // / `qa_reply` so the recipient lands directly on the new reply
+    // instead of just the post.
+    String? commentId,
   }) async {
     await _items(targetUid).add({
       'type': type,
       'actorUid': actorUid,
       if (targetId != null) 'targetId': targetId,
+      if (commentId != null) 'commentId': commentId,
       'read': false,
       'createdAt': FieldValue.serverTimestamp(),
     });

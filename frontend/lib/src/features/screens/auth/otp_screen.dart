@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_strings.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/primary_action_button.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key, this.email});
@@ -173,27 +174,11 @@ class _OtpScreenState extends State<OtpScreen> {
                 }),
               ),
               const SizedBox(height: 36),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () => context.go('/onboarding'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFCE5DE5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    context.t.verify,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+              PrimaryActionButton(
+                label: context.t.verify,
+                onPressed: () => context.go('/onboarding'),
+                size: PrimaryActionSize.large,
+                fullWidth: true,
               ),
               const SizedBox(height: 20),
               Row(

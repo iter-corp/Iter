@@ -27,12 +27,17 @@ class CommentScreen extends ConsumerStatefulWidget {
   final Post post;
   final String? highlightCommentId;
   final bool showPostContext;
+  // Fallback for legacy `reply` notifications that pre-date `commentId`:
+  // when this is set and [highlightCommentId] is not, we look up the
+  // newest comment whose `authorUid` matches and highlight it instead.
+  final String? highlightAuthorUid;
 
   const CommentScreen({
     super.key,
     required this.post,
     this.highlightCommentId,
     this.showPostContext = false,
+    this.highlightAuthorUid,
   });
 
   @override
@@ -47,6 +52,13 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
   final Set<String> _expandedParents = <String>{};
   final Map<String, GlobalKey> _commentKeys = {};
   bool _hasScrolledToHighlight = false;
+
+  /// The id we still want to paint with the purple highlight band. Seeded
+  /// from `widget.highlightCommentId` on first build and cleared after a
+  /// 3-second cooldown so the user can register where the comment is
+  /// without the highlight staying on forever.
+  String? _activeHighlightId;
+  bool _highlightSeeded = false;
 
   void _startReply(Comment parent) {
     // For replies-to-replies, still thread under the top-level parent so we
@@ -224,42 +236,103 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
 
                   // If a comment is highlighted, auto-expand its parent and
                   // scroll to it once after the list is first rendered.
-                  final hid = widget.highlightCommentId;
-                  if (hid != null && !_hasScrolledToHighlight) {
+                  // `_activeHighlightId` mirrors `widget.highlightCommentId`
+                  // on first build and gets nulled out 3 seconds after the
+                  // scroll-to fires so the purple band fades back to
+                  // normal once the user has had a chance to see where the
+                  // notification points.
+                  // Resolve which comment to highlight. Prefer the
+                  // explicit commentId from the notification doc;
+                  // otherwise fall back to the newest comment / reply
+                  // by the notifying actor (handles legacy
+                  // notifications that pre-date `commentId` being
+                  // persisted).
+                  //
+                  // We don't lock in the seed until we actually find a
+                  // candidate — the first data snapshot can arrive
+                  // empty (cache miss), and locking with `null` would
+                  // block the fallback from ever firing once the real
+                  // comments load on the next snapshot.
+                  if (!_highlightSeeded) {
+                    String? resolved = widget.highlightCommentId;
+                    if (resolved == null &&
+                        widget.highlightAuthorUid != null &&
+                        widget.highlightAuthorUid!.isNotEmpty &&
+                        comments.isNotEmpty) {
+                      final authorMatches = comments
+                          .where((c) =>
+                              c.authorUid == widget.highlightAuthorUid)
+                          .toList();
+                      // Newest first.
+                      authorMatches.sort(
+                          (a, b) => b.createdAt.compareTo(a.createdAt));
+                      if (authorMatches.isNotEmpty) {
+                        resolved = authorMatches.first.id;
+                      }
+                    }
+                    if (resolved != null) {
+                      _highlightSeeded = true;
+                      _activeHighlightId = resolved;
+                    } else if (widget.highlightCommentId == null &&
+                        widget.highlightAuthorUid == null) {
+                      // No highlight target at all (e.g. opened from
+                      // post tap rather than a notification). Lock the
+                      // seed so the scroll-to / expand logic skips
+                      // entirely on every rebuild.
+                      _highlightSeeded = true;
+                    }
+                  }
+                  final hid = _activeHighlightId;
+                  final initialHid = _activeHighlightId;
+                  if (initialHid != null && !_hasScrolledToHighlight) {
                     // If the highlighted comment is a reply, find its parent
                     // and expand that parent so the reply is visible.
                     final highlightedComment =
-                        comments.where((c) => c.id == hid).firstOrNull;
+                        comments.where((c) => c.id == initialHid).firstOrNull;
                     if (highlightedComment != null &&
                         highlightedComment.isReply &&
                         !_expandedParents
                             .contains(highlightedComment.parentCommentId)) {
-                      // setState here is safe — we're in the data callback,
-                      // which triggers a rebuild that shows the reply row.
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() => _expandedParents
-                              .add(highlightedComment.parentCommentId!));
-                        }
-                      });
+                      // Expand synchronously so the very next build of
+                      // this ListView includes the reply row — that way
+                      // the scroll-to retry below finds a real
+                      // RenderObject instead of racing the expand.
+                      _expandedParents
+                          .add(highlightedComment.parentCommentId!);
                     }
-                    // Attempt to scroll after a short delay so the list has
-                    // had time to build the item rows.
-                    if (!_hasScrolledToHighlight) {
-                      _hasScrolledToHighlight = true; // prevent re-scheduling
-                      Future.delayed(const Duration(milliseconds: 350), () {
-                        if (!mounted) return;
-                        final key = _commentKeys[hid];
-                        if (key?.currentContext != null) {
-                          Scrollable.ensureVisible(
-                            key!.currentContext!,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeInOut,
-                            alignment: 0.3,
-                          );
-                        }
-                      });
+                    _hasScrolledToHighlight = true; // prevent re-scheduling
+                    // Retry the ensureVisible up to ~1s in 50ms chunks
+                    // so we wait for the reply row to actually be built
+                    // (the parent-expand setState produces a follow-up
+                    // build; the row's GlobalKey only has a context
+                    // after that build commits).
+                    void tryScroll([int attempt = 0]) {
+                      if (!mounted) return;
+                      final key = _commentKeys[initialHid];
+                      final ctx = key?.currentContext;
+                      if (ctx != null) {
+                        Scrollable.ensureVisible(
+                          ctx,
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOut,
+                          alignment: 0.3,
+                        );
+                        // Clear the purple band 3 s after the scroll
+                        // has landed so the highlight doesn't stick
+                        // forever.
+                        Future.delayed(const Duration(seconds: 3), () {
+                          if (!mounted) return;
+                          setState(() => _activeHighlightId = null);
+                        });
+                        return;
+                      }
+                      if (attempt >= 20) return; // ~1 s total
+                      Future.delayed(const Duration(milliseconds: 50),
+                          () => tryScroll(attempt + 1));
                     }
+
+                    Future.delayed(const Duration(milliseconds: 200),
+                        tryScroll);
                   }
 
                   return ListView.builder(

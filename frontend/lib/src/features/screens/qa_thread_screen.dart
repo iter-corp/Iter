@@ -177,13 +177,12 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                           final bPin = b.authorUid == pinUid ? 0 : 1;
                           if (aPin != bPin) return aPin.compareTo(bPin);
                         }
-                        final byHelpful =
-                            b.helpfulCount.compareTo(a.helpfulCount);
-                        if (byHelpful != 0) return byHelpful;
-                        final byUnhelpful =
-                            a.unhelpfulCount.compareTo(b.unhelpfulCount);
-                        if (byUnhelpful != 0) return byUnhelpful;
-                        return (b.createdAt).compareTo(a.createdAt);
+                        // Always order by creation time, newest first.
+                        // Likes / dislikes are editorial signals only —
+                        // they never reorder the list, so a single
+                        // dislike no longer drags an answer to the
+                        // bottom.
+                        return b.createdAt.compareTo(a.createdAt);
                       });
                       final repliesByParent = <String, List<Comment>>{};
                       for (final c in comments) {
@@ -633,29 +632,43 @@ class _AnswerBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Answer cards: bumped from hairline border to a soft shadow +
+    // tinted background so each card reads as its own surface in a
+    // long thread, matching the share-recipient / notification card
+    // design used elsewhere.
     return Container(
       decoration: BoxDecoration(
         color: highlighted
-            ? const Color(0xFF7E3BE8).withValues(alpha: 0.08)
+            ? const Color(0xFF7E3BE8).withValues(alpha: 0.10)
             : context.cardBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: highlighted
-              ? const Color(0xFF7E3BE8).withValues(alpha: 0.5)
-              : context.borderColor,
+              ? const Color(0xFF7E3BE8).withValues(alpha: 0.55)
+              : context.borderColor.withValues(alpha: 0.6),
           width: highlighted ? 1.5 : 1.0,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: highlighted
+                ? const Color(0xFF7E3BE8).withValues(alpha: 0.15)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: highlighted ? 16 : 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _AnswerRow(
                   comment: answer,
+                  postId: postId,
                   onTap: replies.isNotEmpty ? onToggleExpanded : null,
                   trailingAction: replies.isNotEmpty
                       ? Icon(
@@ -710,6 +723,7 @@ class _AnswerBlock extends ConsumerWidget {
                               _AnswerRow(
                                 comment: r,
                                 compact: true,
+                                postId: postId,
                                 trailingAction: null,
                               ),
                               const SizedBox(height: 4),
@@ -998,21 +1012,31 @@ class _ReactionChip extends StatelessWidget {
   }
 }
 
-class _AnswerRow extends StatelessWidget {
+class _AnswerRow extends ConsumerWidget {
   final Comment comment;
   final bool compact;
   final Widget? trailingAction;
   final VoidCallback? onTap;
+  // Post id is needed to wire edit/delete back through CommentService
+  // when the current user is the author of [comment]. Optional so the
+  // existing call sites (reply rows that don't need the menu) keep
+  // working unchanged.
+  final String? postId;
 
   const _AnswerRow({
     required this.comment,
     this.compact = false,
     this.trailingAction,
     this.onTap,
+    this.postId,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUid = ref.watch(authStateProvider).value?.uid;
+    final isAuthor =
+        currentUid != null && currentUid == comment.authorUid;
+    final canManage = isAuthor && postId != null;
     return InkWell(
       onTap: onTap ?? () => openUserProfile(context, uid: comment.authorUid),
       borderRadius: BorderRadius.circular(8),
@@ -1066,6 +1090,11 @@ class _AnswerRow extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (canManage)
+                  _AnswerAuthorMenu(
+                    postId: postId!,
+                    comment: comment,
+                  ),
                 if (trailingAction != null) ...[
                   const SizedBox(width: 4),
                   trailingAction!,
@@ -1213,6 +1242,212 @@ class _AnswerComposer extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Three-dot menu rendered only for the author of an answer/reply.
+/// Lets them edit the text or delete the answer outright. UI gating is
+/// enforced here; the [CommentService] methods don't re-check, so this
+/// is the only entry point that exposes them in the QA UI.
+class _AnswerAuthorMenu extends ConsumerWidget {
+  final String postId;
+  final Comment comment;
+  const _AnswerAuthorMenu({required this.postId, required this.comment});
+
+  Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    // Full-screen editor instead of an AlertDialog — gives the user a
+    // proper writing surface, a keyboard that doesn't fight the dialog
+    // chrome, and matches how the original post editor works elsewhere.
+    final updated = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _EditAnswerScreen(initialText: comment.text),
+        fullscreenDialog: true,
+      ),
+    );
+    if (updated == null || updated.isEmpty || updated == comment.text) return;
+    try {
+      await ref.read(commentServiceProvider).editComment(
+            postId: postId,
+            commentId: comment.id,
+            newText: updated,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.t.delete),
+        content: Text(ctx.t.deleteForMeBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              ctx.t.delete,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(commentServiceProvider).deleteComment(
+            postId: postId,
+            commentId: comment.id,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<String>(
+      tooltip: '',
+      padding: EdgeInsets.zero,
+      icon: Icon(Icons.more_vert, size: 18, color: context.textSecondary),
+      onSelected: (v) {
+        if (v == 'edit') _edit(context, ref);
+        if (v == 'delete') _delete(context, ref);
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              const Icon(Icons.edit_outlined, size: 18),
+              const SizedBox(width: 10),
+              Text(context.t.edit),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline,
+                  size: 18, color: Color(0xFFEF476F)),
+              const SizedBox(width: 10),
+              Text(
+                context.t.delete,
+                style: const TextStyle(color: Color(0xFFEF476F)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Full-screen text editor used by the answer-author menu's Edit
+/// action. Returns the new text via Navigator.pop when the user taps
+/// Save, or null on cancel/back.
+class _EditAnswerScreen extends StatefulWidget {
+  final String initialText;
+  const _EditAnswerScreen({required this.initialText});
+
+  @override
+  State<_EditAnswerScreen> createState() => _EditAnswerScreenState();
+}
+
+class _EditAnswerScreenState extends State<_EditAnswerScreen> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final v = _ctrl.text.trim();
+    if (v.isEmpty) return;
+    Navigator.of(context).pop(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.surfaceSoft,
+      appBar: AppBar(
+        backgroundColor: context.cardBg,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+        title: Text(context.t.edit),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _save,
+            child: Text(
+              context.t.save,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFB05ECC),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: TextField(
+            controller: _ctrl,
+            autofocus: true,
+            maxLines: null,
+            expands: true,
+            textAlignVertical: TextAlignVertical.top,
+            textCapitalization: TextCapitalization.sentences,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.4,
+              color: context.textPrimary,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: context.cardBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: context.borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: context.borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFB05ECC)),
+              ),
+              contentPadding: const EdgeInsets.all(16),
+            ),
+          ),
         ),
       ),
     );

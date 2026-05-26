@@ -27,6 +27,13 @@ class Story {
   /// thumbnail used in the inbox previews.
   final String? videoUrl;
 
+  /// Optional trim window on the uploaded video, in milliseconds. The
+  /// uploaded file itself is unchanged (no re-encode) — the viewer just
+  /// clamps playback to [videoTrimStartMs..videoTrimEndMs]. Either or
+  /// both may be null, meaning "play from start" / "play until end".
+  final int? videoTrimStartMs;
+  final int? videoTrimEndMs;
+
   /// Optional pure-text story content. When set, the viewer renders
   /// [textContent] on a solid background ([backgroundColor]) instead of
   /// loading an image — used when the user composes a text-only story.
@@ -67,6 +74,8 @@ class Story {
     this.commentsCount = 0,
     this.sharedPostId,
     this.videoUrl,
+    this.videoTrimStartMs,
+    this.videoTrimEndMs,
     this.textContent,
     this.backgroundColor,
     this.textColor,
@@ -88,6 +97,8 @@ class Story {
       commentsCount: (d['commentsCount'] as int?) ?? 0,
       sharedPostId: (d['sharedPostId'] as String?)?.trim(),
       videoUrl: (d['videoUrl'] as String?)?.trim(),
+      videoTrimStartMs: (d['videoTrimStartMs'] as num?)?.toInt(),
+      videoTrimEndMs: (d['videoTrimEndMs'] as num?)?.toInt(),
       textContent: (d['textContent'] as String?),
       backgroundColor: (d['backgroundColor'] as num?)?.toInt(),
       textColor: (d['textColor'] as num?)?.toInt(),
@@ -141,6 +152,8 @@ class StoryService {
     required String imageUrl,
     String? sharedPostId,
     String? videoUrl,
+    int? videoTrimStartMs,
+    int? videoTrimEndMs,
     String? textContent,
     int? backgroundColor,
     int? textColor,
@@ -163,6 +176,10 @@ class StoryService {
       if (sharedPostId != null && sharedPostId.isNotEmpty)
         'sharedPostId': sharedPostId,
       if (videoUrl != null && videoUrl.isNotEmpty) 'videoUrl': videoUrl,
+      if (videoTrimStartMs != null && videoTrimStartMs > 0)
+        'videoTrimStartMs': videoTrimStartMs,
+      if (videoTrimEndMs != null && videoTrimEndMs > 0)
+        'videoTrimEndMs': videoTrimEndMs,
       if (textContent != null && textContent.trim().isNotEmpty)
         'textContent': textContent,
       if (backgroundColor != null) 'backgroundColor': backgroundColor,
@@ -220,6 +237,17 @@ class StoryService {
       'avatarUrl': userData['avatarUrl'] as String?,
       'viewedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Lightweight count of how many viewers are on a story. Used by
+  /// the home story rail so it doesn't have to hydrate every viewer's
+  /// user doc just to know "should the ring re-highlight?".
+  Stream<int> streamViewersCount(String storyId) {
+    return _col
+        .doc(storyId)
+        .collection('viewers')
+        .snapshots()
+        .map((s) => s.docs.length);
   }
 
   Stream<List<StoryViewer>> streamViewers(String storyId) {

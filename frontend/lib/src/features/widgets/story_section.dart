@@ -153,12 +153,20 @@ class _MyStoryBubble extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Locally-tracked "seen all my own stories" flag. Once true the ring
-    // dims (own stories never count the author as a viewer, so we use
-    // SharedPreferences instead of Firestore for this signal).
-    final ownIds = stories.map((s) => s.id).toList(growable: false);
-    final allSeenAsync = ref.watch(ownStoriesAllSeenProvider(ownIds));
-    final allSeen = allSeenAsync.maybeWhen(data: (v) => v, orElse: () => false);
+    // Locally-tracked "seen all my own stories" flag. Each own story
+    // contributes (id, currentViewerCount) — the derived provider
+    // returns true only when the author has opened the story AND the
+    // viewer count hasn't grown since they last opened it. Any new
+    // viewer arriving re-highlights the ring; the next view by the
+    // author dims it again.
+    final snapshots = <OwnStoryViewerSnapshot>[
+      for (final s in stories)
+        OwnStoryViewerSnapshot(
+          s.id,
+          ref.watch(storyViewersCountProvider(s.id)).asData?.value ?? 0,
+        ),
+    ];
+    final allSeen = ref.watch(ownStoriesAllSeenProvider(snapshots));
     final showRing = hasStory && !allSeen;
 
     return Padding(

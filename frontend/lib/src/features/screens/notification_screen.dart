@@ -358,29 +358,89 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
 
                   final persistedIds = notifications.map((n) => n.id).toSet();
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) => _NotificationItem(
-                      notif: items[i],
-                      onMarkRead: user == null
-                          ? null
-                          : persistedIds.contains(items[i].id)
-                              ? () => ref
-                                  .read(notificationServiceProvider)
-                                  .markRead(user.uid, items[i].id)
-                              : null,
-                      onDelete: user == null
-                          ? null
-                          : persistedIds.contains(items[i].id)
-                              ? () => ref
-                                  .read(notificationServiceProvider)
-                                  .deleteNotification(user.uid, items[i].id)
-                              : null,
-                      onLongPress: persistedIds.contains(items[i].id)
-                          ? () => _showItemActions(items[i])
-                          : null,
-                    ),
+                  // Build a flat list of entries (headers + items) by
+                  // bucketing notifications by date. Buckets are
+                  // appended in order: Today → Yesterday → Earlier.
+                  // Synthetic follow-request rows have no createdAt;
+                  // we treat them as Today so they always surface at
+                  // the top of the list (they're actionable).
+                  final now = DateTime.now();
+                  final today = DateTime(now.year, now.month, now.day);
+                  final yesterday =
+                      today.subtract(const Duration(days: 1));
+                  final todayItems = <AppNotification>[];
+                  final yesterdayItems = <AppNotification>[];
+                  final earlierItems = <AppNotification>[];
+                  for (final n in items) {
+                    final ts = n.createdAt;
+                    if (ts == null) {
+                      todayItems.add(n);
+                      continue;
+                    }
+                    final day = DateTime(ts.year, ts.month, ts.day);
+                    if (day == today) {
+                      todayItems.add(n);
+                    } else if (day == yesterday) {
+                      yesterdayItems.add(n);
+                    } else {
+                      earlierItems.add(n);
+                    }
+                  }
+                  final entries = <_NotifEntry>[];
+                  if (todayItems.isNotEmpty) {
+                    entries.add(_NotifEntry.header(context.t.notifGroupToday));
+                    entries.addAll(todayItems.map(_NotifEntry.item));
+                  }
+                  if (yesterdayItems.isNotEmpty) {
+                    entries.add(
+                        _NotifEntry.header(context.t.notifGroupYesterday));
+                    entries.addAll(yesterdayItems.map(_NotifEntry.item));
+                  }
+                  if (earlierItems.isNotEmpty) {
+                    entries.add(
+                        _NotifEntry.header(context.t.notifGroupEarlier));
+                    entries.addAll(earlierItems.map(_NotifEntry.item));
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(0, 6, 0, 24),
+                    itemCount: entries.length,
+                    separatorBuilder: (_, i) {
+                      // No top gap before a header (it carries its own
+                      // padding); regular 4px between adjacent items.
+                      final next = i + 1 < entries.length ? entries[i + 1] : null;
+                      if (next != null && next.isHeader) {
+                        return const SizedBox(height: 10);
+                      }
+                      return const SizedBox(height: 4);
+                    },
+                    itemBuilder: (_, i) {
+                      final e = entries[i];
+                      if (e.isHeader) {
+                        return _NotifSectionHeader(label: e.headerLabel!);
+                      }
+                      final n = e.notif!;
+                      return _NotificationItem(
+                        notif: n,
+                        onMarkRead: user == null
+                            ? null
+                            : persistedIds.contains(n.id)
+                                ? () => ref
+                                    .read(notificationServiceProvider)
+                                    .markRead(user.uid, n.id)
+                                : null,
+                        onDelete: user == null
+                            ? null
+                            : persistedIds.contains(n.id)
+                                ? () => ref
+                                    .read(notificationServiceProvider)
+                                    .deleteNotification(user.uid, n.id)
+                                : null,
+                        onLongPress: persistedIds.contains(n.id)
+                            ? () => _showItemActions(n)
+                            : null,
+                      );
+                    },
                   );
                 },
               ),
@@ -748,11 +808,20 @@ class _NotificationItem extends ConsumerWidget {
         return Dismissible(
           key: ValueKey(notif.id),
           direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: AlignmentDirectional.centerEnd,
-            padding: const EdgeInsetsDirectional.only(end: 20),
-            color: Colors.red.shade400,
-            child: const Icon(Icons.delete_outline, color: Colors.white),
+          // Inset the red swipe surface so it lives inside the card
+          // chrome (14px side margin, 4px top/bottom from the tile
+          // padding) and gets the same 18-radius corners.
+          background: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+            child: Container(
+              alignment: AlignmentDirectional.centerEnd,
+              padding: const EdgeInsetsDirectional.only(end: 20),
+              decoration: BoxDecoration(
+                color: Colors.red.shade400,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.delete_outline, color: Colors.white),
+            ),
           ),
           onDismissed: (_) => onDelete?.call(),
           child: tile,
@@ -779,11 +848,21 @@ class _NotificationItem extends ConsumerWidget {
       case 'qa_answer_like':
       case 'qa_answer_dislike':
         if (notif.targetId != null) {
+          // For comment-related types, force the comment sheet open
+          // even if the notification doc was written before we started
+          // persisting `commentId`. Old replies / comments still drop
+          // the user on the comments view; new ones additionally
+          // scroll-to + highlight the specific entry.
+          final isCommentish = notif.type == 'comment' ||
+              notif.type == 'reply' ||
+              notif.type == 'qa_answer' ||
+              notif.type == 'qa_reply';
           _openPostTarget(
             context,
             notif.targetId!,
             highlightCommentId: notif.commentId,
             highlightAuthorUid: notif.actorUid,
+            openComments: isCommentish,
           );
         }
         break;
@@ -833,6 +912,12 @@ class _NotificationItem extends ConsumerWidget {
     String postId, {
     String? highlightCommentId,
     String? highlightAuthorUid,
+    // When true, the comment sheet auto-opens on top of the post —
+    // used for `comment` / `reply` notifications so the user lands
+    // directly on the comments view even if the legacy notification
+    // doc lacks `commentId` (only newly-written docs have it, so the
+    // open-sheet behavior must not depend on the highlight).
+    bool openComments = false,
   }) async {
     final snap =
         await FirebaseFirestore.instance.collection('posts').doc(postId).get();
@@ -845,6 +930,8 @@ class _NotificationItem extends ConsumerWidget {
           builder: (_) => PostDetailScreen(
             postId: postId,
             highlightCommentId: highlightCommentId,
+            highlightAuthorUid: highlightAuthorUid,
+            openComments: openComments,
           ),
         ),
       );
@@ -873,6 +960,8 @@ class _NotificationItem extends ConsumerWidget {
         builder: (_) => PostDetailScreen(
           postId: postId,
           highlightCommentId: highlightCommentId,
+          highlightAuthorUid: highlightAuthorUid,
+          openComments: openComments,
         ),
       ),
     );
@@ -1232,6 +1321,46 @@ class _PostThumbnail extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Either a section-header marker (Today / Yesterday / Earlier) or a
+/// single notification row inside the grouped list. Modeled as a
+/// tagged union so the list's `itemBuilder` can render the right
+/// widget per index without two parallel arrays.
+class _NotifEntry {
+  final String? headerLabel;
+  final AppNotification? notif;
+
+  _NotifEntry.header(this.headerLabel) : notif = null;
+  _NotifEntry.item(AppNotification n)
+      : headerLabel = null,
+        notif = n;
+
+  bool get isHeader => headerLabel != null;
+}
+
+/// Group header rendered above each date bucket in the notifications
+/// list. Aligns with the card chrome's left margin so the label hangs
+/// directly above the cards it titles.
+class _NotifSectionHeader extends StatelessWidget {
+  final String label;
+  const _NotifSectionHeader({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+          color: context.textSecondary,
+        ),
+      ),
     );
   }
 }

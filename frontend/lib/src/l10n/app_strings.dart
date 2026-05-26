@@ -251,6 +251,10 @@ class AppStrings {
   String get noNotifications => _get('no_notifications');
   String get markAllRead => _get('mark_all_read');
   String get notifMarkAsRead => _get('notif_mark_as_read');
+  // Section headers for the date-grouped notification list.
+  String get notifGroupToday => _get('notif_group_today');
+  String get notifGroupYesterday => _get('notif_group_yesterday');
+  String get notifGroupEarlier => _get('notif_group_earlier');
   String get notifMarkAsUnread => _get('notif_mark_as_unread');
   String get notifDelete => _get('notif_delete');
   String get newNotification => _get('new_notification');
@@ -276,6 +280,62 @@ class AppStrings {
   String get blockedUsers => _get('blocked_users');
   String get deleteAccount => _get('delete_account');
   String get contactUs => _get('contact_us');
+  // Contact-us / support thread strings.
+  String get contactNeedSignIn => _get('contact_need_sign_in');
+  String get contactCouldNotOpen => _get('contact_could_not_open');
+  String get contactNewRequest => _get('contact_new_request');
+  String get contactFromLabel => _get('contact_from_label');
+  String get contactNoEmail => _get('contact_no_email');
+  String get contactTypeLabel => _get('contact_type_label');
+  String get contactMessageLabel => _get('contact_message_label');
+  String get contactHowCanWeHelp => _get('contact_how_can_we_help');
+  String get contactOrgHint => _get('contact_org_hint');
+  String get contactSendRequest => _get('contact_send_request');
+  String get contactPleaseWriteMessage => _get('contact_please_write_message');
+  String get contactNotSignedIn => _get('contact_not_signed_in');
+  String contactCouldNotSubmit(Object error) =>
+      _fmt('contact_could_not_submit', {'error': error});
+  String get contactTypeMessage => _get('contact_type_message');
+  String get contactTypeMessageDesc => _get('contact_type_message_desc');
+  String get contactTypeOrg => _get('contact_type_org');
+  String get contactTypeOrgDesc => _get('contact_type_org_desc');
+  String get contactIterTeam => _get('contact_iter_team');
+  String get contactReplyToUser => _get('contact_reply_to_user');
+  String get contactReplyTypeReply => _get('contact_reply_type_reply');
+  String get contactReplyOrgHint => _get('contact_reply_org_hint');
+  String get contactEmptyMessage => _get('contact_empty_message');
+  String get contactEmptyOrgMessage => _get('contact_empty_org_message');
+  String get contactIterSupport => _get('contact_iter_support');
+  String get contactYesterday => _get('contact_yesterday');
+  String contactErrorPrefix(Object error) =>
+      _fmt('contact_error_prefix', {'error': error});
+  String contactFailedSend(Object error) =>
+      _fmt('contact_failed_send', {'error': error});
+  String contactCouldNotUpdateType(Object error) =>
+      _fmt('contact_could_not_update_type', {'error': error});
+  String contactGenericFailed(Object error) =>
+      _fmt('contact_generic_failed', {'error': error});
+  // Admin actions inside contact thread.
+  String get contactRevokeOrgTitle => _get('contact_revoke_org_title');
+  String get contactGrantOrgTitle => _get('contact_grant_org_title');
+  String get contactRevokeOrgBody => _get('contact_revoke_org_body');
+  String get contactGrantOrgBody => _get('contact_grant_org_body');
+  String get contactRevoke => _get('contact_revoke');
+  String get contactGrant => _get('contact_grant');
+  String get contactOrgRevoked => _get('contact_org_revoked');
+  String get contactOrgApproved => _get('contact_org_approved');
+  String get contactDeleteUserTitle => _get('contact_delete_user_title');
+  String get contactDeleteUserBody => _get('contact_delete_user_body');
+  String get contactDeleteEverything => _get('contact_delete_everything');
+  String get contactDeletingAll => _get('contact_deleting_all');
+  String get contactUserDeleted => _get('contact_user_deleted');
+  String get contactDemoteToUser => _get('contact_demote_to_user');
+  String get contactPromoteToAdmin => _get('contact_promote_to_admin');
+  String get contactRevokeEventManager => _get('contact_revoke_event_manager');
+  String get contactGrantEventManager => _get('contact_grant_event_manager');
+  String get contactUnsuspend => _get('contact_unsuspend');
+  String get contactSuspend => _get('contact_suspend');
+  String get contactDeleteUser => _get('contact_delete_user');
   String get aboutApp => _get('about_app');
   String get version => _get('version');
   String get translationLanguage => _get('translation_language');

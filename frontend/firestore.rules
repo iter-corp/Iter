@@ -185,7 +185,25 @@ service cloud.firestore {
         allow delete: if signedIn() && (
           resource.data.authorUid == request.auth.uid || isAdmin()
         );
-        allow update: if false;
+        // Two kinds of updates are allowed:
+        //   1. Any signed-in user can bump reaction counters
+        //      (helpfulCount / unhelpfulCount) on a comment.
+        //   2. The comment's author (or an admin) can edit text.
+        //      `affectedKeys().hasOnly([...])` already implies
+        //      `authorUid` is untouched.
+        allow update: if signedIn() && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'helpfulCount',
+            'unhelpfulCount'
+          ]) ||
+          (
+            (resource.data.authorUid == request.auth.uid || isAdmin()) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'text',
+              'editedAt'
+            ])
+          )
+        );
 
         match /likes/{uid} {
           allow read: if signedIn();
@@ -238,7 +256,15 @@ service cloud.firestore {
         allow delete: if signedIn() && (
           resource.data.authorUid == request.auth.uid || isAdmin()
         );
-        allow update: if false;
+        // Author (or admin) can edit the comment text. authorUid must
+        // remain unchanged so an editor can't masquerade as someone else.
+        allow update: if signedIn() &&
+          (resource.data.authorUid == request.auth.uid || isAdmin()) &&
+          request.resource.data.authorUid == resource.data.authorUid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'text',
+            'editedAt'
+          ]);
 
         match /likes/{uid} {
           allow read: if true;

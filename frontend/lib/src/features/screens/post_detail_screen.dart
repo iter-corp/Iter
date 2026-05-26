@@ -8,16 +8,27 @@ import '../screens/comment_screen.dart';
 import '../widgets/post_card.dart';
 
 /// A standalone screen that displays a single post fetched by [postId].
-/// When [highlightCommentId] is provided the comment sheet opens automatically
-/// and scrolls to / highlights that comment.
+/// When [highlightCommentId] is provided the comment sheet opens
+/// automatically and scrolls to / highlights that comment.
+/// When [openComments] is true the sheet opens even without a specific
+/// comment id — used by `comment` / `reply` notifications so the user
+/// lands on the comments view even if the legacy notification doc
+/// lacks a `commentId`.
 class PostDetailScreen extends StatefulWidget {
   final String postId;
   final String? highlightCommentId;
+  final bool openComments;
+  // Fallback for older `reply` / `comment` notifications written before
+  // `commentId` was persisted: knowing WHO replied lets the comment
+  // screen find their newest reply and highlight that.
+  final String? highlightAuthorUid;
 
   const PostDetailScreen({
     super.key,
     required this.postId,
     this.highlightCommentId,
+    this.openComments = false,
+    this.highlightAuthorUid,
   });
 
   @override
@@ -28,7 +39,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.highlightCommentId != null) {
+    if (widget.highlightCommentId != null || widget.openComments) {
       _openCommentSheetWhenReady();
     }
   }
@@ -56,6 +67,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       builder: (_) => CommentScreen(
         post: post,
         highlightCommentId: widget.highlightCommentId,
+        highlightAuthorUid: widget.highlightAuthorUid,
       ),
     );
   }

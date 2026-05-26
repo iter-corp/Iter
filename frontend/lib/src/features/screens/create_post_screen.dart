@@ -246,7 +246,11 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   }
 
   Future<void> _submit() async {
-    final caption = _captionCtrl.text.trim();
+    // Use trimRight() so trailing spaces / newlines the user accidentally
+    // left behind don't pad the bottom of the rendered caption (showed
+    // up as visible blank lines under the text on the feed). Leading
+    // content is preserved as the user typed it.
+    final caption = _captionCtrl.text.trimRight();
     final placeName = _placeNameCtrl.text.trim();
     final placeCity = _placeCityCtrl.text.trim();
     if (caption.isEmpty && _pickedImages.isEmpty && _pickedVideos.isEmpty) {

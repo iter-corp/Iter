@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +14,7 @@ import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/story_providers.dart';
 import '../../services/own_story_seen_service.dart';
 import '../../services/story_service.dart';
 import '../../theme/app_theme.dart';
@@ -83,6 +87,40 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   final StoryService _storyService = StoryService();
   late final AnimationController _progress;
   String? _loadingForStoryId;
+
+  /// Bumped each time the user navigates between stories so any in-
+  /// flight video-ready signal from the previous story can be ignored.
+  int _navToken = 0;
+
+  /// Resume the progress bar after a pause (long-press release, modal
+  /// dismiss, etc). Image / text stories run on the AnimationController
+  /// so we just `forward()`. Video stories are driven by the player's
+  /// position timer — we mustn't call `forward()` there because the
+  /// controller would race the video. Instead the timer will continue
+  /// emitting position updates once the player resumes.
+  void _resumeProgress() {
+    final story = _currentStory;
+    if (story == null) return;
+    if (story.isVideo) {
+      // Nothing to do — the video player's position timer drives the
+      // bar. If the player itself was paused via [_longPressPaused],
+      // resuming it elsewhere will restart playback and the timer
+      // will tick the bar forward again.
+      return;
+    }
+    _progress.forward();
+  }
+
+  /// Tracks the group index that's currently on screen so the
+  /// transition builder can distinguish "next story (same author)" from
+  /// "next author" and pick a different animation for each. Updated
+  /// inside `_buildStoryBody` right before the new story renders.
+  int _lastGroupIndexForAnim = -1;
+
+  /// True while the user is long-pressing the story — pauses the
+  /// progress timer AND the video player. Read by [_VideoStoryPlayer]
+  /// via the notifier below.
+  final ValueNotifier<bool> _longPressPaused = ValueNotifier(false);
 
   // Like and comment state
   bool _isLiking = false;
@@ -163,7 +201,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       _progress.stop();
       _progress.value = 0;
     } else {
-      _progress.forward();
+      _resumeProgress();
     }
   }
 
@@ -171,6 +209,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   void dispose() {
     _commentFocusNode.removeListener(_onReplyFocusChange);
     _commentController.removeListener(_onReplyTextChange);
+    _longPressPaused.dispose();
     _progress.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
@@ -314,25 +353,90 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     // get written to Firestore, so the author never appears in their
     // own viewers list.
     if (_currentUid != null && story.authorUid == _currentUid) {
+      // Notifier-based markSeen updates the in-memory set so the home
+      // story rail's `ownStoriesAllSeenProvider` watcher re-evaluates
+      // synchronously and drops the purple ring on the next paint.
+      // We also snapshot the CURRENT viewer count so the ring stays
+      // dim until a NEW viewer arrives — then the count exceeds this
+      // snapshot and the ring lights up again.
+      final currentCount =
+          ref.read(storyViewersCountProvider(story.id)).asData?.value ?? 0;
       ref
-          .read(ownStorySeenServiceProvider)
-          .markSeen(story.id)
-          .then((_) => ref.invalidate(ownStoriesAllSeenProvider))
+          .read(ownStorySeenProvider.notifier)
+          .markSeen(story.id, currentViewerCount: currentCount)
           .catchError((Object e) {
         debugPrint('markSeen (own) failed for ${story.id}: $e');
       });
     }
 
+    // Per-story nav token: if the user advances past this story before
+    // its media finishes loading, the post-load callback below sees a
+    // stale token and skips starting the timer.
+    _navToken++;
+    final token = _navToken;
+
+    if (story.isVideo) {
+      // Wait until the video has loaded its first frame and started
+      // playing. The progress bar is then driven directly by the
+      // player's playback clock via `onPositionUpdate` — no
+      // independent animation timer for video stories, so the bar
+      // can't drift or race the video.
+      await _waitForVideoReady(token);
+      if (!mounted ||
+          _loadingForStoryId != story.id ||
+          token != _navToken) {
+        return;
+      }
+      _progress.stop();
+      _progress.value = 0;
+      // Don't `forward()` — the video player will write into
+      // `_progress.value` on every tick.
+      return;
+    }
     try {
       await precacheImage(
         CachedNetworkImageProvider(story.imageUrl),
         context,
       );
     } catch (_) {
-      // Fall through — still start the timer so the viewer never locks up.
+      // Fall through — still start the timer so the viewer never
+      // locks up if precache fails.
     }
-    if (!mounted || _loadingForStoryId != story.id) return;
+    if (!mounted ||
+        _loadingForStoryId != story.id ||
+        token != _navToken) {
+      return;
+    }
+    // Images use the fixed 5s tick.
+    _progress.duration = _kStoryDuration;
     _progress.forward(from: 0);
+  }
+
+  // Signaled by [_VideoStoryPlayer.onReady] once `initialize()` finishes
+  // and the first frame is on screen. We keep ONE active completer at
+  // a time, replaced each nav; `onReady` always resolves the current
+  // one regardless of its token. Token mismatches still get caught
+  // downstream by the navToken check in `_startCurrent`.
+  Completer<Duration>? _videoReadyCompleter;
+
+  Future<Duration> _waitForVideoReady(int token) {
+    // If a prior wait is still pending (user advanced past it before
+    // its video loaded), unblock it so its downstream isn't leaked.
+    final prior = _videoReadyCompleter;
+    if (prior != null && !prior.isCompleted) {
+      prior.complete(Duration.zero);
+    }
+    final c = Completer<Duration>();
+    _videoReadyCompleter = c;
+    return c.future;
+  }
+
+  void _onVideoReady(int token, Duration effective) {
+    final c = _videoReadyCompleter;
+    if (c != null && !c.isCompleted) {
+      _videoReadyCompleter = null;
+      c.complete(effective);
+    }
   }
 
   void _next() {
@@ -378,7 +482,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   Future<void> _openAuthorProfile(String uid) async {
     _progress.stop();
     await openUserProfile(context, uid: uid);
-    if (mounted) _progress.forward();
+    if (mounted) _resumeProgress();
   }
 
   Future<void> _showViewersSheet(String storyId) async {
@@ -392,7 +496,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         service: _storyService,
       ),
     );
-    if (mounted) _progress.forward();
+    if (mounted) _resumeProgress();
   }
 
   Future<void> _showLikersSheet(String storyId) async {
@@ -406,7 +510,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         service: _storyService,
       ),
     );
-    if (mounted) _progress.forward();
+    if (mounted) _resumeProgress();
   }
 
   /// Opens a "Share story" sheet with three options:
@@ -436,7 +540,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         },
       ),
     );
-    if (mounted) _progress.forward();
+    if (mounted) _resumeProgress();
   }
 
   Future<void> _addStoryToMyStory(Story story) async {
@@ -520,8 +624,37 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     if (story.sharedPostId != null && story.sharedPostId!.isNotEmpty) {
       base = _SharedPostStoryView(postId: story.sharedPostId!);
     } else if (story.isVideo) {
+      final tokenAtBuild = _navToken;
       base = _VideoStoryPlayer(
         url: story.videoUrl!,
+        trimStart: story.videoTrimStartMs == null
+            ? null
+            : Duration(milliseconds: story.videoTrimStartMs!),
+        trimEnd: story.videoTrimEndMs == null
+            ? null
+            : Duration(milliseconds: story.videoTrimEndMs!),
+        // Signal back when the first frame is ready so the viewer can
+        // start the progress timer (sized to the actual video length)
+        // instead of running it against a black loading screen.
+        onReady: (effective) => _onVideoReady(tokenAtBuild, effective),
+        // Pauses the underlying VideoPlayer while the user long-presses
+        // the story (mirrors the progress-timer pause).
+        pausedNotifier: _longPressPaused,
+        // Drive the story progress bar off the video's actual playback
+        // clock. Stops the AnimationController and writes its value
+        // directly so the bar fills in lockstep with the visible
+        // frames — no drift, no race against an independent 5s timer.
+        //
+        // No navToken check: the player widget is keyed per story
+        // (above) so the State (and its position timer) is recreated
+        // on every story change; updates can only ever come from the
+        // currently-mounted player.
+        onPositionUpdate: (frac) {
+          if (!mounted) return;
+          if (_progress.isAnimating) _progress.stop();
+          _progress.value = frac;
+          if (frac >= 1.0) _next();
+        },
         // Re-key per story so a new VideoPlayerController is created
         // whenever the user advances past the current story — otherwise
         // the next story would inherit playback state.
@@ -590,7 +723,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     );
 
     if (shouldDelete != true || !mounted) {
-      _progress.forward();
+      _resumeProgress();
       return;
     }
 
@@ -628,7 +761,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.t.storyDeleteFailed(e))),
       );
-      _progress.forward();
+      _resumeProgress();
     }
   }
 
@@ -648,6 +781,14 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         ),
       );
     }
+    // After this frame commits (the one that ran the
+    // AnimatedSwitcher's transitionBuilder against the OLD value of
+    // `_lastGroupIndexForAnim`), advance the marker so the NEXT
+    // transition compares against the now-current group.
+    final groupForFrame = _groupIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _lastGroupIndexForAnim = groupForFrame;
+    });
     final isOwnStory = story.authorUid == _currentUid;
     final width = MediaQuery.of(context).size.width;
     // Mirror tap/swipe direction in RTL so "tap on the leading edge =
@@ -699,8 +840,15 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                 _next();
               }
             },
-          onLongPressStart: (_) => _progress.stop(),
-          onLongPressEnd: (_) => _progress.forward(),
+          onLongPressStart: (_) {
+            _progress.stop();
+            // Notify the video player (if any) so it pauses in sync.
+            _longPressPaused.value = true;
+          },
+          onLongPressEnd: (_) {
+            _longPressPaused.value = false;
+            _resumeProgress();
+          },
           onVerticalDragEnd: (details) {
             if ((details.primaryVelocity ?? 0) > 200) {
               Navigator.pop(context);
@@ -735,7 +883,65 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: _buildStoryBody(story),
+                  // AnimatedSwitcher fades the previous story out and
+                  // the new one in whenever the keyed story changes.
+                  // The slide direction depends on whether we're
+                  // crossing into a new author (horizontal slide) or
+                  // just advancing within the same author (subtle
+                  // zoom/fade) — gives the user a felt difference
+                  // between "next story" and "next person".
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 280),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, anim) {
+                      // Parse the group index out of the child's key and
+                      // compare against the previous group (captured in
+                      // `_lastGroupIndexForAnim`, which is updated on
+                      // the next frame so this read still sees the old
+                      // value during the transition). Author-to-author
+                      // crossings get a horizontal slide; same-author
+                      // advance gets a subtle fade+scale so the user
+                      // feels which kind of jump happened.
+                      int? childGroup;
+                      final k = child.key;
+                      if (k is ValueKey<String>) {
+                        final match = RegExp(r'^group-(-?\d+)/')
+                            .firstMatch(k.value);
+                        if (match != null) {
+                          childGroup = int.tryParse(match.group(1)!);
+                        }
+                      }
+                      final isNewAuthor = childGroup != null &&
+                          _lastGroupIndexForAnim != -1 &&
+                          childGroup != _lastGroupIndexForAnim;
+                      if (isNewAuthor) {
+                        final slide = Tween<Offset>(
+                          begin: const Offset(0.18, 0),
+                          end: Offset.zero,
+                        ).animate(anim);
+                        return FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                              position: slide, child: child),
+                        );
+                      }
+                      final scale = Tween<double>(begin: 1.04, end: 1.0)
+                          .animate(anim);
+                      return FadeTransition(
+                        opacity: anim,
+                        child: ScaleTransition(scale: scale, child: child),
+                      );
+                    },
+                    child: KeyedSubtree(
+                      // The combined key changes both on story id and on
+                      // group, so AnimatedSwitcher triggers a transition
+                      // for either kind of advance.
+                      key: ValueKey<String>(
+                          'group-$_groupIndex/story-${story.id}'),
+                      child: _buildStoryBody(story),
+                    ),
+                  ),
                 ),
                 Positioned(
                   top: 8,
@@ -2145,7 +2351,37 @@ class _ViewerCard extends StatelessWidget {
 
 class _VideoStoryPlayer extends StatefulWidget {
   final String url;
-  const _VideoStoryPlayer({super.key, required this.url});
+  // Optional trim window. The uploaded video bytes aren't re-encoded
+  // (Flutter has no built-in trimmer) — instead we clamp playback here:
+  // start at [trimStart] and seek back to [trimStart] whenever playback
+  // reaches [trimEnd]. Either may be null to mean "edge of video".
+  final Duration? trimStart;
+  final Duration? trimEnd;
+  // Called once the video has loaded its first frame. The story viewer
+  // uses this to delay starting the progress timer until the user can
+  // actually see the video. The argument is the effective playback
+  // duration (trim window if set, else full video length) so the
+  // progress bar can run for the real video length instead of a fixed
+  // 5s tick.
+  final ValueChanged<Duration>? onReady;
+  // While the bound notifier is `true`, the player pauses. The viewer
+  // toggles it during long-press so the video freezes alongside the
+  // progress bar.
+  final ValueListenable<bool>? pausedNotifier;
+  // Called on every playback tick with the current position as a
+  // fraction of the effective playback window (0..1). Lets the viewer
+  // drive the story progress bar straight from the video's clock so
+  // the bar can never drift relative to the visible frames.
+  final ValueChanged<double>? onPositionUpdate;
+  const _VideoStoryPlayer({
+    super.key,
+    required this.url,
+    this.trimStart,
+    this.trimEnd,
+    this.onReady,
+    this.pausedNotifier,
+    this.onPositionUpdate,
+  });
 
   @override
   State<_VideoStoryPlayer> createState() => _VideoStoryPlayerState();
@@ -2154,10 +2390,22 @@ class _VideoStoryPlayer extends StatefulWidget {
 class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
   VideoPlayerController? _controller;
   bool _failed = false;
+  // Cached effective trim window resolved against the actual video
+  // duration once `initialize()` returns.
+  Duration _effectiveStart = Duration.zero;
+  Duration _effectiveEnd = Duration.zero;
+  bool _seeking = false;
+  // Polls `c.value.position` every ~60ms to feed the story progress
+  // bar. VideoPlayerController.addListener only fires on coarse state
+  // changes (not on every painted frame), so the progress bar was
+  // ticking jerkily / appearing not to move. A periodic poll gives the
+  // bar a smooth 60ms update cadence regardless of platform.
+  Timer? _positionTimer;
 
   @override
   void initState() {
     super.initState();
+    widget.pausedNotifier?.addListener(_onPausedChanged);
     _setup();
   }
 
@@ -2170,16 +2418,159 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
         return;
       }
       _controller = c;
-      await c.setLooping(true);
-      await c.play();
+      final total = c.value.duration;
+      _effectiveStart = (widget.trimStart ?? Duration.zero);
+      _effectiveEnd = (widget.trimEnd ?? total);
+      if (_effectiveStart < Duration.zero) _effectiveStart = Duration.zero;
+      if (_effectiveEnd > total) _effectiveEnd = total;
+      if (_effectiveEnd <= _effectiveStart) {
+        // Defensive: malformed trim window — fall back to full video.
+        _effectiveStart = Duration.zero;
+        _effectiveEnd = total;
+      }
+      // Looping is disabled when a trim is present so we can manually
+      // seek back to [trimStart] in the position listener. When there
+      // is no trim, native looping is still cheaper.
+      final hasTrim =
+          widget.trimStart != null || widget.trimEnd != null;
+      await c.setLooping(!hasTrim);
+      if (hasTrim) {
+        await c.seekTo(_effectiveStart);
+      }
+      // Tick listener handles trim wraparound (seek back to start when
+      // the playhead reaches the trim end). Position updates for the
+      // story progress bar are driven by the periodic timer below
+      // because the controller's listener only fires on coarse state
+      // changes and produced a jerky / stuck bar.
+      c.addListener(_onTick);
+      // Honor a paused-at-mount state (rare but possible if the user
+      // long-presses while the next story is still loading).
+      if (widget.pausedNotifier?.value == true) {
+        await c.pause();
+      } else {
+        await c.play();
+      }
+      _startPositionTimer();
+      // Tell the viewer the first frame is ready so it can start the
+      // progress timer (sized to the effective playback window). Done
+      // AFTER play() so the user doesn't see a black frame while the
+      // bar is already counting down.
+      final effective = _effectiveEnd - _effectiveStart;
+      widget.onReady?.call(effective);
       if (mounted) setState(() {});
     } catch (_) {
+      // Even on failure, signal "ready" so the viewer doesn't sit on a
+      // spinner forever — the broken-image placeholder will render and
+      // the timer will advance to the next story. Use the default
+      // story tick when we have no real duration to report.
+      widget.onReady?.call(_kStoryDuration);
       if (mounted) setState(() => _failed = true);
     }
   }
 
+  void _onPausedChanged() {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final paused = widget.pausedNotifier?.value ?? false;
+    if (paused) {
+      try {
+        c.pause();
+      } catch (_) {}
+    } else {
+      try {
+        c.play();
+      } catch (_) {}
+    }
+  }
+
+  void _onTick() {
+    // Listener fires only on coarse state changes. Its job here is to
+    // catch the trim-window wraparound — the smooth position updates
+    // for the progress bar come from `_positionTimer` instead.
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || _seeking) return;
+    final pos = c.value.position;
+    if (pos >= _effectiveEnd) {
+      _seeking = true;
+      c.seekTo(_effectiveStart).whenComplete(() {
+        _seeking = false;
+        if (mounted) c.play();
+      });
+    }
+  }
+
+  /// Drives the story progress bar via a per-frame callback so the
+  /// motion is smooth at the display refresh rate. The raw video
+  /// `position` only updates a few times per second on Android, so
+  /// between native ticks we extrapolate using wall-clock delta from
+  /// the last reported position — that gives a continuous fill
+  /// matching what the user sees on screen.
+  Duration _lastReportedPos = Duration.zero;
+  DateTime _lastReportedAt = DateTime.now();
+
+  void _startPositionTimer() {
+    _stopPositionTimer();
+    _lastReportedPos = _controller?.value.position ?? Duration.zero;
+    _lastReportedAt = DateTime.now();
+    _scheduleFrame();
+  }
+
+  void _scheduleFrame() {
+    _positionTimer = Timer(Duration.zero, () {
+      WidgetsBinding.instance.scheduleFrameCallback((_) => _onFrame());
+    });
+  }
+
+  void _onFrame() {
+    if (!mounted) return;
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) {
+      _scheduleFrame();
+      return;
+    }
+    final cb = widget.onPositionUpdate;
+    if (cb == null) {
+      _scheduleFrame();
+      return;
+    }
+    final nativePos = c.value.position;
+    // If the native position has advanced, snap our anchor to it. If
+    // it hasn't (between native ticks), extrapolate by the wall-clock
+    // delta since the last native update — but only while the
+    // controller reports `isPlaying`, so a paused video freezes the
+    // bar instead of drifting.
+    final now = DateTime.now();
+    Duration effectivePos;
+    if (nativePos != _lastReportedPos) {
+      _lastReportedPos = nativePos;
+      _lastReportedAt = now;
+      effectivePos = nativePos;
+    } else if (c.value.isPlaying) {
+      final wallDelta = now.difference(_lastReportedAt);
+      effectivePos = _lastReportedPos + wallDelta;
+    } else {
+      effectivePos = nativePos;
+    }
+    if (effectivePos > _effectiveEnd) effectivePos = _effectiveEnd;
+    final windowMs = (_effectiveEnd - _effectiveStart).inMilliseconds;
+    if (windowMs > 0) {
+      final intoMs = (effectivePos - _effectiveStart).inMilliseconds;
+      final frac = (intoMs / windowMs).clamp(0.0, 1.0);
+      cb(frac);
+    }
+    _scheduleFrame();
+  }
+
+  void _stopPositionTimer() {
+    _positionTimer?.cancel();
+    _positionTimer = null;
+  }
+
   @override
   void dispose() {
+    _stopPositionTimer();
+    widget.pausedNotifier?.removeListener(_onPausedChanged);
+    _controller?.removeListener(_onTick);
     _controller?.dispose();
     super.dispose();
   }

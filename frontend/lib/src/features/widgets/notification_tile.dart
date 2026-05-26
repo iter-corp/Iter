@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
@@ -34,70 +35,108 @@ class NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Each notification renders as a floating rounded card, matching
+    // the share-recipient cards used in the post / story share sheets.
+    // The list itself supplies vertical spacing via item separators;
+    // here we only carry horizontal margin + the chrome.
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          /// AVATAR + LIKE ICON
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: context.inputFill,
-                backgroundImage:
-                    avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                child: avatar.isEmpty
-                    ? Icon(Icons.person, color: context.textMuted)
-                    : null,
-              ),
-              if (isLike)
-                const Positioned(
-                  bottom: 0,
-                  right: 0,
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: context.borderColor.withValues(alpha: 0.6),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            /// AVATAR — gradient ring around the user picture, mirrors
+            /// the share-recipient card. The small heart badge for like
+            /// notifications still sits on top of the ring.
+            Stack(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(2),
                   child: CircleAvatar(
-                    radius: 8,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.favorite, size: 12, color: Colors.red),
+                    backgroundColor: context.inputFill,
+                    backgroundImage: avatar.isNotEmpty
+                        ? CachedNetworkImageProvider(avatar)
+                        : null,
+                    child: avatar.isEmpty
+                        ? Icon(Icons.person, color: context.textMuted)
+                        : null,
                   ),
                 ),
-            ],
-          ),
-
-          const SizedBox(width: 12),
-
-          /// TEXT
-          //
-          // Kurdish (and many translated) notification strings are 2-3x
-          // longer than the English originals. Without explicit
-          // maxLines/overflow on the title the Row overflowed horizontally,
-          // pushed the trailing thumbnail off-screen, and on some screens
-          // produced the yellow-and-black overflow stripe. Allow up to 2
-          // lines on the title and ellipsis the rest.
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, height: 1.3),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.textSecondary, fontSize: 12),
-                ),
+                if (isLike)
+                  const Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: CircleAvatar(
+                      radius: 8,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.favorite, size: 12, color: Colors.red),
+                    ),
+                  ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
 
-          /// TRAILING
-          _buildTrailing(context),
-        ],
+            const SizedBox(width: 12),
+
+            /// TEXT — title up to 2 lines + 1-line subtitle. Long
+            /// localized strings (Kurdish / Arabic) ellipsis instead of
+            /// overflowing the row.
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        TextStyle(color: context.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            /// TRAILING
+            _buildTrailing(context),
+          ],
+        ),
       ),
     );
   }
