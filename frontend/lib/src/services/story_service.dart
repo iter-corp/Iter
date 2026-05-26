@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../features/model/story_comment_model.dart';
+import '../features/widgets/story_text_overlay.dart';
 import 'notification_service.dart';
 
 
@@ -21,6 +22,39 @@ class Story {
   /// it opens the original post. Null for normal photo stories.
   final String? sharedPostId;
 
+  /// Optional video for video stories. When set, the viewer plays the
+  /// video instead of rendering [imageUrl]. [imageUrl] may still hold a
+  /// thumbnail used in the inbox previews.
+  final String? videoUrl;
+
+  /// Optional pure-text story content. When set, the viewer renders
+  /// [textContent] on a solid background ([backgroundColor]) instead of
+  /// loading an image — used when the user composes a text-only story.
+  final String? textContent;
+  final int? backgroundColor;
+  final int? textColor;
+
+  /// Optional shape wrapping the text — one of: 'none', 'rounded',
+  /// 'box', 'outline', 'pill', 'brush'. Defaults to 'none'. Stored as a
+  /// string so we don't have to migrate the Firestore docs when adding
+  /// new shapes.
+  final String? textBorderStyle;
+
+  /// Free-form text overlays placed on top of the media (image or
+  /// video). For image stories the overlays are also burned into the
+  /// uploaded composite, but we keep the structured list so the viewer
+  /// can re-render them crisply at any size. For video stories the
+  /// overlays are the ONLY source of truth since we can't bake them
+  /// into the video bytes from Flutter.
+  final List<StoryTextOverlay> overlays;
+
+  bool get isVideo => videoUrl != null && videoUrl!.isNotEmpty;
+  bool get isText =>
+      (textContent != null && textContent!.trim().isNotEmpty) &&
+      imageUrl.isEmpty &&
+      !isVideo &&
+      (sharedPostId == null || sharedPostId!.isEmpty);
+
   const Story({
     required this.id,
     required this.authorUid,
@@ -32,6 +66,12 @@ class Story {
     this.likesCount = 0,
     this.commentsCount = 0,
     this.sharedPostId,
+    this.videoUrl,
+    this.textContent,
+    this.backgroundColor,
+    this.textColor,
+    this.textBorderStyle,
+    this.overlays = const [],
   });
 
   factory Story.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -47,6 +87,15 @@ class Story {
       likesCount: (d['likesCount'] as int?) ?? 0,
       commentsCount: (d['commentsCount'] as int?) ?? 0,
       sharedPostId: (d['sharedPostId'] as String?)?.trim(),
+      videoUrl: (d['videoUrl'] as String?)?.trim(),
+      textContent: (d['textContent'] as String?),
+      backgroundColor: (d['backgroundColor'] as num?)?.toInt(),
+      textColor: (d['textColor'] as num?)?.toInt(),
+      textBorderStyle: (d['textBorderStyle'] as String?)?.trim(),
+      overlays: ((d['overlays'] as List?) ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(StoryTextOverlay.fromJson)
+          .toList(growable: false),
     );
   }
 }
@@ -83,11 +132,20 @@ class StoryService {
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('stories');
 
-  /// Creates a story. Pass [sharedPostId] to make it a "shared post"
-  /// story — the viewer then renders that post as a tappable card.
+  /// Creates a story. A story can be one of three kinds:
+  ///   • Image — pass [imageUrl] (optionally [sharedPostId]).
+  ///   • Video — pass [videoUrl] (and an optional [imageUrl] thumbnail).
+  ///   • Text-only — pass [textContent] with [backgroundColor]/[textColor];
+  ///     [imageUrl] may be left empty.
   Future<String> createStory({
     required String imageUrl,
     String? sharedPostId,
+    String? videoUrl,
+    String? textContent,
+    int? backgroundColor,
+    int? textColor,
+    String? textBorderStyle,
+    List<StoryTextOverlay> overlays = const [],
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
@@ -104,6 +162,15 @@ class StoryService {
       'imageUrl': imageUrl,
       if (sharedPostId != null && sharedPostId.isNotEmpty)
         'sharedPostId': sharedPostId,
+      if (videoUrl != null && videoUrl.isNotEmpty) 'videoUrl': videoUrl,
+      if (textContent != null && textContent.trim().isNotEmpty)
+        'textContent': textContent,
+      if (backgroundColor != null) 'backgroundColor': backgroundColor,
+      if (textColor != null) 'textColor': textColor,
+      if (textBorderStyle != null && textBorderStyle.isNotEmpty)
+        'textBorderStyle': textBorderStyle,
+      if (overlays.isNotEmpty)
+        'overlays': overlays.map((o) => o.toJson()).toList(),
       'createdAt': FieldValue.serverTimestamp(),
       'expiresAt': Timestamp.fromDate(expires),
     });

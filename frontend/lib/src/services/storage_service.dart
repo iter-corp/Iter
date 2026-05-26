@@ -48,6 +48,35 @@ class StorageService {
     return _uploadViaEdge(bucket: 'posts', file: file, kind: 'story');
   }
 
+  /// Video attached to a story.
+  ///
+  /// Tries the dedicated `story-video` kind first (paths under
+  /// `stories/videos/`). Older deployments of the `issue-upload-url`
+  /// edge function don't whitelist that kind yet and would return
+  /// `{"error":"bad kind"}` → we fall back to `post-video` (paths under
+  /// `posts/videos/`). The video bytes and public URL are valid either
+  /// way; only the storage path differs.
+  Future<String> uploadStoryVideo(File file) async {
+    try {
+      return await _uploadViaEdge(
+        bucket: 'posts',
+        file: file,
+        kind: 'story-video',
+      );
+    } on StorageException catch (e) {
+      if (e.message.contains('bad kind')) {
+        debugPrint(
+            '[StorageService] story-video kind rejected; falling back to post-video');
+        return _uploadViaEdge(
+          bucket: 'posts',
+          file: file,
+          kind: 'post-video',
+        );
+      }
+      rethrow;
+    }
+  }
+
   /// Video attached to a chat message.
   Future<String> uploadChatVideo(File file, String chatId) {
     return _uploadViaEdge(

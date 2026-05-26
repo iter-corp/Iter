@@ -421,6 +421,25 @@ class _ReportTile extends ConsumerWidget {
                 : Icons.error_outline_rounded,
             color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
           ),
+          // Trailing chevron is replaced with a row: a copy button (so
+          // admins can grab the full report without expanding) plus the
+          // expansion arrow ExpansionTile draws by default isn't
+          // configurable. We use a custom `trailing` to host both.
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: context.t.copy,
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                onPressed: () => _copyReportDetails(context, screen),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                    minWidth: 36, minHeight: 36),
+                visualDensity: VisualDensity.compact,
+              ),
+              Icon(Icons.expand_more, color: context.textSecondary),
+            ],
+          ),
           title: Text(
             report.message.split('\n').first,
             maxLines: 2,
@@ -549,6 +568,21 @@ class _ReportTile extends ConsumerWidget {
       ),
       ),
     );
+  }
+
+  /// Copies a fully formatted dump of this error report to the clipboard
+  /// (timestamp + screen + version + uid + message + stack). Same payload
+  /// the existing Copy button inside the expanded view emits, lifted into
+  /// a helper so the header copy icon can reuse it.
+  void _copyReportDetails(BuildContext context, String screen) {
+    Clipboard.setData(ClipboardData(
+      text: 'When: ${_fullTime(context, report.createdAt)}\n'
+          'Screen: $screen\n'
+          'Type: ${report.kind} · ${report.platform} · v${report.appVersion}\n'
+          'User: ${report.uid ?? "not signed in"}\n\n'
+          '${report.message}\n\n${report.stack}',
+    ));
+    AppFeedback.showInfo(context, context.t.adminCopiedToClipboard);
   }
 
   Widget _pill(BuildContext context, IconData icon, String text) => Container(

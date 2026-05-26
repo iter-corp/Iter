@@ -12,10 +12,24 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(context.t.splashAppName,
-                style: const TextStyle(
-                    fontSize: 48, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
+            // App logo above the wordmark — matches the launcher icon so the
+            // splash reads as a true brand surface instead of plain text.
+            Image.asset(
+              'assets/img/app_icon.png',
+              width: 96,
+              height: 96,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 18),
+            Text(
+              context.t.splashAppName,
+              style: const TextStyle(
+                fontSize: 44,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 28),
             const CircularProgressIndicator(),
           ],
         ),

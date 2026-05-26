@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// ignore: unnecessary_import — Clipboard/ClipboardData come from services.
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -336,6 +338,31 @@ class _ReportTile extends ConsumerWidget {
           leading: Icon(
             report.resolved ? Icons.check_circle_outline : Icons.flag_outlined,
             color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: context.t.copy,
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                    minWidth: 36, minHeight: 36),
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(
+                    text: 'When: ${_fullTime(report.createdAt)}\n'
+                        'Reason: ${report.reason}\n'
+                        'Reported user: ${report.targetUsername.isEmpty ? report.targetUid : "${report.targetUsername} (${report.targetUid})"}\n'
+                        'Reporter: ${report.reporterUsername.isEmpty ? report.reporterUid : "${report.reporterUsername} (${report.reporterUid})"}\n\n'
+                        'Details: ${(report.details ?? "").trim()}',
+                  ));
+                  AppFeedback.showInfo(
+                      context, context.t.adminCopiedToClipboard);
+                },
+              ),
+              Icon(Icons.expand_more, color: context.textSecondary),
+            ],
           ),
           title: Text(
             report.targetUsername.isEmpty

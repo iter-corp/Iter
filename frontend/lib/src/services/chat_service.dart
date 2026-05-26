@@ -439,6 +439,9 @@ class ChatService {
     if (data['location'] is Map) {
       return '📍 Shared a location';
     }
+    if ((data['storyId'] as String?)?.trim().isNotEmpty == true) {
+      return 'Shared a story';
+    }
     return '';
   }
 
@@ -702,7 +705,9 @@ class ChatService {
                                     ? 'Sent a photo'
                                     : hasLocation
                                         ? '📍 Shared a location'
-                                        : '';
+                                        : hasStoryRef
+                                            ? 'Shared a story'
+                                            : '';
 
     batch.set(msgRef, {
       'senderUid': senderUid,

@@ -276,7 +276,7 @@ class ProfileButtons extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -291,7 +291,9 @@ class ProfileButtons extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(vertical: 11),
               ),
-              child: Text(context.t.editProfile,
+              icon: Icon(Icons.edit_outlined,
+                  size: 16, color: context.textPrimary),
+              label: Text(context.t.editProfile,
                   style: TextStyle(
                       color: context.textPrimary, fontWeight: FontWeight.w600)),
             ),

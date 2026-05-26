@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/block_providers.dart';
 import '../../providers/contact_request_providers.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/preferred_language_provider.dart';
@@ -21,6 +23,7 @@ import 'change_password_screen.dart';
 import 'contact_us_screen.dart';
 import 'event_notifications_settings_screen.dart';
 import 'profile_visitors_screen.dart';
+import 'saved_translations_screen.dart';
 
 /// Full-screen profile settings page. Replaces the older bottom-sheet
 /// settings menu with a dedicated route so we can group preferences
@@ -189,6 +192,17 @@ class ProfileSettingsScreen extends ConsumerWidget {
               ),
             ),
             onTap: () => _pickLanguage(context, ref, current: preferredLang),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bookmarks_outlined,
+                color: AppColors.purple),
+            title: Text(context.t.savedTranslations),
+            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const SavedTranslationsScreen(),
+              ),
+            ),
           ),
           _SectionHeader(title: context.t.appearance),
           ListTile(
@@ -892,13 +906,93 @@ class _BlockedUsersList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          context.t.settingsBlockedUsersHint,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: context.textSecondary),
+    final blockedAsync = ref.watch(blockedUsersProvider);
+    return blockedAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            context.t.errorWithMessage(e),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.textSecondary),
+          ),
+        ),
+      ),
+      data: (uids) {
+        if (uids.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                context.t.settingsBlockedUsersHint,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.textSecondary),
+              ),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: uids.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (_, i) => _BlockedUserRow(uid: uids[i]),
+        );
+      },
+    );
+  }
+}
+
+class _BlockedUserRow extends ConsumerWidget {
+  final String uid;
+  const _BlockedUserRow({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final data = ref.watch(userByUidProvider(uid)).valueOrNull;
+    final username = (data?['username'] as String?) ?? uid;
+    final avatar = (data?['avatarUrl'] as String?) ?? '';
+
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 20,
+        backgroundColor: context.inputFill,
+        backgroundImage:
+            avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
+        child: avatar.isEmpty
+            ? Icon(Icons.person, color: context.textSecondary)
+            : null,
+      ),
+      title: Text(
+        username,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      trailing: SizedBox(
+        height: 32,
+        child: OutlinedButton(
+          onPressed: () async {
+            final me = ref.read(authServiceProvider).currentUser;
+            if (me == null) return;
+            await ref.read(blockServiceProvider).unblockUser(
+                  currentUid: me.uid,
+                  targetUid: uid,
+                );
+          },
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Colors.red, width: 1),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+          ),
+          child: Text(
+            context.t.unblock,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 
 /// Data returned when the user taps a saved entry — used to restore it into
@@ -51,13 +52,13 @@ class SavedTranslationsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
-        title: const Text('Saved translations'),
+        title: Text(context.t.savedTranslations),
         backgroundColor: context.cardBg,
         foregroundColor: context.textPrimary,
         elevation: 0,
       ),
       body: uid == null
-          ? const Center(child: Text('Sign in to view saved translations.'))
+          ? Center(child: Text(context.t.savedTranslationsSignInPrompt))
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: query!.snapshots(),
               builder: (context, snap) {
@@ -65,7 +66,8 @@ class SavedTranslationsScreen extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snap.hasError) {
-                  return Center(child: Text('Error: ${snap.error}'));
+                  return Center(
+                      child: Text(context.t.errorWithMessage(snap.error!)));
                 }
                 final items = snap.data?.docs
                         .map(SavedTranslation.fromDoc)
@@ -195,18 +197,13 @@ class _EmptyState extends StatelessWidget {
                 size: 48, color: context.textMuted),
             const SizedBox(height: 12),
             Text(
-              'No saved translations yet',
+              context.t.savedTranslationsEmpty,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Tap the bookmark on a translation to save it.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: context.textSecondary),
             ),
           ],
         ),

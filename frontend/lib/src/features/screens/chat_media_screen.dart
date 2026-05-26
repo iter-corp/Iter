@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../l10n/app_strings.dart';
@@ -15,10 +16,11 @@ import '../../providers/chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../../theme/app_theme.dart';
 
-/// Per-chat media browser. Three tabs over the chat's `messages` stream:
-///   • Images — every photo sent in this chat (grid; tap to view, save, forward)
-///   • Links  — every URL extracted from message text (copy or forward)
-///   • Voices — every voice note (forward to another chat)
+/// Per-chat media browser. Four tabs over the chat's `messages` stream:
+///   • Images — every photo sent in this chat (grid)
+///   • Files  — every document/file attachment
+///   • Voices — every voice note
+///   • Links  — every URL extracted from message text
 /// Reached from the chat header (info icon next to the translate button).
 class ChatMediaScreen extends ConsumerWidget {
   final String chatId;
@@ -35,18 +37,31 @@ class ChatMediaScreen extends ConsumerWidget {
     final messagesAsync = ref.watch(messagesProvider(chatId));
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
+        backgroundColor: context.surfaceSoft,
         appBar: AppBar(
-          title: Text(chatTitle),
-          bottom: TabBar(
-            tabs: [
-              Tab(
-                  icon: const Icon(Icons.image_outlined),
-                  text: context.t.images),
-              Tab(icon: const Icon(Icons.link), text: context.t.links),
-              Tab(icon: const Icon(Icons.mic_none), text: context.t.voices),
-            ],
+          backgroundColor: context.cardBg,
+          foregroundColor: context.textPrimary,
+          elevation: 0,
+          title: Text(
+            chatTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Container(
+              color: context.cardBg,
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: _MediaTabBar(
+                tabs: [
+                  _TabSpec(icon: Icons.photo_library_outlined, label: context.t.images),
+                  _TabSpec(icon: Icons.insert_drive_file_outlined, label: context.t.files),
+                  _TabSpec(icon: Icons.graphic_eq, label: context.t.voices),
+                  _TabSpec(icon: Icons.link, label: context.t.links),
+                ],
+              ),
+            ),
           ),
         ),
         body: messagesAsync.when(
@@ -59,13 +74,17 @@ class ChatMediaScreen extends ConsumerWidget {
             final voices =
                 msgs.where((m) => (m.voiceUrl ?? '').isNotEmpty).toList()
                   ..sort(_sortNewestFirst);
+            final files =
+                msgs.where((m) => (m.fileUrl ?? '').isNotEmpty).toList()
+                  ..sort(_sortNewestFirst);
             final links = _extractLinks(msgs);
 
             return TabBarView(
               children: [
                 _ImagesGrid(images: images),
-                _LinksList(links: links),
+                _FilesList(files: files),
                 _VoicesList(voices: voices),
+                _LinksList(links: links),
               ],
             );
           },
@@ -111,6 +130,75 @@ class _LinkEntry {
 }
 
 // ─────────────────────────────────────────────
+// Modern segmented tab bar — pill-shaped, animated, premium feel.
+// ─────────────────────────────────────────────
+
+class _TabSpec {
+  final IconData icon;
+  final String label;
+  _TabSpec({required this.icon, required this.label});
+}
+
+class _MediaTabBar extends StatelessWidget {
+  final List<_TabSpec> tabs;
+  const _MediaTabBar({required this.tabs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: context.inputFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.borderColor),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: TabBar(
+        isScrollable: false,
+        labelPadding: EdgeInsets.zero,
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          color: AppColors.purple,
+          borderRadius: BorderRadius.circular(11),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.purple.withValues(alpha: 0.22),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: context.textSecondary,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        tabs: [
+          for (final t in tabs)
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(t.icon, size: 16),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      t.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
 // Images tab
 // ─────────────────────────────────────────────
 
@@ -122,16 +210,16 @@ class _ImagesGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (images.isEmpty) {
       return _EmptyState(
-        icon: Icons.image_outlined,
+        icon: Icons.photo_library_outlined,
         text: context.t.noImagesShared,
       );
     }
     return GridView.builder(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(10),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
       ),
       itemCount: images.length,
       itemBuilder: (context, i) {
@@ -139,13 +227,16 @@ class _ImagesGrid extends ConsumerWidget {
         return GestureDetector(
           onTap: () => _openImage(context, ref, url),
           onLongPress: () => _showImageActions(context, ref, url),
-          child: CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => Container(color: Colors.black12),
-            errorWidget: (_, __, ___) => Container(
-              color: Colors.black12,
-              child: const Icon(Icons.broken_image, color: Colors.white54),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(color: context.inputFill),
+              errorWidget: (_, __, ___) => Container(
+                color: context.inputFill,
+                child: Icon(Icons.broken_image, color: context.textSecondary),
+              ),
             ),
           ),
         );
@@ -187,6 +278,10 @@ class _ImagesGrid extends ConsumerWidget {
   void _showImageActions(BuildContext context, WidgetRef ref, String url) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -269,6 +364,204 @@ Future<void> _forwardImage(
 }
 
 // ─────────────────────────────────────────────
+// Files tab
+// ─────────────────────────────────────────────
+
+class _FilesList extends ConsumerWidget {
+  final List<ChatMessage> files;
+  const _FilesList({required this.files});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (files.isEmpty) {
+      return _EmptyState(
+        icon: Icons.insert_drive_file_outlined,
+        text: context.t.noFilesShared,
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      itemCount: files.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final m = files[i];
+        return _FileTile(message: m);
+      },
+    );
+  }
+}
+
+class _FileTile extends ConsumerStatefulWidget {
+  final ChatMessage message;
+  const _FileTile({required this.message});
+
+  @override
+  ConsumerState<_FileTile> createState() => _FileTileState();
+}
+
+class _FileTileState extends ConsumerState<_FileTile> {
+  bool _opening = false;
+
+  Future<void> _open() async {
+    if (_opening) return;
+    final m = widget.message;
+    final url = m.fileUrl;
+    if (url == null || url.isEmpty) return;
+    setState(() => _opening = true);
+    try {
+      final dir = await getTemporaryDirectory();
+      final rawName = (m.fileName ?? '').isNotEmpty
+          ? m.fileName!
+          : url.split('?').first.split('/').last;
+      final safeName = rawName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final path = '${dir.path}/$safeName';
+      final file = File(path);
+      if (!await file.exists()) {
+        final res = await http.get(Uri.parse(url));
+        if (res.statusCode != 200) {
+          throw Exception('HTTP ${res.statusCode}');
+        }
+        await file.writeAsBytes(res.bodyBytes);
+      }
+      final result = await OpenFilex.open(path, type: m.fileMimeType);
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.openFailed(result.message))),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.openFailed(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _forward() async {
+    final target = await _pickForwardTarget(context, ref);
+    if (target == null) return;
+    final m = widget.message;
+    await _sendForward(
+      ref: ref,
+      target: target,
+      fileUrl: m.fileUrl,
+      fileName: m.fileName,
+      fileMimeType: m.fileMimeType,
+      fileSizeBytes: m.fileSizeBytes,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.t.forwardedTo(target.title))),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.message;
+    final name = (m.fileName ?? '').isNotEmpty
+        ? m.fileName!
+        : context.t.unknownFile;
+    final ext = _extOf(name).toUpperCase();
+    final size = _formatSize(m.fileSizeBytes);
+
+    return InkWell(
+      onTap: _open,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: context.purpleSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: _opening
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.4, color: AppColors.purple),
+                    )
+                  : Text(
+                      ext.isEmpty ? 'FILE' : ext,
+                      style: const TextStyle(
+                        color: AppColors.purple,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (size.isNotEmpty) size,
+                      _formatTime(m.createdAt),
+                    ].where((s) => s.isNotEmpty).join(' • '),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: context.t.forward,
+              icon: const Icon(Icons.forward),
+              color: context.textSecondary,
+              onPressed: _forward,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _extOf(String name) {
+    final dot = name.lastIndexOf('.');
+    if (dot < 0 || dot >= name.length - 1) return '';
+    return name.substring(dot + 1);
+  }
+
+  String _formatSize(int? bytes) {
+    if (bytes == null || bytes <= 0) return '';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+}
+
+// ─────────────────────────────────────────────
 // Links tab
 // ─────────────────────────────────────────────
 
@@ -282,49 +575,13 @@ class _LinksList extends ConsumerWidget {
       return _EmptyState(icon: Icons.link, text: context.t.noLinksShared);
     }
     return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       itemCount: links.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final entry = links[i];
-        return ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.link)),
-          title: Text(
-            entry.url,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFB05ECC),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          subtitle: Text(_formatTime(entry.message.createdAt)),
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'copy') {
-                await Clipboard.setData(ClipboardData(text: entry.url));
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.t.linkCopied)),
-                );
-              } else if (value == 'forward') {
-                final target = await _pickForwardTarget(context, ref);
-                if (target == null) return;
-                await _sendForward(
-                  ref: ref,
-                  target: target,
-                  text: entry.url,
-                );
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.t.forwardedTo(target.title))),
-                );
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'copy', child: Text(context.t.copy)),
-              PopupMenuItem(value: 'forward', child: Text(context.t.forward)),
-            ],
-          ),
+        return InkWell(
+          borderRadius: BorderRadius.circular(14),
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: entry.url));
             if (!context.mounted) return;
@@ -332,6 +589,83 @@ class _LinksList extends ConsumerWidget {
               SnackBar(content: Text(context.t.linkCopied)),
             );
           },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: context.purpleSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.link, color: AppColors.purple),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.url,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.purple,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatTime(entry.message.createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: context.textSecondary),
+                  onSelected: (value) async {
+                    if (value == 'copy') {
+                      await Clipboard.setData(ClipboardData(text: entry.url));
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(context.t.linkCopied)),
+                      );
+                    } else if (value == 'forward') {
+                      final target = await _pickForwardTarget(context, ref);
+                      if (target == null) return;
+                      await _sendForward(
+                        ref: ref,
+                        target: target,
+                        text: entry.url,
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text(context.t.forwardedTo(target.title))),
+                      );
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: 'copy', child: Text(context.t.copy)),
+                    PopupMenuItem(
+                        value: 'forward', child: Text(context.t.forward)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -350,46 +684,87 @@ class _VoicesList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (voices.isEmpty) {
       return _EmptyState(
-        icon: Icons.mic_none,
+        icon: Icons.graphic_eq,
         text: context.t.noVoiceMessages,
       );
     }
     return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       itemCount: voices.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final m = voices[i];
         final secs = ((m.voiceDurationMs ?? 0) / 1000).round();
-        return ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.mic)),
-          title: Text(secs > 0
-              ? context.t.secsVoiceMessage(secs)
-              : context.t.voiceMessage),
-          subtitle: Text(_formatTime(m.createdAt)),
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'open') {
-                Navigator.pop(context);
-              } else if (value == 'forward') {
-                final target = await _pickForwardTarget(context, ref);
-                if (target == null) return;
-                await _sendForward(
-                  ref: ref,
-                  target: target,
-                  voiceUrl: m.voiceUrl,
-                  voiceDurationMs: m.voiceDurationMs,
-                );
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.t.forwardedTo(target.title))),
-                );
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                  value: 'open', child: Text(context.t.goToMessage)),
-              PopupMenuItem(
-                  value: 'forward', child: Text(context.t.forward)),
+        final title = secs > 0
+            ? context.t.secsVoiceMessage(secs)
+            : context.t.voiceMessage;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: context.purpleSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.mic, color: AppColors.purple),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatTime(m.createdAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: context.textSecondary),
+                onSelected: (value) async {
+                  if (value == 'forward') {
+                    final target = await _pickForwardTarget(context, ref);
+                    if (target == null) return;
+                    await _sendForward(
+                      ref: ref,
+                      target: target,
+                      voiceUrl: m.voiceUrl,
+                      voiceDurationMs: m.voiceDurationMs,
+                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(context.t.forwardedTo(target.title))),
+                    );
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                      value: 'forward', child: Text(context.t.forward)),
+                ],
+              ),
             ],
           ),
         );
@@ -523,6 +898,10 @@ Future<void> _sendForward({
   String? imageUrl,
   String? voiceUrl,
   int? voiceDurationMs,
+  String? fileUrl,
+  String? fileName,
+  String? fileMimeType,
+  int? fileSizeBytes,
 }) async {
   final me = ref.read(authStateProvider).value?.uid;
   if (me == null) return;
@@ -535,6 +914,10 @@ Future<void> _sendForward({
     imageUrl: imageUrl,
     voiceUrl: voiceUrl,
     voiceDurationMs: voiceDurationMs,
+    fileUrl: fileUrl,
+    fileName: fileName,
+    fileMimeType: fileMimeType,
+    fileSizeBytes: fileSizeBytes,
   );
 }
 
@@ -553,9 +936,24 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 56, color: context.textSecondary),
-          const SizedBox(height: 12),
-          Text(text, style: TextStyle(color: context.textSecondary)),
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: context.purpleSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 40, color: AppColors.purple),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            text,
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

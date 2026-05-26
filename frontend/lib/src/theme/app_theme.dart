@@ -66,6 +66,25 @@ class AppTheme {
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
+    // Material 3 hides the OFF thumb against a white surface on Android
+    // (default outline-colored thumb blends with light track). Pin the
+    // colors so the circle is always visible regardless of state.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return const Color(0xFF6B6B70);
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppColors.purple;
+        return const Color(0xFFE4E4EA);
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.purple;
+        }
+        return const Color(0xFFCFCFD6);
+      }),
+    ),
   );
 
   // ─── Dark Theme ─────────────────────────────────────────────
@@ -121,6 +140,20 @@ class AppTheme {
         borderSide: BorderSide.none,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return const Color(0xFFB8B8C0);
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppColors.purple;
+        return const Color(0xFF3A3A40);
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppColors.purple;
+        return const Color(0xFF50505A);
+      }),
     ),
   );
 }

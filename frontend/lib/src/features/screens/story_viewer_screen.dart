@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
@@ -12,7 +14,9 @@ import '../../providers/post_providers.dart';
 import '../../services/story_service.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
+import '../widgets/story_text_overlay.dart';
 import 'post_detail_screen.dart';
+import 'text_story_composer_screen.dart';
 
 const Duration _kStoryDuration = Duration(seconds: 5);
 
@@ -371,6 +375,164 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     if (mounted) _progress.forward();
   }
 
+  /// Opens a "Share story" sheet with three options:
+  ///   • Add to my story — re-shares the same content as a new 24h story.
+  ///   • Share via apps — opens the OS share sheet with the story image URL.
+  ///   • A list of recent chats so the user can DM the story directly.
+  /// Pauses the progress timer while the sheet is open and resumes on close.
+  Future<void> _openShareSheet(Story story) async {
+    _progress.stop();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StoryShareSheet(
+        story: story,
+        onAddToMyStory: () async {
+          Navigator.pop(context);
+          await _addStoryToMyStory(story);
+        },
+        onShareExternally: () async {
+          Navigator.pop(context);
+          await _shareStoryExternally(story);
+        },
+        onSendToChat: (chatId, otherUid, title) async {
+          Navigator.pop(context);
+          await _sendStoryToChat(story, chatId, otherUid, title);
+        },
+      ),
+    );
+    if (mounted) _progress.forward();
+  }
+
+  Future<void> _addStoryToMyStory(Story story) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.t;
+    try {
+      // Carry every field that defines what the story looks like —
+      // otherwise re-sharing a text or video story would produce an
+      // empty image-story (black screen).
+      await _storyService.createStory(
+        imageUrl: story.imageUrl,
+        sharedPostId: story.sharedPostId,
+        videoUrl: story.videoUrl,
+        textContent: story.textContent,
+        backgroundColor: story.backgroundColor,
+        textColor: story.textColor,
+        textBorderStyle: story.textBorderStyle,
+      );
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.postCardAddedToStory)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.postCardStoryFailed(e))),
+      );
+    }
+  }
+
+  Future<void> _shareStoryExternally(Story story) async {
+    final url = story.imageUrl.trim();
+    if (url.isEmpty) return;
+    final box = context.findRenderObject() as RenderBox?;
+    await Share.share(
+      url,
+      sharePositionOrigin:
+          box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+    );
+  }
+
+  Future<void> _sendStoryToChat(
+      Story story, String chatId, String otherUid, String recipientTitle) async {
+    final me = _currentUid;
+    if (me == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.t;
+    try {
+      await ref.read(chatServiceProvider).sendMessage(
+            chatId: chatId,
+            senderUid: me,
+            receiverUid: otherUid,
+            text: '',
+            // Forward the story as an image (or as a shared-post bubble
+            // when the story itself shares a post).
+            imageUrl: story.sharedPostId == null || story.sharedPostId!.isEmpty
+                ? story.imageUrl
+                : null,
+            sharedPostId: story.sharedPostId,
+            storyId: story.id,
+            storyImageUrl: story.imageUrl,
+          );
+      // "Story sent to <name>" — not "Reply sent". The old copy was
+      // misleading because the user isn't replying to anything yet.
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.storyShared(recipientTitle))),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.storyShareFailed)),
+      );
+    }
+  }
+
+  /// Picks the renderer for the current story based on which fields the
+  /// doc has. Shared-post stories take priority (they show the original
+  /// post as a card), then video, then text-only, then plain image.
+  /// Any text overlays attached to the story (placed at compose time)
+  /// are rendered on top in the same coordinate space used by the
+  /// editor so what you saw while composing matches the published frame.
+  Widget _buildStoryBody(Story story) {
+    Widget base;
+    if (story.sharedPostId != null && story.sharedPostId!.isNotEmpty) {
+      base = _SharedPostStoryView(postId: story.sharedPostId!);
+    } else if (story.isVideo) {
+      base = _VideoStoryPlayer(
+        url: story.videoUrl!,
+        // Re-key per story so a new VideoPlayerController is created
+        // whenever the user advances past the current story — otherwise
+        // the next story would inherit playback state.
+        key: ValueKey('story-video-${story.id}'),
+      );
+    } else if (story.isText) {
+      base = _TextStoryBackground(
+        text: story.textContent!,
+        backgroundColor: Color(story.backgroundColor ?? 0xFFB05ECC),
+        textColor: Color(story.textColor ?? 0xFFFFFFFF),
+        borderStyle: (story.textBorderStyle ?? 'none'),
+      );
+    } else {
+      base = CachedNetworkImage(
+        imageUrl: story.imageUrl,
+        fit: BoxFit.contain,
+        placeholder: (_, __) => const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+        errorWidget: (_, __, ___) => const Center(
+          child: Icon(Icons.broken_image, color: Colors.white),
+        ),
+      );
+    }
+
+    if (story.overlays.isEmpty) return base;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final canvas = Size(constraints.maxWidth, constraints.maxHeight);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            base,
+            for (final overlay in story.overlays)
+              StoryOverlayStatic(
+                overlay: overlay,
+                canvasSize: canvas,
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _deleteCurrentStory() async {
     final story = _currentStory;
     if (story == null) return;
@@ -454,6 +616,12 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     }
     final isOwnStory = story.authorUid == _currentUid;
     final width = MediaQuery.of(context).size.width;
+    // Mirror tap/swipe direction in RTL so "tap on the leading edge =
+    // previous, tap on the trailing edge = next". For LTR the leading
+    // edge is the left; for RTL it's the right. Without this the user
+    // tapped the same physical side regardless of locale, which feels
+    // backwards in Arabic / Kurdish layouts.
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     final userData = ref.watch(userByUidProvider(story.authorUid)).value;
     final avatarUrl = userData?['avatarUrl'] as String?;
     final username = userData?['username'] as String? ?? story.authorUsername;
@@ -473,7 +641,12 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         body: SafeArea(
           child: GestureDetector(
             onTapUp: (details) {
-              if (details.globalPosition.dx < width / 3) {
+              // Leading-edge third = previous, anywhere else = next.
+              // In RTL the leading edge is the right side of the screen.
+              final tappedLeading = isRtl
+                  ? details.globalPosition.dx > width * 2 / 3
+                  : details.globalPosition.dx < width / 3;
+              if (tappedLeading) {
                 _prev();
               } else {
                 _next();
@@ -487,10 +660,16 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             }
           },
           onHorizontalDragEnd: (details) {
+            // Swipe semantics: leading-direction swipe = next group,
+            // trailing-direction swipe = previous group. Velocity sign
+            // is unaffected by Directionality, so flip the mapping in
+            // RTL to match the user's mental model.
             final v = details.primaryVelocity ?? 0;
-            if (v < -200) {
+            final swipedToNext = isRtl ? v > 200 : v < -200;
+            final swipedToPrev = isRtl ? v < -200 : v > 200;
+            if (swipedToNext) {
               _nextGroup();
-            } else if (v > 200) {
+            } else if (swipedToPrev) {
               _prevGroup();
             }
           },
@@ -498,21 +677,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: story.sharedPostId != null &&
-                          story.sharedPostId!.isNotEmpty
-                      ? _SharedPostStoryView(postId: story.sharedPostId!)
-                      : CachedNetworkImage(
-                          imageUrl: story.imageUrl,
-                          fit: BoxFit.contain,
-                          placeholder: (_, __) => const Center(
-                            child: CircularProgressIndicator(
-                                color: Colors.white),
-                          ),
-                          errorWidget: (_, __, ___) => const Center(
-                            child:
-                                Icon(Icons.broken_image, color: Colors.white),
-                          ),
-                        ),
+                  child: _buildStoryBody(story),
                 ),
                 Positioned(
                   top: 8,
@@ -554,60 +719,123 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                   right: 12,
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => _openAuthorProfile(story.authorUid),
-                        child: Row(
-                          children: [
-                            Hero(
-                              tag: 'story_avatar_${story.authorUid}',
-                              child: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Colors.grey.shade700,
-                                backgroundImage: avatarUrl != null
-                                    ? CachedNetworkImageProvider(
-                                        avatarUrl,
-                                      )
-                                    : null,
-                                child: avatarUrl == null
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 16,
-                                        color: Colors.white70,
-                                      )
-                                    : null,
+                      // Author block: avatar + username on top, timestamp
+                      // stacked underneath. Tap opens the author profile.
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _openAuthorProfile(story.authorUid),
+                          child: Row(
+                            children: [
+                              Hero(
+                                tag: 'story_avatar_${story.authorUid}',
+                                child: CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Colors.grey.shade700,
+                                  backgroundImage: avatarUrl != null
+                                      ? CachedNetworkImageProvider(avatarUrl)
+                                      : null,
+                                  child: avatarUrl == null
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 18,
+                                          color: Colors.white70,
+                                        )
+                                      : null,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              username,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      username,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      context.t.timeAgo(story.createdAt),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.75),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              context.t.timeAgo(story.createdAt),
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      if (isOwnStory)
-                        IconButton(
-                          onPressed: _deleteCurrentStory,
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.white,
+                            ],
                           ),
                         ),
+                      ),
                       IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => _openShareSheet(story),
+                        tooltip: context.t.share,
+                        icon: const Icon(
+                          Icons.ios_share,
+                          color: Colors.white,
+                        ),
+                      ),
+                      // Three-dot overflow menu. For own stories, Delete
+                      // lives in here so the header isn't cluttered. The
+                      // dedicated X button is gone — the back gesture
+                      // (swipe down / system back) closes the viewer.
+                      PopupMenuButton<String>(
+                        tooltip: '',
+                        icon: const Icon(Icons.more_vert,
+                            color: Colors.white),
+                        color: Colors.black87,
+                        onSelected: (v) {
+                          if (v == 'delete') _deleteCurrentStory();
+                          if (v == 'close') Navigator.pop(context);
+                        },
+                        itemBuilder: (_) => [
+                          if (isOwnStory)
+                            PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.delete_outline,
+                                      color: Color(0xFFEF476F), size: 20),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    context.t.delete,
+                                    style: const TextStyle(
+                                      color: Color(0xFFEF476F),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          PopupMenuItem<String>(
+                            value: 'close',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.close,
+                                    color: Colors.white, size: 20),
+                                const SizedBox(width: 12),
+                                Text(
+                                  context.t.close,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1100,18 +1328,37 @@ class _StoryReplyComposer extends StatelessWidget {
     // are fully circular regardless of how tall the input grows. Using
     // a fixed large radius (e.g. 28) looked square once the heart icon
     // pushed the row to ~52px tall.
+    // The story viewer is always rendered on a dark backdrop (the story
+    // image / shared-post card). The reply pill therefore uses fixed
+    // light-on-translucent-dark styling regardless of the app's
+    // light/dark theme — otherwise the global InputDecorationTheme
+    // (filled = true, light grey fillColor) leaked through and produced
+    // a milky-white rectangle inside the pill on light mode that hid
+    // the user's typed text. Pinning `filled: false` and explicit white
+    // text/hint colors guarantees readability either way.
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      constraints: const BoxConstraints(minHeight: 54),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: ShapeDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
+        color: Colors.black.withValues(alpha: 0.55),
         shape: StadiumBorder(
           side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.22),
+            color: Colors.white.withValues(alpha: 0.25),
           ),
         ),
+        shadows: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
+        // Bottom-align icons so the pill grows upward as the input
+        // adds new lines — the heart and send stay anchored next to
+        // the last visible row of text instead of floating in space.
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Heart on the left — toggles the story-level like only. Does
           // NOT DM the author; that was the old reactions behavior the
@@ -1127,8 +1374,8 @@ class _StoryReplyComposer extends StatelessWidget {
                   onHeartTap();
                 },
                 child: Container(
-                  width: 40,
-                  height: 40,
+                  width: 42,
+                  height: 42,
                   alignment: Alignment.center,
                   child: Icon(
                     liked ? Icons.favorite : Icons.favorite_border,
@@ -1143,50 +1390,86 @@ class _StoryReplyComposer extends StatelessWidget {
             child: TextField(
               controller: controller,
               focusNode: focusNode,
+              cursorColor: Colors.white,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSend(),
+              // Multi-line: user can press Enter for a newline; send is
+              // the explicit purple button on the right. Keyboard shows
+              // the newline action instead of "Send" because Send would
+              // otherwise dismiss the input mid-thought.
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              maxLines: 5,
+              minLines: 1,
               decoration: InputDecoration(
                 isDense: true,
+                filled: false,
+                fillColor: Colors.transparent,
                 hintText: context.t.storyReplyPrivatelyHint,
                 hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 14,
                 ),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
                 contentPadding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
               ),
             ),
           ),
           const SizedBox(width: 6),
-          GestureDetector(
-            onTap: sending ? null : () => onSend(),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: sending
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : const Color(0xFFB05ECC),
-                shape: BoxShape.circle,
+          AnimatedScale(
+            duration: const Duration(milliseconds: 150),
+            scale: sending ? 0.92 : 1.0,
+            child: GestureDetector(
+              onTap: sending ? null : () => onSend(),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: sending
+                      ? null
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFCE5DE5), Color(0xFFB05ECC)],
+                        ),
+                  color: sending
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : null,
+                  shape: BoxShape.circle,
+                  boxShadow: sending
+                      ? const []
+                      : [
+                          BoxShadow(
+                            color: const Color(0xFFB05ECC)
+                                .withValues(alpha: 0.45),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                ),
+                child: sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.send_rounded,
+                        color: Colors.white, size: 20),
               ),
-              child: sending
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.send, color: Colors.white, size: 18),
             ),
           ),
         ],
@@ -1299,6 +1582,7 @@ class _SharedPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasImage = post.imageUrls.isNotEmpty;
+    final hasVideo = !hasImage && post.videoUrls.isNotEmpty;
     final caption = post.caption.trim();
 
     return Container(
@@ -1361,6 +1645,35 @@ class _SharedPostCard extends StatelessWidget {
                 errorWidget: (_, __, ___) =>
                     Container(color: context.surfaceSoft),
               ),
+            )
+          else if (hasVideo)
+            // Video-only posts have no still image — show a dark tile
+            // with a centered play icon so the story still has a media
+            // affordance. The user can tap the card to open the post and
+            // play the actual video.
+            AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                color: Colors.black,
+                alignment: Alignment.center,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+              ),
             ),
           if (caption.isNotEmpty)
             Padding(
@@ -1396,6 +1709,315 @@ class _SharedPostCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Story share sheet — add to my story / send to friends / share via apps
+// ─────────────────────────────────────────────
+
+class _StoryShareSheet extends ConsumerWidget {
+  final Story story;
+  final Future<void> Function() onAddToMyStory;
+  final Future<void> Function() onShareExternally;
+  final Future<void> Function(
+      String chatId, String otherUid, String title) onSendToChat;
+
+  const _StoryShareSheet({
+    required this.story,
+    required this.onAddToMyStory,
+    required this.onShareExternally,
+    required this.onSendToChat,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  context.t.share,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+            // Quick action row: add-to-my-story + share-via-apps.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ShareAction(
+                      icon: Icons.add_circle_outline,
+                      label: context.t.addToStory,
+                      onTap: onAddToMyStory,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ShareAction(
+                      icon: Icons.ios_share,
+                      label: context.t.share,
+                      onTap: onShareExternally,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: context.borderColor),
+            // Friends / recent chats — tap to DM the story.
+            Expanded(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final inbox = ref.watch(acceptedInboxProvider);
+                  return inbox.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) =>
+                        Center(child: Text(context.t.errorWithMessage(e))),
+                    data: (chats) {
+                      if (chats.isEmpty) {
+                        return Center(child: Text(context.t.noChatsYet));
+                      }
+                      return ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        itemCount: chats.length,
+                        separatorBuilder: (_, __) =>
+                            Divider(height: 1, color: context.borderColor),
+                        itemBuilder: (context, i) {
+                          final c = chats[i];
+                          final title =
+                              c.isGroup ? c.groupName : c.otherUsername;
+                          final avatar = c.isGroup
+                              ? c.groupAvatarUrl
+                              : c.otherAvatarUrl;
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: context.inputFill,
+                              backgroundImage: avatar.isNotEmpty
+                                  ? CachedNetworkImageProvider(avatar)
+                                  : null,
+                              child: avatar.isEmpty
+                                  ? Icon(
+                                      c.isGroup
+                                          ? Icons.group
+                                          : Icons.person,
+                                      color: context.textSecondary,
+                                    )
+                                  : null,
+                            ),
+                            title: Text(
+                              title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            trailing: const Icon(Icons.send,
+                                color: AppColors.purple),
+                            onTap: () =>
+                                onSendToChat(c.chatId, c.otherUid, title),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShareAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Future<void> Function() onTap;
+  const _ShareAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+        decoration: BoxDecoration(
+          color: context.inputFill,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: context.purpleSoft,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: AppColors.purple, size: 22),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: context.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Video story player — auto-plays an inline video story on loop while
+// the viewer is on that story. The progress ring in [StoryViewerScreen]
+// still advances on its own 5s timer; we don't sync the two here.
+// ─────────────────────────────────────────────
+
+class _VideoStoryPlayer extends StatefulWidget {
+  final String url;
+  const _VideoStoryPlayer({super.key, required this.url});
+
+  @override
+  State<_VideoStoryPlayer> createState() => _VideoStoryPlayerState();
+}
+
+class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setup();
+  }
+
+  Future<void> _setup() async {
+    try {
+      final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      await c.initialize();
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
+      _controller = c;
+      await c.setLooping(true);
+      await c.play();
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) {
+      return const Center(
+        child: Icon(Icons.broken_image, color: Colors.white),
+      );
+    }
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+    return Center(
+      child: AspectRatio(
+        aspectRatio: c.value.aspectRatio,
+        child: VideoPlayer(c),
+      ),
+    );
+  }
+}
+
+/// Background + centered text for a text-only story. Matches the look of
+/// the [TextStoryComposerScreen] preview, including the optional text
+/// border / shape selected at compose time.
+class _TextStoryBackground extends StatelessWidget {
+  final String text;
+  final Color backgroundColor;
+  final Color textColor;
+  final String borderStyle;
+
+  const _TextStoryBackground({
+    required this.text,
+    required this.backgroundColor,
+    required this.textColor,
+    this.borderStyle = 'none',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textWidget = Text(
+      text,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: textColor,
+        fontSize: 28,
+        height: 1.25,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    return Container(
+      color: backgroundColor,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 80),
+      child: StoryTextShape(
+        style: borderStyle,
+        bg: backgroundColor,
+        textColor: textColor,
+        child: textWidget,
       ),
     );
   }

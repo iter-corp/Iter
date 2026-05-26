@@ -1096,24 +1096,6 @@ class AdminService {
       'createdByUid': creatorUid,
     });
 
-    // Auto-create the matching event group chat so the admin sees it in
-    // their inbox immediately, before any registrations are approved.
-    // Best-effort: if rules reject (e.g. org_admin without the matching
-    // rule deployed) we still want the event itself to exist.
-    final adminUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (adminUid.isNotEmpty) {
-      try {
-        await _db.collection('eventChats').doc(ref.id).set({
-          'eventId': ref.id,
-          'eventTitle': title,
-          'adminUid': adminUid,
-          'createdAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } catch (e) {
-        debugPrint('[admin-event] eventChat seed failed (non-fatal): $e');
-      }
-    }
-
     // Spark-plan stand-in for the `onEventCreate` Cloud Function: fan the
     // `new_event` notification out to matching users right here, from the
     // admin's device. Best-effort — a failure here mustn't fail event

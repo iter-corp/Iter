@@ -1166,20 +1166,31 @@ List<Post> _filterQaPosts(
   if (q.isEmpty) return posts;
 
   return posts.where((post) {
-    final question = post.caption.toLowerCase();
-    return question.contains(q) || answerMatches.contains(post.id);
+    if (_postMatchesQuery(post, q)) return true;
+    return answerMatches.contains(post.id);
   }).toList();
 }
 
-/// Filters the main feed by post caption text. Case-insensitive
-/// substring match; an empty query returns the list unchanged.
+/// Filters the main feed by post caption text or location. A query like
+/// "Paris" surfaces every post whose city/place is Paris even when the
+/// caption never mentions it.
 List<Post> _filterFeedPosts(List<Post> posts, String query) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return posts;
 
-  return posts
-      .where((post) => post.caption.toLowerCase().contains(q))
-      .toList();
+  return posts.where((post) => _postMatchesQuery(post, q)).toList();
+}
+
+/// True if [post] matches [q]. Caption, place name, and city are all
+/// candidates so a city search on Travel ("Erbil") surfaces every post
+/// tagged with that location regardless of caption wording.
+bool _postMatchesQuery(Post post, String q) {
+  if (post.caption.toLowerCase().contains(q)) return true;
+  final place = post.postPlaceName?.toLowerCase();
+  if (place != null && place.contains(q)) return true;
+  final city = post.postPlaceCity?.toLowerCase();
+  if (city != null && city.contains(q)) return true;
+  return false;
 }
 
 /// One row in the global (all-tabs) search result list. Carries the

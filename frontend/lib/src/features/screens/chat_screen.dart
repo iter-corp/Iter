@@ -32,6 +32,7 @@ import '../../providers/reaction_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/reaction_service.dart';
 import '../../services/storage_service.dart';
+import '../../services/story_service.dart';
 import '../../services/translate_service.dart';
 import '../../utils/app_feedback.dart';
 import '../../utils/maps_links.dart';
@@ -42,6 +43,7 @@ import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
+import 'story_viewer_screen.dart';
 import '../widgets/sticker_picker_sheet.dart';
 
 // Pick a text direction from the first strong-directional codepoint in
@@ -2692,6 +2694,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                   _StoryReplyBanner(
                                     isMe: isMe,
                                     storyImageUrl: msg.storyImageUrl,
+                                    storyId: msg.storyId!,
                                   ),
                                 if (hasVoice)
                                   _VoiceMessageBubble(
@@ -3802,75 +3805,118 @@ class _MessageStatusIcon extends StatelessWidget {
 }
 
 /// Header rendered at the top of a message bubble when the message was sent
-/// in response to a story. Shows a thin "Replied to story" line and, when
-/// the original story image URL is available, a tiny rounded thumbnail so
-/// the recipient knows exactly which story prompted the reply/reaction.
-class _StoryReplyBanner extends StatelessWidget {
+/// in response to (or shared as) a story. Shows a thin label + a tiny
+/// thumbnail when available; tap to open the underlying story doc.
+class _StoryReplyBanner extends ConsumerWidget {
   final bool isMe;
   final String? storyImageUrl;
+  final String storyId;
   const _StoryReplyBanner({
     required this.isMe,
     this.storyImageUrl,
+    required this.storyId,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final fg =
         isMe ? Colors.white.withValues(alpha: 0.85) : const Color(0xFFB05ECC);
     final bg = isMe
         ? Colors.white.withValues(alpha: 0.15)
         : Colors.black.withValues(alpha: 0.05);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border(
-          left: BorderSide(color: fg, width: 3),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openStory(context, ref),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border(
+            left: BorderSide(color: fg, width: 3),
+          ),
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (storyImageUrl != null && storyImageUrl!.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: CachedNetworkImage(
-                imageUrl: storyImageUrl!,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (storyImageUrl != null && storyImageUrl!.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: CachedNetworkImage(
+                  imageUrl: storyImageUrl!,
+                  width: 28,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    width: 28,
+                    height: 36,
+                    color: Colors.black12,
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 28,
+                    height: 36,
+                    color: Colors.black26,
+                    child: Icon(Icons.broken_image, size: 14, color: fg),
+                  ),
+                ),
+              )
+            else
+              Container(
                 width: 28,
                 height: 36,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  width: 28,
-                  height: 36,
-                  color: Colors.black12,
+                decoration: BoxDecoration(
+                  color: fg.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                errorWidget: (_, __, ___) => Container(
-                  width: 28,
-                  height: 36,
-                  color: Colors.black26,
-                  child: Icon(Icons.broken_image, size: 14, color: fg),
+                alignment: Alignment.center,
+                child: Icon(Icons.auto_stories, size: 16, color: fg),
+              ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                context.t.sharedAStory,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-            )
-          else
-            Icon(Icons.auto_stories, size: 14, color: fg),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              context.t.repliedToStory,
-              style: TextStyle(
-                color: fg,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  /// Fetches the story doc by id and opens the story viewer for it.
+  /// Stories expire after 24 h; if the doc is gone we surface a snack
+  /// rather than failing silently.
+  Future<void> _openStory(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final t = context.t;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('stories')
+          .doc(storyId)
+          .get();
+      if (!doc.exists) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(t.storyUnavailable)),
+        );
+        return;
+      }
+      final story = Story.fromDoc(doc);
+      if (!context.mounted) return;
+      await openStoryViewer(context, [
+        [story]
+      ], 0);
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(t.storyUnavailable)),
+      );
+    }
   }
 }
 

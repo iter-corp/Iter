@@ -70,6 +70,8 @@ class AppStrings {
   String get noInternet => _get('no_internet');
   String get send => _get('send');
   String get share => _get('share');
+  String get on => _get('switch_on');
+  String get off => _get('switch_off');
   String get report => _get('report');
   String get block => _get('block');
   String get unblock => _get('unblock');
@@ -286,6 +288,9 @@ class AppStrings {
   String get translated => _get('translated');
   String get showOriginal => _get('show_original');
   String get savedTranslations => _get('saved_translations');
+  String get savedTranslationsSignInPrompt =>
+      _get('saved_translations_sign_in_prompt');
+  String get savedTranslationsEmpty => _get('saved_translations_empty');
   String get seeTranslation => _get('see_translation');
   // ── Translate screen (input/output UI strings) ──
   String get translateEnterText => _get('translate_enter_text');
@@ -396,6 +401,9 @@ class AppStrings {
   // ──────────────────────────────────────────────────────────────
   String get homeFeed => _get('home_feed');
   String get homeTravelShort => _get('home_travel_short');
+  String get homeModeFeedSubtitle => _get('home_mode_feed_subtitle');
+  String get homeModeTravelSubtitle => _get('home_mode_travel_subtitle');
+  String get homeModeDiscussSubtitle => _get('home_mode_discuss_subtitle');
   String get homeTravelMode => _get('home_travel_mode');
   String get homeDiscuss => _get('home_discuss');
   String homeErrorPrefix(Object error) =>
@@ -696,9 +704,13 @@ class AppStrings {
   String get images => _get('images');
   String get links => _get('links');
   String get voices => _get('voices');
+  String get files => _get('files');
   String get noImagesShared => _get('no_images_shared');
   String get noLinksShared => _get('no_links_shared');
   String get noVoiceMessages => _get('no_voice_messages');
+  String get noFilesShared => _get('no_files_shared');
+  String get openFile => _get('open_file');
+  String get unknownFile => _get('unknown_file');
   String get saveToGallery => _get('save_to_gallery');
   String get forwardToAnotherChat => _get('forward_to_another_chat');
   String get saving => _get('saving');
@@ -754,6 +766,10 @@ class AppStrings {
   String storyFailedToggleLike(Object error) =>
       _fmt('story_failed_toggle_like', {'error': error});
   String get storyReplySent => _get('story_reply_sent');
+  String storyShared(Object name) => _fmt('story_shared', {'name': name});
+  String get storyShareFailed => _get('story_share_failed');
+  String get sharedAStory => _get('shared_a_story');
+  String get storyUnavailable => _get('story_unavailable');
   String get storySignInToReply => _get('story_sign_in_to_reply');
   String storyFailedSendReply(Object error) =>
       _fmt('story_failed_send_reply', {'error': error});
@@ -777,6 +793,11 @@ class AppStrings {
   String storyFailedPublish(Object error) =>
       _fmt('story_failed_publish', {'error': error});
   String get storyPublish => _get('story_publish');
+  String get textStoryHint => _get('text_story_hint');
+  String get videoStoryTooLong => _get('video_story_too_long');
+  String get storyCreateMenuPhoto => _get('story_create_menu_photo');
+  String get storyCreateMenuVideo => _get('story_create_menu_video');
+  String get storyCreateMenuText => _get('story_create_menu_text');
   String get storyTapToViewPost => _get('story_tap_to_view_post');
   String get storyPhotoPermissionDenied =>
       _get('story_photo_permission_denied');

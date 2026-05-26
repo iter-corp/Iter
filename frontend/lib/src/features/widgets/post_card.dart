@@ -968,11 +968,6 @@ class _PostCardState extends ConsumerState<PostCard>
                                       : null,
                                 ),
                                 title: Text(c.otherUsername),
-                                subtitle: Text(
-                                  c.lastMessage,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
                                 trailing: const Icon(Icons.send,
                                     color: Color(0xFFB05ECC)),
                                 onTap: () async {

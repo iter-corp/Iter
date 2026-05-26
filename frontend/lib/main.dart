@@ -26,6 +26,7 @@ import 'src/services/admin_service.dart';
 import 'src/services/error_report_service.dart';
 import 'src/services/fcm_service.dart';
 import 'src/services/message_cache.dart';
+import 'src/services/presence_service.dart';
 import 'src/theme/app_theme.dart';
 import 'src/utils/responsive.dart';
 
@@ -145,6 +146,7 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   late final StreamSubscription<FcmMessageEvent> _fcmTapSubscription;
   final Set<String> _handledFcmMessageIds = <String>{};
+  final PresenceService _presence = PresenceService();
 
   @override
   void initState() {
@@ -164,6 +166,21 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_configureSystemUi());
+      // Restore the "online" flag after returning from background. The
+      // onDisconnect handler set in PresenceService.setOnline already
+      // flips us back to offline if the socket drops, so we re-register
+      // it here too.
+      final uid = ref.read(authStateProvider).value?.uid;
+      if (uid != null) unawaited(_presence.setOnline(uid));
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      // Mark offline as soon as the user backgrounds the app so other
+      // people stop seeing them as "online" immediately, instead of
+      // waiting for the RTDB onDisconnect to fire on socket close.
+      final uid = ref.read(authStateProvider).value?.uid;
+      if (uid != null) unawaited(_presence.setOffline(uid));
     }
   }
 
@@ -228,8 +245,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
       if (nextUser != null) {
         unawaited(fcmService.init(nextUser.uid));
+        // Mark the user online from the moment they're signed in, so
+        // their inbox tile and 1:1 chat headers show the green dot
+        // even before they navigate into a specific chat.
+        unawaited(_presence.setOnline(nextUser.uid));
       } else if (previousUser != null) {
         unawaited(fcmService.removeToken(previousUser.uid));
+        unawaited(_presence.setOffline(previousUser.uid));
         // Wipe the on-disk message cache so the next user on this
         // device can't see plaintext previews from the signed-out
         // account.

@@ -10,6 +10,7 @@ import '../../l10n/app_strings.dart';
 import '../../services/storage_service.dart';
 import '../../services/story_service.dart';
 import '../../utils/app_feedback.dart';
+import '../widgets/story_text_overlay.dart' show BrushBackground;
 
 class StoryPreviewScreen extends StatefulWidget {
   final File file;
@@ -377,7 +378,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
 enum _StoryFontStyle { classic, bold, italic, mono }
 
-enum _StoryBackgroundStyle { none, filled, translucent }
+enum _StoryBackgroundStyle { none, filled, translucent, brush }
 
 class _StoryTextOverlay {
   final String id;
@@ -471,6 +472,9 @@ BoxDecoration? _backgroundDecorationFor(_StoryTextOverlay o) {
         color: Colors.black.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(8),
       );
+    case _StoryBackgroundStyle.brush:
+      // Drawn by [BrushBackground] separately — no BoxDecoration.
+      return null;
   }
 }
 
@@ -601,27 +605,37 @@ class _OverlayWidgetState extends State<_OverlayWidget> {
                   widget.onDragUpdate(details.focalPoint);
                 },
                 onScaleEnd: (_) => widget.onDragEnd(),
-                child: Container(
-                  // Constrain to most of the canvas width before rotation
-                  // so very long text wraps instead of overflowing.
-                  constraints: BoxConstraints(
-                    maxWidth: widget.canvasSize.width * 0.85,
-                  ),
-                  padding: o.backgroundStyle == _StoryBackgroundStyle.none
-                      ? EdgeInsets.zero
-                      : const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                  // Active selection is shown via a soft outer halo
-                  // (boxShadow) rather than a border, so the rendered
-                  // shape is identical whether selected or not — and
-                  // therefore identical to the composer preview.
-                  decoration: _selectionDecoration(o, widget.isActive),
-                  child: Text(
-                    o.text,
-                    textAlign: o.alignment,
-                    style: textStyle,
-                  ),
-                ),
+                child: o.backgroundStyle == _StoryBackgroundStyle.brush
+                    ? ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: widget.canvasSize.width * 0.85,
+                        ),
+                        child: BrushBackground(
+                          color: Colors.black,
+                          child: Text(
+                            o.text,
+                            textAlign: o.alignment,
+                            style: textStyle.copyWith(color: Colors.white),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        constraints: BoxConstraints(
+                          maxWidth: widget.canvasSize.width * 0.85,
+                        ),
+                        padding:
+                            o.backgroundStyle == _StoryBackgroundStyle.none
+                                ? EdgeInsets.zero
+                                : const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                        decoration:
+                            _selectionDecoration(o, widget.isActive),
+                        child: Text(
+                          o.text,
+                          textAlign: o.alignment,
+                          style: textStyle,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -711,6 +725,8 @@ class _TextComposerScreenState extends State<_TextComposerScreen> {
         return Icons.format_color_fill;
       case _StoryBackgroundStyle.translucent:
         return Icons.opacity;
+      case _StoryBackgroundStyle.brush:
+        return Icons.brush;
     }
   }
 
@@ -843,7 +859,27 @@ class _TextComposerScreenState extends State<_TextComposerScreen> {
                                 maxWidth:
                                     MediaQuery.of(context).size.width * 0.85,
                               ),
-                              child: Container(
+                              child: _backgroundStyle ==
+                                      _StoryBackgroundStyle.brush
+                                  ? BrushBackground(
+                                      color: Colors.black,
+                                      child: TextField(
+                                        controller: _controller,
+                                        autofocus: true,
+                                        maxLines: null,
+                                        textAlign: _alignment,
+                                        cursorColor: Colors.white,
+                                        style: _textStyleFor(preview)
+                                            .copyWith(color: Colors.white),
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          isCollapsed: true,
+                                          hintText: '',
+                                        ),
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    )
+                                  : Container(
                                 padding: _backgroundStyle ==
                                         _StoryBackgroundStyle.none
                                     ? EdgeInsets.zero

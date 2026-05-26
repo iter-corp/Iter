@@ -77,6 +77,7 @@ class _EventNotificationsSettingsScreenState
       await ref.read(userServiceProvider).setEventNotifPrefs(uid, _prefs);
       if (mounted) {
         AppFeedback.showSuccess(context, context.t.eventNotifSaved);
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
@@ -217,27 +218,94 @@ class _EventNotificationsSettingsScreenState
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Container(
+    // Light up the whole card when ON: tinted background, brand-colored
+    // border, and a filled bell icon. The bare Switch thumb on its own
+    // wasn't a strong enough signal on Android in light mode — users
+    // missed the on/off state.
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
+        color: value
+            ? AppColors.purple.withValues(alpha: 0.10)
+            : context.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value
+              ? AppColors.purple.withValues(alpha: 0.55)
+              : context.borderColor,
+          width: value ? 1.4 : 1,
+        ),
+        boxShadow: value
+            ? [
+                BoxShadow(
+                  color: AppColors.purple.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
-        activeThumbColor: AppColors.purple,
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: context.textPrimary,
+        activeThumbColor: Colors.white,
+        activeTrackColor: AppColors.purple,
+        inactiveThumbColor: context.textSecondary,
+        inactiveTrackColor: context.inputFill,
+        secondary: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: value ? AppColors.purple : context.inputFill,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            value ? Icons.notifications_active : Icons.notifications_off,
+            color: value ? Colors.white : context.textSecondary,
+            size: 20,
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: context.textSecondary),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: value ? AppColors.purple : context.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: value
+                    ? AppColors.purple
+                    : context.textSecondary.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                value ? context.t.on : context.t.off,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: value ? Colors.white : context.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            subtitle,
+            style: TextStyle(fontSize: 12, color: context.textSecondary),
+          ),
         ),
       ),
     );

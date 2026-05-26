@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
@@ -11,6 +12,8 @@ import '../widgets/feature_disabled_view.dart';
 import 'add_to_story_screen.dart';
 import 'create_post_screen.dart';
 import 'story_preview_screen.dart';
+import 'text_story_composer_screen.dart';
+import 'video_story_preview_screen.dart';
 
 /// Distinguishes the two camera-setup failure modes so the message can be
 /// localized at render time (the async setup code has no BuildContext).
@@ -57,11 +60,25 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive) {
-      c.dispose();
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      // Drop the reference BEFORE disposing so any rebuild while the
+      // app is suspended sees `_controller == null` and renders the
+      // spinner instead of CameraPreview(disposedController), which
+      // trips a "used after dispose" assertion and paints a red error
+      // screen for a frame.
+      if (c != null) {
+        _controller = null;
+        _initFuture = null;
+        if (mounted) setState(() {});
+        // Fire-and-forget dispose; awaiting blocks the lifecycle
+        // callback, which Android doesn't like.
+        c.dispose();
+      }
     } else if (state == AppLifecycleState.resumed) {
-      _setupCamera();
+      if (_controller == null) _setupCamera();
     }
   }
 
@@ -98,9 +115,16 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
   Future<void> _flipCamera() async {
     if (_cameras.length < 2) return;
     _activeCamera = (_activeCamera + 1) % _cameras.length;
-    await _controller?.dispose();
+    // Clear the reference BEFORE awaiting dispose so any rebuild
+    // happening during the await renders the spinner branch rather
+    // than feeding a half-disposed controller to CameraPreview.
+    final old = _controller;
     _controller = null;
-    setState(() {});
+    _initFuture = null;
+    if (mounted) setState(() {});
+    try {
+      await old?.dispose();
+    } catch (_) {}
     await _setupCamera();
   }
 
@@ -161,6 +185,52 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
     }
   }
 
+  Future<void> _openTextStory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TextStoryComposerScreen()),
+    );
+  }
+
+  Future<void> _pickVideoFromGallery() async {
+    if (_uploading) return;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickVideo(
+        source: ImageSource.gallery,
+        // Stories are short — hint to the system picker (Android cropper) so
+        // users don't pick a movie-length clip. Hard cap is enforced again
+        // on the preview screen.
+        maxDuration: const Duration(seconds: 30),
+      );
+      if (picked == null) return;
+      // Verify the cached copy actually exists before pushing the
+      // preview screen. On some Android devices the system picker
+      // returns a path under cache/ that's evicted between pick and
+      // read, so the preview screen would otherwise face a missing
+      // file and fail to init.
+      final file = File(picked.path);
+      if (!await file.exists() || (await file.length()) == 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.cameraCaptureFailed('empty file'))),
+        );
+        return;
+      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoStoryPreviewScreen(file: file),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.t.cameraCaptureFailed(e))),
+      );
+    }
+  }
+
   void _onTabSelected(int index) {
     switch (index) {
       case 0:
@@ -207,6 +277,16 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
                     onTap: () => Navigator.pop(context),
                   ),
                   const Spacer(),
+                  _CircleButton(
+                    icon: Icons.text_fields_rounded,
+                    onTap: _openTextStory,
+                  ),
+                  const SizedBox(width: 10),
+                  _CircleButton(
+                    icon: Icons.videocam_outlined,
+                    onTap: _pickVideoFromGallery,
+                  ),
+                  const SizedBox(width: 10),
                   _CircleButton(
                     icon: _flashIcon,
                     onTap: _cycleFlash,
