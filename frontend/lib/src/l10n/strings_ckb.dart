@@ -191,6 +191,8 @@ const Map<String, String> ckbStrings = {
   'notifications': 'ئاگادارکردنەوەکان',
   'no_notifications': 'هیچ ئاگادارکردنەوەیەک نییە هێشتا',
   'mark_all_read': 'دیاریکردنی هەمووی وەک خوێندراوە',
+  'comment_edit_blocked_profanity':
+      'ناتوانرێت نوێ بکرێتەوە — دەستکارییەکە وشەی نەگونجاوی تێدایە. کۆمێنتە کۆنەکە وەک خۆی دەمێنێتەوە.',
   'notif_mark_as_read': 'وەک خوێندراوە دیاریبکە',
   'notif_group_today': 'ئەمڕۆ',
   'notif_group_yesterday': 'دوێنێ',
@@ -708,6 +710,7 @@ const Map<String, String> ckbStrings = {
   'notif_started_following': '{username} دەستی کرد بە فۆڵۆوکردنت',
   'notif_requested_to_follow': '{username} داوای کرد فۆڵۆوت بکات',
   'notif_liked_your_post': '{username} لایکی پۆستەکەی کردی',
+  'notif_reposted_your_post': '{username} پۆستەکەتی ڕیپۆست کردەوە',
   'notif_liked_your_comment': '{username} لایکی کۆمێنتەکەی کردی',
   'notif_commented_on_post': '{username} کۆمێنتی لەسەر پۆستەکەت نووسی',
   'notif_replied_to_comment': '{username} وەڵامی کۆمێنتەکەی دایتەوە',

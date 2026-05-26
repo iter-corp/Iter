@@ -670,6 +670,11 @@ class _NotificationItem extends ConsumerWidget {
             trailingType = NotificationType.image;
             isLike = true;
             break;
+          case 'repost':
+            title = context.t.notifRepostedYourPost(username);
+            subtitle = context.t.timeAgo(notif.createdAt);
+            trailingType = NotificationType.image;
+            break;
           case 'comment':
             title = context.t.notifCommentedOnPost(username);
             subtitle = context.t.timeAgo(notif.createdAt);
@@ -763,6 +768,7 @@ class _NotificationItem extends ConsumerWidget {
                 notif.type == 'comment' ||
                 notif.type == 'comment_like' ||
                 notif.type == 'reply' ||
+                notif.type == 'repost' ||
                 notif.type == 'qa_answer' ||
                 notif.type == 'qa_reply' ||
                 notif.type == 'qa_answer_like' ||
@@ -841,6 +847,7 @@ class _NotificationItem extends ConsumerWidget {
         );
         break;
       case 'like':
+      case 'repost':
       case 'comment':
       case 'reply':
       case 'qa_answer':

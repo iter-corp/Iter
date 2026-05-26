@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/comment_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
@@ -1739,11 +1740,21 @@ class _QaThreadCard extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _QaMeta(
-                      icon: Icons.chat_bubble_outline,
-                      label: context.t.homeAnswersCount(post.commentsCount),
-                      onTap: openThread,
-                    ),
+                    // Live answer count from the subcollection — keeps
+                    // the chip in sync with reality on legacy posts
+                    // whose cached `commentsCount` drifted negative.
+                    Consumer(builder: (context, ref, _) {
+                      final live = ref
+                              .watch(commentsCountProvider(post.id))
+                              .asData
+                              ?.value ??
+                          (post.commentsCount < 0 ? 0 : post.commentsCount);
+                      return _QaMeta(
+                        icon: Icons.chat_bubble_outline,
+                        label: context.t.homeAnswersCount(live),
+                        onTap: openThread,
+                      );
+                    }),
                     _QaMeta(
                       icon: isLiked ? Icons.favorite : Icons.favorite_border,
                       label: context.t.homeHelpfulCount(post.likesCount),

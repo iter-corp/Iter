@@ -816,7 +816,7 @@ class _UserQaActivitySectionState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$time • ${context.t.homeAnswersCount(p.commentsCount)}',
+                              '$time • ${context.t.homeAnswersCount(p.commentsCount < 0 ? 0 : p.commentsCount)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.textSecondary,

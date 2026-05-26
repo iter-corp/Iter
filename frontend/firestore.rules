@@ -219,7 +219,16 @@ service cloud.firestore {
         match /items/{commentId} {
           allow read: if isSelf(uid) || isAdmin();
           allow create: if isSelf(uid) && request.resource.data.authorUid == request.auth.uid;
-          allow update: if false;
+          // Owner can edit the text of their own sender-only comment.
+          // Only `text` and `editedAt` may change; `authorUid` and
+          // profanity flags stay put.
+          allow update: if isSelf(uid) &&
+            resource.data.authorUid == request.auth.uid &&
+            request.resource.data.authorUid == resource.data.authorUid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'text',
+              'editedAt'
+            ]);
           allow delete: if isSelf(uid) || isAdmin();
         }
       }

@@ -6,6 +6,16 @@ import 'package:flutter/foundation.dart';
 import 'notification_service.dart';
 import 'profanity_filter_service.dart';
 
+/// Thrown by [CommentService.editComment] when the new text would
+/// introduce profanity into a comment that was previously clean.
+/// Callers should treat this as a user-fixable error (show a snackbar
+/// telling the author the edit was rejected) — not a service crash.
+class ProfanityEditRejected implements Exception {
+  const ProfanityEditRejected();
+  @override
+  String toString() => 'ProfanityEditRejected';
+}
+
 class Comment {
   final String id;
   final String authorUid;
@@ -89,6 +99,15 @@ class CommentService {
     String commentId,
   ) =>
       _comments(postId).doc(commentId).collection('reactions');
+
+  /// Live count of *public* comments / answers on [postId]. This is
+  /// what the QA cards and the answer count badge should display —
+  /// counting straight from the subcollection means the number is
+  /// always in sync with reality, even on legacy posts whose cached
+  /// `commentsCount` on the post doc drifted into negative territory.
+  Stream<int> streamCommentsCount(String postId) {
+    return _comments(postId).snapshots().map((s) => s.docs.length);
+  }
 
   Stream<List<Comment>> streamComments(
     String postId, {
@@ -272,15 +291,89 @@ class CommentService {
   /// `editedAt` server timestamp so UI can render an "edited" hint if
   /// it wants to. Caller is responsible for authz (UI gates the edit
   /// button to the author).
+  ///
+  /// Re-runs the profanity filter on the new text and migrates the
+  /// comment between the public `comments` path and the per-user
+  /// `privateComments` path as needed so the visibility state matches
+  /// the new content. A sender-only comment whose edit cleans up the
+  /// word is promoted to public; a public comment that picks up a bad
+  /// word is moved to sender-only.
   Future<void> editComment({
     required String postId,
     required String commentId,
     required String newText,
+    bool senderOnly = false,
+    String? currentUid,
   }) async {
-    await _comments(postId).doc(commentId).update({
-      'text': newText,
-      'editedAt': FieldValue.serverTimestamp(),
-    });
+    final trimmed = newText.trim();
+    if (trimmed.isEmpty) return;
+    final matches = await _profanityFilter.findMatches(trimmed);
+    final flagged = matches.isNotEmpty;
+
+    // Sender-only path → may need to PROMOTE to public if the new text
+    // is clean. Either way the existing private doc needs touching.
+    if (senderOnly) {
+      if (currentUid == null || currentUid.isEmpty) {
+        throw ArgumentError('currentUid is required for sender-only edits');
+      }
+      final privateRef =
+          _privateComments(postId, currentUid).doc(commentId);
+      if (flagged) {
+        // Still bad — update in place, keep the flags.
+        await privateRef.update({
+          'text': trimmed,
+          'editedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      // Cleaned up: copy the doc to the public collection, drop the
+      // private copy, bump the post's public comment count.
+      final snap = await privateRef.get();
+      final old = snap.data() ?? {};
+      final publicRef = _comments(postId).doc();
+      final batch = _db.batch();
+      batch.set(publicRef, {
+        'authorUid': old['authorUid'],
+        'authorUsername': old['authorUsername'],
+        'authorAvatar': old['authorAvatar'],
+        'text': trimmed,
+        'createdAt': old['createdAt'] ?? FieldValue.serverTimestamp(),
+        'editedAt': FieldValue.serverTimestamp(),
+        'helpfulCount': old['helpfulCount'] ?? 0,
+        'unhelpfulCount': old['unhelpfulCount'] ?? 0,
+        if (old['parentCommentId'] != null)
+          'parentCommentId': old['parentCommentId'],
+        if (old['replyToUsername'] != null)
+          'replyToUsername': old['replyToUsername'],
+        // profanityFiltered + senderOnly intentionally omitted — the
+        // new doc is public, no flags.
+      });
+      batch.delete(privateRef);
+      batch.update(_postRef(postId),
+          {'commentsCount': FieldValue.increment(1)});
+      await batch.commit();
+      return;
+    }
+
+    // Public path → only allow CLEAN edits. If the new text picks up a
+    // bad word we reject the edit (keep the original visible to all
+    // readers); the author already saw the warning that profanity is
+    // blocked. This intentionally diverges from the addComment flow,
+    // where a brand-new comment can land in the sender-only bucket —
+    // editing a public comment into a flagged one would be a way to
+    // sneak content past readers who already saw the clean version.
+    final publicRef = _comments(postId).doc(commentId);
+    if (!flagged) {
+      await publicRef.update({
+        'text': trimmed,
+        'editedAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+    // Surface the rejection through an exception so the UI can show a
+    // localized snackbar / toast. Callers should treat this as a
+    // user-fixable error, not a service crash.
+    throw const ProfanityEditRejected();
   }
 
   Future<void> deleteComment({

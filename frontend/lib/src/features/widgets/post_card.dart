@@ -517,7 +517,11 @@ class _PostCardState extends ConsumerState<PostCard>
                                           ),
                                           child: _miniIcon(
                                             'assets/icons/Group.svg',
-                                            '${post.commentsCount}',
+                                            // Clamp at 0 — legacy posts
+                                            // sometimes carry a negative
+                                            // cached count; surface 0
+                                            // instead of "-3".
+                                            '${post.commentsCount < 0 ? 0 : post.commentsCount}',
                                           ),
                                         ),
                                         if (repostsEnabled) ...[

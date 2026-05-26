@@ -191,6 +191,8 @@ const Map<String, String> arStrings = {
   'notifications': 'الإشعارات',
   'no_notifications': 'لا توجد إشعارات بعد',
   'mark_all_read': 'تحديد الكل كمقروء',
+  'comment_edit_blocked_profanity':
+      'تعذر التحديث — يحتوي التعديل على كلمات يحظرها مرشحنا. يبقى التعليق الأصلي كما هو.',
   'notif_mark_as_read': 'تحديد كمقروء',
   'notif_group_today': 'اليوم',
   'notif_group_yesterday': 'أمس',
@@ -707,6 +709,7 @@ const Map<String, String> arStrings = {
   'notif_started_following': 'بدأ {username} بمتابعتك',
   'notif_requested_to_follow': 'طلب {username} متابعتك',
   'notif_liked_your_post': 'أعجب {username} بمنشورك',
+  'notif_reposted_your_post': 'أعاد {username} نشر منشورك',
   'notif_liked_your_comment': 'أعجب {username} بتعليقك',
   'notif_commented_on_post': 'علق {username} على منشورك',
   'notif_replied_to_comment': 'رد {username} على تعليقك',

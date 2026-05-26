@@ -250,6 +250,8 @@ class AppStrings {
   String get notifications => _get('notifications');
   String get noNotifications => _get('no_notifications');
   String get markAllRead => _get('mark_all_read');
+  String get commentEditBlockedProfanity =>
+      _get('comment_edit_blocked_profanity');
   String get notifMarkAsRead => _get('notif_mark_as_read');
   // Section headers for the date-grouped notification list.
   String get notifGroupToday => _get('notif_group_today');
@@ -897,6 +899,8 @@ class AppStrings {
       _fmt('notif_liked_your_post', {'username': username});
   String notifLikedYourComment(Object username) =>
       _fmt('notif_liked_your_comment', {'username': username});
+  String notifRepostedYourPost(Object username) =>
+      _fmt('notif_reposted_your_post', {'username': username});
   String notifCommentedOnPost(Object username) =>
       _fmt('notif_commented_on_post', {'username': username});
   String notifRepliedToComment(Object username) =>

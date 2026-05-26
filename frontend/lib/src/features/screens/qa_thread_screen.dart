@@ -386,14 +386,11 @@ class _QuestionCard extends ConsumerWidget {
             const SizedBox(height: 12),
             _EmbeddedPostCard(postId: post.sourcePostId!),
           ],
-          const SizedBox(height: 10),
-          Text(
-            context.t.homeAnswersCount(post.commentsCount),
-            style: TextStyle(
-              fontSize: 12,
-              color: context.textMuted,
-            ),
-          ),
+          // Answer count text removed — the "Answers (N)" badge below
+          // the question card already shows the live count and is the
+          // single source of truth. The duplicate header line was
+          // pulling from the post doc's cached `commentsCount`, which
+          // could be stale or negative on legacy posts.
         ],
       ),
     );
@@ -1268,12 +1265,25 @@ class _AnswerAuthorMenu extends ConsumerWidget {
       ),
     );
     if (updated == null || updated.isEmpty || updated == comment.text) return;
+    final currentUid = ref.read(authStateProvider).value?.uid;
     try {
       await ref.read(commentServiceProvider).editComment(
             postId: postId,
             commentId: comment.id,
             newText: updated,
+            // Sender-only (profanity-flagged) answers live in the
+            // per-user `privateComments` subcollection. Pass the
+            // flag + uid so the service writes to the right path —
+            // otherwise the public-path update fails with a
+            // permission error.
+            senderOnly: comment.senderOnly,
+            currentUid: currentUid,
           );
+    } on ProfanityEditRejected {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.t.commentEditBlockedProfanity)),
+      );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1304,10 +1314,13 @@ class _AnswerAuthorMenu extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
+    final currentUid = ref.read(authStateProvider).value?.uid;
     try {
       await ref.read(commentServiceProvider).deleteComment(
             postId: postId,
             commentId: comment.id,
+            senderOnly: comment.senderOnly,
+            currentUid: currentUid,
           );
     } catch (e) {
       if (!context.mounted) return;

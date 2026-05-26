@@ -747,17 +747,44 @@ class PostService {
     final postRepostRef =
         _posts.doc(postId).collection('reposts').doc(user.uid);
 
+    bool didRepost = false;
     await _db.runTransaction((tx) async {
       final existing = await tx.get(userRepostRef);
       if (existing.exists) {
+        didRepost = false;
         tx.delete(userRepostRef);
         tx.delete(postRepostRef);
       } else {
+        didRepost = true;
         final data = {'createdAt': FieldValue.serverTimestamp()};
         tx.set(userRepostRef, data);
         tx.set(postRepostRef, data);
       }
     });
+
+    // Notify the post's author. Best-effort — failures here mustn't
+    // unwind the repost itself. Deterministic doc id keeps the
+    // repost → un-repost → repost cycle to a single notification.
+    try {
+      final postSnap = await _posts.doc(postId).get();
+      final authorUid = postSnap.data()?['authorUid'] as String?;
+      if (authorUid != null && authorUid.isNotEmpty && authorUid != user.uid) {
+        final notifId = 'repost_${user.uid}_$postId';
+        if (didRepost) {
+          await _notifications.upsertNotification(
+            targetUid: authorUid,
+            docId: notifId,
+            type: 'repost',
+            actorUid: user.uid,
+            targetId: postId,
+          );
+        } else {
+          await _notifications.removeNotificationById(authorUid, notifId);
+        }
+      }
+    } catch (_) {
+      // Swallow — repost succeeded; notifications are best-effort.
+    }
   }
 
   Stream<bool> streamIsReposted(String postId, {String? uid}) {

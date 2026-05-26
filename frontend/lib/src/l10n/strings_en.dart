@@ -195,6 +195,8 @@ const Map<String, String> enStrings = {
   'notifications': 'Notifications',
   'no_notifications': 'No notifications yet',
   'mark_all_read': 'Mark all as read',
+  'comment_edit_blocked_profanity':
+      "Can't update — the edit contains words our filter blocks. The original comment stays as-is.",
   'notif_mark_as_read': 'Mark as read',
   'notif_group_today': 'Today',
   'notif_group_yesterday': 'Yesterday',
@@ -739,6 +741,7 @@ const Map<String, String> enStrings = {
   'notif_started_following': '{username} started following you',
   'notif_requested_to_follow': '{username} requested to follow you',
   'notif_liked_your_post': '{username} liked your post',
+  'notif_reposted_your_post': '{username} reposted your post',
   'notif_liked_your_comment': '{username} liked your comment',
   'notif_commented_on_post': '{username} commented on your post',
   'notif_replied_to_comment': '{username} replied to your comment',
