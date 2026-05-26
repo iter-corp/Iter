@@ -250,6 +250,9 @@ class AppStrings {
   String get notifications => _get('notifications');
   String get noNotifications => _get('no_notifications');
   String get markAllRead => _get('mark_all_read');
+  String get notifMarkAsRead => _get('notif_mark_as_read');
+  String get notifMarkAsUnread => _get('notif_mark_as_unread');
+  String get notifDelete => _get('notif_delete');
   String get newNotification => _get('new_notification');
 
   // ──────────────────────────────────────────────────────────────
@@ -381,6 +384,9 @@ class AppStrings {
       _get('onboarding_gender_non_binary');
   String get onboardingGenderOther => _get('onboarding_gender_other');
   String get onboardingMin3Chars => _get('onboarding_min_3_chars');
+  String get onboardingName => _get('onboarding_name');
+  String get onboardingNameHint => _get('onboarding_name_hint');
+  String get onboardingNameRequired => _get('onboarding_name_required');
   String get onboardingAboutYou => _get('onboarding_about_you');
   String get onboardingOptional => _get('onboarding_optional');
   String get onboardingAboutYouDesc => _get('onboarding_about_you_desc');
@@ -548,6 +554,7 @@ class AppStrings {
   String postCardCouldNotRepost(Object error) =>
       _fmt('post_card_could_not_repost', {'error': error});
   String get postCardSendTo => _get('post_card_send_to');
+  String get postCardSend => _get('post_card_send');
   String get postCardNoConversations => _get('post_card_no_conversations');
   String postCardSharedTo(Object username) =>
       _fmt('post_card_shared_to', {'username': username});
@@ -1169,6 +1176,10 @@ class AppStrings {
   String get adminFieldCountry => _get('admin_field_country');
   String get adminChooseCountry => _get('admin_choose_country');
   String get adminSearchCountry => _get('admin_search_country');
+  String get adminFieldCity => _get('admin_field_city');
+  String get adminChooseCity => _get('admin_choose_city');
+  String get adminSearchCity => _get('admin_search_city');
+  String get adminCityPickCountryFirst => _get('admin_city_pick_country_first');
   String get adminFieldDescription => _get('admin_field_description');
   String get adminDescribeTheEvent => _get('admin_describe_the_event');
   String get adminFieldLink => _get('admin_field_link');

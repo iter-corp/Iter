@@ -34,6 +34,101 @@ class NotificationScreen extends ConsumerStatefulWidget {
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   _NotificationCategory _selectedCategory = _NotificationCategory.activity;
 
+  /// One-shot guard: auto-mark-all-as-read happens exactly once per screen
+  /// mount, on the first frame. Without the guard, [build] could re-trigger
+  /// the bulk update every time the notifications stream emits.
+  bool _autoMarkedRead = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoMarkAllReadOnce();
+    });
+  }
+
+  Future<void> _autoMarkAllReadOnce() async {
+    if (_autoMarkedRead || !mounted) return;
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+    _autoMarkedRead = true;
+    try {
+      await ref.read(notificationServiceProvider).markAllRead(user.uid);
+    } catch (_) {
+      // Best-effort — failure here shouldn't block the user from seeing
+      // the screen. Snapshot will still surface notifications as-is.
+    }
+  }
+
+  Future<void> _showItemActions(AppNotification notif) async {
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(
+                  notif.read
+                      ? Icons.mark_email_unread_outlined
+                      : Icons.mark_email_read_outlined,
+                ),
+                title: Text(
+                  notif.read
+                      ? context.t.notifMarkAsUnread
+                      : context.t.notifMarkAsRead,
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final service = ref.read(notificationServiceProvider);
+                  if (notif.read) {
+                    await service.markUnread(user.uid, notif.id);
+                  } else {
+                    await service.markRead(user.uid, notif.id);
+                  }
+                },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: Text(
+                  context.t.notifDelete,
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ref
+                        .read(notificationServiceProvider)
+                        .deleteNotification(user.uid, notif.id);
+                  } catch (_) {}
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   _NotificationCategory _categoryForType(String type) {
     switch (type) {
       case 'follow':
@@ -147,6 +242,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             /// HEADER
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              // Notifications are auto-marked read on screen open, so the
+              // "Mark all read" button used to live here is gone. Title
+              // wrapped in Expanded with ellipsis for long localized labels
+              // (Kurdish/Arabic translations otherwise overflowed the row).
               child: Row(
                 children: [
                   IconButton(
@@ -154,27 +253,17 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     icon: const Icon(Icons.arrow_back, size: 26),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    context.t.notifications,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (user != null)
-                    TextButton(
-                      onPressed: () => ref
-                          .read(notificationServiceProvider)
-                          .markAllRead(user.uid),
-                      child: Text(
-                        context.t.markAllRead,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFB05ECC),
-                        ),
+                  Expanded(
+                    child: Text(
+                      context.t.notifications,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -288,6 +377,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                   .read(notificationServiceProvider)
                                   .deleteNotification(user.uid, items[i].id)
                               : null,
+                      onLongPress: persistedIds.contains(items[i].id)
+                          ? () => _showItemActions(items[i])
+                          : null,
                     ),
                   );
                 },
@@ -406,11 +498,13 @@ class _NotificationItem extends ConsumerWidget {
   final AppNotification notif;
   final VoidCallback? onMarkRead;
   final VoidCallback? onDelete;
+  final VoidCallback? onLongPress;
 
   const _NotificationItem({
     required this.notif,
     this.onMarkRead,
     this.onDelete,
+    this.onLongPress,
   });
 
   @override
@@ -630,6 +724,9 @@ class _NotificationItem extends ConsumerWidget {
             onMarkRead?.call();
             _navigateToTarget(context, notif);
           },
+          // Long-press reveals per-notification actions: toggle read state
+          // (so users can mark a swept-read item back to unread) and delete.
+          onLongPress: onLongPress,
           child: Opacity(
             opacity: notif.read ? 0.55 : 1.0,
             child: NotificationTile(

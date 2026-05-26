@@ -9,6 +9,7 @@ import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/admin_service.dart';
+import '../../../services/city_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../theme/app_theme.dart';
 
@@ -673,6 +674,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   bool _uploadingImage = false;
   String _eventType = '';
   String _country = '';
+  String _city = '';
   String _funds = '';
   DateTime? _deadlineAt;
 
@@ -690,6 +692,12 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       _imageUrls.addAll(e.imageUrls);
       _eventType = e.eventType;
       _country = e.country.isNotEmpty ? e.country : e.location;
+      // Existing events store "City, Country" in `location` — split that
+      // out so the editor pre-fills the city picker when reopening.
+      final locParts = e.location.split(',');
+      if (locParts.length >= 2) {
+        _city = locParts.first.trim();
+      }
       _funds = e.funds;
       _deadlineAt = e.deadlineAt;
     }
@@ -787,11 +795,18 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     setState(() => _saving = true);
     try {
       final admin = ref.read(adminServiceProvider);
+      // When a city is picked, store the combined "City, Country" string
+      // in `location` so the existing read path (`_eventCity`, the events
+      // list, the card subtitle) keeps surfacing the city without any
+      // model changes. When no city is picked, fall back to just country.
+      final cityTrim = _city.trim();
+      final composedLocation = cityTrim.isEmpty
+          ? _country.trim()
+          : '$cityTrim, ${_country.trim()}';
       final data = <String, dynamic>{
         'title': _titleCtrl.text.trim(),
         'subtitle': _subtitleCtrl.text.trim(),
-        // Location now mirrors country so event cards/details keep one source.
-        'location': _country.trim(),
+        'location': composedLocation,
         'description': _descCtrl.text.trim(),
         'link': _linkCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
@@ -800,6 +815,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         'deadline': _deadlineAt,
         'eventType': _eventType,
         'country': _country,
+        'city': cityTrim,
+        'locationCity': cityTrim.toLowerCase(),
         'funds': _funds,
       };
       if (widget.existing == null) {
@@ -921,12 +938,44 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               selected: _country.isEmpty ? null : _country,
               onChanged: (v) {
                 setState(() {
+                  if (v != _country) _city = '';
                   _country = v;
                   _countryError = null;
                 });
               },
             ),
             if (_countryError != null) _FieldError(text: _countryError!),
+            // City picker — only meaningful once a country is picked. The
+            // option list is derived from `worldCitiesProvider` filtered
+            // down to cities whose `countryName` matches the chosen
+            // country. Optional: leaving it empty stores just the country.
+            Consumer(
+              builder: (context, ref, _) {
+                final hasCountry = _country.trim().isNotEmpty;
+                final cityOptions = hasCountry
+                    ? (ref.watch(worldCitiesProvider).value ?? const [])
+                        .where((c) =>
+                            c.countryName.toLowerCase() ==
+                            _country.trim().toLowerCase())
+                        .map((c) => c.name)
+                        .toSet()
+                        .toList()
+                    : <String>[];
+                cityOptions.sort();
+                return _SearchablePickerField(
+                  placeholder: hasCountry
+                      ? context.t.adminFieldCity
+                      : context.t.adminCityPickCountryFirst,
+                  sheetTitle: context.t.adminChooseCity,
+                  searchHint: context.t.adminSearchCity,
+                  options: cityOptions,
+                  selected: _city.isEmpty ? null : _city,
+                  onChanged: hasCountry
+                      ? (v) => setState(() => _city = v)
+                      : (_) {},
+                );
+              },
+            ),
             _SearchablePickerField(
               placeholder: 'Funds',
               sheetTitle: 'Choose funding status',

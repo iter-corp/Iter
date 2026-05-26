@@ -71,54 +71,64 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
   }
 
   Future<void> _setup() async {
-    // Defensive file checks first: the gallery picker on some Samsung
-    // devices returns a content:// URI that's resolved into a temp file
-    // by image_picker — if the OS evicted the cached copy between pick
-    // and arrival here the file is missing or 0 bytes, and
-    // VideoPlayerController.file() blows up with a cryptic
-    // PlatformException.
+    debugPrint('[VideoStorySetup] === _setup() called ===');
+    debugPrint('[VideoStorySetup] file.path=${widget.file.path}');
+
     try {
-      if (!await widget.file.exists()) {
+      final exists = await widget.file.exists();
+      debugPrint('[VideoStorySetup] file exists=$exists');
+      if (!exists) {
         if (mounted) {
           setState(() => _initError = 'File not found: ${widget.file.path}');
         }
         return;
       }
       final size = await widget.file.length();
+      debugPrint('[VideoStorySetup] file size=$size bytes');
       if (size == 0) {
         if (mounted) setState(() => _initError = 'Empty video file');
         return;
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[VideoStorySetup] file read failed: $e\n$st');
       if (mounted) setState(() => _initError = 'Cannot read file: $e');
       return;
     }
 
     VideoPlayerController? c;
     try {
+      debugPrint('[VideoStorySetup] creating VideoPlayerController.file()');
       c = VideoPlayerController.file(widget.file);
+      debugPrint('[VideoStorySetup] -> controller.initialize()');
       await c.initialize();
+      debugPrint('[VideoStorySetup] <- initialize OK '
+          'duration=${c.value.duration} aspect=${c.value.aspectRatio} '
+          'size=${c.value.size}');
       if (!mounted) {
+        debugPrint('[VideoStorySetup] not mounted post-init, disposing');
         await c.dispose();
         return;
       }
       _controller = c;
       _tooLong = c.value.duration > _maxStoryDuration;
-      // Each player call is wrapped because the controller can be
-      // disposed mid-await if the user backs out fast — without the
-      // try/catch that triggers an unhandled async error.
+      debugPrint('[VideoStorySetup] _tooLong=$_tooLong '
+          'maxDuration=$_maxStoryDuration');
       try {
         await c.setLooping(true);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[VideoStorySetup] setLooping failed: $e');
+      }
       if (!_tooLong) {
         try {
           await c.play();
-        } catch (_) {}
+          debugPrint('[VideoStorySetup] play() OK');
+        } catch (e) {
+          debugPrint('[VideoStorySetup] play() failed: $e');
+        }
       }
       if (mounted) setState(() {});
-    } catch (e) {
-      // Make sure a half-initialized controller is disposed so we don't
-      // leak the underlying media player.
+    } catch (e, st) {
+      debugPrint('[VideoStorySetup] !! init failed: $e\n$st');
       try {
         await c?.dispose();
       } catch (_) {}
@@ -142,27 +152,91 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
   }
 
   Future<void> _publish() async {
-    if (_uploading || _tooLong) return;
+    debugPrint('[VideoStoryPublish] === _publish() called ===');
+    debugPrint('[VideoStoryPublish] state: _uploading=$_uploading '
+        '_tooLong=$_tooLong file=${widget.file.path} '
+        'overlays.count=${_overlays.length}');
+    if (_uploading || _tooLong) {
+      debugPrint('[VideoStoryPublish] ABORT: guard hit '
+          '(_uploading=$_uploading _tooLong=$_tooLong)');
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     setState(() {
       _activeOverlayId = null;
       _uploading = true;
     });
+
+    // Pre-upload file sanity check so we don't blame the network for a
+    // missing/empty file.
     try {
-      final url = await StorageService().uploadStoryVideo(widget.file);
-      await StoryService().createStory(
+      final exists = await widget.file.exists();
+      final size = exists ? await widget.file.length() : -1;
+      debugPrint('[VideoStoryPublish] pre-upload file check: '
+          'exists=$exists size=$size bytes path=${widget.file.path}');
+      if (!exists) {
+        throw Exception('Video file no longer exists at ${widget.file.path}');
+      }
+      if (size == 0) {
+        throw Exception('Video file is empty');
+      }
+    } catch (e, st) {
+      debugPrint('[VideoStoryPublish] pre-upload check failed: $e\n$st');
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
+      return;
+    }
+
+    final uploadStart = DateTime.now();
+    String url;
+    try {
+      debugPrint('[VideoStoryPublish] -> StorageService.uploadStoryVideo()');
+      url = await StorageService().uploadStoryVideo(widget.file);
+      final elapsed = DateTime.now().difference(uploadStart);
+      debugPrint('[VideoStoryPublish] <- upload OK in ${elapsed.inMilliseconds}ms');
+      debugPrint('[VideoStoryPublish] publicUrl=$url');
+    } catch (e, st) {
+      final elapsed = DateTime.now().difference(uploadStart);
+      debugPrint('[VideoStoryPublish] !! upload FAILED after '
+          '${elapsed.inMilliseconds}ms: $e');
+      debugPrint('[VideoStoryPublish] upload stacktrace:\n$st');
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
+      return;
+    }
+
+    final docStart = DateTime.now();
+    try {
+      debugPrint('[VideoStoryPublish] -> StoryService.createStory() '
+          'videoUrl.len=${url.length} overlays=${_overlays.length}');
+      final storyId = await StoryService().createStory(
         imageUrl: '',
         videoUrl: url,
         overlays: _overlays,
       );
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      AppFeedback.showSuccessOn(messenger, context.t.storyPublishedUploaded);
-    } catch (e) {
+      final elapsed = DateTime.now().difference(docStart);
+      debugPrint('[VideoStoryPublish] <- createStory OK in '
+          '${elapsed.inMilliseconds}ms storyId=$storyId');
+    } catch (e, st) {
+      final elapsed = DateTime.now().difference(docStart);
+      debugPrint('[VideoStoryPublish] !! createStory FAILED after '
+          '${elapsed.inMilliseconds}ms: $e');
+      debugPrint('[VideoStoryPublish] createStory stacktrace:\n$st');
       if (!mounted) return;
       setState(() => _uploading = false);
       AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
+      return;
     }
+
+    debugPrint('[VideoStoryPublish] === SUCCESS — popping to root ===');
+    if (!mounted) {
+      debugPrint('[VideoStoryPublish] not mounted after publish, skipping nav');
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    AppFeedback.showSuccessOn(messenger, context.t.storyPublishedUploaded);
   }
 
   Future<void> _addText() async {
@@ -236,7 +310,10 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
 
   void _cancel() {
     if (_uploading) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Pop just this preview so the user returns to the camera screen.
+    // Previously this used popUntil(isFirst) which dumped them back at
+    // home and they'd have to re-enter the add-story flow from scratch.
+    Navigator.of(context).pop();
   }
 
   @override

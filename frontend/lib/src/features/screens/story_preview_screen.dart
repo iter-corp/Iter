@@ -151,7 +151,11 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
   void _cancel() {
     if (_uploading) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Pop just this preview so the user lands back on the camera screen
+    // that pushed it — they probably want to retake the shot, not jump
+    // all the way out to home. (Previously this used popUntil(isFirst)
+    // which kicked the user out of the add-story flow entirely.)
+    Navigator.of(context).pop();
   }
 
   @override

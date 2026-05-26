@@ -36,6 +36,11 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final List<File> _pickedVideos = [];
   bool _isPrivate = false;
   bool _posting = false;
+  // One-shot guard so the "followers-only by default for private
+  // accounts" rule only runs once per screen mount — otherwise the
+  // user couldn't manually flip to Public, because every rebuild
+  // would force the chip back to followers-only.
+  bool _privacyDefaultApplied = false;
   double? _placeLat;
   double? _placeLng;
   bool _placeFromCurrentLocation = false;
@@ -362,6 +367,21 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final user = ref.watch(currentUserDocProvider).value;
     final username = (user?['username'] as String?) ?? '';
     final avatarUrl = user?['avatarUrl'] as String?;
+
+    // First time the user doc resolves: if the account is private,
+    // default this post's audience to followers-only. The user can
+    // still tap the privacy chip to switch to Public for an individual
+    // post — the guard makes sure we don't keep overriding their choice
+    // on every rebuild.
+    if (!_privacyDefaultApplied && user != null) {
+      _privacyDefaultApplied = true;
+      final accountIsPrivate = (user['isPrivate'] as bool?) ?? false;
+      if (accountIsPrivate && !_isPrivate) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _isPrivate = true);
+        });
+      }
+    }
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,

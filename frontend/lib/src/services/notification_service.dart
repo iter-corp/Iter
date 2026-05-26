@@ -85,6 +85,11 @@ class NotificationService {
   Future<void> markRead(String uid, String notifId) =>
       _items(uid).doc(notifId).update({'read': true});
 
+  /// Flip a single notification back to unread. Used by the long-press
+  /// action menu so the user can re-surface something they read.
+  Future<void> markUnread(String uid, String notifId) =>
+      _items(uid).doc(notifId).update({'read': false});
+
   /// Update the status of a notification (e.g. 'accepted', 'rejected')
   Future<void> updateNotificationStatus(
           String uid, String notifId, String status) =>

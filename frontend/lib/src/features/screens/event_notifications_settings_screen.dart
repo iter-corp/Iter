@@ -28,6 +28,19 @@ class _EventNotificationsSettingsScreenState
   bool _hydrated = false;
   bool _saving = false;
 
+  /// Inline search over the country chip list. ~200 countries is too
+  /// many to scroll through one by one, so a search field above the
+  /// chips lets the user jump to the one they want. Selected countries
+  /// stay visible at the top of the filtered list regardless of query.
+  final TextEditingController _countrySearchCtrl = TextEditingController();
+  String _countryQuery = '';
+
+  @override
+  void dispose() {
+    _countrySearchCtrl.dispose();
+    super.dispose();
+  }
+
   void _hydrate(EventNotifPrefs p) {
     if (_hydrated) return;
     _prefs = p;
@@ -168,7 +181,31 @@ class _EventNotificationsSettingsScreenState
                       : context.t.eventNotifCustomCountriesDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                // Inline search field over the country chips. Filters
+                // case-insensitively; selected countries are always
+                // included even when they don't match the query so the
+                // user can deselect them from the same list.
+                TextField(
+                  controller: _countrySearchCtrl,
+                  onChanged: (v) =>
+                      setState(() => _countryQuery = v.trim().toLowerCase()),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintText: context.t.adminSearchCountry,
+                    suffixIcon: _countryQuery.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              _countrySearchCtrl.clear();
+                              setState(() => _countryQuery = '');
+                            },
+                          ),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -178,7 +215,15 @@ class _EventNotificationsSettingsScreenState
                       selected: _allCountries,
                       onSelected: (_) => _selectAllCountries(),
                     ),
-                    ...eventCountries.map((c) {
+                    ...eventCountries.where((c) {
+                      if (_countryQuery.isEmpty) return true;
+                      final isSelected = !_allCountries &&
+                          _prefs.countries.contains(c.toLowerCase());
+                      // Keep selected countries visible regardless of query
+                      // so the user can deselect them without clearing it.
+                      return isSelected ||
+                          c.toLowerCase().contains(_countryQuery);
+                    }).map((c) {
                       final selected = !_allCountries &&
                           _prefs.countries.contains(c.toLowerCase());
                       return _buildFilterChip(

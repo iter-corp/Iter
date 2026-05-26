@@ -6,6 +6,7 @@ import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/story_providers.dart';
 import '../../navigation/user_profile_nav.dart';
+import '../../services/own_story_seen_service.dart';
 import '../../services/story_service.dart';
 import '../../theme/app_theme.dart';
 import '../screens/camera_story_screen.dart';
@@ -129,7 +130,7 @@ class _StoriesListState extends ConsumerState<StoriesList> {
   }
 }
 
-class _MyStoryBubble extends StatelessWidget {
+class _MyStoryBubble extends ConsumerWidget {
   final String? avatarUrl;
   final bool hasStory;
   final List<Story> stories;
@@ -143,34 +144,46 @@ class _MyStoryBubble extends StatelessWidget {
     required this.groupIndex,
   });
 
+  void _openCamera(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CameraStoryScreen()),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Locally-tracked "seen all my own stories" flag. Once true the ring
+    // dims (own stories never count the author as a viewer, so we use
+    // SharedPreferences instead of Firestore for this signal).
+    final ownIds = stories.map((s) => s.id).toList(growable: false);
+    final allSeenAsync = ref.watch(ownStoriesAllSeenProvider(ownIds));
+    final allSeen = allSeenAsync.maybeWhen(data: (v) => v, orElse: () => false);
+    final showRing = hasStory && !allSeen;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Column(
         children: [
-          GestureDetector(
-            onTap: () {
-              if (hasStory) {
-                openStoryViewer(context, allGroups, groupIndex);
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CameraStoryScreen(),
-                  ),
-                );
-              }
-            },
-            child: Stack(
-              alignment: AlignmentDirectional.bottomEnd,
-              children: [
-                Container(
+          Stack(
+            alignment: AlignmentDirectional.bottomEnd,
+            children: [
+              // Avatar — tap opens viewer if a story exists, else camera.
+              GestureDetector(
+                onTap: () {
+                  if (hasStory) {
+                    openStoryViewer(context, allGroups, groupIndex);
+                  } else {
+                    _openCamera(context);
+                  }
+                },
+                child: Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: hasStory
-                        ? Border.all(color: const Color(0xFFB05ECC), width: 2.5)
+                    border: showRing
+                        ? Border.all(
+                            color: const Color(0xFFB05ECC), width: 2.5)
                         : null,
                   ),
                   child: Hero(
@@ -189,19 +202,32 @@ class _MyStoryBubble extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (!hasStory)
-                  Container(
-                    width: 20,
-                    height: 20,
+              ),
+              // The + add button is ALWAYS visible — even after publishing
+              // a story. Tapping it opens the camera so the user can
+              // immediately publish another. (Previously it was hidden
+              // once a story existed, leaving no obvious entry point.)
+              Positioned.directional(
+                textDirection: Directionality.of(context),
+                bottom: 0,
+                end: 0,
+                child: GestureDetector(
+                  onTap: () => _openCamera(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 22,
+                    height: 22,
                     decoration: BoxDecoration(
                       color: const Color(0xFFB05ECC),
                       shape: BoxShape.circle,
                       border: Border.all(color: context.cardBg, width: 2),
                     ),
-                    child: const Icon(Icons.add, color: Colors.white, size: 14),
+                    child:
+                        const Icon(Icons.add, color: Colors.white, size: 14),
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(context.t.yourStory,

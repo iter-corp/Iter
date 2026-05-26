@@ -772,6 +772,18 @@ class PostService {
         .map((s) => s.exists);
   }
 
+  /// Live count of users who reposted this post. The post doc itself
+  /// has no `repostsCount` field — counts are derived from the
+  /// `posts/{id}/reposts` subcollection so they stay in sync with
+  /// transactional add/remove in [toggleRepost].
+  Stream<int> streamRepostsCount(String postId) {
+    return _posts
+        .doc(postId)
+        .collection('reposts')
+        .snapshots()
+        .map((s) => s.docs.length);
+  }
+
   Future<void> toggleSave(String postId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');

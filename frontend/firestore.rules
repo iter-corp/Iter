@@ -126,7 +126,13 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
     match /{path=**}/comments/{commentId} {
-      allow read: if isAdmin();
+      // Per-post path (/posts/{postId}/comments/{id}) handles regular reads.
+      // The collection-group form is also needed for the profile "Answers"
+      // tab — `collectionGroup('comments').where('authorUid', '==', uid)`.
+      // Allow any signed-in user to read their OWN comments via the CG
+      // query; admins keep full read access.
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.authorUid == request.auth.uid);
     }
     match /{path=**}/likes/{likeUid} {
       allow read: if isAdmin();

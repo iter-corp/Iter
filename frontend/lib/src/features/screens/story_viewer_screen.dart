@@ -11,6 +11,7 @@ import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../services/own_story_seen_service.dart';
 import '../../services/story_service.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
@@ -129,6 +130,10 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         }
       });
     _commentFocusNode.addListener(_onReplyFocusChange);
+    // Text changes also gate auto-advance: if the user has typed
+    // anything we treat them as still composing even if focus briefly
+    // bounces (autocomplete strips, picker dialogs etc).
+    _commentController.addListener(_onReplyTextChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_allGroups.isEmpty) {
@@ -140,12 +145,23 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   }
 
   /// Pauses the auto-advance progress when the user focuses the reply
-  /// input (typing a reply) and resumes when they unfocus, so the story
-  /// doesn't move on while they're mid-message.
-  void _onReplyFocusChange() {
+  /// input (typing a reply) and resumes when they unfocus AND the input
+  /// is empty. Without the "and empty" guard the story used to advance
+  /// the instant focus bounced (autocomplete strips, suggestion picker)
+  /// even though the user was still mid-message.
+  void _onReplyFocusChange() => _updateReplyPauseState();
+  void _onReplyTextChange() => _updateReplyPauseState();
+
+  void _updateReplyPauseState() {
     if (!mounted) return;
-    if (_commentFocusNode.hasFocus) {
+    final composing = _commentFocusNode.hasFocus ||
+        _commentController.text.isNotEmpty;
+    if (composing) {
+      // Reset progress to 0 so the user gets the full 5s window once
+      // they're done typing, rather than the story snapping to the next
+      // because there were only ~200ms left when they started.
       _progress.stop();
+      _progress.value = 0;
     } else {
       _progress.forward();
     }
@@ -154,6 +170,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   @override
   void dispose() {
     _commentFocusNode.removeListener(_onReplyFocusChange);
+    _commentController.removeListener(_onReplyTextChange);
     _progress.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
@@ -282,12 +299,29 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     _loadingForStoryId = story.id;
 
     // Record the view immediately — don't gate it behind image preload so
-    // fast taps through stories are still counted.
+    // fast taps through stories are still counted. `recordView` early-
+    // returns for the author themselves, so we never count the user as
+    // a viewer of their own story.
     _storyService
         .recordView(story.id, authorUid: story.authorUid)
         .catchError((Object e, StackTrace _) {
       debugPrint('recordView failed for ${story.id}: $e');
     });
+
+    // If this is one of the user's OWN stories, mark it locally as seen
+    // so the home rail can dim the ring on next paint. This is a
+    // device-local flag (SharedPreferences) — it intentionally does NOT
+    // get written to Firestore, so the author never appears in their
+    // own viewers list.
+    if (_currentUid != null && story.authorUid == _currentUid) {
+      ref
+          .read(ownStorySeenServiceProvider)
+          .markSeen(story.id)
+          .then((_) => ref.invalidate(ownStoriesAllSeenProvider))
+          .catchError((Object e) {
+        debugPrint('markSeen (own) failed for ${story.id}: $e');
+      });
+    }
 
     try {
       await precacheImage(
@@ -641,6 +675,19 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         body: SafeArea(
           child: GestureDetector(
             onTapUp: (details) {
+              // If the user is mid-reply (keyboard open OR text in
+              // composer), the tap dismisses the keyboard instead of
+              // advancing the story. Auto-advance is also paused via
+              // `_updateReplyPauseState`, so the story sits still while
+              // they keep typing.
+              final keyboardVisible =
+                  MediaQuery.of(context).viewInsets.bottom > 0;
+              if (keyboardVisible ||
+                  _commentFocusNode.hasFocus ||
+                  _commentController.text.isNotEmpty) {
+                _commentFocusNode.unfocus();
+                return;
+              }
               // Leading-edge third = previous, anywhere else = next.
               // In RTL the leading edge is the right side of the screen.
               final tappedLeading = isRtl
@@ -660,6 +707,17 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             }
           },
           onHorizontalDragEnd: (details) {
+            // Block group swipes while the keyboard is open / user is
+            // composing a reply — same rule as tap-to-advance. Otherwise
+            // a slight horizontal motion while reaching for the keyboard
+            // could yank them off the story.
+            final keyboardVisible =
+                MediaQuery.of(context).viewInsets.bottom > 0;
+            if (keyboardVisible ||
+                _commentFocusNode.hasFocus ||
+                _commentController.text.isNotEmpty) {
+              return;
+            }
             // Swipe semantics: leading-direction swipe = next group,
             // trailing-direction swipe = previous group. Velocity sign
             // is unaffected by Directionality, so flip the mapping in
@@ -787,56 +845,31 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                           color: Colors.white,
                         ),
                       ),
-                      // Three-dot overflow menu. For own stories, Delete
-                      // lives in here so the header isn't cluttered. The
-                      // dedicated X button is gone — the back gesture
-                      // (swipe down / system back) closes the viewer.
-                      PopupMenuButton<String>(
-                        tooltip: '',
-                        icon: const Icon(Icons.more_vert,
-                            color: Colors.white),
-                        color: Colors.black87,
-                        onSelected: (v) {
-                          if (v == 'delete') _deleteCurrentStory();
-                          if (v == 'close') Navigator.pop(context);
-                        },
-                        itemBuilder: (_) => [
-                          if (isOwnStory)
-                            PopupMenuItem<String>(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.delete_outline,
-                                      color: Color(0xFFEF476F), size: 20),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    context.t.delete,
-                                    style: const TextStyle(
-                                      color: Color(0xFFEF476F),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                      // Own stories show a direct trash icon — no overflow
+                      // menu, no Close item. Back gesture / swipe down
+                      // closes the viewer. Wears the same translucent
+                      // black pill chrome as the views counter so the
+                      // header reads as one design system.
+                      if (isOwnStory)
+                        GestureDetector(
+                          onTap: _deleteCurrentStory,
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.15),
                               ),
                             ),
-                          PopupMenuItem<String>(
-                            value: 'close',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.close,
-                                    color: Colors.white, size: 20),
-                                const SizedBox(width: 12),
-                                Text(
-                                  context.t.close,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
+                            child: const Icon(
+                              Icons.delete_outline,
+                              color: Color(0xFFEF476F),
+                              size: 20,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
                 ),
@@ -1240,46 +1273,23 @@ class _ViewersSheet extends ConsumerWidget {
                     }
                     return ListView.separated(
                       controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
                       itemCount: viewers.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
                         final v = viewers[i];
                         final userData = ref.watch(userByUidProvider(v.uid)).value;
                         final avatarUrl = userData?['avatarUrl'] as String?;
-                        final username = userData?['username'] as String? ?? v.username;
-                        return ListTile(
+                        final username =
+                            userData?['username'] as String? ?? v.username;
+                        return _ViewerCard(
+                          avatarUrl: avatarUrl ?? '',
+                          title: username.isEmpty ? v.uid : username,
+                          trailingText: context.t.timeAgo(v.viewedAt),
                           onTap: () {
                             Navigator.pop(context);
                             openUserProfile(context, uid: v.uid);
                           },
-                          leading: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: context.surfaceSoft,
-                            backgroundImage: avatarUrl != null
-                                ? CachedNetworkImageProvider(avatarUrl)
-                                : null,
-                            child: avatarUrl == null
-                                ? Icon(
-                                    Icons.person,
-                                    size: 18,
-                                    color: context.textSecondary,
-                                  )
-                                : null,
-                          ),
-                          title: Text(
-                            username.isEmpty ? v.uid : username,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: context.textPrimary,
-                            ),
-                          ),
-                          trailing: Text(
-                            context.t.timeAgo(v.viewedAt),
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
                         );
                       },
                     );
@@ -1338,7 +1348,10 @@ class _StoryReplyComposer extends StatelessWidget {
     // text/hint colors guarantees readability either way.
     return Container(
       constraints: const BoxConstraints(minHeight: 54),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      // Horizontal padding needs to clear the stadium curve so the 40px
+      // gradient send circle doesn't get clipped by the rounded end of
+      // the pill (it was poking out on the leading side in RTL).
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: ShapeDecoration(
         color: Colors.black.withValues(alpha: 0.55),
         shape: StadiumBorder(
@@ -1355,14 +1368,16 @@ class _StoryReplyComposer extends StatelessWidget {
         ],
       ),
       child: Row(
-        // Bottom-align icons so the pill grows upward as the input
-        // adds new lines — the heart and send stay anchored next to
-        // the last visible row of text instead of floating in space.
-        crossAxisAlignment: CrossAxisAlignment.end,
+        // Center vertically so heart and send sit on the same baseline
+        // as the (single-line) hint. When the input grows past one line
+        // the buttons stay centered against the multi-line block, which
+        // reads better than bottom-anchored icons that crowd the last
+        // line of text.
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Heart on the left — toggles the story-level like only. Does
-          // NOT DM the author; that was the old reactions behavior the
-          // user removed.
+          // Heart at the leading edge — toggles the story-level like
+          // only. Does NOT DM the author; that was the old reactions
+          // behavior the user removed.
           StreamBuilder<bool>(
             stream: service.streamIsLiked(storyId),
             builder: (context, snapshot) {
@@ -1373,10 +1388,9 @@ class _StoryReplyComposer extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   onHeartTap();
                 },
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
                   child: Icon(
                     liked ? Icons.favorite : Icons.favorite_border,
                     color: liked ? const Color(0xFFFF3B5C) : Colors.white,
@@ -1400,9 +1414,15 @@ class _StoryReplyComposer extends StatelessWidget {
               // the explicit purple button on the right. Keyboard shows
               // the newline action instead of "Send" because Send would
               // otherwise dismiss the input mid-thought.
+              //
+              // Cap the visible height at 2 lines — beyond that the
+              // pill would start to dominate the story canvas. Anything
+              // past 2 lines scrolls inside the field (TextField's
+              // built-in scroll behavior kicks in once the content
+              // exceeds maxLines).
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
-              maxLines: 5,
+              maxLines: 2,
               minLines: 1,
               decoration: InputDecoration(
                 isDense: true,
@@ -1431,8 +1451,8 @@ class _StoryReplyComposer extends StatelessWidget {
               onTap: sending ? null : () => onSend(),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: sending
@@ -1809,10 +1829,10 @@ class _StoryShareSheet extends ConsumerWidget {
                       }
                       return ListView.separated(
                         controller: scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        padding:
+                            const EdgeInsets.fromLTRB(14, 10, 14, 16),
                         itemCount: chats.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(height: 1, color: context.borderColor),
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, i) {
                           final c = chats[i];
                           final title =
@@ -1820,29 +1840,11 @@ class _StoryShareSheet extends ConsumerWidget {
                           final avatar = c.isGroup
                               ? c.groupAvatarUrl
                               : c.otherAvatarUrl;
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: context.inputFill,
-                              backgroundImage: avatar.isNotEmpty
-                                  ? CachedNetworkImageProvider(avatar)
-                                  : null,
-                              child: avatar.isEmpty
-                                  ? Icon(
-                                      c.isGroup
-                                          ? Icons.group
-                                          : Icons.person,
-                                      color: context.textSecondary,
-                                    )
-                                  : null,
-                            ),
-                            title: Text(
-                              title,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600),
-                            ),
-                            trailing: const Icon(Icons.send,
-                                color: AppColors.purple),
-                            onTap: () =>
+                          return _StoryShareRecipientCard(
+                            avatarUrl: avatar,
+                            title: title,
+                            isGroup: c.isGroup,
+                            onSend: () =>
                                 onSendToChat(c.chatId, c.otherUid, title),
                           );
                         },
@@ -1906,6 +1908,229 @@ class _ShareAction extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Modern rounded card used inside the story share sheet to list each
+/// recipient. Mirrors the post-share card design so the two share surfaces
+/// feel like one product.
+class _StoryShareRecipientCard extends StatelessWidget {
+  final String avatarUrl;
+  final String title;
+  final bool isGroup;
+  final VoidCallback onSend;
+
+  const _StoryShareRecipientCard({
+    required this.avatarUrl,
+    required this.title,
+    required this.isGroup,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onSend,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: context.borderColor.withValues(alpha: 0.6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: CircleAvatar(
+                  backgroundColor: context.inputFill,
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(avatarUrl)
+                      : null,
+                  child: avatarUrl.isEmpty
+                      ? Icon(
+                          isGroup ? Icons.group : Icons.person,
+                          color: context.textSecondary,
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onSend,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            const Color(0xFFB05ECC).withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        context.t.postCardSend,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Modern rounded card used in the "Viewers" sheet. Mirrors the share
+/// sheet's recipient card design — same gradient avatar ring and card
+/// chrome — but with a timestamp trailing instead of a Send button.
+class _ViewerCard extends StatelessWidget {
+  final String avatarUrl;
+  final String title;
+  final String trailingText;
+  final VoidCallback onTap;
+
+  const _ViewerCard({
+    required this.avatarUrl,
+    required this.title,
+    required this.trailingText,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: context.borderColor.withValues(alpha: 0.6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: CircleAvatar(
+                  backgroundColor: context.inputFill,
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(avatarUrl)
+                      : null,
+                  child: avatarUrl.isEmpty
+                      ? Icon(Icons.person, color: context.textSecondary)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                trailingText,
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

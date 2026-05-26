@@ -14,11 +14,14 @@ class SplashScreen extends StatelessWidget {
           children: [
             // App logo above the wordmark — matches the launcher icon so the
             // splash reads as a true brand surface instead of plain text.
-            Image.asset(
-              'assets/img/app_icon.png',
-              width: 96,
-              height: 96,
-              fit: BoxFit.contain,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Image.asset(
+                'assets/img/app_icon.png',
+                width: 96,
+                height: 96,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(height: 18),
             Text(

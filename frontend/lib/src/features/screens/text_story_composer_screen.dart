@@ -181,8 +181,19 @@ class _TextStoryComposerScreenState extends State<TextStoryComposerScreen> {
                           fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
+                        // Explicitly disable the global
+                        // InputDecorationTheme fill — without this the
+                        // theme's `filled: true` + light-grey fillColor
+                        // shows up as a milky white rectangle behind the
+                        // text, defeating the user-picked shape style.
                         decoration: InputDecoration(
+                          filled: false,
+                          fillColor: Colors.transparent,
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
                           isCollapsed: true,
                           hintText: context.t.textStoryHint,
                           hintStyle: TextStyle(

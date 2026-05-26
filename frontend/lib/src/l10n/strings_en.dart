@@ -195,6 +195,9 @@ const Map<String, String> enStrings = {
   'notifications': 'Notifications',
   'no_notifications': 'No notifications yet',
   'mark_all_read': 'Mark all as read',
+  'notif_mark_as_read': 'Mark as read',
+  'notif_mark_as_unread': 'Mark as unread',
+  'notif_delete': 'Delete',
   'new_notification': 'New notification',
 
   // ── Settings ──────────────────────────────────────────────────
@@ -309,6 +312,9 @@ const Map<String, String> enStrings = {
   'onboarding_gender_non_binary': 'Non-binary',
   'onboarding_gender_other': 'Other',
   'onboarding_min_3_chars': 'Min 3 characters',
+  'onboarding_name': 'Full name',
+  'onboarding_name_hint': 'Your real name (shown on your profile)',
+  'onboarding_name_required': 'Please enter your name',
   'onboarding_about_you': 'About you',
   'onboarding_optional': 'Optional',
   'onboarding_about_you_desc':
@@ -449,6 +455,7 @@ const Map<String, String> enStrings = {
   'post_card_reposted_to_profile': 'Reposted to your profile',
   'post_card_could_not_repost': 'Could not repost: {error}',
   'post_card_send_to': 'Send to',
+  'post_card_send': 'Send',
   'post_card_no_conversations': 'No conversations yet.\nStart a chat first.',
   'post_card_shared_to': 'Shared to {username}',
   'post_card_edit_caption': 'Edit caption',
@@ -963,6 +970,10 @@ const Map<String, String> enStrings = {
   'admin_field_country': 'Country',
   'admin_choose_country': 'Choose country',
   'admin_search_country': 'Search country...',
+  'admin_field_city': 'City',
+  'admin_choose_city': 'Choose city',
+  'admin_search_city': 'Search city...',
+  'admin_city_pick_country_first': 'Pick a country first',
   'admin_field_description': 'Description',
   'admin_describe_the_event': 'Describe the event',
   'admin_field_link': 'Link',

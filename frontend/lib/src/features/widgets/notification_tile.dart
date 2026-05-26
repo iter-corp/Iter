@@ -66,19 +66,34 @@ class NotificationTile extends StatelessWidget {
           const SizedBox(width: 12),
 
           /// TEXT
+          //
+          // Kurdish (and many translated) notification strings are 2-3x
+          // longer than the English originals. Without explicit
+          // maxLines/overflow on the title the Row overflowed horizontally,
+          // pushed the trailing thumbnail off-screen, and on some screens
+          // produced the yellow-and-black overflow stripe. Allow up to 2
+          // lines on the title and ellipsis the rest.
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 13)),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, height: 1.3),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
 
           /// TRAILING
           _buildTrailing(context),

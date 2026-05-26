@@ -786,40 +786,51 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
             ),
             const SizedBox(height: 12),
             // Horizontal chip strip — tap to change target language.
+            // Dedupe by translation code: kTranslateLanguages lists English
+            // twice (USA / UK) for speech-to-text, but the translation API
+            // treats them as one `en` so both chips would light up.
             SizedBox(
               height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: kTranslateLanguages.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  final lang = kTranslateLanguages[i];
-                  final selected = lang.code == _target;
-                  return GestureDetector(
-                    onTap: () => _selectLang(lang.code),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFFB05ECC)
-                            : Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        lang.label,
-                        style: TextStyle(
-                          color: selected ? Colors.white : null,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+              child: Builder(builder: (context) {
+                final seen = <String>{};
+                final chipLangs = <TranslateLanguage>[];
+                for (final l in kTranslateLanguages) {
+                  if (seen.add(l.code)) chipLangs.add(l);
+                }
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: chipLangs.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (_, i) {
+                    final lang = chipLangs[i];
+                    final selected = lang.code == _target;
+                    final label = lang.code == 'en' ? 'English' : lang.label;
+                    return GestureDetector(
+                      onTap: () => _selectLang(lang.code),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFB05ECC)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: selected ? Colors.white : null,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                );
+              }),
             ),
             const SizedBox(height: 16),
             if (_loading)

@@ -452,7 +452,14 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
     _controller = TextEditingController(text: i?.text ?? '');
     _color = i?.color ?? Colors.white;
     _fontStyle = i?.fontStyle ?? StoryFontStyle.classic;
-    _backgroundStyle = i?.backgroundStyle ?? StoryBackgroundStyle.none;
+    // Migrate any legacy overlays that were saved with `filled` (the old
+    // user-cycle included it, producing the unwanted white box behind
+    // text). Treat them as `none` so reopening the editor doesn't
+    // resurrect the box. New compositions also default to `none`.
+    final initialStyle = i?.backgroundStyle ?? StoryBackgroundStyle.none;
+    _backgroundStyle = initialStyle == StoryBackgroundStyle.filled
+        ? StoryBackgroundStyle.none
+        : initialStyle;
     _alignment = i?.alignment ?? TextAlign.center;
     _fontSize = i?.fontSize ?? 32;
   }
@@ -473,9 +480,20 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
 
   void _cycleBackground() {
     setState(() {
-      const values = StoryBackgroundStyle.values;
-      _backgroundStyle =
-          values[(values.indexOf(_backgroundStyle) + 1) % values.length];
+      // `filled` is intentionally excluded from the user-facing cycle: it
+      // painted a solid rectangle in the text color behind the text,
+      // which (with a white text color) showed as a glaring white box
+      // and forced the text to flip black. Users found that confusing
+      // and asked for the box to be removed. The remaining styles —
+      // none / translucent / brush — give the same expressive range
+      // without ever drawing an opaque colored rectangle.
+      const values = [
+        StoryBackgroundStyle.none,
+        StoryBackgroundStyle.translucent,
+        StoryBackgroundStyle.brush,
+      ];
+      final i = values.indexOf(_backgroundStyle);
+      _backgroundStyle = values[(i == -1 ? 0 : i + 1) % values.length];
     });
   }
 
@@ -631,8 +649,17 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                                       cursorColor: Colors.white,
                                       style: textStyleForOverlay(preview)
                                           .copyWith(color: Colors.white),
+                                      // `filled: false` overrides the global
+                                      // InputDecorationTheme which sets a
+                                      // light-grey fill — that fill was
+                                      // showing as a square behind the
+                                      // story text while editing.
                                       decoration: const InputDecoration(
+                                        filled: false,
+                                        fillColor: Colors.transparent,
                                         border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
                                         isCollapsed: true,
                                         hintText: '',
                                       ),
@@ -655,7 +682,11 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                                       style: textStyleForOverlay(preview)
                                           .copyWith(color: displayColor),
                                       decoration: const InputDecoration(
+                                        filled: false,
+                                        fillColor: Colors.transparent,
                                         border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
                                         isCollapsed: true,
                                         hintText: '',
                                       ),

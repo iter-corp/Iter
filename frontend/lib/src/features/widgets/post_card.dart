@@ -500,14 +500,41 @@ class _PostCardState extends ConsumerState<PostCard>
                                           GestureDetector(
                                             behavior: HitTestBehavior.opaque,
                                             onTap: _toggleRepost,
-                                            child: PoppingActionIcon(
-                                              active: isReposted,
-                                              activeIcon: Icons.repeat,
-                                              inactiveIcon: Icons.repeat,
-                                              activeColor:
-                                                  const Color(0xFFB05ECC),
-                                              inactiveColor: Colors.white,
-                                              size: 20,
+                                            child: Row(
+                                              children: [
+                                                PoppingActionIcon(
+                                                  active: isReposted,
+                                                  activeIcon: Icons.repeat,
+                                                  inactiveIcon: Icons.repeat,
+                                                  activeColor:
+                                                      const Color(0xFFB05ECC),
+                                                  inactiveColor: Colors.white,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                // Live count from the
+                                                // post's reposts
+                                                // subcollection. Mirrors
+                                                // how the heart shows
+                                                // `${post.likesCount}`.
+                                                Consumer(
+                                                  builder: (_, ref, __) {
+                                                    final count = ref
+                                                        .watch(
+                                                            repostsCountProvider(
+                                                                post.id))
+                                                        .value ??
+                                                        0;
+                                                    return Text(
+                                                      '$count',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 12,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
@@ -843,11 +870,15 @@ class _PostCardState extends ConsumerState<PostCard>
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: () => _translateCaption(context),
-                  icon: const Icon(Icons.translate, size: 18),
-                  label: Text(context.t.translate),
-                ),
+                // Hide Translate when the caption has no translatable text
+                // (emoji-only / symbols-only). Translation APIs return the
+                // emoji unchanged anyway, so the button would be a no-op.
+                if (!_isEmojiOnlyCaption(widget.post.caption))
+                  TextButton.icon(
+                    onPressed: () => _translateCaption(context),
+                    icon: const Icon(Icons.translate, size: 18),
+                    label: Text(context.t.translate),
+                  ),
               ],
             ),
           ),
@@ -857,13 +888,17 @@ class _PostCardState extends ConsumerState<PostCard>
   }
 
   Future<void> _translateCaption(BuildContext context) async {
-    final raw = widget.post.caption.trim();
-    if (raw.isEmpty) return;
+    // Strip emojis before translation — the API returns them unchanged but
+    // bundling them with the text occasionally trips language detection on
+    // captions that are mostly emoji with a few words. Empty result means
+    // the caption was emoji-only and there's nothing to translate.
+    final stripped = _stripEmoji(widget.post.caption).trim();
+    if (stripped.isEmpty) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _PostTranslateSheet(text: raw),
+      builder: (_) => _PostTranslateSheet(text: stripped),
     );
   }
 
@@ -952,25 +987,16 @@ class _PostCardState extends ConsumerState<PostCard>
                             );
                           }
                           return ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
                             itemCount: convs.length,
                             separatorBuilder: (_, __) =>
-                                const Divider(height: 1),
+                                const SizedBox(height: 8),
                             itemBuilder: (_, i) {
                               final c = convs[i];
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.grey.shade200,
-                                  backgroundImage: c.otherAvatarUrl.isNotEmpty
-                                      ? NetworkImage(c.otherAvatarUrl)
-                                      : null,
-                                  child: c.otherAvatarUrl.isEmpty
-                                      ? const Icon(Icons.person)
-                                      : null,
-                                ),
-                                title: Text(c.otherUsername),
-                                trailing: const Icon(Icons.send,
-                                    color: Color(0xFFB05ECC)),
-                                onTap: () async {
+                              return _ShareRecipientCard(
+                                avatarUrl: c.otherAvatarUrl,
+                                title: c.otherUsername,
+                                onSend: () async {
                                   await _shareAs(
                                       ref2, c.chatId, currentUid, c.otherUid);
                                   if (ctx.mounted) Navigator.pop(ctx);
@@ -2459,6 +2485,21 @@ class _ExpandableCaptionState extends State<_ExpandableCaption> {
   }
 }
 
+// Unicode ranges covering the bulk of emoji/pictograph characters plus
+// the variation-selector and zero-width joiner used inside multi-codepoint
+// emoji sequences. Stripping these leaves the actual text behind so the
+// translator only sees real words.
+final RegExp _emojiPattern = RegExp(
+  r'[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}'
+  r'\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}'
+  r'\u{2B00}-\u{2BFF}\u{1F100}-\u{1F1FF}\u{FE00}-\u{FE0F}\u{200D}]+',
+  unicode: true,
+);
+
+String _stripEmoji(String s) => s.replaceAll(_emojiPattern, '');
+
+bool _isEmojiOnlyCaption(String s) => _stripEmoji(s).trim().isEmpty;
+
 /// Bottom sheet for translating a post caption. Mirrors the comment
 /// translate sheet — horizontal chip strip lets the user pick a target
 /// language, the result is re-fetched on each selection (cache makes
@@ -2542,38 +2583,50 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
             const SizedBox(height: 12),
             SizedBox(
               height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: kTranslateLanguages.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  final lang = kTranslateLanguages[i];
-                  final selected = lang.code == _target;
-                  return GestureDetector(
-                    onTap: () => _selectLang(lang.code),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFFB05ECC)
-                            : Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        lang.label,
-                        style: TextStyle(
-                          color: selected ? Colors.white : null,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+              child: Builder(builder: (context) {
+                // Dedupe by translation code — the speech-to-text list has
+                // separate entries for English (USA) and (UK) but the
+                // translation API treats them as one `en`, so showing both
+                // chips made both light up simultaneously.
+                final seen = <String>{};
+                final chipLangs = <TranslateLanguage>[];
+                for (final l in kTranslateLanguages) {
+                  if (seen.add(l.code)) chipLangs.add(l);
+                }
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: chipLangs.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (_, i) {
+                    final lang = chipLangs[i];
+                    final selected = lang.code == _target;
+                    final label = lang.code == 'en' ? 'English' : lang.label;
+                    return GestureDetector(
+                      onTap: () => _selectLang(lang.code),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFB05ECC)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: selected ? Colors.white : null,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                );
+              }),
             ),
             const SizedBox(height: 16),
             if (_loading)
@@ -2614,6 +2667,132 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Single friend tile inside the post-share sheet. A rounded card with a
+/// 26-radius avatar, the username, and a pill-shape Send CTA on the trailing
+/// side. The whole card is tappable as well as the pill, so users can hit
+/// either zone.
+class _ShareRecipientCard extends StatelessWidget {
+  final String avatarUrl;
+  final String title;
+  final VoidCallback onSend;
+
+  const _ShareRecipientCard({
+    required this.avatarUrl,
+    required this.title,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onSend,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: context.borderColor.withValues(alpha: 0.6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: CircleAvatar(
+                  backgroundColor: context.inputFill,
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(avatarUrl)
+                      : null,
+                  child: avatarUrl.isEmpty
+                      ? Icon(Icons.person, color: context.textSecondary)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onSend,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            const Color(0xFFB05ECC).withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        context.t.postCardSend,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

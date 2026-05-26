@@ -140,6 +140,13 @@ final isRepostedProvider = StreamProvider.family<bool, String>((ref, postId) {
   return ref.watch(postServiceProvider).streamIsReposted(postId, uid: uid);
 });
 
+/// Live count of reposts for a post — drives the small number rendered
+/// next to the repost icon, the same way `${post.likesCount}` appears
+/// next to the heart.
+final repostsCountProvider = StreamProvider.family<int, String>((ref, postId) {
+  return ref.watch(postServiceProvider).streamRepostsCount(postId);
+});
+
 final userRepostsProvider =
     StreamProvider.family<List<Post>, String>((ref, uid) {
   final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));

@@ -21,6 +21,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
@@ -44,6 +45,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _usernameCtrl.dispose();
     _bioCtrl.dispose();
     _cityCtrl.dispose();
@@ -143,10 +145,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
 
       final city = _cityCtrl.text.trim();
+      final realName = _nameCtrl.text.trim();
       final applicableLevel =
           academicLevelAppliesTo(_profession) ? _academicLevel : null;
       final data = <String, dynamic>{
-        'name': username,
+        // Display name = what the user typed in the Name field. Falls back
+        // to the username so older callers that read `name` still get a
+        // non-empty value.
+        'name': realName.isEmpty ? username : realName,
         'username': username,
         'usernameLower': username,
         'handle': '@$username',
@@ -183,6 +189,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                TextFormField(
+                  controller: _nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: context.t.onboardingName,
+                    hintText: context.t.onboardingNameHint,
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? context.t.onboardingNameRequired
+                      : null,
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _usernameCtrl,
                   decoration: InputDecoration(labelText: context.t.username),

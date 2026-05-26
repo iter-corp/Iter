@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Show splash only on initial boot. During later auth refreshes, keep the
       // current route to avoid visible /home <-> /splash route churn.
       if (authAsync.isLoading) {
+        debugPrint('[Router] loc=$loc authLoading -> stay');
         return loc == '/splash' ? null : null;
       }
 
@@ -37,7 +39,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           loc == '/otp';
 
       if (user == null) {
-        // Not logged in - go to login unless already on auth page
+        debugPrint('[Router] loc=$loc user=null inAuthFlow=$inAuthFlow '
+            '-> ${inAuthFlow ? "stay" : "/login"}');
         return inAuthFlow ? null : '/login';
       }
 
@@ -47,6 +50,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Keep current route while the user doc stream resolves; redirect once we
       // have a concrete value so we don't repeatedly reopen pages.
       if (userDocAsync.isLoading) {
+        debugPrint('[Router] loc=$loc uid=${user.uid} docLoading -> stay');
         return null;
       }
 
@@ -67,16 +71,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           username == null ||
           username.trim().isEmpty;
 
+      debugPrint('[Router] loc=$loc uid=${user.uid} docExists=${userDoc != null} '
+          'username=${username == null ? "<null>" : "\"$username\""} '
+          'needsOnboarding=$needsOnboarding');
+
       if (needsOnboarding) {
-        if (loc == '/onboarding' || loc == '/otp') return null;
+        if (loc == '/onboarding' || loc == '/otp') {
+          debugPrint('[Router] needsOnboarding && already on $loc -> stay');
+          return null;
+        }
+        debugPrint('[Router] needsOnboarding -> /onboarding');
         return '/onboarding';
       }
 
       // Onboarding done - send to home
       if (inAuthFlow || loc == '/onboarding' || loc == '/splash') {
+        debugPrint('[Router] onboarding done from $loc -> /home');
         return '/home';
       }
 
+      debugPrint('[Router] onboarding done, no redirect from $loc');
       return null;
     },
     routes: [

@@ -643,8 +643,15 @@ class _EventAuthorHeader extends ConsumerWidget {
     final author = authorAsync?.value;
 
     final username = (author?['username'] as String?)?.trim();
-    final handle = (author?['handle'] as String?)?.trim();
+    final rawHandle = (author?['handle'] as String?)?.trim();
     final avatarUrl = (author?['avatarUrl'] as String?)?.trim();
+
+    // Some user docs store the handle WITH a leading `@` (older signup
+    // path), others store it without. Strip any leading `@` so we never
+    // render the double-prefixed `@@mohammed`.
+    final handle = (rawHandle == null)
+        ? null
+        : rawHandle.replaceFirst(RegExp(r'^@+'), '');
 
     final primary =
         (username != null && username.isNotEmpty) ? username : fallbackTitle;
