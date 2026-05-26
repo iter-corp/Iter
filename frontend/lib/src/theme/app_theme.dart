@@ -12,6 +12,52 @@ class AppColors {
 }
 
 class AppTheme {
+  static final ButtonStyle _primaryButtonStyle = FilledButton.styleFrom(
+    backgroundColor: AppColors.purpleVivid,
+    foregroundColor: Colors.white,
+    disabledBackgroundColor: AppColors.purpleVivid.withValues(alpha: 0.45),
+    disabledForegroundColor: Colors.white.withValues(alpha: 0.75),
+    elevation: 4,
+    shadowColor: AppColors.purple.withValues(alpha: 0.35),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+    textStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(30),
+    ),
+  );
+
+  static final ButtonStyle _outlinedButtonStyle = OutlinedButton.styleFrom(
+    foregroundColor: AppColors.purpleVivid,
+    disabledForegroundColor: AppColors.purpleVivid.withValues(alpha: 0.45),
+    side: const BorderSide(color: AppColors.purpleVivid, width: 1.4),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+    textStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(30),
+    ),
+  );
+
+  static final ButtonStyle _textButtonStyle = TextButton.styleFrom(
+    foregroundColor: AppColors.purpleVivid,
+    disabledForegroundColor: AppColors.purpleVivid.withValues(alpha: 0.45),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+    textStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(30),
+    ),
+  );
   // ─── Light Theme ────────────────────────────────────────────
   static ThemeData light = ThemeData(
     brightness: Brightness.light,
@@ -46,16 +92,10 @@ class AppTheme {
       selectedItemColor: AppColors.purple,
       unselectedItemColor: Color(0xFF6B6B70),
     ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.purpleBright,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-        elevation: 0,
-      ),
-    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: _primaryButtonStyle),
+    filledButtonTheme: FilledButtonThemeData(style: _primaryButtonStyle),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedButtonStyle),
+    textButtonTheme: TextButtonThemeData(style: _textButtonStyle),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFFF0F0F0),
@@ -121,16 +161,10 @@ class AppTheme {
       selectedItemColor: AppColors.purpleBright,
       unselectedItemColor: Color(0xFF6B6B70),
     ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.purpleBright,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-        elevation: 0,
-      ),
-    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: _primaryButtonStyle),
+    filledButtonTheme: FilledButtonThemeData(style: _primaryButtonStyle),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedButtonStyle),
+    textButtonTheme: TextButtonThemeData(style: _textButtonStyle),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFF252528),

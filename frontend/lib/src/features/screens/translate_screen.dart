@@ -12,6 +12,7 @@ import '../../providers/admin_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/feature_disabled_view.dart';
+import '../widgets/primary_action_button.dart';
 import 'saved_translations_screen.dart';
 
 // Languages: see [kTranslateLanguages] in translate_service.dart for the
@@ -380,39 +381,12 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
                 const SizedBox(height: 16),
 
                 // 📌 Translate Button
-                Center(
-                  child: SizedBox(
-                    width: 200,
-                    height: 35,
-                    child: ElevatedButton(
-                      onPressed: _onTranslate,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFCE5DE5),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: _isTranslating
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              context.t.translate,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ),
+                PrimaryActionButton(
+                  label: context.t.translate,
+                  onPressed: _isTranslating ? null : _onTranslate,
+                  loading: _isTranslating,
+                  size: PrimaryActionSize.large,
+                  fullWidth: true,
                 ),
                 const SizedBox(height: 16),
 
@@ -463,9 +437,16 @@ class _LanguageSelectorRow extends StatelessWidget {
             width: 33,
             height: 33,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xFFCE5DE5),
-              borderRadius: BorderRadius.all(Radius.circular(10)),
+            decoration: BoxDecoration(
+              color: AppColors.purpleVivid,
+              borderRadius: const BorderRadius.all(Radius.circular(10)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.purple.withValues(alpha: 0.24),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: SvgPicture.asset(
               'assets/icons/swap.svg',
@@ -623,7 +604,7 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                           ),
                           trailing: isCurrent
                               ? const Icon(Icons.check,
-                                  color: Color(0xFFCE5DE5))
+                                  color: AppColors.purpleVivid)
                               : null,
                           onTap: () => Navigator.pop(context, lang.label),
                         );
@@ -806,7 +787,7 @@ class _WaveAnimationState extends State<_WaveAnimation>
                     2.0, 30.0), // 🔹 clamp prevents 0-height render glitch
                 margin: const EdgeInsets.symmetric(horizontal: 0.8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFCE5DE5),
+                  color: AppColors.purpleVivid,
                   borderRadius: BorderRadius.circular(2),
                 ),
               );
@@ -867,7 +848,7 @@ class _OutputBox extends StatelessWidget {
                           Icons.bookmark,
                           key: ValueKey('filled'),
                           size: 22,
-                          color: Color(0xFFCE5DE5),
+                          color: AppColors.purpleVivid,
                         )
                       : SvgPicture.asset(
                           key: const ValueKey('outline'),

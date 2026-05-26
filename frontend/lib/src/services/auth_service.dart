@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -38,6 +39,73 @@ class AuthService {
   /// sign-out so returning users always land on /home.
   bool justSignedUp = false;
 
+  bool get requiresEmailVerification {
+    final user = _auth.currentUser;
+    return user != null &&
+        (user.email ?? '').trim().isNotEmpty &&
+        !user.emailVerified;
+  }
+
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.reload();
+    final user = _auth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  Future<bool> reloadAndCheckEmailVerified() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser?.emailVerified ?? false;
+  }
+
+  Future<void> discardPendingSignup() async {
+    var user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await user.reload().timeout(const Duration(seconds: 4));
+      user = _auth.currentUser;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'no-current-user' || e.code == 'user-not-found') {
+        justSignedUp = false;
+        return;
+      }
+      rethrow;
+    }
+
+    if (user == null) {
+      justSignedUp = false;
+      return;
+    }
+
+    if (user.emailVerified) {
+      throw FirebaseAuthException(
+        code: 'email-already-verified',
+        message: 'This email is already verified.',
+      );
+    }
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .delete()
+          .timeout(const Duration(seconds: 6));
+    } catch (_) {
+      // Best-effort cleanup. Deleting the Auth user is the important part for
+      // freeing the email so the user can restart signup on the Spark plan.
+    }
+    try {
+      await user.delete().timeout(const Duration(seconds: 8));
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'no-current-user' && e.code != 'user-not-found') {
+        rethrow;
+      }
+    }
+    justSignedUp = false;
+  }
+
   Map<String, dynamic> _defaultUserDoc(User user, {String? avatarUrl}) {
     return {
       'uid': user.uid,
@@ -51,6 +119,7 @@ class AuthService {
       'role': 'user',
       'suspended': false,
       'isPrivate': false,
+      'appIntroSeen': false,
       'followersCount': 0,
       'followingCount': 0,
       'postsCount': 0,
@@ -122,12 +191,20 @@ class AuthService {
         'role': 'user',
         'suspended': false,
         'isPrivate': false,
+        'appIntroSeen': false,
         'followersCount': 0,
         'followingCount': 0,
         'postsCount': 0,
         'fcmTokens': <String>[],
         'createdAt': FieldValue.serverTimestamp(),
       });
+      try {
+        await user.sendEmailVerification();
+      } catch (_) {
+        // The OTP/verification screen exposes a resend action, so a transient
+        // mail-send failure should not leave behind a created account plus a
+        // failed signup screen.
+      }
     }
     return user;
   }
@@ -204,6 +281,7 @@ class AuthService {
         'role': 'user',
         'suspended': false,
         'isPrivate': false,
+        'appIntroSeen': false,
         'followersCount': 0,
         'followingCount': 0,
         'postsCount': 0,
@@ -261,6 +339,7 @@ class AuthService {
         'role': 'user',
         'suspended': false,
         'isPrivate': false,
+        'appIntroSeen': false,
         'followersCount': 0,
         'followingCount': 0,
         'postsCount': 0,

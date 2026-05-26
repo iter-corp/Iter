@@ -228,6 +228,7 @@ class PostService {
   Future<String> createQaPost({
     required String question,
     String details = '',
+    String discussKind = 'question',
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
@@ -257,6 +258,7 @@ class PostService {
       'commentsCount': 0,
       'isPrivate': false,
       'postType': 'qa',
+      'discussKind': discussKind == 'discussion' ? 'discussion' : 'question',
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -301,6 +303,7 @@ class PostService {
       'commentsCount': 0,
       'isPrivate': false,
       'postType': 'qa',
+      'discussKind': 'discussion',
       'sourcePostId': source.id,
       'createdAt': FieldValue.serverTimestamp(),
     });

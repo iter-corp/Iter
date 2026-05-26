@@ -247,6 +247,16 @@ class _QuestionCard extends ConsumerWidget {
 
   const _QuestionCard({required this.post});
 
+  static const List<String> _reportReasons = [
+    'Spam or scam',
+    'Harassment or bullying',
+    'Hate speech',
+    'Violence or threats',
+    'Nudity or sexual content',
+    'Misinformation',
+    'Something else',
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final caption = post.caption.trim();
@@ -258,11 +268,14 @@ class _QuestionCard extends ConsumerWidget {
     final title =
         lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
     final body = lines.length > 1 ? lines.sublist(1).join('\n') : '';
+    final isQuestion = post.discussKind == 'question' ||
+        (post.discussKind == null && title.contains('?'));
     final hasSourcePost =
         post.sourcePostId != null && post.sourcePostId!.isNotEmpty;
     // Only the question's author may edit it.
     final currentUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final isAuthor = currentUid != null && currentUid == post.authorUid;
+    final canReport = currentUid != null && currentUid != post.authorUid;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -323,7 +336,9 @@ class _QuestionCard extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  context.t.qaQuestionLabel,
+                  isQuestion
+                      ? context.t.homeQuestionLabel
+                      : context.t.homeDiscussionLabel,
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -331,9 +346,8 @@ class _QuestionCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              // 3-dot menu — only the question's author sees it, and
-              // it only offers "Edit question".
-              if (isAuthor)
+              // 3-dot menu for question actions.
+              if (isAuthor || canReport)
                 SizedBox(
                   width: 32,
                   height: 32,
@@ -345,16 +359,56 @@ class _QuestionCard extends ConsumerWidget {
                       if (action == 'edit') {
                         _editQuestion(context, ref);
                       }
+                      if (action == 'delete') {
+                        _deleteQuestion(context, ref);
+                      }
+                      if (action == 'report') {
+                        _reportQuestion(context, ref);
+                      }
                     },
                     itemBuilder: (_) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(children: [
-                          const Icon(Icons.edit_outlined, size: 18),
-                          const SizedBox(width: 8),
-                          Text(context.t.qaEditQuestion),
-                        ]),
-                      ),
+                      if (isAuthor)
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(children: [
+                            const Icon(Icons.edit_outlined, size: 18),
+                            const SizedBox(width: 8),
+                            Text(context.t.qaEditQuestion),
+                          ]),
+                        ),
+                      if (isAuthor)
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(children: [
+                            const Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Color(0xFFEF476F),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              context.t.homeDeleteQuestionMenu,
+                              style:
+                                  const TextStyle(color: Color(0xFFEF476F)),
+                            ),
+                          ]),
+                        ),
+                      if (canReport)
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Row(children: [
+                            const Icon(
+                              Icons.flag_outlined,
+                              size: 18,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              context.t.homeReportQuestionMenu,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ]),
+                        ),
                     ],
                   ),
                 ),
@@ -440,6 +494,176 @@ class _QuestionCard extends ConsumerWidget {
           );
     } catch (_) {
       // Edit is best-effort; the thread re-streams on success.
+    }
+  }
+
+  Future<void> _reportQuestion(BuildContext context, WidgetRef ref) async {
+    final detailsCtrl = TextEditingController();
+    var selectedReason = _reportReasons.first;
+
+    try {
+      final submitted = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: context.cardBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetContext) {
+          return StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                context.t.homeReportQuestionMenu,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimary,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  Navigator.pop(sheetContext, false),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          context.t.homePickReasonQuestion,
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._reportReasons.map(
+                          (reason) => RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: reason,
+                            groupValue: selectedReason,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setSheetState(() => selectedReason = value);
+                            },
+                            title: Text(
+                              reason,
+                              style: TextStyle(color: context.textPrimary),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: detailsCtrl,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            hintText: context.t.homeExtraDetailsOptional,
+                            filled: true,
+                            fillColor: context.inputFill,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide:
+                                  BorderSide(color: context.borderColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, false),
+                                child: Text(context.t.cancel),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, true),
+                                child: Text(context.t.homeSendReport),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      if (submitted != true) return;
+
+      await ref.read(postServiceProvider).reportQaPost(
+            post: post,
+            reason: selectedReason,
+            details: detailsCtrl.text,
+          );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.t.homeReportSentAdmins)),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.t.homeCouldNotReportQuestion(e))),
+      );
+    } finally {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => detailsCtrl.dispose());
+    }
+  }
+
+  Future<void> _deleteQuestion(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.t.homeDeleteQuestionTitle),
+        content: Text(context.t.homeDeleteQuestionBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(context.t.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await ref.read(postServiceProvider).deletePost(post.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.t.homeQuestionDeleted)),
+      );
+      Navigator.of(context).maybePop();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.t.homeCouldNotDelete(e))),
+      );
     }
   }
 }
@@ -801,7 +1025,7 @@ class _AnswerReactionBar extends ConsumerWidget {
             icon: Icons.favorite_border,
             label: '${answer.helpfulCount}',
             active: false,
-            activeColor: const Color(0xFFE54865),
+            activeColor: AppColors.purple,
             compact: compact,
             onTap: () {},
           ),
@@ -837,7 +1061,7 @@ class _AnswerReactionBar extends ConsumerWidget {
               icon: heartOn ? Icons.favorite : Icons.favorite_border,
               label: '${answer.helpfulCount}',
               active: heartOn,
-              activeColor: const Color(0xFFE54865),
+              activeColor: AppColors.purple,
               compact: compact,
               onTap: () => setReaction('heart'),
             ),
@@ -861,7 +1085,7 @@ class _AnswerReactionBar extends ConsumerWidget {
             icon: Icons.favorite_border,
             label: '${answer.helpfulCount}',
             active: false,
-            activeColor: const Color(0xFFE54865),
+            activeColor: AppColors.purple,
             compact: compact,
             onTap: () => setReaction('heart'),
           ),
@@ -884,7 +1108,7 @@ class _AnswerReactionBar extends ConsumerWidget {
             icon: Icons.favorite_border,
             label: '${answer.helpfulCount}',
             active: false,
-            activeColor: const Color(0xFFE54865),
+            activeColor: AppColors.purple,
             compact: compact,
             onTap: () => setReaction('heart'),
           ),
@@ -1296,8 +1520,8 @@ class _AnswerAuthorMenu extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(ctx.t.delete),
-        content: Text(ctx.t.deleteForMeBody),
+        title: Text(ctx.t.commentDeleteTitle),
+        content: Text(ctx.t.commentDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1335,7 +1559,7 @@ class _AnswerAuthorMenu extends ConsumerWidget {
     return PopupMenuButton<String>(
       tooltip: '',
       padding: EdgeInsets.zero,
-      icon: Icon(Icons.more_vert, size: 18, color: context.textSecondary),
+      icon: Icon(Icons.more_horiz, size: 18, color: context.textSecondary),
       onSelected: (v) {
         if (v == 'edit') _edit(context, ref);
         if (v == 'delete') _delete(context, ref);

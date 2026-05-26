@@ -484,7 +484,7 @@ class _PostCardState extends ConsumerState<PostCard>
                                                     ? Icons.favorite
                                                     : Icons.favorite_border,
                                                 color: isLiked
-                                                    ? Colors.red
+                                                    ? AppColors.purple
                                                     : Colors.white,
                                                 size: 20,
                                               ),

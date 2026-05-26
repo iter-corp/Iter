@@ -355,10 +355,12 @@ const Map<String, String> enStrings = {
   'forgot_password_enter_email': 'Enter your email address',
   'forgot_password_enter_valid_email': 'Enter a valid email address',
   'forgot_password_send_reset_link': 'Send Reset Link',
-  'otp_enter_code': 'Enter OTP code',
-  'otp_code_sent_to': 'OTP code has been send\nto{destination}',
-  'otp_didnt_get': "Didn't get OTP? ",
-  'otp_resend': 'Resend OTP',
+  'otp_enter_code': 'Verify your email',
+  'otp_code_sent_to': 'We sent a verification link to\n{destination}',
+  'otp_didnt_get': "Didn't get the email? ",
+  'otp_resend': 'Resend email',
+  'otp_open_email_instruction':
+      'Open the link in your email, then come back and tap Verify.',
   'onboarding_setup_profile': 'Set up profile',
   'onboarding_gender': 'Gender',
   'onboarding_gender_male': 'Male',
@@ -383,6 +385,22 @@ const Map<String, String> enStrings = {
   'onboarding_city': 'City',
   'onboarding_city_autofilled': 'Auto-filled — edit if needed',
   'onboarding_city_hint': 'e.g. Paris',
+  'app_intro_posts_title': 'Posts for everyday updates',
+  'app_intro_posts_body':
+      'Share what you are working on, react to friends, comment, and keep up with the main feed.',
+  'app_intro_discuss_title': 'Questions and discussions',
+  'app_intro_discuss_body':
+      'Use Discuss to ask questions, start conversations, answer others, and follow helpful threads.',
+  'app_intro_travel_title': 'Travel mode for places',
+  'app_intro_travel_body':
+      'Switch Home into Travel Mode to discover posts by place, browse all places, or focus on what is nearby.',
+  'app_intro_events_title': 'Events and people nearby',
+  'app_intro_events_body':
+      'The Events tab helps you find opportunities, activities, and people connected to your city and interests.',
+  'app_intro_translate_title': 'Translate, chat, and profile',
+  'app_intro_translate_body':
+      'Translate text in the Translate tab, use built-in translation across the app, message people, and manage your profile.',
+  'app_intro_start': 'Start using Iter',
   'splash_app_name': 'Iter',
 
   // ── HOME/FEED SCREENS (added) ──
@@ -429,8 +447,10 @@ const Map<String, String> enStrings = {
   'home_ask_community': 'Ask the community',
   'home_write_question_first': 'Write your question first',
   'home_whats_your_question': "What's your question?",
+  'home_whats_your_discussion': 'What do you want to discuss?',
   'home_add_more_context': 'Add more context (optional)...',
   'home_post_question': 'Post Question',
+  'home_post_discussion': 'Post Discussion',
   'home_search_place': 'Search place',
   'home_location_services_off':
       'Location services are turned off. Turn them on so Travel Mode can show nearby posts.',
@@ -460,6 +480,8 @@ const Map<String, String> enStrings = {
   'post_not_found': 'Post not found',
   'comment_no_comments_first': 'No comments yet. Be the first!',
   'comment_hide_replies': 'Hide replies',
+  'comment_delete_title': 'Delete comment?',
+  'comment_delete_body': 'Are you sure you want to delete this comment?',
   'comment_replying_to': 'Replying to @{username}',
   'comment_reply_to_hint': 'Reply to @{username}...',
   'comment_add_comment_hint': 'Add a comment...',

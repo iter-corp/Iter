@@ -115,7 +115,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             password: _passCtrl.text,
           );
       if (!mounted) return;
-      context.push('/otp?email=${Uri.encodeComponent(_emailCtrl.text.trim())}');
+      context.go('/otp?email=${Uri.encodeComponent(_emailCtrl.text.trim())}');
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {

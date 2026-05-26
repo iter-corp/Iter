@@ -438,6 +438,7 @@ class AppStrings {
       _fmt('otp_code_sent_to', {'destination': destination});
   String get otpDidntGet => _get('otp_didnt_get');
   String get otpResend => _get('otp_resend');
+  String get otpOpenEmailInstruction => _get('otp_open_email_instruction');
   String get onboardingSetupProfile => _get('onboarding_setup_profile');
   String get onboardingGender => _get('onboarding_gender');
   String get onboardingGenderMale => _get('onboarding_gender_male');
@@ -462,6 +463,17 @@ class AppStrings {
   String get onboardingCityAutofilled =>
       _get('onboarding_city_autofilled');
   String get onboardingCityHint => _get('onboarding_city_hint');
+  String get appIntroPostsTitle => _get('app_intro_posts_title');
+  String get appIntroPostsBody => _get('app_intro_posts_body');
+  String get appIntroDiscussTitle => _get('app_intro_discuss_title');
+  String get appIntroDiscussBody => _get('app_intro_discuss_body');
+  String get appIntroTravelTitle => _get('app_intro_travel_title');
+  String get appIntroTravelBody => _get('app_intro_travel_body');
+  String get appIntroEventsTitle => _get('app_intro_events_title');
+  String get appIntroEventsBody => _get('app_intro_events_body');
+  String get appIntroTranslateTitle => _get('app_intro_translate_title');
+  String get appIntroTranslateBody => _get('app_intro_translate_body');
+  String get appIntroStart => _get('app_intro_start');
   String get splashAppName => _get('splash_app_name');
 
   // ──────────────────────────────────────────────────────────────
@@ -514,8 +526,10 @@ class AppStrings {
   String get homeAskCommunity => _get('home_ask_community');
   String get homeWriteQuestionFirst => _get('home_write_question_first');
   String get homeWhatsYourQuestion => _get('home_whats_your_question');
+  String get homeWhatsYourDiscussion => _get('home_whats_your_discussion');
   String get homeAddMoreContext => _get('home_add_more_context');
   String get homePostQuestion => _get('home_post_question');
+  String get homePostDiscussion => _get('home_post_discussion');
   String get homeSearchPlace => _get('home_search_place');
   String get homeLocationServicesOff => _get('home_location_services_off');
   String get travelLocationOffBanner => _get('travel_location_off_banner');
@@ -545,6 +559,8 @@ class AppStrings {
   String get postNotFound => _get('post_not_found');
   String get commentNoCommentsFirst => _get('comment_no_comments_first');
   String get commentHideReplies => _get('comment_hide_replies');
+  String get commentDeleteTitle => _get('comment_delete_title');
+  String get commentDeleteBody => _get('comment_delete_body');
   String commentReplyingTo(Object username) =>
       _fmt('comment_replying_to', {'username': username});
   String commentReplyToHint(Object username) =>

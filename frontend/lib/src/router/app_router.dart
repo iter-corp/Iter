@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/model/main_screen.dart';
 import '../features/screens/admin/admin_dashboard_screen.dart';
+import '../features/screens/auth/app_intro_screen.dart';
 import '../features/screens/auth/forgot_password_screen.dart';
 import '../features/screens/auth/login_screen.dart';
 import '../features/screens/auth/onboarding_screen.dart';
@@ -44,6 +45,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         return inAuthFlow ? null : '/login';
       }
 
+      final needsEmailVerification =
+          ref.read(authServiceProvider).requiresEmailVerification;
+      if (needsEmailVerification) {
+        if (loc == '/otp') {
+          debugPrint('[Router] email unverified && already on /otp -> stay');
+          return null;
+        }
+        final email = Uri.encodeComponent(user.email ?? '');
+        debugPrint('[Router] email unverified from $loc -> /otp');
+        return '/otp?email=$email';
+      }
+
       // Logged in - check onboarding
       final userDocAsync = ref.read(currentUserDocProvider);
 
@@ -70,10 +83,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final needsOnboarding = userDoc == null ||
           username == null ||
           username.trim().isEmpty;
+      final appIntroSeen = userDoc?['appIntroSeen'] == true;
 
       debugPrint('[Router] loc=$loc uid=${user.uid} docExists=${userDoc != null} '
           'username=${username == null ? "<null>" : "\"$username\""} '
-          'needsOnboarding=$needsOnboarding');
+          'needsOnboarding=$needsOnboarding appIntroSeen=$appIntroSeen');
 
       if (needsOnboarding) {
         if (loc == '/onboarding' || loc == '/otp') {
@@ -84,8 +98,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/onboarding';
       }
 
+      if (!appIntroSeen) {
+        if (loc == '/app-intro') {
+          debugPrint('[Router] app intro pending && already on /app-intro -> stay');
+          return null;
+        }
+        debugPrint('[Router] app intro pending from $loc -> /app-intro');
+        return '/app-intro';
+      }
+
       // Onboarding done - send to home
-      if (inAuthFlow || loc == '/onboarding' || loc == '/splash') {
+      if (inAuthFlow ||
+          loc == '/onboarding' ||
+          loc == '/app-intro' ||
+          loc == '/splash') {
         debugPrint('[Router] onboarding done from $loc -> /home');
         return '/home';
       }
@@ -110,6 +136,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         builder: (_, __) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/app-intro',
+        builder: (_, __) => const AppIntroScreen(),
       ),
       GoRoute(path: '/home', builder: (_, __) => const MainScreen()),
       GoRoute(
@@ -162,6 +192,7 @@ class _AuthListenable extends ChangeNotifier {
       isUserDocLoading: userDocAsync.isLoading,
       needsOnboarding:
           doc == null || username == null || username.trim().isEmpty,
+      appIntroSeen: doc?['appIntroSeen'] == true,
     );
   });
 

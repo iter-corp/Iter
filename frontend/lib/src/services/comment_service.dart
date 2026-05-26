@@ -244,8 +244,9 @@ class CommentService {
           // notification lands directly on the reply, scrolls to it,
           // and highlights it for ~3s — matching how `comment_like`
           // and the QA `qa_reply` flows already behave.
-          await _notifications.createNotification(
+          await _notifications.upsertNotification(
             targetUid: parentAuthorUid,
+            docId: 'reply_${postId}_${commentRef.id}_$authorUid',
             type: 'reply',
             actorUid: authorUid,
             targetId: postId,
@@ -264,8 +265,9 @@ class CommentService {
             'postId=$postId commentId=${commentRef.id}');
         if (postAuthorUid != null && postAuthorUid != authorUid) {
           try {
-            await _notifications.createNotification(
+            await _notifications.upsertNotification(
               targetUid: postAuthorUid,
+              docId: 'comment_${postId}_${commentRef.id}_$authorUid',
               type: 'comment',
               actorUid: authorUid,
               targetId: postId,
@@ -390,12 +392,59 @@ class CommentService {
       return;
     }
 
+    final commentRef = _comments(postId).doc(commentId);
+    final commentSnap = await commentRef.get();
+    final commentData = commentSnap.data();
+    final commentAuthorUid = commentData?['authorUid'] as String?;
+    final parentCommentId = commentData?['parentCommentId'] as String?;
+
     final batch = _db.batch();
-    batch.delete(_comments(postId).doc(commentId));
+    batch.delete(commentRef);
     batch.update(_postRef(postId), {
       'commentsCount': FieldValue.increment(-1),
     });
     await batch.commit();
+
+    // Best-effort cleanup for the top-level "commented on your post"
+    // notification, replies, and Q&A answer/reply notifications. The
+    // deterministic IDs let the actor delete their own notification fan-out
+    // without needing to query someone else's private notification list.
+    try {
+      final postSnap = await _postRef(postId).get();
+      final postData = postSnap.data();
+      final postAuthorUid = postData?['authorUid'] as String?;
+      final isQa = (postData?['postType'] as String?) == 'qa';
+      final isTopLevel = parentCommentId == null;
+
+      if (commentAuthorUid == null) return;
+
+      if (isTopLevel && postAuthorUid != null) {
+        final notifId = isQa
+            ? 'qa_answer_${postId}_${commentId}_$commentAuthorUid'
+            : 'comment_${postId}_${commentId}_$commentAuthorUid';
+        if (postAuthorUid != commentAuthorUid) {
+          await _notifications.removeNotificationById(postAuthorUid, notifId);
+        }
+        return;
+      }
+
+      if (parentCommentId != null) {
+        final parentSnap = await _comments(postId).doc(parentCommentId).get();
+        final parentAuthorUid = parentSnap.data()?['authorUid'] as String?;
+        if (parentAuthorUid == null || parentAuthorUid == commentAuthorUid) {
+          return;
+        }
+        final notifId = isQa
+            ? 'qa_reply_${postId}_${commentId}_$commentAuthorUid'
+            : 'reply_${postId}_${commentId}_$commentAuthorUid';
+        await _notifications.removeNotificationById(
+          parentAuthorUid,
+          notifId,
+        );
+      }
+    } catch (_) {
+      // Notification cleanup is best-effort; the comment is already deleted.
+    }
   }
 
   Future<void> toggleLikeComment({

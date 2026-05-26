@@ -46,8 +46,24 @@ class MessageTabBar extends StatelessWidget {
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFB05ECC) : context.inputFill,
+          color: isActive ? null : context.inputFill,
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [AppColors.purple, AppColors.purpleVivid],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           borderRadius: BorderRadius.circular(20),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: AppColors.purple.withValues(alpha: 0.30),
+                    blurRadius: 9,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Center(
           child: Text(

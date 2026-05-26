@@ -235,18 +235,40 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                       ),
                       const SizedBox(width: 8),
                       Material(
-                        color: const Color(0xFFB05ECC),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        clipBehavior: Clip.antiAlias,
                         child: InkWell(
                           onTap: () => showCreateGroupSheet(context),
-                          borderRadius: BorderRadius.circular(12),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 10),
-                            child: Icon(
-                              Icons.group_add_outlined,
-                              color: Colors.white,
-                              size: 22,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Ink(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.purple,
+                                  AppColors.purpleVivid,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.purple
+                                      .withValues(alpha: 0.32),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 10),
+                              child: Icon(
+                                Icons.group_add_outlined,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),

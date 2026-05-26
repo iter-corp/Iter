@@ -20,6 +20,7 @@ import 'create_post_screen.dart';
 import 'notification_screen.dart';
 import 'post_detail_screen.dart';
 import 'qa_thread_screen.dart';
+import '../widgets/primary_action_button.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_section.dart';
 
@@ -1413,13 +1414,17 @@ class _ModeDropdown extends StatelessWidget {
         height: 38,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: AppColors.purple,
+          gradient: const LinearGradient(
+            colors: [AppColors.purple, AppColors.purpleVivid],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColors.purple.withValues(alpha: 0.30),
+              color: AppColors.purple.withValues(alpha: 0.35),
               blurRadius: 10,
-              offset: const Offset(0, 3),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1536,7 +1541,8 @@ class _QaThreadCard extends ConsumerWidget {
     final body = lines.length > 1 ? lines.sublist(1).join(' ') : '';
     final preview = _twoSentencePreview(body);
     final timeLabel = context.t.timeAgo(post.createdAt);
-    final isQuestion = title.contains('?');
+    final isQuestion = post.discussKind == 'question' ||
+        (post.discussKind == null && title.contains('?'));
 
     void openThread() {
       Navigator.push(
@@ -1691,8 +1697,18 @@ class _QaThreadCard extends ConsumerWidget {
                           if (canReport)
                             PopupMenuItem<String>(
                               value: 'report',
-                              child:
-                                  Text(context.t.homeReportQuestionMenu),
+                              child: Row(children: [
+                                const Icon(
+                                  Icons.flag_outlined,
+                                  size: 18,
+                                  color: Colors.red,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  context.t.homeReportQuestionMenu,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ]),
                             ),
                           if (canDelete)
                             PopupMenuItem<String>(
@@ -1740,24 +1756,14 @@ class _QaThreadCard extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    // Live answer count from the subcollection — keeps
-                    // the chip in sync with reality on legacy posts
-                    // whose cached `commentsCount` drifted negative.
-                    Consumer(builder: (context, ref, _) {
-                      final live = ref
-                              .watch(commentsCountProvider(post.id))
-                              .asData
-                              ?.value ??
-                          (post.commentsCount < 0 ? 0 : post.commentsCount);
-                      return _QaMeta(
-                        icon: Icons.chat_bubble_outline,
-                        label: context.t.homeAnswersCount(live),
-                        onTap: openThread,
-                      );
-                    }),
+                    _QaMeta(
+                      icon: Icons.forum_outlined,
+                      label: context.t.homeDiscuss,
+                      onTap: openThread,
+                    ),
                     _QaMeta(
                       icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                      label: context.t.homeHelpfulCount(post.likesCount),
+                      label: '',
                       highlighted: isLiked,
                       onTap: () async {
                         try {
@@ -1773,11 +1779,6 @@ class _QaThreadCard extends ConsumerWidget {
                           );
                         }
                       },
-                    ),
-                    _QaMeta(
-                      icon: Icons.edit_outlined,
-                      label: context.t.homeWriteAnswer,
-                      onTap: openThread,
                     ),
                   ],
                 ),
@@ -2242,20 +2243,10 @@ class _SearchPostRow extends StatelessWidget {
     }
 
     // ── Post button (shared) ─────────────────────────────────────
-    final Widget postButton = SizedBox(
-      height: 42,
-      child: FilledButton.icon(
-        onPressed: onPost,
-        icon: const Icon(Icons.add, size: 18),
-        label: Text(context.t.post),
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.purple,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
+    final Widget postButton = PrimaryActionButton(
+      label: context.t.post,
+      icon: Icons.add,
+      onPressed: onPost,
     );
 
     // ── Reset (✕) button — only in the results state ─────────────
@@ -2348,15 +2339,17 @@ class _QaMeta extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 14, color: fg),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: fg,
-                  fontWeight: FontWeight.w600,
+              if (label.isNotEmpty) ...[
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: fg,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -2381,6 +2374,7 @@ class _AskQuestionSheet extends ConsumerStatefulWidget {
 class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
   final _questionCtrl = TextEditingController();
   final _detailsCtrl = TextEditingController();
+  String _discussKind = 'question';
   bool _submitting = false;
 
   @override
@@ -2403,6 +2397,7 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
       await ref.read(postServiceProvider).createQaPost(
             question: question,
             details: details,
+            discussKind: _discussKind,
           );
       if (!mounted) return;
       Navigator.pop(context);
@@ -2501,6 +2496,24 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                 ],
               ),
               const SizedBox(height: 20),
+              Row(
+                children: [
+                  _DiscussKindButton(
+                    icon: Icons.help_outline_rounded,
+                    label: context.t.homeQuestionLabel,
+                    selected: _discussKind == 'question',
+                    onTap: () => setState(() => _discussKind = 'question'),
+                  ),
+                  const SizedBox(width: 8),
+                  _DiscussKindButton(
+                    icon: Icons.forum_outlined,
+                    label: context.t.homeDiscussionLabel,
+                    selected: _discussKind == 'discussion',
+                    onTap: () => setState(() => _discussKind = 'discussion'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               // Question field
               TextField(
                 controller: _questionCtrl,
@@ -2514,7 +2527,9 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                   color: context.textPrimary,
                 ),
                 decoration: InputDecoration(
-                  hintText: context.t.homeWhatsYourQuestion,
+                  hintText: _discussKind == 'discussion'
+                      ? context.t.homeWhatsYourDiscussion
+                      : context.t.homeWhatsYourQuestion,
                   hintStyle: TextStyle(
                       color: context.textSecondary,
                       fontWeight: FontWeight.w400),
@@ -2550,36 +2565,68 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
                 ),
               ),
               const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _submitting ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF7E3BE8),
-                    disabledBackgroundColor:
-                        const Color(0xFF7E3BE8).withValues(alpha: 0.5),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+              PrimaryActionButton(
+                label: _discussKind == 'discussion'
+                    ? context.t.homePostDiscussion
+                    : context.t.homePostQuestion,
+                onPressed: _submitting ? null : _submit,
+                loading: _submitting,
+                size: PrimaryActionSize.large,
+                fullWidth: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscussKindButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DiscussKindButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? const Color(0xFF7E3BE8) : context.textSecondary;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? context.purpleSoft : context.inputFill,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF7E3BE8).withValues(alpha: 0.35)
+                  : context.borderColor,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          context.t.homePostQuestion,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
                 ),
               ),
             ],
@@ -3233,12 +3280,9 @@ class _TravelFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
-    const purple = Color(0xFFB05ECC);
-    final bg = selected
-        ? purple
-        : (disabled
+    final bg = disabled
             ? context.inputFill.withValues(alpha: 0.5)
-            : context.inputFill);
+            : context.inputFill;
     final fg = selected
         ? Colors.white
         : (disabled ? context.textMuted : context.textPrimary);
@@ -3248,12 +3292,28 @@ class _TravelFilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: bg,
+          color: selected ? null : bg,
+          gradient: selected
+              ? const LinearGradient(
+                  colors: [AppColors.purple, AppColors.purpleVivid],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? purple : Colors.transparent,
+            color: selected ? Colors.transparent : Colors.transparent,
             width: 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.purple.withValues(alpha: 0.30),
+                    blurRadius: 9,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

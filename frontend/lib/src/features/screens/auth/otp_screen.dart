@@ -1,40 +1,93 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_strings.dart';
+import '../../../providers/auth_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../widgets/primary_action_button.dart';
 
-class OtpScreen extends StatefulWidget {
+class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key, this.email});
 
   final String? email;
 
   @override
-  State<OtpScreen> createState() => _OtpScreenState();
+  ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
-  final List<TextEditingController> _controllers =
-      List.generate(5, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(5, (_) => FocusNode());
+class _OtpScreenState extends ConsumerState<OtpScreen> {
+  bool _verifying = false;
+  bool _resending = false;
+  bool _canceling = false;
+  String? _error;
 
-  @override
-  void dispose() {
-    for (final controller in _controllers) {
-      controller.dispose();
+  Future<void> _verify() async {
+    setState(() {
+      _verifying = true;
+      _error = null;
+    });
+    try {
+      final verified =
+          await ref.read(authServiceProvider).reloadAndCheckEmailVerified();
+      if (!mounted) return;
+      if (verified) {
+        context.go('/onboarding');
+      } else {
+        setState(() {
+          _error =
+              'Please open the verification link in your email, then tap Verify.';
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _verifying = false);
     }
-    for (final focusNode in _focusNodes) {
-      focusNode.dispose();
-    }
-    super.dispose();
   }
 
-  void _onChanged(String value, int index) {
-    if (value.isNotEmpty && index < _focusNodes.length - 1) {
-      _focusNodes[index + 1].requestFocus();
-    } else if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
+  Future<void> _resend() async {
+    setState(() {
+      _resending = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authServiceProvider).sendEmailVerification();
+      if (mounted) {
+        setState(() {
+          _error = 'Verification email sent. Check your inbox.';
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
+
+  Future<void> _cancelSignup() async {
+    setState(() {
+      _canceling = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authServiceProvider).discardPendingSignup();
+      if (mounted) {
+        setState(() => _canceling = false);
+        context.go('/signup');
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _error = 'Cancel took too long. Check your connection and try again.';
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _canceling = false);
     }
   }
 
@@ -52,21 +105,25 @@ class _OtpScreenState extends State<OtpScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: () => context.pop(),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: context.cardBg,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.chevron_left,
-                    color: context.textPrimary,
-                    size: 22,
-                  ),
+              IconButton(
+                onPressed: _canceling ? null : _cancelSignup,
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                style: IconButton.styleFrom(
+                  backgroundColor: context.cardBg,
+                  foregroundColor: context.textPrimary,
+                  disabledForegroundColor:
+                      context.textMuted.withValues(alpha: 0.55),
                 ),
+                icon: _canceling
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.textMuted,
+                        ),
+                      )
+                    : const Icon(Icons.chevron_left_rounded),
               ),
               const SizedBox(height: 24),
               Row(
@@ -95,7 +152,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.send_rounded,
+                    Icons.mark_email_read_rounded,
                     color: Color(0xFFCE5DE5),
                     size: 40,
                   ),
@@ -125,58 +182,55 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
               const SizedBox(height: 36),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(5, (index) {
-                  return SizedBox(
-                    width: 58,
-                    height: 58,
-                    child: TextField(
-                      controller: _controllers[index],
-                      focusNode: _focusNodes[index],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: 1,
-                      onChanged: (value) => _onChanged(value, index),
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: context.textPrimary,
-                      ),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        filled: true,
-                        fillColor: context.surfaceSoft,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(50),
-                          borderSide: BorderSide(
-                            color: context.borderColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(50),
-                          borderSide: BorderSide(
-                            color: context.borderColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(50),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFCE5DE5),
-                            width: 2,
-                          ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.mail_outline_rounded,
+                      color: Color(0xFFCE5DE5),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        context.t.otpOpenEmailInstruction,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.textSecondary,
+                          height: 1.4,
                         ),
                       ),
                     ),
-                  );
-                }),
+                  ],
+                ),
               ),
               const SizedBox(height: 36),
+              if (_error != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.borderColor),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(fontSize: 13, color: context.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               PrimaryActionButton(
                 label: context.t.verify,
-                onPressed: () => context.go('/onboarding'),
+                onPressed: _verifying ? null : _verify,
+                loading: _verifying,
                 size: PrimaryActionSize.large,
                 fullWidth: true,
               ),
@@ -188,9 +242,9 @@ class _OtpScreenState extends State<OtpScreen> {
                     style: TextStyle(fontSize: 13, color: context.textMuted),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: _resending ? null : _resend,
                     child: Text(
-                      context.t.otpResend,
+                      _resending ? context.t.loading : context.t.otpResend,
                       style: TextStyle(
                         fontSize: 13,
                         color: context.textPrimary,

@@ -10,6 +10,7 @@ import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../theme/app_theme.dart';
 import '../screens/chat_screen.dart';
+import 'primary_action_button.dart';
 
 /// Opens a bottom sheet that lets the signed-in user create a new group chat
 /// by picking members from the accounts they follow.
@@ -214,38 +215,18 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _busy ||
-                              _selected.isEmpty ||
-                              _nameCtrl.text.trim().isEmpty
-                          ? null
-                          : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFB05ECC),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      child: _busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : Text(
-                              _selected.isEmpty
-                                  ? context.t.createGroupCreate
-                                  : context.t
-                                      .createGroupCreateCount(_selected.length),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                    ),
+                  child: PrimaryActionButton(
+                    label: _selected.isEmpty
+                        ? context.t.createGroupCreate
+                        : context.t.createGroupCreateCount(_selected.length),
+                    onPressed: _busy ||
+                            _selected.isEmpty ||
+                            _nameCtrl.text.trim().isEmpty
+                        ? null
+                        : _submit,
+                    loading: _busy,
+                    size: PrimaryActionSize.large,
+                    fullWidth: true,
                   ),
                 ),
               ),

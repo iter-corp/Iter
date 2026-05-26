@@ -28,6 +28,7 @@ class Post {
   /// Set on a Discuss (QA) post that was created *from* a feed/travel
   /// post — holds the id of that original post.
   final String? sourcePostId;
+  final String? discussKind;
 
   Post({
     required this.id,
@@ -50,6 +51,7 @@ class Post {
     this.travelDistanceLabel,
     this.discussTopicId,
     this.sourcePostId,
+    this.discussKind,
   });
 
   factory Post.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
@@ -75,6 +77,7 @@ class Post {
       postLocationExact: (data['postLocationExact'] as bool?) ?? false,
       discussTopicId: (data['discussTopicId'] as String?)?.trim(),
       sourcePostId: (data['sourcePostId'] as String?)?.trim(),
+      discussKind: (data['discussKind'] as String?)?.trim(),
     );
   }
 
@@ -113,6 +116,7 @@ class Post {
       postLocationExact: (data['postLocationExact'] as bool?) ?? false,
       travelDistanceKm: (data['distanceKm'] as num?)?.toDouble(),
       travelDistanceLabel: (data['distanceLabel'] as String?)?.trim(),
+      discussKind: (data['discussKind'] as String?)?.trim(),
     );
   }
 }

@@ -524,6 +524,48 @@ class _CommentTile extends ConsumerWidget {
     );
   }
 
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String? currentUid,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.t.commentDeleteTitle),
+        content: Text(ctx.t.commentDeleteBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              ctx.t.delete,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      await ref.read(commentServiceProvider).deleteComment(
+            postId: post.id,
+            commentId: comment.id,
+            senderOnly: comment.senderOnly,
+            currentUid: currentUid,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider).value?.uid;
@@ -689,7 +731,7 @@ class _CommentTile extends ConsumerWidget {
                                           : Icons.favorite_border,
                                       size: 14,
                                       color: isLiked
-                                          ? const Color(0xFFFF4D6D)
+                                          ? AppColors.purple
                                           : context.textSecondary,
                                     ),
                                     const SizedBox(width: 4),
@@ -701,7 +743,7 @@ class _CommentTile extends ConsumerWidget {
                                           count > 0 ? '$count' : 'Like',
                                           style: TextStyle(
                                             color: isLiked
-                                                ? const Color(0xFFFF4D6D)
+                                                ? AppColors.purple
                                                 : context.textSecondary,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
@@ -756,14 +798,7 @@ class _CommentTile extends ConsumerWidget {
             ),
             if (canDelete)
               GestureDetector(
-                onTap: () async {
-                  await ref.read(commentServiceProvider).deleteComment(
-                        postId: post.id,
-                        commentId: comment.id,
-                        senderOnly: comment.senderOnly,
-                        currentUid: currentUid,
-                      );
-                },
+                onTap: () => _confirmDelete(context, ref, currentUid),
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 8),
                   child:

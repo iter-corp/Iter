@@ -38,6 +38,8 @@ class PrimaryActionButton extends StatelessWidget {
     final dims = _dimsFor(size);
     final btn = Material(
       color: Colors.transparent,
+      borderRadius: BorderRadius.circular(30),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: disabled ? null : onPressed,
         borderRadius: BorderRadius.circular(30),
