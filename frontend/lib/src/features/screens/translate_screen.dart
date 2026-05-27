@@ -11,6 +11,7 @@ import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/feature_disabled_view.dart';
 import '../widgets/primary_action_button.dart';
 import 'saved_translations_screen.dart';
@@ -331,7 +332,7 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       );
     }
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -490,13 +491,11 @@ class _LanguageDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => _openPicker(context),
-      child: Container(
+      child: AppGlassCard(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: context.inputFill,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: context.borderColor),
-        ),
+        radius: 12,
+        surfaceAlpha: context.isDark ? 0.28 : 0.54,
+        borderAlpha: context.isDark ? 0.18 : 0.52,
         child: Row(
           children: [
             Expanded(
@@ -634,13 +633,13 @@ class _InputBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 120,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: context.inputFill,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return AppGlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 12),
+      height: 136,
+      radius: 22,
+      emphasize: true,
+      surfaceAlpha: context.isDark ? 0.18 : 0.48,
+      borderAlpha: context.isDark ? 0.24 : 0.56,
       child: Stack(
         children: [
           TextField(
@@ -649,16 +648,26 @@ class _InputBox extends StatelessWidget {
             expands: true,
             textAlignVertical: TextAlignVertical.top,
             decoration: InputDecoration(
+              filled: false,
+              fillColor: Colors.transparent,
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
               hintText: context.t.translateEnterText,
-              hintStyle: TextStyle(fontSize: 15, color: context.textMuted),
+              hintStyle: TextStyle(
+                fontSize: 15,
+                color: context.textMuted.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w600,
+              ),
               isDense: true,
-              contentPadding: EdgeInsets.zero,
+              contentPadding: const EdgeInsets.only(right: 42, bottom: 28),
             ),
             style: TextStyle(
-                fontSize: 15,
-                color: context.textPrimary,
-                fontWeight: FontWeight.bold),
+              fontSize: 15,
+              color: context.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
 
           // 🔹 Mic icon ↔ animated wave toggle
@@ -677,7 +686,9 @@ class _InputBox extends StatelessWidget {
                         width: 22,
                         height: 22,
                         colorFilter: ColorFilter.mode(
-                            context.textPrimary, BlendMode.srcIn),
+                          context.textPrimary,
+                          BlendMode.srcIn,
+                        ),
                       ),
               ),
             ),
@@ -817,21 +828,13 @@ class _OutputBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppGlassCard(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 110),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      radius: 22,
+      surfaceAlpha: context.isDark ? 0.24 : 0.54,
+      borderAlpha: context.isDark ? 0.16 : 0.50,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

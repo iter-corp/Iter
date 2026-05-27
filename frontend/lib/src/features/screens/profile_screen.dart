@@ -18,6 +18,7 @@ import '../../providers/theme_provider.dart';
 
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
 import 'profile_settings_screen.dart';
@@ -140,71 +141,73 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         : ref.watch(userPostsProvider(currentUid));
 
     return Scaffold(
-      backgroundColor: context.cardBg,
-      body: userAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-        data: (user) {
-          if (user == null) {
-            return Center(child: Text(context.t.profileNoProfileData));
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
-              children: [
-                ProfileCoverAvatar(
-                  coverUrl: user['coverUrl'] as String?,
-                  avatarUrl: user['avatarUrl'] as String?,
-                ),
-                ProfileNameBio(
-                  name: (user['name'] as String?) ??
-                      (user['username'] as String?) ??
-                      'No name',
-                  handle: (user['handle'] as String?) ??
-                      ((user['username'] as String?) != null
-                          ? '@${user['username']}'
-                          : ''),
-                  bio: (user['bio'] as String?) ?? '',
-                  profession: (user['profession'] as String?) ?? '',
-                  educationLevel: (user['academicLevel'] as String?) ?? '',
-                  fieldOfStudy: (user['field'] as String?) ?? '',
-                ),
-                ProfileStats(
-                  followers: followersAsync.valueOrNull?.length ??
-                      (user['followersCount'] as int?) ??
-                      0,
-                  following: followingAsync.valueOrNull?.length ??
-                      (user['followingCount'] as int?) ??
-                      0,
-                  posts: postsAsync.valueOrNull?.length ??
-                      (user['postsCount'] as int?) ??
-                      0,
-                  onFollowersTap: () => _showUserListSheet(
-                    title: context.t.followers,
-                    uids: followersAsync.value ?? const [],
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: userAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+          data: (user) {
+            if (user == null) {
+              return Center(child: Text(context.t.profileNoProfileData));
+            }
+            return SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 100),
+              child: Column(
+                children: [
+                  ProfileCoverAvatar(
+                    coverUrl: user['coverUrl'] as String?,
+                    avatarUrl: user['avatarUrl'] as String?,
                   ),
-                  onFollowingTap: () => _showUserListSheet(
-                    title: context.t.following,
-                    uids: followingAsync.value ?? const [],
+                  ProfileNameBio(
+                    name: (user['name'] as String?) ??
+                        (user['username'] as String?) ??
+                        'No name',
+                    handle: (user['handle'] as String?) ??
+                        ((user['username'] as String?) != null
+                            ? '@${user['username']}'
+                            : ''),
+                    bio: (user['bio'] as String?) ?? '',
+                    profession: (user['profession'] as String?) ?? '',
+                    educationLevel: (user['academicLevel'] as String?) ?? '',
+                    fieldOfStudy: (user['field'] as String?) ?? '',
                   ),
-                ),
-                ProfileButtons(
-                  onSettings: () => _showSettings(context),
-                  showSettingsNotificationDot:
-                      isAdmin && (hasNewReports || hasUnreadContact),
-                ),
-                ProfileTabBar(
-                  selectedTab: selectedTab,
-                  onTap: (i) => setState(() => selectedTab = i),
-                ),
-                if (currentUid != null)
-                  _tabContent(currentUid)
-                else
-                  const ProfileEmpty(),
-              ],
-            ),
-          );
-        },
+                  ProfileStats(
+                    followers: followersAsync.valueOrNull?.length ??
+                        (user['followersCount'] as int?) ??
+                        0,
+                    following: followingAsync.valueOrNull?.length ??
+                        (user['followingCount'] as int?) ??
+                        0,
+                    posts: postsAsync.valueOrNull?.length ??
+                        (user['postsCount'] as int?) ??
+                        0,
+                    onFollowersTap: () => _showUserListSheet(
+                      title: context.t.followers,
+                      uids: followersAsync.value ?? const [],
+                    ),
+                    onFollowingTap: () => _showUserListSheet(
+                      title: context.t.following,
+                      uids: followingAsync.value ?? const [],
+                    ),
+                  ),
+                  ProfileButtons(
+                    onSettings: () => _showSettings(context),
+                    showSettingsNotificationDot:
+                        isAdmin && (hasNewReports || hasUnreadContact),
+                  ),
+                  ProfileTabBar(
+                    selectedTab: selectedTab,
+                    onTap: (i) => setState(() => selectedTab = i),
+                  ),
+                  if (currentUid != null)
+                    _tabContent(currentUid)
+                  else
+                    const ProfileEmpty(),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -989,17 +992,17 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
             return _EmptyTab(
               icon: asked ? Icons.help_outline_rounded : Icons.rate_review,
               title: asked
-                  ? context.t.profileNoQuestionsAsked
-                  : context.t.profileNoAnswersYet,
+                  ? context.t.profileNoThreadsStarted
+                  : context.t.profileNoRepliesYet,
               subtitle: asked
-                  ? context.t.profileNoQuestionsAskedSubtitle
-                  : context.t.profileNoAnswersSubtitle,
+                  ? context.t.profileNoThreadsStartedSubtitle
+                  : context.t.profileNoRepliesSubtitle,
             );
           }
           return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 96),
             itemCount: posts.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (_, i) {
@@ -1083,7 +1086,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
               children: [
                 Expanded(
                   child: _InnerQaTab(
-                    label: context.t.profileQuestionsAsked,
+                    label: context.t.profileThreadsStarted,
                     selected: _innerTab == 0,
                     onTap: () => setState(() => _innerTab = 0),
                   ),
@@ -1091,7 +1094,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: _InnerQaTab(
-                    label: context.t.profileQuestionsAnswered,
+                    label: context.t.profileReplies,
                     selected: _innerTab == 1,
                     onTap: () => setState(() => _innerTab = 1),
                   ),

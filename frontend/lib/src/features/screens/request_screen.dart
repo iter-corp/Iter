@@ -127,29 +127,6 @@ class RequestsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        /// HIDDEN REQUESTS ROW
-        ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: context.inputFill,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.notifications_off_outlined, size: 24),
-          ),
-          title: Text(context.t.requestHiddenRequests,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => HiddenRequestsScreen(requests: requests),
-            ),
-          ),
-        ),
-
-        Divider(color: Theme.of(context).dividerColor),
-
         /// REQUEST LIST
         Expanded(
           child: ListView.builder(

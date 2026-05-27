@@ -12,6 +12,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/event_chat_providers.dart';
 import '../../services/chat_service.dart';
 import '../../services/event_chat_service.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/create_group_sheet.dart';
 import '../widgets/message_widget.dart';
 import 'chat_screen.dart';
@@ -139,6 +140,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = ref.watch(authStateProvider).value?.uid;
     final inboxAsync = ref.watch(inboxProvider);
     final requestsAsync = ref.watch(requestsProvider);
     final eventChatsAsync = ref.watch(myEventChatsProvider);
@@ -146,8 +148,11 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
     final oneToOne = (inboxAsync.valueOrNull ?? []).where(_matches).toList();
     final eventRows =
         (eventChatsAsync.valueOrNull ?? []).where(_matchesEvent).toList();
-    final requestConvs =
+    final allRequestConvs =
         (requestsAsync.valueOrNull ?? []).where(_matches).toList();
+    final requestConvs = currentUid == null
+        ? allRequestConvs
+        : allRequestConvs.where((c) => !c.isMutedBy(currentUid)).toList();
 
     // Merge + sort by lastTime (newest first).
     final merged = <InboxRow>[
@@ -160,46 +165,8 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
       return b.sortTime!.compareTo(a.sortTime!);
     });
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
-          colors: context.isDark
-              ? const [Color(0xFF101017), Color(0xFF171726), Color(0xFF11111A)]
-              : const [Color(0xFFF8F5FF), Color(0xFFEFF6FF), Color(0xFFFDF7F2)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -60,
-            right: -30,
-            child: _AmbientOrb(
-              size: 220,
-              color: const Color(0xFF6FA8FF)
-                  .withValues(alpha: context.isDark ? 0.12 : 0.18),
-            ),
-          ),
-          Positioned(
-            top: 140,
-            left: -50,
-            child: _AmbientOrb(
-              size: 180,
-              color: const Color(0xFFC08BFF)
-                  .withValues(alpha: context.isDark ? 0.10 : 0.16),
-            ),
-          ),
-          Positioned(
-            bottom: -70,
-            right: 30,
-            child: _AmbientOrb(
-              size: 200,
-              color: const Color(0xFF6EE7B7)
-                  .withValues(alpha: context.isDark ? 0.08 : 0.14),
-            ),
-          ),
-          SafeArea(
+    return AppPageBackground(
+      child: SafeArea(
             child: Column(
               children: [
                 // ── Search bar + New group ──────────────────────────────────
@@ -329,8 +296,6 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                 ),
               ],
             ),
-          ),
-        ],
       ),
     );
   }
@@ -1207,29 +1172,6 @@ class _GlassChatCard extends StatelessWidget {
               ),
               child: child,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AmbientOrb extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _AmbientOrb({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, Colors.transparent],
           ),
         ),
       ),

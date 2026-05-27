@@ -618,18 +618,38 @@ class _CommentTile extends ConsumerWidget {
       openUserProfile(context, uid: comment.authorUid);
     }
 
+    final cardColor = context.cardBg.withValues(
+      alpha: context.isDark ? 0.72 : 0.90,
+    );
+    final borderColor = highlighted
+        ? AppColors.purple.withValues(alpha: 0.55)
+        : context.borderColor.withValues(alpha: 0.55);
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
       curve: Curves.easeOut,
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      margin: EdgeInsetsDirectional.fromSTEB(
+        comment.isReply ? 0 : 12,
+        5,
+        12,
+        5,
+      ),
       decoration: BoxDecoration(
         color: highlighted
-            ? const Color(0xFF8A3FB8).withValues(alpha: 0.10)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+            ? AppColors.purple.withValues(alpha: context.isDark ? 0.24 : 0.12)
+            : cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: context.isDark ? 0.20 : 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

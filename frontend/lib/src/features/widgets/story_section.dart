@@ -26,6 +26,7 @@ class _StoriesListState extends ConsumerState<StoriesList> {
   Future<void> _computeSeen(
     Map<String, List<Story>> byAuthor,
     String currentUid,
+    Set<String> locallyViewed,
   ) async {
     final storyService = ref.read(storyServiceProvider);
     for (final entry in byAuthor.entries) {
@@ -33,7 +34,8 @@ class _StoriesListState extends ConsumerState<StoriesList> {
       // Author is "seen" only if ALL their stories have been viewed.
       bool allSeen = true;
       for (final story in entry.value) {
-        final viewed = await storyService.hasViewed(story.id);
+        final viewed = locallyViewed.contains(story.id) ||
+            await storyService.hasViewed(story.id);
         if (!viewed) {
           allSeen = false;
           break;
@@ -49,6 +51,7 @@ class _StoriesListState extends ConsumerState<StoriesList> {
   Widget build(BuildContext context) {
     final storiesAsync = ref.watch(activeStoriesProvider);
     final user = ref.watch(currentUserDocProvider).value;
+    final locallyViewed = ref.watch(locallyViewedStoryIdsProvider);
 
     return Container(
       height: 110,
@@ -66,14 +69,21 @@ class _StoriesListState extends ConsumerState<StoriesList> {
           final currentUid = user?['uid'] as String? ?? '';
 
           // Compute seen state asynchronously.
-          _computeSeen(byAuthor, currentUid);
+          _computeSeen(byAuthor, currentUid, locallyViewed);
+
+          bool seenForAuthor(MapEntry<String, List<Story>> entry) {
+            if (_seenByAuthor[entry.key] == true) return true;
+            return entry.value.every(
+              (story) => locallyViewed.contains(story.id),
+            );
+          }
 
           // Sort authors: unseen first, then seen.
           final otherAuthors =
               byAuthor.entries.where((e) => e.key != currentUid).toList();
           otherAuthors.sort((a, b) {
-            final aSeen = _seenByAuthor[a.key] ?? false;
-            final bSeen = _seenByAuthor[b.key] ?? false;
+            final aSeen = seenForAuthor(a);
+            final bSeen = seenForAuthor(b);
             if (aSeen != bSeen) return aSeen ? 1 : -1;
             // Within same seen-status, newest story author first.
             return b.value.last.createdAt.compareTo(a.value.last.createdAt);
@@ -102,7 +112,7 @@ class _StoriesListState extends ConsumerState<StoriesList> {
                 final groupIndex = (hasOwnStory ? 1 : 0) + i;
                 return _StoryBubble(
                   stories: entry.value,
-                  seen: _seenByAuthor[entry.key] ?? false,
+                  seen: seenForAuthor(entry),
                   allGroups: allGroups,
                   groupIndex: groupIndex,
                 );

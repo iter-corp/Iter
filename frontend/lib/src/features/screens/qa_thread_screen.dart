@@ -126,13 +126,21 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
         final post = (snap.hasData && snap.data!.exists)
             ? Post.fromDoc(snap.data!)
             : widget.post;
+        final firstLine = post.caption
+            .split('\n')
+            .map((line) => line.trim())
+            .firstWhere((line) => line.isNotEmpty, orElse: () => '');
+        final isQuestionThread = post.discussKind == 'question' ||
+            (post.discussKind == null && firstLine.contains('?'));
 
         final commentsAsync = ref.watch(commentsProvider(post.id));
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: Text(context.t.qaThreadTitle),
+            title: Text(isQuestionThread
+                ? context.t.qaQuestionThreadTitle
+                : context.t.qaDiscussionThreadTitle),
             foregroundColor: context.textPrimary,
           ),
           body: SafeArea(
@@ -890,15 +898,6 @@ class _AnswerBlock extends ConsumerWidget {
                 _AnswerRow(
                   comment: answer,
                   postId: postId,
-                  onTap: replies.isNotEmpty ? onToggleExpanded : null,
-                  trailingAction: replies.isNotEmpty
-                      ? Icon(
-                          expanded
-                              ? Icons.keyboard_arrow_up_outlined
-                              : Icons.keyboard_arrow_down_outlined,
-                          color: context.textSecondary,
-                        )
-                      : null,
                 ),
                 const SizedBox(height: 6),
                 _AnswerReactionBar(
@@ -910,14 +909,37 @@ class _AnswerBlock extends ConsumerWidget {
                 if (replies.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      expanded
-                          ? context.t.commentHideReplies
-                          : '${context.t.viewComments} (${replies.length})',
-                      style: TextStyle(
-                        color: context.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                    child: InkWell(
+                      onTap: onToggleExpanded,
+                      borderRadius: BorderRadius.circular(999),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 2,
+                          vertical: 4,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              expanded
+                                  ? context.t.commentHideReplies
+                                  : context.t.qaViewReplies(replies.length),
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              expanded
+                                  ? Icons.keyboard_arrow_up_outlined
+                                  : Icons.keyboard_arrow_down_outlined,
+                              size: 18,
+                              color: context.textSecondary,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -755,8 +755,8 @@ class _UserQaActivitySectionState
               child: Center(
                 child: Text(
                   asked
-                      ? context.t.profileNoQuestionsAsked
-                      : context.t.profileNoAnswersYet,
+                      ? context.t.profileNoThreadsStarted
+                      : context.t.profileNoRepliesYet,
                   style: TextStyle(color: context.textSecondary),
                 ),
               ),
@@ -765,7 +765,7 @@ class _UserQaActivitySectionState
           return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 96),
             itemCount: posts.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (_, i) {
@@ -849,7 +849,7 @@ class _UserQaActivitySectionState
               children: [
                 Expanded(
                   child: _UserQaInnerTab(
-                    label: context.t.profileQuestionsAsked,
+                    label: context.t.profileThreadsStarted,
                     selected: _innerTab == 0,
                     onTap: () => setState(() => _innerTab = 0),
                   ),
@@ -857,7 +857,7 @@ class _UserQaActivitySectionState
                 const SizedBox(width: 6),
                 Expanded(
                   child: _UserQaInnerTab(
-                    label: context.t.profileQuestionsAnswered,
+                    label: context.t.profileReplies,
                     selected: _innerTab == 1,
                     onTap: () => setState(() => _innerTab = 1),
                   ),

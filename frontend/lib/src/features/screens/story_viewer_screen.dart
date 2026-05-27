@@ -347,6 +347,12 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       debugPrint('recordView failed for ${story.id}: $e');
     });
 
+    if (_currentUid != null && story.authorUid != _currentUid) {
+      ref.read(locallyViewedStoryIdsProvider.notifier).update(
+            (seen) => {...seen, story.id},
+          );
+    }
+
     // If this is one of the user's OWN stories, mark it locally as seen
     // so the home rail can dim the ring on next paint. This is a
     // device-local flag (SharedPreferences) — it intentionally does NOT

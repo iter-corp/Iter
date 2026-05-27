@@ -26,53 +26,108 @@ class MessageTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(child: _tab(context, context.t.allCount(allCount), 0)),
-          const SizedBox(width: 8),
-          Expanded(
-              child: _tab(
-                  context, context.t.requestsCount(requestCount), 1)),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const padding = 4.0;
+          final innerWidth = constraints.maxWidth - padding * 2;
+          final pillWidth = innerWidth / 2;
+          final isAll = selectedTab == 0;
+
+          return Container(
+            height: 48,
+            padding: const EdgeInsets.all(padding),
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: Stack(
+              children: [
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: isAll
+                      ? AlignmentDirectional.centerStart
+                      : AlignmentDirectional.centerEnd,
+                  child: Container(
+                    width: pillWidth,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.purple, AppColors.purpleVivid],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.purple.withValues(alpha: 0.35),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _tab(
+                        context,
+                        context.t.allCount(allCount),
+                        Icons.chat_bubble_rounded,
+                        0,
+                      ),
+                    ),
+                    Expanded(
+                      child: _tab(
+                        context,
+                        context.t.requestsCount(requestCount),
+                        Icons.mark_chat_unread_rounded,
+                        1,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _tab(BuildContext context, String label, int index) {
+  Widget _tab(BuildContext context, String label, IconData icon, int index) {
     final bool isActive = selectedTab == index;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => onTap(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive ? null : context.inputFill,
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [AppColors.purple, AppColors.purpleVivid],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: AppColors.purple.withValues(alpha: 0.30),
-                    blurRadius: 9,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isActive ? Colors.white : context.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
+      child: Center(
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 220),
+          style: TextStyle(
+            color: isActive ? Colors.white : context.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13.5,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 17,
+                color: isActive ? Colors.white : context.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1846,20 +1846,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       )
                     : Row(
                         children: [
-                          IconButton(
+                          _ChatIconButton(
                             tooltip: context.t.attach,
                             onPressed: _showAttachMenu,
-                            icon: Icon(Icons.attach_file,
-                                color: context.textSecondary),
+                            icon: Icons.attach_file,
                           ),
+                          const SizedBox(width: 6),
                           GestureDetector(
                             onTap: () {
                               setState(() =>
                                   _showStickerPicker = !_showStickerPicker);
                             },
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 2),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: _showStickerPicker
+                                    ? context.purpleSoft
+                                    : context.cardBg,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: _showStickerPicker
+                                      ? AppColors.purple.withValues(alpha: 0.32)
+                                      : context.borderColor,
+                                ),
+                              ),
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 200),
                                 child: Icon(
@@ -1867,15 +1880,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       ? Icons.keyboard
                                       : Icons.emoji_emotions_outlined,
                                   key: ValueKey(_showStickerPicker),
-                                  size: 24,
+                                  size: 21,
                                   color: _showStickerPicker
-                                      ? const Color(0xFFB05ECC)
+                                      ? AppColors.purpleVivid
                                       : context.textSecondary,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: ValueListenableBuilder<TextEditingValue>(
                               valueListenable: _controller,
@@ -1889,11 +1902,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   padding: const EdgeInsets.only(
                                       left: 14, right: 10, top: 2, bottom: 2),
                                   decoration: BoxDecoration(
-                                    color: context.inputFill,
+                                    color: context.cardBg,
                                     borderRadius: BorderRadius.circular(24),
                                     border: Border.all(
                                       color: activeBorder
-                                          ? const Color(0xFFB05ECC)
+                                          ? AppColors.purpleVivid
                                           : context.borderColor
                                               .withValues(alpha: 0.72),
                                       width: activeBorder ? 1.3 : 1,
@@ -1901,13 +1914,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     boxShadow: activeBorder
                                         ? [
                                             BoxShadow(
-                                              color: const Color(0xFFB05ECC)
+                                              color: AppColors.purple
                                                   .withValues(alpha: 0.16),
                                               blurRadius: 12,
                                               offset: const Offset(0, 2),
                                             ),
                                           ]
-                                        : const [],
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(
+                                                  alpha:
+                                                      context.isDark ? 0.18 : 0.05),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
                                   ),
                                   child: TextField(
                                     controller: _controller,
@@ -1969,50 +1990,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   ),
                                 );
                               }
-                              return GestureDetector(
-                                behavior: HitTestBehavior.opaque,
+                              return _ChatGradientCircleButton(
+                                active: hasText,
                                 onTap: hasText
                                     ? _sendMessage
                                     : _startVoiceRecording,
-                                child: AnimatedContainer(
+                                child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 220),
-                                  curve: Curves.easeOutCubic,
-                                  width: 44,
-                                  height: 44,
-                                  margin: const EdgeInsets.all(4),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: hasText
-                                        ? const Color(0xFFB05ECC)
-                                        : Colors.transparent,
-                                  ),
-                                  child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 220),
-                                    switchInCurve: Curves.easeOutBack,
-                                    switchOutCurve: Curves.easeIn,
-                                    transitionBuilder: (child, animation) {
-                                      return ScaleTransition(
-                                        scale: animation,
-                                        child: RotationTransition(
-                                          turns: Tween<double>(
-                                                  begin: 0.75, end: 1.0)
-                                              .animate(animation),
-                                          child: FadeTransition(
-                                            opacity: animation,
-                                            child: child,
-                                          ),
+                                  switchInCurve: Curves.easeOutBack,
+                                  switchOutCurve: Curves.easeIn,
+                                  transitionBuilder: (child, animation) {
+                                    return ScaleTransition(
+                                      scale: animation,
+                                      child: RotationTransition(
+                                        turns: Tween<double>(
+                                                begin: 0.75, end: 1.0)
+                                            .animate(animation),
+                                        child: FadeTransition(
+                                          opacity: animation,
+                                          child: child,
                                         ),
-                                      );
-                                    },
-                                    child: Icon(
-                                      hasText ? Icons.send : Icons.mic_none,
-                                      key: ValueKey(hasText),
-                                      color: hasText
-                                          ? Colors.white
-                                          : const Color(0xFFB05ECC),
-                                      size: 22,
-                                    ),
+                                      ),
+                                    );
+                                  },
+                                  child: Icon(
+                                    hasText ? Icons.send : Icons.mic_none,
+                                    key: ValueKey(hasText),
+                                    color: hasText
+                                        ? Colors.white
+                                        : AppColors.purpleVivid,
+                                    size: 22,
                                   ),
                                 ),
                               );
@@ -2184,26 +2191,49 @@ class _ReplyComposingBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: context.purpleSoft,
-        border: Border(
-          left: BorderSide(
-            color: const Color(0xFFB05ECC).withValues(alpha: 0.8),
-            width: 3,
-          ),
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColors.purple.withValues(alpha: 0.22),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.purple.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.reply, size: 16, color: Color(0xFFB05ECC)),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [AppColors.purple, AppColors.purpleVivid],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: const Icon(Icons.reply, size: 15, color: Colors.white),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               previewText,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: context.textPrimary, fontSize: 13),
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
             ),
           ),
           IconButton(
@@ -2266,33 +2296,149 @@ class _RecordingBarState extends State<_RecordingBar> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButton(
+        _ChatIconButton(
           onPressed: widget.onCancel,
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
+          icon: Icons.delete_outline,
+          foregroundColor: AppColors.red,
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: context.inputFill,
+              color: context.cardBg,
               borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: context.borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withValues(alpha: context.isDark ? 0.18 : 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Row(
               children: [
                 const Icon(Icons.fiber_manual_record,
-                    color: Colors.red, size: 14),
+                    color: AppColors.red, size: 14),
                 const SizedBox(width: 8),
                 Text(context.t.recordingElapsed(_elapsed()),
-                    style: TextStyle(color: context.textPrimary, fontSize: 13)),
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    )),
               ],
             ),
           ),
         ),
-        IconButton(
-          onPressed: widget.onStop,
-          icon: const Icon(Icons.send, color: Color(0xFFB05ECC)),
+        const SizedBox(width: 8),
+        _ChatGradientCircleButton(
+          active: true,
+          onTap: widget.onStop,
+          child: const Icon(Icons.send, color: Colors.white, size: 21),
         ),
       ],
+    );
+  }
+}
+
+class _ChatIconButton extends StatelessWidget {
+  final String? tooltip;
+  final VoidCallback? onPressed;
+  final IconData icon;
+  final Color? foregroundColor;
+
+  const _ChatIconButton({
+    this.tooltip,
+    required this.onPressed,
+    required this.icon,
+    this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Ink(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            shape: BoxShape.circle,
+            border: Border.all(color: context.borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black
+                    .withValues(alpha: context.isDark ? 0.16 : 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: foregroundColor ?? context.textSecondary,
+          ),
+        ),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+class _ChatGradientCircleButton extends StatelessWidget {
+  final bool active;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _ChatGradientCircleButton({
+    required this.active,
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        width: 44,
+        height: 44,
+        margin: const EdgeInsets.all(4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: active ? null : context.cardBg,
+          gradient: active
+              ? const LinearGradient(
+                  colors: [AppColors.purple, AppColors.purpleVivid],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          border: active ? null : Border.all(color: context.borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: (active ? AppColors.purple : Colors.black).withValues(
+                alpha: active ? 0.32 : (context.isDark ? 0.16 : 0.04),
+              ),
+              blurRadius: active ? 12 : 8,
+              offset: Offset(0, active ? 4 : 3),
+            ),
+          ],
+        ),
+        child: child,
+      ),
     );
   }
 }
@@ -2431,7 +2577,13 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   /// Builds the text to render for the message body, plus an optional
   /// trailing "Show original" / "Show translation" / loading indicator.
   Widget _buildBody({required Color textColor}) {
-    final originalStyle = TextStyle(color: textColor, fontSize: 14);
+    final originalStyle = TextStyle(
+      color: textColor,
+      fontSize: 14.5,
+      height: 1.34,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0,
+    );
     if (msg.encryptedUnreadable) {
       // Legacy ciphertext from an older client; no key to decrypt it
       // with anymore.
@@ -2584,6 +2736,20 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     final hasSticker = msg.stickerUrl != null && msg.stickerUrl!.isNotEmpty;
     final outgoingBodyColor =
         _isSenderOnlyProfanity ? const Color(0xFFB00020) : Colors.white;
+    final outgoingGradient = widget.flashing
+        ? LinearGradient(
+            colors: [
+              AppColors.purpleBright.withValues(alpha: 0.9),
+              AppColors.purpleVivid.withValues(alpha: 0.9),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : const LinearGradient(
+            colors: [AppColors.purple, AppColors.purpleVivid],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2645,36 +2811,46 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
-                              color: widget.flashing
-                                  ? const Color(0xFFB05ECC)
-                                      .withValues(alpha: 0.85)
-                                  : (isMe
-                                      ? (_isSenderOnlyProfanity
-                                          ? const Color(0xFFFFE5E5)
-                                          : const Color(0xFFB05ECC))
-                                      : context.inputFill),
+                              color: isMe && !_isSenderOnlyProfanity
+                                  ? null
+                                  : (_isSenderOnlyProfanity
+                                      ? const Color(0xFFFFE5E5)
+                                      : context.cardBg),
+                              gradient: isMe && !_isSenderOnlyProfanity
+                                  ? outgoingGradient
+                                  : null,
                               border: _isSenderOnlyProfanity
                                   ? Border.all(
                                       color: const Color(0xFFF28B82),
                                       width: 1,
                                     )
-                                  : null,
+                                  : Border.all(
+                                      color: isMe
+                                          ? Colors.white.withValues(alpha: 0.10)
+                                          : context.borderColor,
+                                    ),
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(16),
                                 topRight: const Radius.circular(16),
                                 bottomLeft: Radius.circular(isMe ? 16 : 4),
                                 bottomRight: Radius.circular(isMe ? 4 : 16),
                               ),
-                              boxShadow: widget.flashing
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(0xFFB05ECC)
-                                            .withValues(alpha: 0.5),
-                                        blurRadius: 14,
-                                        spreadRadius: 1,
-                                      ),
-                                    ]
-                                  : null,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isMe
+                                          ? AppColors.purple
+                                          : Colors.black)
+                                      .withValues(
+                                    alpha: widget.flashing
+                                        ? 0.42
+                                        : (isMe
+                                            ? 0.22
+                                            : (context.isDark ? 0.18 : 0.06)),
+                                  ),
+                                  blurRadius: widget.flashing ? 16 : 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2866,9 +3042,19 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheet) => SafeArea(
+        top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
             const SizedBox(height: 8),
             // Reactions strip — surfaced at the top so a tap on a
             // message goes straight to picking an emoji, no extra tap
@@ -2906,8 +3092,14 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                             decoration: BoxDecoration(
                               color: selected
                                   ? context.purpleSoft
-                                  : Colors.transparent,
+                                  : context.inputFill.withValues(alpha: 0.62),
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.purple.withValues(alpha: 0.22)
+                                    : context.borderColor
+                                        .withValues(alpha: 0.62),
+                              ),
                             ),
                             child:
                                 Text(e, style: const TextStyle(fontSize: 28)),
@@ -2919,98 +3111,107 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                 },
               ),
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.reply),
-              title: Text(context.t.reply),
-              onTap: () {
-                Navigator.pop(sheet);
-                onReply();
-              },
-            ),
-            // Translate to the user's preferred language. Falls back to
-            // English when the user hasn't set one yet (handled by the
-            // preferredLanguageProvider default).
-            if (msg.text.trim().isNotEmpty)
-              Consumer(
-                builder: (context, sheetRef, _) {
-                  final target = sheetRef.watch(preferredLanguageProvider);
-                  return ListTile(
-                    leading: const Icon(Icons.translate),
-                    title: Text(
-                        context.t.translateToLang(target.toUpperCase())),
-                    subtitle: Text(
-                      context.t.translateChangeInSettings,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.textSecondary,
-                      ),
-                    ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _BubbleMenuAction(
+                    icon: Icons.reply,
+                    label: context.t.reply,
                     onTap: () {
                       Navigator.pop(sheet);
-                      _showTranslationSheet(
-                        context,
-                        text: msg.text,
-                        target: target,
-                      );
+                      onReply();
                     },
-                  );
-                },
-              ),
-            // Voice message options. Transcript is captured on the
-            // sender's device when the recording starts; if it's
-            // missing (mic contention, language unsupported, etc.) we
-            // still offer the entry but flag it as unavailable.
-            if (msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty) ...[
-              ListTile(
-                leading: const Icon(Icons.subtitles_outlined),
-                title: Text(context.t.showTranscript),
-                subtitle: (msg.voiceTranscript ?? '').trim().isEmpty
-                    ? Text(
-                        context.t.transcriptUnavailable,
-                        style: const TextStyle(fontSize: 11),
-                      )
-                    : null,
-                enabled: (msg.voiceTranscript ?? '').trim().isNotEmpty,
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _showVoiceTranscriptSheet(
-                    context,
-                    transcript: msg.voiceTranscript ?? '',
-                  );
-                },
-              ),
-              if ((msg.voiceTranscript ?? '').trim().isNotEmpty)
-                Consumer(
-                  builder: (context, sheetRef, _) {
-                    final target = sheetRef.watch(preferredLanguageProvider);
-                    return ListTile(
-                      leading: const Icon(Icons.translate),
-                      title: Text(
-                          context.t.translateVoiceToLang(target.toUpperCase())),
-                      onTap: () {
-                        Navigator.pop(sheet);
-                        _showTranslationSheet(
-                          context,
-                          text: msg.voiceTranscript!,
-                          target: target,
+                  ),
+                  if (msg.text.trim().isNotEmpty) const SizedBox(height: 8),
+                  // Translate to the user's preferred language. Falls back to
+                  // English when the user hasn't set one yet (handled by the
+                  // preferredLanguageProvider default).
+                  if (msg.text.trim().isNotEmpty)
+                    Consumer(
+                      builder: (context, sheetRef, _) {
+                        final target =
+                            sheetRef.watch(preferredLanguageProvider);
+                        return _BubbleMenuAction(
+                          icon: Icons.translate,
+                          label:
+                              context.t.translateToLang(target.toUpperCase()),
+                          subtitle: Text(
+                            context.t.translateChangeInSettings,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(sheet);
+                            _showTranslationSheet(
+                              context,
+                              text: msg.text,
+                              target: target,
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
-            ],
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: Text(
-                context.t.delete,
-                style: const TextStyle(color: Colors.red),
+                    ),
+                  if (msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _BubbleMenuAction(
+                      icon: Icons.subtitles_outlined,
+                      label: context.t.showTranscript,
+                      subtitle: (msg.voiceTranscript ?? '').trim().isEmpty
+                          ? Text(
+                              context.t.transcriptUnavailable,
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                      enabled:
+                          (msg.voiceTranscript ?? '').trim().isNotEmpty,
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        _showVoiceTranscriptSheet(
+                          context,
+                          transcript: msg.voiceTranscript ?? '',
+                        );
+                      },
+                    ),
+                    if ((msg.voiceTranscript ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Consumer(
+                        builder: (context, sheetRef, _) {
+                          final target =
+                              sheetRef.watch(preferredLanguageProvider);
+                          return _BubbleMenuAction(
+                            icon: Icons.translate,
+                            label: context
+                                .t
+                                .translateVoiceToLang(target.toUpperCase()),
+                            onTap: () {
+                              Navigator.pop(sheet);
+                              _showTranslationSheet(
+                                context,
+                                text: msg.voiceTranscript!,
+                                target: target,
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 8),
+                  _BubbleMenuAction(
+                    icon: Icons.delete_outline,
+                    label: context.t.delete,
+                    destructive: true,
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      _showDeleteMessageOptions(context);
+                    },
+                  ),
+                ],
               ),
-              onTap: () {
-                Navigator.pop(sheet);
-                _showDeleteMessageOptions(context);
-              },
             ),
           ],
         ),
@@ -3181,6 +3382,97 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Modern action row used by the message long-press sheet.
+class _BubbleMenuAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Widget? subtitle;
+  final VoidCallback? onTap;
+  final bool destructive;
+  final bool enabled;
+
+  const _BubbleMenuAction({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.onTap,
+    this.destructive = false,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = enabled && onTap != null;
+    final accent = destructive ? AppColors.red : AppColors.purpleVivid;
+    final textColor = destructive ? AppColors.red : context.textPrimary;
+
+    return Opacity(
+      opacity: active ? 1 : 0.52,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: active ? onTap : null,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: destructive
+                  ? AppColors.red.withValues(alpha: context.isDark ? 0.12 : 0.08)
+                  : context.inputFill
+                      .withValues(alpha: context.isDark ? 0.7 : 0.85),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: destructive
+                    ? AppColors.red.withValues(alpha: 0.18)
+                    : context.borderColor.withValues(alpha: 0.82),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: destructive ? 0.12 : 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: accent, size: 19),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        subtitle!,
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

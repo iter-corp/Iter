@@ -570,6 +570,8 @@ class AppStrings {
       _fmt('comment_translate_to', {'language': language});
   String get commentTranslationCopied => _get('comment_translation_copied');
   String get qaThreadTitle => _get('qa_thread_title');
+  String get qaQuestionThreadTitle => _get('qa_question_thread_title');
+  String get qaDiscussionThreadTitle => _get('qa_discussion_thread_title');
   String qaCouldNotLoadAnswers(Object error) =>
       _fmt('qa_could_not_load_answers', {'error': error});
   String get qaUntitledQuestion => _get('qa_untitled_question');
@@ -582,6 +584,8 @@ class AppStrings {
       _fmt('qa_could_not_save_reaction', {'error': error});
   String get qaWriteAnswerHint => _get('qa_write_answer_hint');
   String get qaWriteReplyHint => _get('qa_write_reply_hint');
+  String qaViewReplies(Object count) =>
+      _fmt('qa_view_replies', {'count': count});
   String get createPostNewPost => _get('create_post_new_post');
   String get createPostCaptionHint => _get('create_post_caption_hint');
   String get createPostPlace => _get('create_post_place');
@@ -1503,6 +1507,13 @@ class AppStrings {
       _get('profile_no_answers_subtitle');
   String get profileQuestionsAsked => _get('profile_questions_asked');
   String get profileQuestionsAnswered => _get('profile_questions_answered');
+  String get profileThreadsStarted => _get('profile_threads_started');
+  String get profileReplies => _get('profile_replies');
+  String get profileNoThreadsStarted => _get('profile_no_threads_started');
+  String get profileNoRepliesYet => _get('profile_no_replies_yet');
+  String get profileNoThreadsStartedSubtitle =>
+      _get('profile_no_threads_started_subtitle');
+  String get profileNoRepliesSubtitle => _get('profile_no_replies_subtitle');
   String get profileInviteFriends => _get('profile_invite_friends');
   String get profileCreateFirstPost => _get('profile_create_first_post');
   String get profileShareYourContent => _get('profile_share_your_content');

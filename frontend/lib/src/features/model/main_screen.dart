@@ -12,6 +12,7 @@ import '../screens/event_screen.dart'; // ✅ Added
 import '../screens/message_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/translate_screen.dart';
+import '../widgets/app_page_background.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -86,20 +87,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   // 📌 SECTION: Resolve background color per tab
-  Color _backgroundColor(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    switch (_selectedIndex) {
-      case 1: // Events
-      case 3: // Messages
-      case 4: // Profile
-        return Theme.of(context).scaffoldBackgroundColor;
-      default:
-        return isDark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : const Color(0xFFE8EAF0);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final inboxAsync = ref.watch(inboxProvider);
@@ -107,10 +94,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final unreadChats = inbox.where((c) => c.unreadCount > 0).length;
 
     return Scaffold(
-      backgroundColor: _backgroundColor(context),
+      backgroundColor: Colors.transparent,
       extendBody: true,
       body: Stack(
         children: [
+          const AppPageBackground(child: SizedBox.expand()),
           // 📌 SECTION: Current Screen
           PageView(
             controller: _pageController,

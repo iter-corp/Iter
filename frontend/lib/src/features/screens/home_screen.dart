@@ -20,6 +20,7 @@ import 'create_post_screen.dart';
 import 'notification_screen.dart';
 import 'post_detail_screen.dart';
 import 'qa_thread_screen.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/primary_action_button.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_section.dart';
@@ -1553,28 +1554,16 @@ class _QaThreadCard extends ConsumerWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+    return AppGlassCard(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      radius: 18,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           onTap: openThread,
-          child: Ink(
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: context.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black
-                      .withValues(alpha: context.isDark ? 0.12 : 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

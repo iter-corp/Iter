@@ -970,7 +970,6 @@ class _PostCardState extends ConsumerState<PostCard>
                         ),
                       ),
                     ),
-                    const Divider(height: 1),
                     // Share the post to the current user's story.
                     ListTile(
                       leading: Container(
@@ -998,7 +997,6 @@ class _PostCardState extends ConsumerState<PostCard>
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
                     ),
-                    const Divider(height: 1),
                     Expanded(
                       child: inboxAsync.when(
                         loading: () =>

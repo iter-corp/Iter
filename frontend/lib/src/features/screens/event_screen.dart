@@ -19,6 +19,7 @@ import '../../services/admin_service.dart';
 import '../../services/city_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/maps_links.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/event_detail.dart';
 import 'chat_screen.dart';
 
@@ -172,18 +173,26 @@ class _EventBodyState extends ConsumerState<EventBody> {
     if (!mounted) return;
     await prefs.setBool(prefKey, true);
     if (!mounted) return;
-    await showTravelQuickStartSheet(context);
+    await showEventsQuickStartSheet(context);
   }
 
   Future<void> _onEventCityTap(List<AdminEvent> events) async {
-    // Tapping the chip while a city is active clears the filter.
+    // Tapping the chip while a country is active clears the filter.
     if (_selectedEventCity != null) {
       setState(() => _selectedEventCity = null);
       return;
     }
-    final chosen = await showCityPicker(
-      context,
-      initialQuery: _selectedEventCity ?? '',
+    final configCountries =
+        ref.read(adminConfigProvider).valueOrNull?.eventCountries;
+    final eventCountries = {
+      ...?configCountries,
+      ...events.map((e) => e.country).where((c) => c.trim().isNotEmpty),
+    }.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final chosen = await _pickFromSheet(
+      title: context.t.adminChooseCountry,
+      options: eventCountries.isEmpty ? kEventCountries : eventCountries,
+      selected: _selectedEventCity,
     );
     if (chosen == null) return;
     setState(() => _selectedEventCity = chosen.isEmpty ? null : chosen);
@@ -307,103 +316,101 @@ class _EventBodyState extends ConsumerState<EventBody> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
         child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _MainToggle(active: _mainTab, onChanged: _setTab),
-                  const SizedBox(height: 14),
-                  if (_mainTab == _MainTab.events)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SearchBar(
-                            controller: _searchController,
-                            hint: context.t.eventsSearchEvents,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _LayoutToggle(
-                          layout: _eventsLayout,
-                          onChanged: (l) => setState(() => _eventsLayout = l),
-                        ),
-                        const SizedBox(width: 6),
-                        GestureDetector(
-                          onTap: () => showTravelQuickStartSheet(context),
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: context.cardBg,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: context.borderColor),
-                            ),
-                            child: const Icon(
-                              Icons.help_outline_rounded,
-                              size: 18,
-                              color: _kBrandPurple,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _MainToggle(active: _mainTab, onChanged: _setTab),
+                    const SizedBox(height: 14),
+                    if (_mainTab == _MainTab.events)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SearchBar(
+                              controller: _searchController,
+                              hint: context.t.eventsSearchEvents,
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  else
-                    _SearchBar(
-                      controller: _searchController,
-                      hint: context.t.eventsSearchPeople,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) {
-                  final offset = Tween<Offset>(
-                    begin: const Offset(0, 0.03),
-                    end: Offset.zero,
-                  ).animate(animation);
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: offset, child: child),
-                  );
-                },
-                child: _mainTab == _MainTab.partners
-                    ? _PartnersView(
-                        key: const ValueKey('partners'),
-                        query: _query,
-                        selectedCity: _selectedCity,
-                        nearbyMode: _nearbyMode,
-                        selectedField: _selectedField,
-                        selectedAcademicLevel: _selectedAcademicLevel,
-                        onFilterTap: _onPartnerFilterTap,
+                          const SizedBox(width: 8),
+                          _LayoutToggle(
+                            layout: _eventsLayout,
+                            onChanged: (l) => setState(() => _eventsLayout = l),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => showEventsQuickStartSheet(context),
+                            child: AppGlassCard(
+                              width: 38,
+                              height: 38,
+                              radius: 19,
+                              surfaceAlpha: context.isDark ? 0.24 : 0.52,
+                              borderAlpha: context.isDark ? 0.16 : 0.50,
+                              child: const Icon(
+                                Icons.help_outline_rounded,
+                                size: 18,
+                                color: _kBrandPurple,
+                              ),
+                            ),
+                          ),
+                        ],
                       )
-                    : _EventsView(
-                        key: const ValueKey('events'),
-                        query: _query,
-                        selectedCity: _selectedEventCity,
-                        selectedEventType: _selectedEventType,
-                        layout: _eventsLayout,
-                        onCityTap: _onEventCityTap,
-                        onClearCity: () =>
-                            setState(() => _selectedEventCity = null),
-                        onTypeTap: _onEventTypeTap,
-                        onClearType: () =>
-                            setState(() => _selectedEventType = null),
+                    else
+                      _SearchBar(
+                        controller: _searchController,
+                        hint: context.t.eventsSearchPeople,
                       ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 6),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final offset = Tween<Offset>(
+                      begin: const Offset(0, 0.03),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(position: offset, child: child),
+                    );
+                  },
+                  child: _mainTab == _MainTab.partners
+                      ? _PartnersView(
+                          key: const ValueKey('partners'),
+                          query: _query,
+                          selectedCity: _selectedCity,
+                          nearbyMode: _nearbyMode,
+                          selectedField: _selectedField,
+                          selectedAcademicLevel: _selectedAcademicLevel,
+                          onFilterTap: _onPartnerFilterTap,
+                        )
+                      : _EventsView(
+                          key: const ValueKey('events'),
+                          query: _query,
+                          selectedCity: _selectedEventCity,
+                          selectedEventType: _selectedEventType,
+                          layout: _eventsLayout,
+                          onCityTap: _onEventCityTap,
+                          onClearCity: () =>
+                              setState(() => _selectedEventCity = null),
+                          onTypeTap: _onEventTypeTap,
+                          onClearType: () =>
+                              setState(() => _selectedEventType = null),
+                        ),
+                ),
+              ),
+            ],
+          ),
       ),
     );
   }
@@ -425,14 +432,12 @@ class _MainToggle extends StatelessWidget {
         final innerWidth = constraints.maxWidth - padding * 2;
         final pillWidth = innerWidth / 2;
         final isEvents = active == _MainTab.events;
-        return Container(
+        return AppGlassCard(
           height: 48,
           padding: const EdgeInsets.all(padding),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: context.borderColor),
-          ),
+          radius: 28,
+          surfaceAlpha: context.isDark ? 0.28 : 0.54,
+          borderAlpha: context.isDark ? 0.18 : 0.52,
           child: Stack(
             children: [
               AnimatedAlign(
@@ -541,21 +546,12 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppGlassCard(
       height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      radius: 18,
+      surfaceAlpha: context.isDark ? 0.24 : 0.52,
+      borderAlpha: context.isDark ? 0.16 : 0.50,
       child: Row(
         children: [
           const Icon(Icons.search_rounded, size: 20, color: _kBrandPurple),
@@ -566,7 +562,11 @@ class _SearchBar extends StatelessWidget {
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
                 filled: false,
+                fillColor: Colors.transparent,
                 hintText: hint,
                 hintStyle:
                     TextStyle(fontSize: 14, color: context.textSecondary),
@@ -834,53 +834,60 @@ class _FilterChipRow extends StatelessWidget {
         itemBuilder: (context, i) {
           final selected = activeIndices.contains(i);
           final isDropdown = dropdownIndices.contains(i);
+          final child = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                labels[i],
+                style: TextStyle(
+                  color: selected ? Colors.white : context.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  height: 1.1,
+                ),
+              ),
+              if (isDropdown) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  selected
+                      ? Icons.close_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  size: 16,
+                  color: selected ? Colors.white : context.textSecondary,
+                ),
+              ],
+            ],
+          );
           return GestureDetector(
             onTap: () => onTap(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              decoration: BoxDecoration(
-                color: selected ? _kBrandPurple : context.cardBg,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: selected ? _kBrandPurple : context.borderColor,
-                ),
-                boxShadow: selected
-                    ? [
+            child: selected
+                ? AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _kBrandPurple,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: _kBrandPurple),
+                      boxShadow: [
                         BoxShadow(
                           color: _kBrandPurple.withValues(alpha: 0.25),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    labels[i],
-                    style: TextStyle(
-                      color: selected ? Colors.white : context.textSecondary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      height: 1.1,
+                      ],
                     ),
+                    child: child,
+                  )
+                : AppGlassCard(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 10),
+                    radius: 22,
+                    surfaceAlpha: context.isDark ? 0.22 : 0.50,
+                    borderAlpha: context.isDark ? 0.14 : 0.46,
+                    child: child,
                   ),
-                  if (isDropdown) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      selected
-                          ? Icons.close_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: selected ? Colors.white : context.textSecondary,
-                    ),
-                  ],
-                ],
-              ),
-            ),
           );
         },
       ),
@@ -983,20 +990,12 @@ class _PartnerCardState extends ConsumerState<_PartnerCard> {
         onTapCancel: () => setState(() => _pressed = false),
         onTapUp: (_) => setState(() => _pressed = false),
         onTap: () => openUserProfile(context, uid: widget.uid),
-        child: Container(
+        child: AppGlassCard(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.borderColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.035),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+          radius: 22,
+          emphasize: isOnline,
+          surfaceAlpha: context.isDark ? 0.24 : 0.52,
+          borderAlpha: context.isDark ? 0.16 : 0.50,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1206,12 +1205,11 @@ class _Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppGlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: context.tagBg,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      radius: 20,
+      surfaceAlpha: context.isDark ? 0.20 : 0.44,
+      borderAlpha: context.isDark ? 0.12 : 0.38,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1283,7 +1281,7 @@ class _EventsView extends ConsumerWidget {
             if (!inText) return false;
           }
           if (cityPick != null && cityPick.isNotEmpty) {
-            if (_eventCity(e).toLowerCase() != cityPick) return false;
+            if (e.country.trim().toLowerCase() != cityPick) return false;
           }
           if (typePick != null && typePick.isNotEmpty) {
             if (e.eventType.toLowerCase().trim() != typePick) return false;
@@ -1410,138 +1408,108 @@ class _EventFilterBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
+            child: _EventFilterChip(
+              active: cityActive,
+              icon: Icons.location_on_rounded,
+              label: cityActive ? selectedCity! : context.t.eventsFilterByCity,
               onTap: onCityTap,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: cityActive ? _kBrandPurple : context.cardBg,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: cityActive ? _kBrandPurple : context.borderColor,
-                  ),
-                  boxShadow: cityActive
-                      ? [
-                          BoxShadow(
-                            color: _kBrandPurple.withValues(alpha: 0.25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_rounded,
-                      size: 16,
-                      color: cityActive ? Colors.white : _kBrandPurple,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        cityActive
-                            ? selectedCity!
-                            : context.t.eventsFilterByCity,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color:
-                              cityActive ? Colors.white : context.textSecondary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    if (cityActive)
-                      GestureDetector(
-                        onTap: onClearCity,
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 15,
-                          color: Colors.white,
-                        ),
-                      )
-                    else
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: context.textSecondary,
-                      ),
-                  ],
-                ),
-              ),
+              onClear: onClearCity,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: GestureDetector(
+            child: _EventFilterChip(
+              active: typeActive,
+              icon: Icons.tune_rounded,
+              label: typeActive ? selectedType! : 'Filter by type',
               onTap: onTypeTap,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: typeActive ? _kBrandPurple : context.cardBg,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: typeActive ? _kBrandPurple : context.borderColor,
-                  ),
-                  boxShadow: typeActive
-                      ? [
-                          BoxShadow(
-                            color: _kBrandPurple.withValues(alpha: 0.25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.tune_rounded,
-                      size: 16,
-                      color: typeActive ? Colors.white : _kBrandPurple,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        typeActive ? selectedType! : 'Filter by type',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color:
-                              typeActive ? Colors.white : context.textSecondary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    if (typeActive)
-                      GestureDetector(
-                        onTap: onClearType,
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 15,
-                          color: Colors.white,
-                        ),
-                      )
-                    else
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: context.textSecondary,
-                      ),
-                  ],
-                ),
-              ),
+              onClear: onClearType,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EventFilterChip extends StatelessWidget {
+  final bool active;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  const _EventFilterChip({
+    required this.active,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      children: [
+        Icon(icon, size: 16, color: active ? Colors.white : _kBrandPurple),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: active ? Colors.white : context.textSecondary,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        if (active)
+          GestureDetector(
+            onTap: onClear,
+            child: const Icon(
+              Icons.close_rounded,
+              size: 15,
+              color: Colors.white,
+            ),
+          )
+        else
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: context.textSecondary,
+          ),
+      ],
+    );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: active
+          ? AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _kBrandPurple,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: _kBrandPurple),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kBrandPurple.withValues(alpha: 0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: content,
+            )
+          : AppGlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              radius: 22,
+              surfaceAlpha: context.isDark ? 0.22 : 0.50,
+              borderAlpha: context.isDark ? 0.14 : 0.46,
+              child: content,
+            ),
     );
   }
 }
@@ -1553,14 +1521,12 @@ class _LayoutToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppGlassCard(
       height: 38,
       padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.borderColor),
-      ),
+      radius: 20,
+      surfaceAlpha: context.isDark ? 0.24 : 0.52,
+      borderAlpha: context.isDark ? 0.16 : 0.50,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1624,19 +1590,16 @@ class _BecomeAdminBanner extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
       child: Material(
-        color: context.purpleSoft,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () => _showContactSheet(context, email),
-          child: Container(
+          child: AppGlassCard(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: _kBrandPurple.withValues(alpha: 0.3),
-              ),
-            ),
+            radius: 16,
+            surfaceAlpha: context.isDark ? 0.22 : 0.50,
+            borderAlpha: context.isDark ? 0.16 : 0.48,
             child: Row(
               children: [
                 const Icon(
@@ -2367,51 +2330,67 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(36),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 84,
-              height: 84,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _kBrandPurple.withValues(alpha: 0.18),
-                    _kBrandDeep.withValues(alpha: 0.08),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: math.max(0, constraints.maxHeight - 48),
+            ),
+            child: Center(
+              child: AppGlassCard(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+                radius: 24,
+                surfaceAlpha: context.isDark ? 0.22 : 0.50,
+                borderAlpha: context.isDark ? 0.14 : 0.48,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _kBrandPurple.withValues(alpha: 0.18),
+                            _kBrandDeep.withValues(alpha: 0.08),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 34, color: _kBrandPurple),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(color: context.textSecondary, fontSize: 13),
+                    ),
                   ],
                 ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 38, color: _kBrandPurple),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimary,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.textSecondary, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
-
 // ─────────────────────────────────────────────────────────
 // Events map view — geocodes each event's location string and
 // drops a pin at the resolved coordinate.
@@ -2723,20 +2702,34 @@ class _EventMapSheet extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => openDirectionsTo(
+                child: GestureDetector(
+                  onTap: () => openDirectionsTo(
                     context,
                     lat: point.latitude,
                     lng: point.longitude,
                   ),
-                  icon: const Icon(Icons.directions_rounded, size: 16),
-                  label: Text(context.t.eventsDirections),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _kBrandPurple,
-                    side: const BorderSide(color: _kBrandPurple),
+                  child: AppGlassCard(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                    radius: 14,
+                    surfaceAlpha: context.isDark ? 0.22 : 0.50,
+                    borderAlpha: context.isDark ? 0.16 : 0.48,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.directions_rounded,
+                          size: 16,
+                          color: _kBrandPurple,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          context.t.eventsDirections,
+                          style: const TextStyle(
+                            color: _kBrandPurple,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -2787,140 +2780,135 @@ class _EventMapSheet extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-// Travel Mode Quick-Start sheet
+// Events Quick-Start sheet
 // Shown on first-ever entry to the Events tab; reachable
 // later via the (?) help button next to the filter.
 // ─────────────────────────────────────────────────────────
-Future<void> showTravelQuickStartSheet(BuildContext context) {
+Future<void> showEventsQuickStartSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => const _TravelQuickStartSheet(),
+    builder: (_) => const _EventsQuickStartSheet(),
   );
 }
 
-class _TravelQuickStartSheet extends StatelessWidget {
-  const _TravelQuickStartSheet();
+class _EventsQuickStartSheet extends StatelessWidget {
+  const _EventsQuickStartSheet();
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.92,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.borderColor,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+      ),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomInset),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                const SizedBox(height: 18),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_kBrandPurple, _kBrandDeep],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.travel_explore_rounded,
-                          color: Colors.white, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              context.t.eventsTravelMode,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              context.t.eventsQuickStartGuide,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _QuickStartStep(
-                  icon: Icons.swap_horiz_rounded,
-                  title: context.t.eventsSwitchTravelFeed,
-                  body: context.t.eventsSwitchTravelFeedBody,
-                ),
-                _QuickStartStep(
-                  icon: Icons.location_on_rounded,
-                  title: context.t.eventsFilterByCityStep,
-                  body: context.t.eventsFilterByCityStepBody,
-                ),
-                _QuickStartStep(
-                  icon: Icons.map_outlined,
-                  title: context.t.eventsSeeEventsOnMap,
-                  body: context.t.eventsSeeEventsOnMapBody,
-                ),
-                _QuickStartStep(
-                  icon: Icons.flight_takeoff_rounded,
-                  title: context.t.eventsPlanYourTrip,
-                  body: context.t.eventsPlanYourTripBody,
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kBrandPurple,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      context.t.eventsGotIt,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_kBrandPurple, _kBrandDeep],
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.event_available_rounded,
+                      color: Colors.white, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          context.t.events,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          context.t.eventsQuickStartGuide,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            _QuickStartStep(
+              icon: Icons.event_note_rounded,
+              title: context.t.eventsSwitchTravelFeed,
+              body: context.t.eventsSwitchTravelFeedBody,
+            ),
+            _QuickStartStep(
+              icon: Icons.location_on_rounded,
+              title: context.t.eventsFilterByCityStep,
+              body: context.t.eventsFilterByCityStepBody,
+            ),
+            _QuickStartStep(
+              icon: Icons.map_outlined,
+              title: context.t.eventsSeeEventsOnMap,
+              body: context.t.eventsSeeEventsOnMapBody,
+            ),
+            _QuickStartStep(
+              icon: Icons.people_alt_rounded,
+              title: context.t.eventsPlanYourTrip,
+              body: context.t.eventsPlanYourTripBody,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kBrandPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  context.t.eventsGotIt,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
