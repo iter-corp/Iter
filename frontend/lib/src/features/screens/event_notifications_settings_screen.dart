@@ -9,6 +9,7 @@ import '../../services/admin_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
+import '../widgets/app_page_background.dart';
 
 /// Lets a user tune push notifications for newly published events:
 ///   1. Master on/off switch.
@@ -110,12 +111,13 @@ class _EventNotificationsSettingsScreenState
     final eventTypes = cfg.eventTypes;
     final eventCountries = kEventCountries;
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.eventNotifTitle),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -129,15 +131,21 @@ class _EventNotificationsSettingsScreenState
           ),
         ],
       ),
-      body: prefsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-        data: (loaded) {
-          _hydrate(loaded);
-          final enabled = _prefs.mode != EventNotifMode.off;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
+      body: AppPageBackground(
+        child: prefsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+          data: (loaded) {
+            _hydrate(loaded);
+            final enabled = _prefs.mode != EventNotifMode.off;
+            return ListView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                24 + MediaQuery.of(context).padding.bottom,
+              ),
+              children: [
               _switchTile(
                 title: context.t.eventNotifNewEventNotifications,
                 subtitle: context.t.eventNotifNewEventSubtitle,
@@ -188,23 +196,34 @@ class _EventNotificationsSettingsScreenState
                 // case-insensitively; selected countries are always
                 // included even when they don't match the query so the
                 // user can deselect them from the same list.
-                TextField(
-                  controller: _countrySearchCtrl,
-                  onChanged: (v) =>
-                      setState(() => _countryQuery = v.trim().toLowerCase()),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    hintText: context.t.adminSearchCountry,
-                    suffixIcon: _countryQuery.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () {
-                              _countrySearchCtrl.clear();
-                              setState(() => _countryQuery = '');
-                            },
-                          ),
-                    isDense: true,
+                AppGlassCard(
+                  radius: 16,
+                  surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                  borderAlpha: context.isDark ? 0.14 : 0.50,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                    controller: _countrySearchCtrl,
+                    onChanged: (v) =>
+                        setState(() => _countryQuery = v.trim().toLowerCase()),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      hintText: context.t.adminSearchCountry,
+                      suffixIcon: _countryQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                _countrySearchCtrl.clear();
+                                setState(() => _countryQuery = '');
+                              },
+                            ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -260,9 +279,10 @@ class _EventNotificationsSettingsScreenState
                 ),
               ],
               const SizedBox(height: 24),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -290,29 +310,11 @@ class _EventNotificationsSettingsScreenState
     // border, and a filled bell icon. The bare Switch thumb on its own
     // wasn't a strong enough signal on Android in light mode — users
     // missed the on/off state.
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      decoration: BoxDecoration(
-        color: value
-            ? AppColors.purple.withValues(alpha: 0.10)
-            : context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: value
-              ? AppColors.purple.withValues(alpha: 0.55)
-              : context.borderColor,
-          width: value ? 1.4 : 1,
-        ),
-        boxShadow: value
-            ? [
-                BoxShadow(
-                  color: AppColors.purple.withValues(alpha: 0.18),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
+    return AppGlassCard(
+      radius: 16,
+      emphasize: value,
+      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+      borderAlpha: value ? 0.65 : (context.isDark ? 0.14 : 0.50),
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
@@ -395,7 +397,9 @@ class _EventNotificationsSettingsScreenState
       ),
       selected: selected,
       onSelected: onSelected,
-      backgroundColor: context.cardBg,
+      backgroundColor: context.isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : Colors.white.withValues(alpha: 0.30),
       selectedColor: AppColors.purple.withValues(alpha: 0.18),
       side: BorderSide(
         color: selected
@@ -422,7 +426,9 @@ class _EventNotificationsSettingsScreenState
       ),
       selected: selected,
       onSelected: onSelected,
-      backgroundColor: context.cardBg,
+      backgroundColor: context.isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : Colors.white.withValues(alpha: 0.30),
       selectedColor: AppColors.purple.withValues(alpha: 0.18),
       checkmarkColor: AppColors.purple,
       side: BorderSide(

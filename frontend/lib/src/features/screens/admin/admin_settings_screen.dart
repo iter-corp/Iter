@@ -5,6 +5,7 @@ import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 
 class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -250,12 +251,13 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   Widget build(BuildContext context) {
     final cfgAsync = ref.watch(adminConfigProvider);
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.adminAppSettings),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -269,7 +271,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
           ),
         ],
       ),
-      body: cfgAsync.when(
+      body: AppPageBackground(
+        child: cfgAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (cfg) {
@@ -483,6 +486,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             ],
           );
         },
+        ),
       ),
     );
   }
@@ -589,13 +593,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Container(
+    return AppGlassCard(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
-      ),
+      radius: 16,
       child: SwitchListTile(
         title: Text(title),
         value: value,
@@ -646,19 +646,9 @@ class _FocusInputCardState extends State<_FocusInputCard> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        color: context.inputFill,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _focusNode.hasFocus
-              ? AppColors.purple.withValues(alpha: 0.55)
-              : context.borderColor,
-          width: _focusNode.hasFocus ? 1.4 : 1,
-        ),
-      ),
+    return AppGlassCard(
+      radius: 16,
+      borderAlpha: _focusNode.hasFocus ? 0.65 : null,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: TextField(
         focusNode: _focusNode,
@@ -714,21 +704,9 @@ class _FocusInputRowState extends State<_FocusInputRow> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        color: context.inputFill,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: widget.errorText != null
-              ? Theme.of(context).colorScheme.error
-              : _focusNode.hasFocus
-                  ? AppColors.purple.withValues(alpha: 0.55)
-                  : context.borderColor,
-          width: _focusNode.hasFocus ? 1.4 : 1,
-        ),
-      ),
+    return AppGlassCard(
+      radius: 16,
+      borderAlpha: widget.errorText != null || _focusNode.hasFocus ? 0.65 : null,
       padding: const EdgeInsets.fromLTRB(14, 2, 10, 2),
       child: Row(
         children: [

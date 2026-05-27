@@ -448,16 +448,19 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
     final selected = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: context.cardBg,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       isScrollControlled: true,
       builder: (sheet) {
-        return SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(sheet).size.height * 0.6,
-            child: Column(
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: AppPageBackground(
+            child: SafeArea(
+              child: SizedBox(
+                height: MediaQuery.of(sheet).size.height * 0.6,
+                child: Column(
               children: [
                 const SizedBox(height: 8),
                 Container(
@@ -490,24 +493,32 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     itemBuilder: (_, i) {
                       final lang = entries[i];
                       final selected = lang.code == current;
-                      return ListTile(
-                        title: Text(lang.label),
-                        subtitle: Text(
-                          lang.code.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.textSecondary,
+                      return AppGlassCard(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
+                        radius: 16,
+                        child: ListTile(
+                          title: Text(lang.label),
+                          subtitle: Text(
+                            lang.code.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textSecondary,
+                            ),
                           ),
+                          trailing: selected
+                              ? const Icon(Icons.check,
+                                  color: AppColors.purple)
+                              : null,
+                          onTap: () => Navigator.pop(sheet, lang.code),
                         ),
-                        trailing: selected
-                            ? const Icon(Icons.check, color: AppColors.purple)
-                            : null,
-                        onTap: () => Navigator.pop(sheet, lang.code),
                       );
                     },
                   ),
                 ),
               ],
+                ),
+              ),
             ),
           ),
         );
@@ -523,7 +534,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: context.cardBg,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -733,22 +744,15 @@ InputDecoration _settingsInputDecoration(
   required String label,
   Widget? suffixIcon,
 }) {
-  final baseBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide(color: context.borderColor),
-  );
-
   return InputDecoration(
     labelText: label,
     labelStyle: TextStyle(color: context.textSecondary),
     filled: false,
     fillColor: Colors.transparent,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-    enabledBorder: baseBorder,
-    border: baseBorder,
-    focusedBorder: baseBorder.copyWith(
-      borderSide: const BorderSide(color: AppColors.purple, width: 1.5),
-    ),
+    enabledBorder: InputBorder.none,
+    border: InputBorder.none,
+    focusedBorder: InputBorder.none,
     suffixIcon: suffixIcon,
     suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
   );
@@ -852,59 +856,82 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: context.cardBg,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: Text(context.t.changeEmail),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: _settingsInputDecoration(context,
-                label: context.t.settingsNewEmail),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _passCtrl,
-            obscureText: _obscure,
-            decoration: _settingsInputDecoration(
-              context,
-              label: context.t.settingsCurrentPassword,
-              suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscure = !_obscure),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: AppGlassCard(
+        radius: 20,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              context.t.changeEmail,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 16),
+            AppGlassCard(
+              radius: 16,
+              padding: EdgeInsets.zero,
+              child: TextField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _settingsInputDecoration(
+                    context, label: context.t.settingsNewEmail),
               ),
             ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _error!,
-              style: const TextStyle(color: Colors.red, fontSize: 13),
+            const SizedBox(height: 12),
+            AppGlassCard(
+              radius: 16,
+              padding: EdgeInsets.zero,
+              child: TextField(
+                controller: _passCtrl,
+                obscureText: _obscure,
+                decoration: _settingsInputDecoration(
+                  context,
+                  label: context.t.settingsCurrentPassword,
+                  suffixIcon: IconButton(
+                    icon:
+                        Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed:
+                      _loading ? null : () => Navigator.of(context).pop(false),
+                  child: Text(context.t.cancel),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _loading ? null : _save,
+                  child: _loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(context.t.save,
+                          style: const TextStyle(color: AppColors.purple)),
+                ),
+              ],
             ),
           ],
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: Text(context.t.cancel),
-        ),
-        TextButton(
-          onPressed: _loading ? null : _save,
-          child: _loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(context.t.save,
-                  style: const TextStyle(color: AppColors.purple)),
-        ),
-      ],
     );
   }
 }
@@ -914,10 +941,13 @@ class _BlockedUsersSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.65,
-        child: Column(
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: AppPageBackground(
+        child: SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.65,
+            child: Column(
           children: [
             const SizedBox(height: 8),
             Container(
@@ -944,6 +974,8 @@ class _BlockedUsersSheet extends ConsumerWidget {
             // page can stand alone. Tapping unblock removes the user.
             const Expanded(child: _BlockedUsersList()),
           ],
+            ),
+          ),
         ),
       ),
     );

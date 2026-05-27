@@ -8,6 +8,7 @@ import '../../../providers/admin_providers.dart';
 import '../../../services/error_report_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
+import '../../widgets/app_page_background.dart';
 import 'admin_reports_toolbar.dart';
 
 /// Admin view of app-wide errors captured by [ErrorReportService] — uncaught
@@ -33,12 +34,13 @@ class _AdminErrorReportsScreenState
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: context.surfaceSoft,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(context.t.errorReports),
-          backgroundColor: context.cardBg,
+          backgroundColor: Colors.transparent,
           foregroundColor: context.textPrimary,
           elevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
           actions: [
             PopupMenuButton<String>(
               onSelected: (v) async {
@@ -69,7 +71,8 @@ class _AdminErrorReportsScreenState
             ],
           ),
         ),
-        body: reportsAsync.when(
+        body: AppPageBackground(
+          child: reportsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (_) => TabBarView(
@@ -87,6 +90,7 @@ class _AdminErrorReportsScreenState
                 emptySubtitle: context.t.adminSolvedReportsMoveHere,
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -262,13 +266,9 @@ class _RollupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppGlassCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.borderColor),
-      ),
+      radius: 16,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -363,16 +363,11 @@ class _ReportTile extends ConsumerWidget {
         : report.screen!.trim();
     if (selecting) {
       final title = report.message.split('\n').first;
-      return Container(
+      return AppGlassCard(
         margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? const Color(0xFF7E3BE8) : context.borderColor,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
+        radius: 16,
+        emphasize: selected,
+        borderAlpha: selected ? 0.65 : null,
         child: CheckboxListTile(
           value: selected,
           onChanged: (v) => onSelectedChanged(v ?? false),
@@ -399,17 +394,10 @@ class _ReportTile extends ConsumerWidget {
     }
     return GestureDetector(
       onLongPress: onLongPress,
-      child: Container(
+      child: AppGlassCard(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: report.resolved
-              ? context.borderColor
-              : const Color(0xFFE04E5C).withValues(alpha: 0.4),
-        ),
-      ),
+      radius: 16,
+      borderAlpha: report.resolved ? null : 0.65,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(

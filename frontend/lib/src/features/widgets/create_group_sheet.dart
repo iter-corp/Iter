@@ -10,6 +10,7 @@ import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../theme/app_theme.dart';
 import '../screens/chat_screen.dart';
+import 'app_page_background.dart';
 import 'primary_action_button.dart';
 
 /// Opens a bottom sheet that lets the signed-in user create a new group chat
@@ -18,7 +19,7 @@ Future<void> showCreateGroupSheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: context.cardBg,
+    backgroundColor: Colors.transparent,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -98,12 +99,15 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            children: [
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: AppPageBackground(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                children: [
               const SizedBox(height: 12),
               Container(
                 width: 40,
@@ -128,39 +132,21 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
+                child: _GlassInput(
                   controller: _nameCtrl,
-                  decoration: InputDecoration(
-                    hintText: context.t.createGroupGroupName,
-                    filled: true,
-                    fillColor: context.inputFill,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+                  hintText: context.t.createGroupGroupName,
+                  icon: Icons.group_outlined,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
+                child: _GlassInput(
                   controller: _searchCtrl,
+                  hintText: context.t.createGroupSearchPeople,
+                  icon: Icons.search,
                   onChanged: (v) => setState(() => _query = v),
-                  decoration: InputDecoration(
-                    hintText: context.t.createGroupSearchPeople,
-                    prefixIcon: Icon(Icons.search, color: context.textMuted),
-                    filled: true,
-                    fillColor: context.inputFill,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 0),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -193,6 +179,7 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                     }
                     return ListView.builder(
                       controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: uids.length,
                       itemBuilder: (_, i) => _UserRow(
                         uid: uids[i],
@@ -230,10 +217,51 @@ class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
                   ),
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _GlassInput extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final IconData icon;
+  final ValueChanged<String>? onChanged;
+
+  const _GlassInput({
+    required this.controller,
+    required this.hintText,
+    required this.icon,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppGlassCard(
+      radius: 16,
+      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+      borderAlpha: context.isDark ? 0.14 : 0.50,
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: TextStyle(color: context.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: context.textSecondary),
+          prefixIcon: Icon(icon, color: AppColors.purple),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        ),
+      ),
     );
   }
 }
@@ -282,22 +310,46 @@ class _UserRow extends ConsumerWidget {
           return const SizedBox.shrink();
         }
 
-        return CheckboxListTile(
-          value: selected,
-          onChanged: (v) => onToggle(v ?? false),
-          controlAffinity: ListTileControlAffinity.trailing,
-          secondary: CircleAvatar(
-            radius: 20,
-            backgroundColor: context.inputFill,
-            backgroundImage:
-                avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
-            child: avatar.isEmpty
-                ? Icon(Icons.person, color: context.textSecondary)
-                : null,
+        return AppGlassCard(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          radius: 16,
+          surfaceAlpha: context.isDark ? 0.42 : 0.36,
+          borderAlpha: selected ? 0.65 : (context.isDark ? 0.14 : 0.50),
+          emphasize: selected,
+          child: CheckboxListTile(
+            value: selected,
+            onChanged: (v) => onToggle(v ?? false),
+            controlAffinity: ListTileControlAffinity.trailing,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            checkboxShape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            secondary: CircleAvatar(
+              radius: 20,
+              backgroundColor: context.inputFill,
+              backgroundImage:
+                  avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
+              child: avatar.isEmpty
+                  ? Icon(Icons.person, color: context.textSecondary)
+                  : null,
+            ),
+            title: Text(
+              username,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: context.textPrimary,
+              ),
+            ),
+            subtitle: fullName.trim().isEmpty
+                ? null
+                : Text(
+                    fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: context.textSecondary),
+                  ),
+            activeColor: AppColors.purple,
           ),
-          title: Text(username,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          activeColor: const Color(0xFFB05ECC),
         );
       },
     );

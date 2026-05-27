@@ -8,6 +8,7 @@ import '../../../providers/auth_providers.dart';
 import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/responsive.dart';
+import '../../widgets/app_page_background.dart';
 import '../../widgets/primary_action_button.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -155,192 +156,195 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final logoSize = context.scaleW(72, 84);
     final t = context.t;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-          child: Form(
-            key: _formKey,
-            // No form-level autovalidate: each field opts in via its own
-            // `touched` flag so errors only appear after the user leaves the
-            // field (or taps Sign Up), not while they're still typing.
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: context.scaleW(16, 30)),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    'assets/img/app_icon.png',
-                    width: logoSize,
-                    height: logoSize,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  t.signUp,
-                  style: TextStyle(
-                    fontSize: context.scaleW(20, 24),
-                    fontWeight: FontWeight.bold,
-                    color: context.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  t.signupSubtitle,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.textMuted,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                _buildTextField(
-                  controller: _emailCtrl,
-                  hint: t.email,
-                  prefixIcon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
-                  touched: _emailTouched,
-                  onBlur: () {
-                    if (!_emailTouched) setState(() => _emailTouched = true);
-                  },
-                  validator: (value) {
-                    final v = value?.trim() ?? '';
-                    if (v.isEmpty || !_emailRegex.hasMatch(v)) {
-                      return t.signupEnterValidEmail;
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _passCtrl,
-                  hint: t.password,
-                  prefixIcon: Icons.lock_outline,
-                  isPassword: true,
-                  obscured: _obscurePassword,
-                  onToggleObscure: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  // Only surface the red "min 8 chars" pill once the user
-                  // has left the field with a too-short value. Hidden by
-                  // default and as soon as they type the 8th character.
-                  helperText: (_passTouched && _passCtrl.text.length < 8)
-                      ? t.signupPasswordMinLength
-                      : null,
-                  touched: _passTouched,
-                  onBlur: () {
-                    if (!_passTouched) setState(() => _passTouched = true);
-                    // Surface a mismatch error on the confirm field as soon
-                    // as the user finishes typing the password — otherwise
-                    // they'd need to re-focus the confirm field to see it.
-                    if (_confirmTouched) setState(() {});
-                  },
-                  validator: (value) => _validatePassword(value, t),
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _confirmCtrl,
-                  hint: t.confirmPassword,
-                  prefixIcon: Icons.lock_outline,
-                  isPassword: true,
-                  obscured: _obscureConfirm,
-                  onToggleObscure: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
-                  touched: _confirmTouched,
-                  onBlur: () {
-                    if (!_confirmTouched) {
-                      setState(() => _confirmTouched = true);
-                    }
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return t.signupEnterPassword;
-                    }
-                    if (value != _passCtrl.text) return t.passwordsDontMatch;
-                    return null;
-                  },
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: context.isDark
-                          ? const Color(0xFF3D1F1F)
-                          : const Color(0xFFFFEEEE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+            child: Form(
+              key: _formKey,
+              // No form-level autovalidate: each field opts in via its own
+              // `touched` flag so errors only appear after the user leaves the
+              // field (or taps Sign Up), not while they're still typing.
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(height: context.scaleW(16, 30)),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/img/app_icon.png',
+                      width: logoSize,
+                      height: logoSize,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                ],
-                const SizedBox(height: 24),
-                PrimaryActionButton(
-                  label: context.t.signUp,
-                  onPressed: _loading ? null : _submit,
-                  loading: _loading,
-                  size: PrimaryActionSize.large,
-                  fullWidth: true,
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: context.borderColor)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                  const SizedBox(height: 20),
+                  Text(
+                    t.signUp,
+                    style: TextStyle(
+                      fontSize: context.scaleW(20, 24),
+                      fontWeight: FontWeight.bold,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    t.signupSubtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.textMuted,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildTextField(
+                    controller: _emailCtrl,
+                    hint: t.email,
+                    prefixIcon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    touched: _emailTouched,
+                    onBlur: () {
+                      if (!_emailTouched) setState(() => _emailTouched = true);
+                    },
+                    validator: (value) {
+                      final v = value?.trim() ?? '';
+                      if (v.isEmpty || !_emailRegex.hasMatch(v)) {
+                        return t.signupEnterValidEmail;
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    controller: _passCtrl,
+                    hint: t.password,
+                    prefixIcon: Icons.lock_outline,
+                    isPassword: true,
+                    obscured: _obscurePassword,
+                    onToggleObscure: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    // Only surface the red "min 8 chars" pill once the user
+                    // has left the field with a too-short value. Hidden by
+                    // default and as soon as they type the 8th character.
+                    helperText: (_passTouched && _passCtrl.text.length < 8)
+                        ? t.signupPasswordMinLength
+                        : null,
+                    touched: _passTouched,
+                    onBlur: () {
+                      if (!_passTouched) setState(() => _passTouched = true);
+                      // Surface a mismatch error on the confirm field as soon
+                      // as the user finishes typing the password — otherwise
+                      // they'd need to re-focus the confirm field to see it.
+                      if (_confirmTouched) setState(() {});
+                    },
+                    validator: (value) => _validatePassword(value, t),
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    controller: _confirmCtrl,
+                    hint: t.confirmPassword,
+                    prefixIcon: Icons.lock_outline,
+                    isPassword: true,
+                    obscured: _obscureConfirm,
+                    onToggleObscure: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                    touched: _confirmTouched,
+                    onBlur: () {
+                      if (!_confirmTouched) {
+                        setState(() => _confirmTouched = true);
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return t.signupEnterPassword;
+                      }
+                      if (value != _passCtrl.text) return t.passwordsDontMatch;
+                      return null;
+                    },
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: context.isDark
+                            ? const Color(0xFF3D1F1F)
+                            : const Color(0xFFFFEEEE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Text(
-                        context.t.loginOr,
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  PrimaryActionButton(
+                    label: context.t.signUp,
+                    onPressed: _loading ? null : _submit,
+                    loading: _loading,
+                    size: PrimaryActionSize.large,
+                    fullWidth: true,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: context.borderColor)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          context.t.loginOr,
+                          style:
+                              TextStyle(fontSize: 13, color: context.textMuted),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: context.borderColor)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSocialButton(
+                    label: _googleLoading
+                        ? context.t.loginSigningIn
+                        : context.t.continueWithGoogle,
+                    icon: _googleLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : _buildSocialBadge('G', const Color(0xFF4285F4)),
+                    onTap: _googleLoading ? () {} : _signInWithGoogle,
+                  ),
+                  SizedBox(height: context.scaleW(20, 30)),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        context.t.alreadyHaveAccount,
                         style:
                             TextStyle(fontSize: 13, color: context.textMuted),
                       ),
-                    ),
-                    Expanded(child: Divider(color: context.borderColor)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildSocialButton(
-                  label: _googleLoading
-                      ? context.t.loginSigningIn
-                      : context.t.continueWithGoogle,
-                  icon: _googleLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : _buildSocialBadge('G', const Color(0xFF4285F4)),
-                  onTap: _googleLoading ? () {} : _signInWithGoogle,
-                ),
-                SizedBox(height: context.scaleW(20, 30)),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      context.t.alreadyHaveAccount,
-                      style: TextStyle(fontSize: 13, color: context.textMuted),
-                    ),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: () => context.go('/login'),
-                      child: Text(
-                        context.t.signIn,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFFCE5DE5),
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => context.go('/login'),
+                        child: Text(
+                          context.t.signIn,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFFCE5DE5),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: context.bottomSafeInset),
-              ],
+                    ],
+                  ),
+                  SizedBox(height: context.bottomSafeInset),
+                ],
+              ),
             ),
           ),
         ),
@@ -377,73 +381,78 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       // `canRequestFocus: false` keeps this wrapper from stealing focus from
       // the inner TextFormField — we only want it for the blur callback.
       canRequestFocus: false,
-      child: TextFormField(
-      controller: controller,
-      validator: validator,
-      autovalidateMode:
-          touched ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
-      keyboardType: keyboardType,
-      obscureText: isObscured,
-      // Autofill hints help password managers offer to generate / save a
-      // strong password on the signup flow.
-      autofillHints: isPassword
-          ? const [AutofillHints.newPassword]
-          : keyboardType == TextInputType.emailAddress
-              ? const [AutofillHints.email]
-              : null,
-      style: TextStyle(fontSize: 14, color: context.textPrimary),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
-        // Render the helper as a custom widget so we can give it a red
-        // pill background with white text — calls out the password rule
-        // more clearly than the default muted-text helper.
-        helper: helperText == null
-            ? null
-            : Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE53935),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      helperText,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
+      child: AppGlassCard(
+        radius: 16,
+        child: TextFormField(
+          controller: controller,
+          validator: validator,
+          autovalidateMode: touched
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
+          keyboardType: keyboardType,
+          obscureText: isObscured,
+          // Autofill hints help password managers offer to generate / save a
+          // strong password on the signup flow.
+          autofillHints: isPassword
+              ? const [AutofillHints.newPassword]
+              : keyboardType == TextInputType.emailAddress
+                  ? const [AutofillHints.email]
+                  : null,
+          style: TextStyle(fontSize: 14, color: context.textPrimary),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+            // Render the helper as a custom widget so we can give it a red
+            // pill background with white text — calls out the password rule
+            // more clearly than the default muted-text helper.
+            helper: helperText == null
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53935),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          helperText,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-        helperMaxLines: 2,
-        prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  isObscured
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  size: 20,
-                  color: context.textMuted,
-                ),
-                onPressed: onToggleObscure,
-              )
-            : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+            helperMaxLines: 2,
+            prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(
+                      isObscured
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 20,
+                      color: context.textMuted,
+                    ),
+                    onPressed: onToggleObscure,
+                  )
+                : null,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: true,
+            fillColor: Colors.transparent,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          ),
         ),
-        filled: true,
-        fillColor: context.cardBg,
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-      ),
       ),
     );
   }
@@ -453,9 +462,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     required Widget icon,
     required VoidCallback onTap,
   }) {
-    return SizedBox(
+    return AppGlassCard(
       width: double.infinity,
       height: 52,
+      radius: 16,
       child: OutlinedButton.icon(
         onPressed: onTap,
         icon: icon,
@@ -467,10 +477,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           ),
         ),
         style: OutlinedButton.styleFrom(
-          backgroundColor: context.cardBg,
-          side: BorderSide(color: context.borderColor),
+          backgroundColor: Colors.transparent,
+          side: BorderSide.none,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/app_page_background.dart';
 
 /// Full-page change-password screen. Replaces the old `AlertDialog`
 /// version so the keyboard has room to open without overflowing, and so
@@ -176,21 +177,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required Widget suffixIcon,
     String? errorText,
   }) {
-    final baseBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide(color: context.borderColor),
-    );
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: context.textSecondary),
       filled: false,
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      enabledBorder: baseBorder,
-      border: baseBorder,
-      focusedBorder: baseBorder.copyWith(
-        borderSide: const BorderSide(color: AppColors.purple, width: 1.5),
-      ),
+      enabledBorder: InputBorder.none,
+      border: InputBorder.none,
+      focusedBorder: InputBorder.none,
       // When errorText is set Flutter automatically swaps to the error
       // border colors, so the field outlines red as the user types.
       errorText: errorText,
@@ -207,12 +202,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     // route; it can't block this screen).
     final busy = _loading;
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.changePassword),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
         actions: [
           TextButton(
             onPressed: busy ? null : _save,
@@ -229,68 +225,86 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _currentPassCtrl,
-                obscureText: _obscureCurrent,
-                autofillHints: const [AutofillHints.password],
-                decoration: _fieldDecoration(
-                  label: context.t.settingsCurrentPassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureCurrent
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+      body: AppPageBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              24 + MediaQuery.of(context).padding.bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                  controller: _currentPassCtrl,
+                  obscureText: _obscureCurrent,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: _fieldDecoration(
+                    label: context.t.settingsCurrentPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureCurrent
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscureCurrent = !_obscureCurrent),
                     ),
-                    onPressed: () =>
-                        setState(() => _obscureCurrent = !_obscureCurrent),
+                  ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _newPassCtrl,
-                obscureText: _obscureNew,
-                autofillHints: const [AutofillHints.newPassword],
-                decoration: _fieldDecoration(
-                  label: context.t.settingsNewPassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureNew ? Icons.visibility_off : Icons.visibility,
+                const SizedBox(height: 14),
+                AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                  controller: _newPassCtrl,
+                  obscureText: _obscureNew,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: _fieldDecoration(
+                    label: context.t.settingsNewPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureNew ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscureNew = !_obscureNew),
                     ),
-                    onPressed: () =>
-                        setState(() => _obscureNew = !_obscureNew),
+                  ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _confirmPassCtrl,
-                obscureText: _obscureConfirm,
-                autofillHints: const [AutofillHints.newPassword],
-                decoration: _fieldDecoration(
-                  label: context.t.settingsConfirmNewPassword,
+                const SizedBox(height: 14),
+                AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                  controller: _confirmPassCtrl,
+                  obscureText: _obscureConfirm,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: _fieldDecoration(
+                    label: context.t.settingsConfirmNewPassword,
                   // Live mismatch error — `_confirmError` is null until the
                   // user has typed something AND the value differs from the
                   // new-password field, so it doesn't yell at them while
                   // they're still in the middle of typing the same value.
-                  errorText: _confirmError,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureConfirm
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                    errorText: _confirmError,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirm
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
-                    onPressed: () =>
-                        setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
                   ),
                 ),
-              ),
               const SizedBox(height: 8),
               // "Forgot current password?" — navigates to the same
               // forgot-password screen used from the login page rather
@@ -312,36 +326,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   style: const TextStyle(color: Colors.red, fontSize: 13),
                 ),
               ],
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 48,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.purple,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 48,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.purple,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
+                    onPressed: busy ? null : _save,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            context.t.save,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
-                  onPressed: busy ? null : _save,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          context.t.save,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

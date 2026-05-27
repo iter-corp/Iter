@@ -6,6 +6,7 @@ import '../../../providers/admin_providers.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../providers/contact_request_providers.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 import 'admin_blacklist_screen.dart';
 import 'admin_contact_requests_screen.dart';
 import 'admin_discuss_posts_screen.dart';
@@ -40,22 +41,24 @@ class AdminDashboardScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.adminDashboardTitle),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          28 + MediaQuery.paddingOf(context).bottom,
-        ),
-        children: [
-          _AdminTile(
+      body: AppPageBackground(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            28 + MediaQuery.paddingOf(context).bottom,
+          ),
+          children: [
+            _AdminTile(
             icon: Icons.people_alt_outlined,
             title: context.t.adminTileUsersTitle,
             subtitle: context.t.adminTileUsersSubtitle,
@@ -149,7 +152,8 @@ class AdminDashboardScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -174,18 +178,17 @@ class _AdminTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: context.cardBg,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
+    return AppGlassCard(
+      radius: 16,
+      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+      borderAlpha: context.isDark ? 0.14 : 0.50,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
-          ),
           child: Row(
             children: [
               Container(
@@ -208,8 +211,12 @@ class _AdminTile extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: const Color(0xFFE04E5C),
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: context.cardBg, width: 1.2),
+                            border: Border.all(
+                              color: context.isDark
+                                  ? const Color(0xFF1E1E2C)
+                                  : Colors.white,
+                              width: 1.2,
+                            ),
                           ),
                         ),
                       ),
@@ -244,6 +251,7 @@ class _AdminTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

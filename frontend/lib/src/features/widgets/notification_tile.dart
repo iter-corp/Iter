@@ -64,18 +64,9 @@ class NotificationTile extends StatelessWidget {
             /// notifications still sits on top of the ring.
             Stack(
               children: [
-                Container(
+                SizedBox(
                   width: 48,
                   height: 48,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(2),
                   child: CircleAvatar(
                     backgroundColor: context.inputFill,
                     backgroundImage: avatar.isNotEmpty

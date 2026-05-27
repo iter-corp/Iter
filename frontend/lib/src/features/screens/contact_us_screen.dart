@@ -8,6 +8,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/contact_request_providers.dart';
 import '../../services/contact_request_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/app_page_background.dart';
 import 'user_screen.dart';
 
 /// User-facing "Contact us" entry. Opened from Settings. This now
@@ -23,23 +24,50 @@ class ContactUsScreen extends ConsumerWidget {
     final myThreads = ref.watch(myContactRequestsProvider);
     if (auth == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(context.t.contactUs)),
-        body: Center(
-          child: Text(
-            context.t.contactNeedSignIn,
-            style: TextStyle(color: context.textSecondary),
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(context.t.contactUs),
+          backgroundColor: Colors.transparent,
+          foregroundColor: context.textPrimary,
+          elevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+        ),
+        body: AppPageBackground(
+          child: Center(
+            child: Text(
+              context.t.contactNeedSignIn,
+              style: TextStyle(color: context.textSecondary),
+            ),
           ),
         ),
       );
     }
     return myThreads.when(
       loading: () => Scaffold(
-        appBar: AppBar(title: Text(context.t.contactUs)),
-        body: const Center(child: CircularProgressIndicator()),
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(context.t.contactUs),
+          backgroundColor: Colors.transparent,
+          foregroundColor: context.textPrimary,
+          elevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+        ),
+        body: const AppPageBackground(
+          child: Center(child: CircularProgressIndicator()),
+        ),
       ),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: Text(context.t.contactUs)),
-        body: Center(child: Text('${context.t.contactCouldNotOpen}: $e')),
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(context.t.contactUs),
+          backgroundColor: Colors.transparent,
+          foregroundColor: context.textPrimary,
+          elevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+        ),
+        body: AppPageBackground(
+          child: Center(child: Text('${context.t.contactCouldNotOpen}: $e')),
+        ),
       ),
       data: (threads) {
         final active = threads.isNotEmpty
@@ -156,9 +184,17 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
     final profile = ref.watch(currentUserDocProvider).valueOrNull;
     final email = (profile?['email'] as String?) ?? auth?.email ?? '';
     return Scaffold(
-      appBar: AppBar(title: Text(context.t.contactNewRequest)),
-      body: SafeArea(
-        child: SingleChildScrollView(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: Text(context.t.contactNewRequest),
+        backgroundColor: Colors.transparent,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+      ),
+      body: AppPageBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,15 +205,10 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                       fontWeight: FontWeight.w700,
                       color: context.textSecondary)),
               const SizedBox(height: 6),
-              Container(
+              AppGlassCard(
                 width: double.infinity,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: context.surfaceSoft,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: context.borderColor),
-                ),
                 child: Text(
                   email.isNotEmpty ? email : context.t.contactNoEmail,
                   style: TextStyle(color: context.textPrimary, fontSize: 14),
@@ -201,16 +232,23 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
                       fontWeight: FontWeight.w700,
                       color: context.textSecondary)),
               const SizedBox(height: 6),
-              TextField(
-                controller: _bodyCtrl,
-                minLines: 5,
-                maxLines: 12,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: _type == ContactRequestType.organization
-                      ? context.t.contactOrgHint
-                      : context.t.contactHowCanWeHelp,
-                  border: const OutlineInputBorder(),
+              AppGlassCard(
+                radius: 16,
+                padding: EdgeInsets.zero,
+                child: TextField(
+                  controller: _bodyCtrl,
+                  minLines: 5,
+                  maxLines: 12,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: _type == ContactRequestType.organization
+                        ? context.t.contactOrgHint
+                        : context.t.contactHowCanWeHelp,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(14),
+                  ),
                 ),
               ),
               if (_error != null) ...[
@@ -241,6 +279,7 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -258,19 +297,12 @@ class _TypeChoice extends StatelessWidget {
       return Expanded(
         child: GestureDetector(
           onTap: () => onChanged(t),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+          child: AppGlassCard(
+            radius: 14,
+            emphasize: selected,
+            surfaceAlpha: context.isDark ? 0.42 : 0.36,
+            borderAlpha: selected ? 0.65 : (context.isDark ? 0.14 : 0.50),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.purple.withValues(alpha: 0.10)
-                  : context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: selected ? AppColors.purple : context.borderColor,
-                width: selected ? 1.5 : 1,
-              ),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -577,7 +609,12 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     final requesterSuspended = (requesterLive?['suspended'] as bool?) ?? false;
     final canManageRequester = isAdmin && widget.request.userUid.isNotEmpty;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
         title: isAdmin
             ? InkWell(
                 borderRadius: BorderRadius.circular(24),
@@ -678,8 +715,9 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
+      body: AppPageBackground(
+        child: SafeArea(
+          child: Column(
           children: [
             if (canEditType)
               Padding(
@@ -737,14 +775,12 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                 },
               ),
             ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              decoration: BoxDecoration(
-                color: context.cardBg,
-                border: Border(
-                  top: BorderSide(color: context.borderColor),
-                ),
-              ),
+            AppGlassCard(
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              radius: 24,
+              surfaceAlpha: context.isDark ? 0.46 : 0.38,
+              borderAlpha: context.isDark ? 0.14 : 0.50,
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -760,9 +796,10 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                             : _requestType == ContactRequestType.organization
                                 ? context.t.contactReplyOrgHint
                                 : context.t.contactReplyTypeReply,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                       ),
@@ -790,6 +827,7 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -886,19 +924,12 @@ class _ThreadTypeBar extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () => onChanged(type),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+          child: AppGlassCard(
+            radius: 14,
+            emphasize: selected,
+            surfaceAlpha: context.isDark ? 0.42 : 0.36,
+            borderAlpha: selected ? 0.65 : (context.isDark ? 0.14 : 0.50),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.purple.withValues(alpha: 0.10)
-                  : context.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: selected ? AppColors.purple : context.borderColor,
-                width: selected ? 1.5 : 1,
-              ),
-            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

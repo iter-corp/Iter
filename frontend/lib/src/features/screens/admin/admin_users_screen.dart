@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 import '../user_screen.dart';
 
 class AdminUsersScreen extends ConsumerStatefulWidget {
@@ -63,29 +64,32 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     return DefaultTabController(
       length: 5,
       child: Scaffold(
-        backgroundColor: context.surfaceSoft,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(context.t.adminTileUsersTitle),
-          backgroundColor: context.cardBg,
+          backgroundColor: Colors.transparent,
           foregroundColor: context.textPrimary,
           elevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
         ),
-        body: Column(
-          children: [
+        body: AppPageBackground(
+          child: Column(
+            children: [
             // One shared search field above the tabs so the query persists
             // and applies to whichever tab is active.
             Padding(
               padding: const EdgeInsets.all(12),
-              child: TextField(
-                onChanged: (v) => setState(() => _query = v),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: context.t.adminUsersSearchHint,
-                  filled: true,
-                  fillColor: context.cardBg,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: context.borderColor),
+              child: AppGlassCard(
+                radius: 16,
+                padding: EdgeInsets.zero,
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: context.t.adminUsersSearchHint,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
                   ),
                 ),
               ),
@@ -103,7 +107,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                       // Scrollable so longer translated labels (Arabic /
                       // Kurdish) don't crowd or clip on small screens.
                       Material(
-                        color: context.surfaceSoft,
+                        color: Colors.transparent,
                         child: TabBar(
                           isScrollable: true,
                           labelColor: AppColors.purple,
@@ -142,7 +146,8 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                 },
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -230,12 +235,8 @@ class _UserTile extends ConsumerWidget {
       subtitle = context.t.adminUsersNoEmail;
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.borderColor),
-      ),
+    return AppGlassCard(
+      radius: 16,
       child: ListTile(
         onTap: uid.isEmpty
             ? null

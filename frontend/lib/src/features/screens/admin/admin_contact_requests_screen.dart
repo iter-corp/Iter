@@ -7,6 +7,7 @@ import '../../../providers/contact_request_providers.dart';
 import '../../../services/contact_request_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
+import '../../widgets/app_page_background.dart';
 import '../contact_us_screen.dart';
 
 /// Admin-side list of every contact-us thread. Tapping a row opens [ContactThreadScreen], which the
@@ -38,15 +39,17 @@ class _AdminContactRequestsScreenState
     }
     final async = ref.watch(allContactRequestsProvider);
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.contactRequests),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: SafeArea(
-        child: Column(
+      body: AppPageBackground(
+        child: SafeArea(
+          child: Column(
           children: [
             _FilterBar(
               onlyUnread: _onlyUnread,
@@ -87,6 +90,7 @@ class _AdminContactRequestsScreenState
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -107,18 +111,10 @@ class _FilterBar extends StatelessWidget {
     Widget chip(String label, bool selected, VoidCallback onTap) {
       return GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+        child: AppGlassCard(
+          radius: 20,
+          emphasize: selected,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.purple.withValues(alpha: 0.12)
-                : context.cardBg,
-            border: Border.all(
-              color: selected ? AppColors.purple : context.borderColor,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
           child: Text(
             label,
             style: TextStyle(
@@ -157,23 +153,17 @@ class _AdminRequestTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isOrg = request.type == ContactRequestType.organization;
     final unread = request.unreadByAdmin;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return AppGlassCard(
+      radius: 16,
+      emphasize: unread,
+      borderAlpha: unread ? 0.65 : null,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: unread
-                  ? AppColors.purple.withValues(alpha: 0.5)
-                  : context.borderColor,
-              width: unread ? 1.5 : 1,
-            ),
-          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -311,6 +301,7 @@ class _AdminRequestTile extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

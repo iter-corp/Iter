@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 import 'admin_discuss_reports_screen.dart';
 import 'admin_error_reports_screen.dart';
 import 'admin_post_reports_screen.dart';
@@ -20,21 +21,23 @@ class AdminReportsScreen extends ConsumerWidget {
     final hasNewErrorReports = ref.watch(hasNewErrorReportsProvider);
 
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.reports),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          24 + MediaQuery.paddingOf(context).bottom,
-        ),
-        children: [
+      body: AppPageBackground(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            24 + MediaQuery.paddingOf(context).bottom,
+          ),
+          children: [
           _ReportsTile(
             icon: Icons.flag_outlined,
             title: context.t.adminPostReports,
@@ -102,7 +105,8 @@ class AdminReportsScreen extends ConsumerWidget {
               );
             },
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -127,18 +131,15 @@ class _ReportsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: context.cardBg,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
+    return AppGlassCard(
+      radius: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
-          ),
           child: Row(
             children: [
               Container(
@@ -161,8 +162,7 @@ class _ReportsTile extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: const Color(0xFFE04E5C),
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: context.cardBg, width: 1.2),
+                            border: Border.all(color: Colors.white, width: 1.2),
                           ),
                         ),
                       ),
@@ -197,6 +197,7 @@ class _ReportsTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

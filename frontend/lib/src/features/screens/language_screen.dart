@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/locale_provider.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/app_page_background.dart';
 
 /// Full-screen language picker. Reachable from Settings → Language.
 ///
@@ -18,31 +19,42 @@ class LanguageScreen extends ConsumerWidget {
     final current = ref.watch(localeProvider);
 
     return Scaffold(
-      backgroundColor: context.cardBg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.appLanguage),
         centerTitle: false,
+        backgroundColor: Colors.transparent,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          for (final lang in AppLanguage.values)
-            _LanguageTile(
-              language: lang,
-              selected: lang == current,
-              onTap: () {
-                ref.read(localeProvider.notifier).setLanguage(lang);
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(context.t.languageChanged),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-              },
-            ),
-        ],
+      body: AppPageBackground(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            24 + MediaQuery.of(context).padding.bottom,
+          ),
+          children: [
+            for (final lang in AppLanguage.values)
+              _LanguageTile(
+                language: lang,
+                selected: lang == current,
+                onTap: () {
+                  ref.read(localeProvider.notifier).setLanguage(lang);
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(context.t.languageChanged),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -61,37 +73,41 @@ class _LanguageTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      leading: CircleAvatar(
-        backgroundColor: selected
-            ? AppColors.purple
-            : AppColors.purple.withValues(alpha: 0.12),
-        child: Text(
-          language.code.toUpperCase(),
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.purple,
+    return AppGlassCard(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      radius: 16,
+      emphasize: selected,
+      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+      borderAlpha: selected ? 0.65 : (context.isDark ? 0.14 : 0.50),
+      child: ListTile(
+        onTap: onTap,
+        leading: CircleAvatar(
+          backgroundColor: selected
+              ? AppColors.purple
+              : AppColors.purple.withValues(alpha: 0.12),
+          child: Text(
+            language.code.toUpperCase(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : AppColors.purple,
+            ),
           ),
         ),
+        title: Text(
+          language.nativeName,
+          textDirection: language.direction,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          language.englishName,
+          textDirection: TextDirection.ltr,
+          style: TextStyle(fontSize: 12, color: context.textSecondary),
+        ),
+        trailing: selected
+            ? const Icon(Icons.check_circle, color: AppColors.purple)
+            : Icon(Icons.circle_outlined, color: context.textSecondary),
       ),
-      // The native name is intentionally shown in its own script and
-      // direction so each option is recognizable regardless of the
-      // currently active UI language.
-      title: Text(
-        language.nativeName,
-        textDirection: language.direction,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        language.englishName,
-        textDirection: TextDirection.ltr,
-        style: TextStyle(fontSize: 12, color: context.textSecondary),
-      ),
-      trailing: selected
-          ? const Icon(Icons.check_circle, color: AppColors.purple)
-          : Icon(Icons.circle_outlined, color: context.textSecondary),
     );
   }
 }

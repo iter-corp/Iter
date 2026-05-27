@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/app_strings.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../services/auth_service.dart';
+import '../../widgets/app_page_background.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/responsive.dart';
@@ -135,173 +136,172 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final vPad = context.scaleW(20, 32);
     final logoSize = context.scaleW(72, 84);
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: context.scaleW(16, 30)),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    'assets/img/app_icon.png',
-                    width: logoSize,
-                    height: logoSize,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  context.t.login,
-                  style: TextStyle(
-                    fontSize: context.scaleW(20, 24),
-                    fontWeight: FontWeight.bold,
-                    color: context.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  context.t.loginSubtitle,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.textMuted,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                _buildTextField(
-                  controller: _usernameCtrl,
-                  hint: context.t.loginUsernameOrEmail,
-                  prefixIcon: Icons.person_2_outlined,
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? context.t.loginEnterUsernameOrEmail
-                      : null,
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _passCtrl,
-                  hint: context.t.password,
-                  prefixIcon: Icons.lock_outline,
-                  isPassword: true,
-                  validator: (v) => (v == null || v.length < 6)
-                      ? context.t.loginMin6Chars
-                      : null,
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: GestureDetector(
-                    onTap: () => context.push('/forgot-password'),
-                    child: Text(
-                      context.t.forgotPassword,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFCE5DE5),
-                      ),
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(height: context.scaleW(16, 30)),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/img/app_icon.png',
+                      width: logoSize,
+                      height: logoSize,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: context.isDark
-                          ? const Color(0xFF3D1F1F)
-                          : const Color(0xFFFFEEEE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
+                  const SizedBox(height: 20),
+                  Text(
+                    context.t.login,
+                    style: TextStyle(
+                      fontSize: context.scaleW(20, 24),
+                      fontWeight: FontWeight.bold,
+                      color: context.textPrimary,
                     ),
                   ),
-                ],
-                const SizedBox(height: 24),
-                PrimaryActionButton(
-                  label: context.t.login,
-                  onPressed: _loading ? null : _submit,
-                  loading: _loading,
-                  size: PrimaryActionSize.large,
-                  fullWidth: true,
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: context.borderColor)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                  const SizedBox(height: 8),
+                  Text(
+                    context.t.loginSubtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.textMuted,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildTextField(
+                    controller: _usernameCtrl,
+                    hint: context.t.loginUsernameOrEmail,
+                    prefixIcon: Icons.person_2_outlined,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? context.t.loginEnterUsernameOrEmail
+                        : null,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    controller: _passCtrl,
+                    hint: context.t.password,
+                    prefixIcon: Icons.lock_outline,
+                    isPassword: true,
+                    validator: (v) => (v == null || v.length < 6)
+                        ? context.t.loginMin6Chars
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: GestureDetector(
+                      onTap: () => context.push('/forgot-password'),
                       child: Text(
-                        context.t.loginOr,
-                        style:
-                            TextStyle(fontSize: 13, color: context.textMuted),
+                        context.t.forgotPassword,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFCE5DE5),
+                        ),
                       ),
                     ),
-                    Expanded(child: Divider(color: context.borderColor)),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    AppGlassCard(
+                      width: double.infinity,
+                      radius: 14,
+                      surfaceAlpha: context.isDark ? 0.62 : 0.54,
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                _buildSocialButton(
-                  label: _googleLoading
-                      ? context.t.loginSigningIn
-                      : context.t.continueWithGoogle,
-                  icon: _googleLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : _buildSocialBadge('G', const Color(0xFF4285F4)),
-                  onTap: _googleLoading ? () {} : _signInWithGoogle,
-                ),
-                if (_isIOS) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
+                  PrimaryActionButton(
+                    label: context.t.login,
+                    onPressed: _loading ? null : _submit,
+                    loading: _loading,
+                    size: PrimaryActionSize.large,
+                    fullWidth: true,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: context.borderColor)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          context.t.loginOr,
+                          style:
+                              TextStyle(fontSize: 13, color: context.textMuted),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: context.borderColor)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   _buildSocialButton(
-                    label: _appleLoading
+                    label: _googleLoading
                         ? context.t.loginSigningIn
-                        : context.t.continueWithApple,
-                    icon: _appleLoading
+                        : context.t.continueWithGoogle,
+                    icon: _googleLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Icon(Icons.apple,
-                            size: 24, color: context.textPrimary),
-                    onTap: _appleLoading ? () {} : _signInWithApple,
+                        : _buildSocialBadge('G', const Color(0xFF4285F4)),
+                    onTap: _googleLoading ? () {} : _signInWithGoogle,
                   ),
-                ],
-                const SizedBox(height: 30),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      context.t.dontHaveAccount,
-                      style: TextStyle(fontSize: 13, color: context.textMuted),
-                    ),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: () => context.push('/signup'),
-                      child: Text(
-                        context.t.signUp,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFCE5DE5),
-                        ),
-                      ),
+                  if (_isIOS) ...[
+                    const SizedBox(height: 12),
+                    _buildSocialButton(
+                      label: _appleLoading
+                          ? context.t.loginSigningIn
+                          : context.t.continueWithApple,
+                      icon: _appleLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(Icons.apple,
+                              size: 24, color: context.textPrimary),
+                      onTap: _appleLoading ? () {} : _signInWithApple,
                     ),
                   ],
-                ),
-                SizedBox(height: context.bottomSafeInset),
-              ],
+                  const SizedBox(height: 30),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        context.t.dontHaveAccount,
+                        style:
+                            TextStyle(fontSize: 13, color: context.textMuted),
+                      ),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => context.push('/signup'),
+                        child: Text(
+                          context.t.signUp,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFCE5DE5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: context.bottomSafeInset),
+                ],
+              ),
             ),
           ),
         ),
@@ -316,36 +316,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     required String? Function(String?) validator,
     bool isPassword = false,
   }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      obscureText: isPassword ? _obscurePassword : false,
-      style: TextStyle(fontSize: 14, color: context.textPrimary),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
-        prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  size: 20,
-                  color: context.textMuted,
-                ),
-                onPressed: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
-              )
-            : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+    return AppGlassCard(
+      radius: 16,
+      child: TextFormField(
+        controller: controller,
+        validator: validator,
+        obscureText: isPassword ? _obscurePassword : false,
+        style: TextStyle(fontSize: 14, color: context.textPrimary),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+          prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 20,
+                    color: context.textMuted,
+                  ),
+                  onPressed: () {
+                    setState(() => _obscurePassword = !_obscurePassword);
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          filled: true,
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
         ),
-        filled: true,
-        fillColor: context.cardBg,
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
     );
   }
@@ -355,9 +359,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     required Widget icon,
     required VoidCallback onTap,
   }) {
-    return SizedBox(
+    return AppGlassCard(
       width: double.infinity,
       height: 52,
+      radius: 16,
       child: OutlinedButton.icon(
         onPressed: onTap,
         icon: icon,
@@ -369,10 +374,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         style: OutlinedButton.styleFrom(
-          backgroundColor: context.cardBg,
-          side: BorderSide(color: context.borderColor),
+          backgroundColor: Colors.transparent,
+          side: BorderSide.none,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 
 class AdminBlacklistScreen extends ConsumerWidget {
   const AdminBlacklistScreen({super.key});
@@ -13,14 +14,16 @@ class AdminBlacklistScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final listAsync = ref.watch(blacklistProvider);
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.adminBlacklistedEmails),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: listAsync.when(
+      body: AppPageBackground(
+        child: listAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (items) {
@@ -47,13 +50,10 @@ class AdminBlacklistScreen extends ConsumerWidget {
               final email = (item['email'] as String?) ?? '';
               final deletedAt =
                   (item['deletedAt'] as dynamic)?.toDate() as DateTime?;
-              return Container(
+              return AppGlassCard(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: context.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.shade100),
-                ),
+                radius: 16,
+                borderAlpha: 0.60,
                 child: Row(
                   children: [
                     Container(
@@ -123,6 +123,7 @@ class AdminBlacklistScreen extends ConsumerWidget {
             },
           );
         },
+        ),
       ),
     );
   }

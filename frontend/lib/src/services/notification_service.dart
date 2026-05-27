@@ -85,6 +85,19 @@ class NotificationService {
   Future<void> markRead(String uid, String notifId) =>
       _items(uid).doc(notifId).update({'read': true});
 
+  /// Mark a known set of notification documents as read. Used by the
+  /// notification screen to close only the category the user actually viewed.
+  Future<void> markNotificationsRead(String uid, Iterable<String> ids) async {
+    final uniqueIds = ids.toSet();
+    if (uniqueIds.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final id in uniqueIds) {
+      batch.update(_items(uid).doc(id), {'read': true});
+    }
+    await batch.commit();
+  }
+
   /// Flip a single notification back to unread. Used by the long-press
   /// action menu so the user can re-surface something they read.
   Future<void> markUnread(String uid, String notifId) =>

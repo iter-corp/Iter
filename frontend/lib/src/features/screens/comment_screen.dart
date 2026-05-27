@@ -13,6 +13,7 @@ import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
 import '../../services/translate_service.dart';
 import '../model/post_model.dart';
+import '../widgets/app_page_background.dart';
 
 class _ReplyTarget {
   final String parentCommentId;
@@ -188,18 +189,14 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               ),
             ),
 
-            Divider(height: 1, color: Theme.of(context).dividerColor),
+            const SizedBox(height: 2),
 
             if (widget.showPostContext)
-              Container(
+              AppGlassCard(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                decoration: BoxDecoration(
-                  color: context.inputFill,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
+                radius: 16,
                 child: Text(
                   widget.post.caption.trim(),
                   style: TextStyle(
@@ -260,12 +257,12 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                         widget.highlightAuthorUid!.isNotEmpty &&
                         comments.isNotEmpty) {
                       final authorMatches = comments
-                          .where((c) =>
-                              c.authorUid == widget.highlightAuthorUid)
+                          .where(
+                              (c) => c.authorUid == widget.highlightAuthorUid)
                           .toList();
                       // Newest first.
-                      authorMatches.sort(
-                          (a, b) => b.createdAt.compareTo(a.createdAt));
+                      authorMatches
+                          .sort((a, b) => b.createdAt.compareTo(a.createdAt));
                       if (authorMatches.isNotEmpty) {
                         resolved = authorMatches.first.id;
                       }
@@ -297,8 +294,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                       // this ListView includes the reply row — that way
                       // the scroll-to retry below finds a real
                       // RenderObject instead of racing the expand.
-                      _expandedParents
-                          .add(highlightedComment.parentCommentId!);
+                      _expandedParents.add(highlightedComment.parentCommentId!);
                     }
                     _hasScrolledToHighlight = true; // prevent re-scheduling
                     // Retry the ensureVisible up to ~1s in 50ms chunks
@@ -331,8 +327,8 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                           () => tryScroll(attempt + 1));
                     }
 
-                    Future.delayed(const Duration(milliseconds: 200),
-                        tryScroll);
+                    Future.delayed(
+                        const Duration(milliseconds: 200), tryScroll);
                   }
 
                   return ListView.builder(
@@ -417,15 +413,18 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
               ),
             ),
 
-            Divider(height: 1, color: Theme.of(context).dividerColor),
+            const SizedBox(height: 2),
 
             // Reply target banner
             if (_replyTo != null)
-              Container(
+              AppGlassCard(
                 width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: context.purpleSoft,
+                radius: 16,
+                emphasize: true,
+                surfaceAlpha: context.isDark ? 0.58 : 0.50,
                 child: Row(
                   children: [
                     Expanded(
@@ -455,41 +454,101 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
                 top: 8,
                 bottom: composerBottomInset,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: context.inputFill,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        decoration: InputDecoration(
-                          hintText: _replyTo != null
-                              ? context.t
-                                  .commentReplyToHint(_replyTo!.username)
-                              : context.t.commentAddCommentHint,
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (_) => _submit(),
+              child: AppGlassCard(
+                radius: 28,
+                surfaceAlpha: context.isDark ? 0.56 : 0.46,
+                padding: const EdgeInsetsDirectional.fromSTEB(14, 6, 6, 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Icon(
+                        _replyTo == null
+                            ? Icons.chat_bubble_outline_rounded
+                            : Icons.reply_rounded,
+                        size: 20,
+                        color: context.textSecondary,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _sending
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(
-                          onPressed: _submit,
-                          icon:
-                              const Icon(Icons.send, color: Color(0xFFB05ECC)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          inputDecorationTheme: const InputDecorationTheme(
+                            filled: false,
+                            fillColor: Colors.transparent,
+                          ),
                         ),
-                ],
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          minLines: 1,
+                          maxLines: 4,
+                          textInputAction: TextInputAction.send,
+                          cursorColor: AppColors.purple,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 14,
+                            height: 1.3,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            hoverColor: Colors.transparent,
+                            focusColor: Colors.transparent,
+                            hintText: _replyTo != null
+                                ? context.t
+                                    .commentReplyToHint(_replyTo!.username)
+                                : context.t.commentAddCommentHint,
+                            hintStyle: TextStyle(
+                              color: context.textMuted,
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            contentPadding:
+                                const EdgeInsets.symmetric(vertical: 11),
+                          ),
+                          onSubmitted: (_) => _submit(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 160),
+                      child: _sending
+                          ? const SizedBox(
+                              key: ValueKey('sending'),
+                              width: 44,
+                              height: 44,
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            )
+                          : IconButton.filled(
+                              key: const ValueKey('send'),
+                              style: IconButton.styleFrom(
+                                backgroundColor: AppColors.purple,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(44, 44),
+                              ),
+                              onPressed: _submit,
+                              icon: const Icon(Icons.send_rounded, size: 19),
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -618,13 +677,6 @@ class _CommentTile extends ConsumerWidget {
       openUserProfile(context, uid: comment.authorUid);
     }
 
-    final cardColor = context.cardBg.withValues(
-      alpha: context.isDark ? 0.72 : 0.90,
-    );
-    final borderColor = highlighted
-        ? AppColors.purple.withValues(alpha: 0.55)
-        : context.borderColor.withValues(alpha: 0.55);
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
       curve: Curves.easeOut,
@@ -635,20 +687,26 @@ class _CommentTile extends ConsumerWidget {
         5,
       ),
       decoration: BoxDecoration(
-        color: highlighted
-            ? AppColors.purple.withValues(alpha: context.isDark ? 0.24 : 0.12)
-            : cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: context.isDark ? 0.20 : 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: highlighted
+            ? [
+                BoxShadow(
+                  color: AppColors.purple.withValues(
+                    alpha: context.isDark ? 0.22 : 0.14,
+                  ),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
-      child: Padding(
+      child: AppGlassCard(
+        radius: 18,
+        emphasize: highlighted,
+        borderAlpha: highlighted ? 0.70 : null,
+        surfaceAlpha: highlighted
+            ? (context.isDark ? 0.58 : 0.48)
+            : (context.isDark ? 0.48 : 0.38),
         padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -827,7 +885,7 @@ class _CommentTile extends ConsumerWidget {
               ),
           ],
         ),
-      ), // Padding
+      ),
     ); // AnimatedContainer
   }
 }
@@ -983,8 +1041,7 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
                           Clipboard.setData(ClipboardData(text: _translated!));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content:
-                                  Text(context.t.commentTranslationCopied),
+                              content: Text(context.t.commentTranslationCopied),
                             ),
                           );
                         },

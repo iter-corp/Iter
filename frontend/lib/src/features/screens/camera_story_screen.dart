@@ -35,6 +35,7 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
   int _activeCamera = 0;
   FlashMode _flashMode = FlashMode.auto;
   bool _uploading = false;
+  bool _settingUpCamera = false;
   // Camera setup error kind, resolved to a localized message in
   // [_buildPreview] where a BuildContext is available. [_initErrorDetail]
   // holds the raw exception text for the "init failed" case.
@@ -78,17 +79,55 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
         c.dispose();
       }
     } else if (state == AppLifecycleState.resumed) {
-      if (_controller == null) _setupCamera();
+      if (_controller == null || _initError != null) _setupCamera();
     }
   }
 
-  Future<void> _setupCamera() async {
+  Future<List<CameraDescription>> _availableCamerasWithRetry() async {
+    Object? lastError;
+    var lastCameras = const <CameraDescription>[];
+    const delays = [
+      Duration.zero,
+      Duration(milliseconds: 350),
+      Duration(milliseconds: 900),
+    ];
+
+    for (final delay in delays) {
+      if (delay > Duration.zero) {
+        await Future.delayed(delay);
+      }
+      if (!mounted) return const <CameraDescription>[];
+      try {
+        final cameras = await availableCameras();
+        if (cameras.isNotEmpty) return cameras;
+        lastCameras = cameras;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (lastError != null && lastCameras.isEmpty) throw lastError;
+    return lastCameras;
+  }
+
+  Future<void> _setupCamera({bool retryOnFailure = true}) async {
+    if (_settingUpCamera) return;
+    _settingUpCamera = true;
+    var shouldRetrySetup = false;
     try {
-      _cameras = await availableCameras();
+      if (mounted) {
+        setState(() {
+          _initError = null;
+          _initErrorDetail = '';
+        });
+      }
+
+      _cameras = await _availableCamerasWithRetry();
       if (_cameras.isEmpty) {
-        setState(() => _initError = _CameraInitError.noCameras);
+        if (mounted) setState(() => _initError = _CameraInitError.noCameras);
         return;
       }
+      if (_activeCamera >= _cameras.length) _activeCamera = 0;
       final desc = _cameras[_activeCamera];
       final c = CameraController(
         desc,
@@ -98,9 +137,28 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
       );
       _controller = c;
       _initFuture = c.initialize();
-      await _initFuture;
+      try {
+        await _initFuture;
+      } catch (_) {
+        _controller = null;
+        _initFuture = null;
+        if (mounted) setState(() {});
+        await c.dispose();
+        if (!mounted) return;
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        final retry = CameraController(
+          desc,
+          ResolutionPreset.high,
+          enableAudio: false,
+          imageFormatGroup: ImageFormatGroup.jpeg,
+        );
+        _controller = retry;
+        _initFuture = retry.initialize();
+        await _initFuture;
+      }
       if (!mounted) return;
-      await c.setFlashMode(_flashMode);
+      await _controller?.setFlashMode(_flashMode);
       setState(() {});
     } catch (e) {
       if (mounted) {
@@ -108,6 +166,16 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
           _initError = _CameraInitError.initFailed;
           _initErrorDetail = '$e';
         });
+      }
+      shouldRetrySetup = retryOnFailure;
+    } finally {
+      _settingUpCamera = false;
+    }
+
+    if (shouldRetrySetup && mounted && _controller == null) {
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (mounted && _controller == null) {
+        await _setupCamera(retryOnFailure: false);
       }
     }
   }

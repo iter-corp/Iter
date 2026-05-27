@@ -7,6 +7,7 @@ import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../model/post_model.dart';
+import '../../widgets/app_page_background.dart';
 import '../qa_thread_screen.dart';
 
 class AdminDiscussPostsScreen extends ConsumerStatefulWidget {
@@ -25,27 +26,30 @@ class _AdminDiscussPostsScreenState
   Widget build(BuildContext context) {
     final postsAsync = ref.watch(adminDiscussPostsProvider);
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.adminDiscussPosts),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: Column(
-        children: [
+      body: AppPageBackground(
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
-              onChanged: (v) => setState(() => _query = v),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: context.t.adminDiscussSearchHint,
-                filled: true,
-                fillColor: context.cardBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.borderColor),
+            child: AppGlassCard(
+              radius: 16,
+              padding: EdgeInsets.zero,
+              child: TextField(
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: context.t.adminDiscussSearchHint,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
               ),
             ),
@@ -87,12 +91,8 @@ class _AdminDiscussPostsScreenState
                     final caption = (p['caption'] as String? ?? '').trim();
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: context.cardBg,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: context.borderColor),
-                        ),
+                      child: AppGlassCard(
+                        radius: 16,
                         child: ListTile(
                           onTap: () async {
                             final postId = (p['id'] as String? ?? '').trim();
@@ -154,7 +154,8 @@ class _AdminDiscussPostsScreenState
               },
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

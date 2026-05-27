@@ -13,6 +13,7 @@ import '../../../services/admin_service.dart';
 import '../../../services/city_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 
 class AdminEventsScreen extends ConsumerStatefulWidget {
   const AdminEventsScreen({super.key});
@@ -131,12 +132,13 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.events),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
@@ -148,171 +150,171 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
         label: Text(context.t.adminNewEvent,
             style: const TextStyle(color: Colors.white)),
       ),
-      body: eventsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-        data: (events) {
-          // Build option sets from the actual data so the filter sheet
-          // only ever offers values that exist on real events.
-          final typeOptions = <String>{
-            for (final e in events)
-              if (e.eventType.isNotEmpty) e.eventType,
-          };
-          final countryOptions = <String>{
-            for (final e in events)
-              if (e.country.isNotEmpty) e.country,
-          };
-          final fundingOptions = <String>{
-            for (final e in events)
-              if (e.funds.isNotEmpty) e.funds,
-          };
+      body: AppPageBackground(
+        child: eventsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+          data: (events) {
+            // Build option sets from the actual data so the filter sheet
+            // only ever offers values that exist on real events.
+            final typeOptions = <String>{
+              for (final e in events)
+                if (e.eventType.isNotEmpty) e.eventType,
+            };
+            final countryOptions = <String>{
+              for (final e in events)
+                if (e.country.isNotEmpty) e.country,
+            };
+            final fundingOptions = <String>{
+              for (final e in events)
+                if (e.funds.isNotEmpty) e.funds,
+            };
 
-          // Collect author usernames so search can match by author name.
-          // Watching one provider per author would cause N rebuilds on
-          // every cache fire, so we collect a snapshot once per build.
-          final authorNames = <String, String>{};
-          for (final e in events) {
-            if (e.createdByUid.isEmpty) continue;
-            final doc = ref.watch(userByUidProvider(e.createdByUid)).value;
-            final name = (doc?['username'] as String?)?.trim() ?? '';
-            if (name.isNotEmpty) authorNames[e.createdByUid] = name;
-          }
+            // Collect author usernames so search can match by author name.
+            // Watching one provider per author would cause N rebuilds on
+            // every cache fire, so we collect a snapshot once per build.
+            final authorNames = <String, String>{};
+            for (final e in events) {
+              if (e.createdByUid.isEmpty) continue;
+              final doc = ref.watch(userByUidProvider(e.createdByUid)).value;
+              final name = (doc?['username'] as String?)?.trim() ?? '';
+              if (name.isNotEmpty) authorNames[e.createdByUid] = name;
+            }
 
-          final filtered =
-              events.where((e) => _matches(e, authorNames)).toList();
+            final filtered =
+                events.where((e) => _matches(e, authorNames)).toList();
 
-          return Column(
-            children: [
-              // Search + filter toolbar. Kept above the list so the user
-              // can refine the visible set without scrolling.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          hintText: context.t.adminEventsSearchHint,
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          suffixIcon: _searchCtrl.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: context.t.clear,
-                                  icon: const Icon(Icons.close, size: 18),
-                                  onPressed: () => _searchCtrl.clear(),
-                                ),
-                          filled: true,
-                          fillColor: context.cardBg,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 0),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+            return Column(
+              children: [
+                // Search + filter toolbar. Kept above the list so the user
+                // can refine the visible set without scrolling.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: AppGlassCard(
+                          radius: 16,
+                          padding: EdgeInsets.zero,
+                          child: TextField(
+                            controller: _searchCtrl,
+                            textInputAction: TextInputAction.search,
+                            decoration: InputDecoration(
+                              hintText: context.t.adminEventsSearchHint,
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              suffixIcon: _searchCtrl.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: context.t.clear,
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () => _searchCtrl.clear(),
+                                    ),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 0),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChipButton(
-                      activeCount: _activeFilterCount,
-                      onTap: () => _openFilterSheet(
-                        typeOptions: typeOptions,
-                        countryOptions: countryOptions,
-                        fundingOptions: fundingOptions,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: filtered.isEmpty
-                    ? Center(
-                        child: Text(
-                          events.isEmpty
-                              ? context.t.adminNoEventsYet
-                              : context.t.adminNoResults,
-                          style: TextStyle(color: context.textSecondary),
+                      const SizedBox(width: 8),
+                      _FilterChipButton(
+                        activeCount: _activeFilterCount,
+                        onTap: () => _openFilterSheet(
+                          typeOptions: typeOptions,
+                          countryOptions: countryOptions,
+                          fundingOptions: fundingOptions,
                         ),
-                      )
-                    : ListView.builder(
-                        padding:
-                            EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) {
-                          final e = filtered[i];
-                          final url =
-                              e.imageUrls.isNotEmpty ? e.imageUrls.first : null;
-                          final authorName = authorNames[e.createdByUid];
-                          // Subtitle line: prefer "author · location" when
-                          // we know the author, fall back to location so
-                          // legacy events keep their old presentation.
-                          final subtitle = authorName != null &&
-                                  authorName.isNotEmpty
-                              ? (e.location.isEmpty
-                                  ? authorName
-                                  : '$authorName · ${e.location}')
-                              : e.location;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: context.cardBg,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: context.borderColor),
-                              ),
-                              child: ListTile(
-                                leading: SizedBox(
-                                  width: 56,
-                                  height: 56,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: url != null
-                                        ? CachedNetworkImage(
-                                            imageUrl: url, fit: BoxFit.cover)
-                                        : Container(
-                                            color: context.inputFill,
-                                            child: Icon(Icons.event,
-                                                color: context.textSecondary),
-                                          ),
-                                  ),
-                                ),
-                                title: Text(
-                                  e.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  subtitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: context.textSecondary,
-                                      fontSize: 12),
-                                ),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        _EventEditorScreen(existing: e),
-                                  ),
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.red),
-                                  onPressed: () =>
-                                      _confirmDelete(context, ref, e.id),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
                       ),
-              ),
-            ],
-          );
-        },
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Text(
+                            events.isEmpty
+                                ? context.t.adminNoEventsYet
+                                : context.t.adminNoResults,
+                            style: TextStyle(color: context.textSecondary),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding:
+                              EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) {
+                            final e = filtered[i];
+                            final url = e.imageUrls.isNotEmpty
+                                ? e.imageUrls.first
+                                : null;
+                            final authorName = authorNames[e.createdByUid];
+                            // Subtitle line: prefer "author · location" when
+                            // we know the author, fall back to location so
+                            // legacy events keep their old presentation.
+                            final subtitle =
+                                authorName != null && authorName.isNotEmpty
+                                    ? (e.location.isEmpty
+                                        ? authorName
+                                        : '$authorName · ${e.location}')
+                                    : e.location;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: AppGlassCard(
+                                radius: 16,
+                                child: ListTile(
+                                  leading: SizedBox(
+                                    width: 56,
+                                    height: 56,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: url != null
+                                          ? CachedNetworkImage(
+                                              imageUrl: url, fit: BoxFit.cover)
+                                          : Container(
+                                              color: context.inputFill,
+                                              child: Icon(Icons.event,
+                                                  color: context.textSecondary),
+                                            ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    e.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 12),
+                                  ),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          _EventEditorScreen(existing: e),
+                                    ),
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () =>
+                                        _confirmDelete(context, ref, e.id),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -328,8 +330,8 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
       await ref.read(adminServiceProvider).deleteEvent(id);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     }
   }
@@ -350,32 +352,39 @@ class _FilterChipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = activeCount > 0;
-    return Material(
-      color: active ? const Color(0xFF7E3BE8) : context.cardBg,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
+    return AppGlassCard(
+      radius: 12,
+      emphasize: active,
+      surfaceAlpha: active ? 0.58 : null,
+      child: Material(
+        color: active
+            ? const Color(0xFF7E3BE8).withValues(alpha: 0.88)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.tune,
-                size: 18,
-                color: active ? Colors.white : context.textPrimary,
-              ),
-              if (active) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '$activeCount',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.tune,
+                  size: 18,
+                  color: active ? Colors.white : context.textPrimary,
                 ),
+                if (active) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '$activeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -429,11 +438,9 @@ class _EventFiltersSheetState extends State<_EventFiltersSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+      child: AppGlassCard(
+        radius: 24,
+        surfaceAlpha: context.isDark ? 0.72 : 0.70,
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
@@ -732,8 +739,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.t.adminUploadFailed(e))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.adminUploadFailed(e))));
       }
     } finally {
       if (mounted) setState(() => _uploadingImage = false);
@@ -798,9 +805,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       // list, the card subtitle) keeps surfacing the city without any
       // model changes. When no city is picked, fall back to just country.
       final cityTrim = _city.trim();
-      final composedLocation = cityTrim.isEmpty
-          ? _country.trim()
-          : '$cityTrim, ${_country.trim()}';
+      final composedLocation =
+          cityTrim.isEmpty ? _country.trim() : '$cityTrim, ${_country.trim()}';
       final data = <String, dynamic>{
         'title': _titleCtrl.text.trim(),
         'subtitle': _subtitleCtrl.text.trim(),
@@ -838,8 +844,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.t.adminSaveFailed(e))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.adminSaveFailed(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -865,12 +871,13 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       if (_funds.isNotEmpty) _funds,
     }.toList();
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(isNew ? context.t.adminNewEvent : context.t.adminEditEvent),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
         actions: [
           TextButton(
             onPressed: _saving
@@ -890,237 +897,235 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset + 12),
-          children: [
-            _refinedField(
-              label: context.t.adminFieldTitle,
-              controller: _titleCtrl,
-              hint: context.t.adminEnterEventTitle,
-              maxLength: 50,
-              required: false,
-              errorText: _titleError,
-              textInputAction: TextInputAction.next,
-              onChanged: (v) {
-                if (_titleError != null && v.trim().isNotEmpty) {
-                  setState(() => _titleError = null);
-                }
-              },
-            ),
-            _refinedField(
-              label: context.t.adminFieldSubtitle,
-              controller: _subtitleCtrl,
-              hint: context.t.adminShortSubtitleOptional,
-              maxLength: 50,
-              textInputAction: TextInputAction.next,
-            ),
-            _SearchablePickerField(
-              placeholder: context.t.adminFieldEventType,
-              sheetTitle: context.t.adminChooseEventType,
-              searchHint: context.t.adminSearchEventType,
-              options: typeOptions,
-              selected: _eventType.isEmpty ? null : _eventType,
-              onChanged: (v) {
-                setState(() {
-                  _eventType = v;
-                  _eventTypeError = null;
-                });
-              },
-            ),
-            if (_eventTypeError != null) _FieldError(text: _eventTypeError!),
-            _SearchablePickerField(
-              placeholder: context.t.adminFieldCountry,
-              sheetTitle: context.t.adminChooseCountry,
-              searchHint: context.t.adminSearchCountry,
-              options: countryOptions,
-              selected: _country.isEmpty ? null : _country,
-              onChanged: (v) {
-                setState(() {
-                  if (v != _country) _city = '';
-                  _country = v;
-                  _countryError = null;
-                });
-              },
-            ),
-            if (_countryError != null) _FieldError(text: _countryError!),
-            // City picker — only meaningful once a country is picked. The
-            // option list is derived from `worldCitiesProvider` filtered
-            // down to cities whose `countryName` matches the chosen
-            // country. Optional: leaving it empty stores just the country.
-            Consumer(
-              builder: (context, ref, _) {
-                final hasCountry = _country.trim().isNotEmpty;
-                final citiesAsync = ref.watch(worldCitiesProvider);
-                if (!hasCountry) {
+      body: AppPageBackground(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset + 12),
+            children: [
+              _refinedField(
+                label: context.t.adminFieldTitle,
+                controller: _titleCtrl,
+                hint: context.t.adminEnterEventTitle,
+                maxLength: 50,
+                required: false,
+                errorText: _titleError,
+                textInputAction: TextInputAction.next,
+                onChanged: (v) {
+                  if (_titleError != null && v.trim().isNotEmpty) {
+                    setState(() => _titleError = null);
+                  }
+                },
+              ),
+              _refinedField(
+                label: context.t.adminFieldSubtitle,
+                controller: _subtitleCtrl,
+                hint: context.t.adminShortSubtitleOptional,
+                maxLength: 50,
+                textInputAction: TextInputAction.next,
+              ),
+              _SearchablePickerField(
+                placeholder: context.t.adminFieldEventType,
+                sheetTitle: context.t.adminChooseEventType,
+                searchHint: context.t.adminSearchEventType,
+                options: typeOptions,
+                selected: _eventType.isEmpty ? null : _eventType,
+                onChanged: (v) {
+                  setState(() {
+                    _eventType = v;
+                    _eventTypeError = null;
+                  });
+                },
+              ),
+              if (_eventTypeError != null) _FieldError(text: _eventTypeError!),
+              _SearchablePickerField(
+                placeholder: context.t.adminFieldCountry,
+                sheetTitle: context.t.adminChooseCountry,
+                searchHint: context.t.adminSearchCountry,
+                options: countryOptions,
+                selected: _country.isEmpty ? null : _country,
+                onChanged: (v) {
+                  setState(() {
+                    if (v != _country) _city = '';
+                    _country = v;
+                    _countryError = null;
+                  });
+                },
+              ),
+              if (_countryError != null) _FieldError(text: _countryError!),
+              // City picker — only meaningful once a country is picked. The
+              // option list is derived from `worldCitiesProvider` filtered
+              // down to cities whose `countryName` matches the chosen
+              // country. Optional: leaving it empty stores just the country.
+              Consumer(
+                builder: (context, ref, _) {
+                  final hasCountry = _country.trim().isNotEmpty;
+                  final citiesAsync = ref.watch(worldCitiesProvider);
+                  if (!hasCountry) {
+                    return _SearchablePickerField(
+                      placeholder: context.t.adminCityPickCountryFirst,
+                      sheetTitle: context.t.adminChooseCity,
+                      searchHint: context.t.adminSearchCity,
+                      options: const [],
+                      selected: null,
+                      enabled: false,
+                      onChanged: (_) {},
+                    );
+                  }
+                  if (citiesAsync.isLoading) {
+                    return _SearchablePickerField(
+                      placeholder: context.t.cityPickerLoading,
+                      sheetTitle: context.t.adminChooseCity,
+                      searchHint: context.t.adminSearchCity,
+                      options: const [],
+                      selected: _city.isEmpty ? null : _city,
+                      enabled: false,
+                      onChanged: (_) {},
+                    );
+                  }
+                  final cities = citiesAsync.value ?? const <CityOption>[];
+                  final selectedCountry = normalizeCitySearch(_country);
+                  final cityOptions = cities
+                      .where((c) =>
+                          normalizeCitySearch(c.countryName) == selectedCountry)
+                      .map((c) => c.name)
+                      .toSet()
+                      .toList()
+                    ..sort();
                   return _SearchablePickerField(
-                    placeholder: context.t.adminCityPickCountryFirst,
+                    placeholder: context.t.adminFieldCity,
                     sheetTitle: context.t.adminChooseCity,
                     searchHint: context.t.adminSearchCity,
-                    options: const [],
-                    selected: null,
-                    enabled: false,
-                    onChanged: (_) {},
-                  );
-                }
-                if (citiesAsync.isLoading) {
-                  return _SearchablePickerField(
-                    placeholder: context.t.cityPickerLoading,
-                    sheetTitle: context.t.adminChooseCity,
-                    searchHint: context.t.adminSearchCity,
-                    options: const [],
+                    options: cityOptions,
                     selected: _city.isEmpty ? null : _city,
-                    enabled: false,
-                    onChanged: (_) {},
+                    onChanged: (v) => setState(() => _city = v),
                   );
-                }
-                final cities = citiesAsync.value ?? const <CityOption>[];
-                final selectedCountry = normalizeCitySearch(_country);
-                final cityOptions = cities
-                    .where((c) =>
-                        normalizeCitySearch(c.countryName) ==
-                        selectedCountry)
-                    .map((c) => c.name)
-                    .toSet()
-                    .toList()
-                  ..sort();
-                return _SearchablePickerField(
-                  placeholder: context.t.adminFieldCity,
-                  sheetTitle: context.t.adminChooseCity,
-                  searchHint: context.t.adminSearchCity,
-                  options: cityOptions,
-                  selected: _city.isEmpty ? null : _city,
-                  onChanged: (v) => setState(() => _city = v),
-                );
-              },
-            ),
-            _SearchablePickerField(
-              placeholder: 'Funds',
-              sheetTitle: 'Choose funding status',
-              searchHint: 'Search funding status...',
-              options: fundsOptions,
-              selected: _funds.isEmpty ? null : _funds,
-              enableSearch: false,
-              onChanged: (v) {
-                setState(() {
-                  _funds = v;
-                  _fundsError = null;
-                });
-              },
-            ),
-            if (_fundsError != null) _FieldError(text: _fundsError!),
-            _DeadlineField(
-              deadlineAt: _deadlineAt,
-              onPick: _pickDeadline,
-              onClear: _deadlineAt == null
-                  ? null
-                  : () => setState(() => _deadlineAt = null),
-            ),
-            _refinedField(
-              label: context.t.adminFieldDescription,
-              controller: _descCtrl,
-              hint: context.t.adminDescribeTheEvent,
-              maxLines: 4,
-              required: false,
-              errorText: _descError,
-              textInputAction: TextInputAction.newline,
-              onChanged: (v) {
-                if (_descError != null && v.trim().isNotEmpty) {
-                  setState(() => _descError = null);
-                }
-              },
-            ),
-            _refinedField(
-              label: context.t.adminFieldLink,
-              controller: _linkCtrl,
-              hint: context.t.adminRegistrationOrInfoLink,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-            ),
-            _refinedField(
-              label: context.t.adminFieldPhone,
-              controller: _phoneCtrl,
-              hint: context.t.adminContactPhoneOptional,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-            ),
-            _refinedField(
-              label: context.t.adminFieldEmail,
-              controller: _emailCtrl,
-              hint: context.t.adminContactEmailOptional,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.done,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(context.t.adminFieldImages,
-                    style: TextStyle(
-                        color: context.textSecondary,
-                        fontWeight: FontWeight.w600)),
-                const Text(' *',
-                    style: TextStyle(
-                        color: Colors.redAccent, fontWeight: FontWeight.w700)),
-              ],
-            ),
-            if (_imagesError != null) _FieldError(text: _imagesError!),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._imageUrls.map((u) => Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: CachedNetworkImage(
-                            imageUrl: u,
-                            width: 86,
-                            height: 86,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: 2,
-                          right: 2,
-                          child: GestureDetector(
-                            onTap: () => setState(() => _imageUrls.remove(u)),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              padding: const EdgeInsets.all(3),
-                              child: const Icon(Icons.close,
-                                  size: 14, color: Colors.white),
+                },
+              ),
+              _SearchablePickerField(
+                placeholder: 'Funds',
+                sheetTitle: 'Choose funding status',
+                searchHint: 'Search funding status...',
+                options: fundsOptions,
+                selected: _funds.isEmpty ? null : _funds,
+                enableSearch: false,
+                onChanged: (v) {
+                  setState(() {
+                    _funds = v;
+                    _fundsError = null;
+                  });
+                },
+              ),
+              if (_fundsError != null) _FieldError(text: _fundsError!),
+              _DeadlineField(
+                deadlineAt: _deadlineAt,
+                onPick: _pickDeadline,
+                onClear: _deadlineAt == null
+                    ? null
+                    : () => setState(() => _deadlineAt = null),
+              ),
+              _refinedField(
+                label: context.t.adminFieldDescription,
+                controller: _descCtrl,
+                hint: context.t.adminDescribeTheEvent,
+                maxLines: 4,
+                required: false,
+                errorText: _descError,
+                textInputAction: TextInputAction.newline,
+                onChanged: (v) {
+                  if (_descError != null && v.trim().isNotEmpty) {
+                    setState(() => _descError = null);
+                  }
+                },
+              ),
+              _refinedField(
+                label: context.t.adminFieldLink,
+                controller: _linkCtrl,
+                hint: context.t.adminRegistrationOrInfoLink,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+              ),
+              _refinedField(
+                label: context.t.adminFieldPhone,
+                controller: _phoneCtrl,
+                hint: context.t.adminContactPhoneOptional,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+              ),
+              _refinedField(
+                label: context.t.adminFieldEmail,
+                controller: _emailCtrl,
+                hint: context.t.adminContactEmailOptional,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(context.t.adminFieldImages,
+                      style: TextStyle(
+                          color: context.textSecondary,
+                          fontWeight: FontWeight.w600)),
+                  const Text(' *',
+                      style: TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w700)),
+                ],
+              ),
+              if (_imagesError != null) _FieldError(text: _imagesError!),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ..._imageUrls.map((u) => Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: CachedNetworkImage(
+                              imageUrl: u,
+                              width: 86,
+                              height: 86,
+                              fit: BoxFit.cover,
                             ),
                           ),
-                        ),
-                      ],
-                    )),
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 86,
-                    height: 86,
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: context.borderColor),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _imageUrls.remove(u)),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(3),
+                                child: const Icon(Icons.close,
+                                    size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )),
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: AppGlassCard(
+                      width: 86,
+                      height: 86,
+                      radius: 10,
+                      child: _uploadingImage
+                          ? const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(Icons.add_a_photo_outlined,
+                              color: context.textSecondary),
                     ),
-                    child: _uploadingImage
-                        ? const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(Icons.add_a_photo_outlined,
-                            color: context.textSecondary),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -1140,10 +1145,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: Material(
-        elevation: 1,
-        borderRadius: BorderRadius.circular(12),
-        color: context.cardBg,
+      child: AppGlassCard(
+        radius: 12,
         child: TextFormField(
           controller: controller,
           maxLines: maxLines,
@@ -1158,7 +1161,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
             labelText: label,
             hintText: hint ?? label,
             filled: true,
-            fillColor: context.inputFill,
+            fillColor: Colors.transparent,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -1221,12 +1224,8 @@ class _DeadlineField extends StatelessWidget {
         : MaterialLocalizations.of(context).formatMediumDate(deadlineAt!);
     return GestureDetector(
       onTap: onPick,
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.borderColor),
-        ),
+      child: AppGlassCard(
+        radius: 12,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         margin: const EdgeInsets.only(bottom: 12),
         child: Row(
@@ -1302,12 +1301,8 @@ class _SearchablePickerField extends StatelessWidget {
       onTap: enabled ? () => _open(context) : null,
       child: Opacity(
         opacity: enabled ? 1 : 0.72,
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.borderColor),
-          ),
+        child: AppGlassCard(
+          radius: 12,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           margin: const EdgeInsets.only(bottom: 12),
           child: Row(
@@ -1388,11 +1383,9 @@ class _PickerSheetState extends State<_PickerSheet> {
     // Cap visible height to _visibleRows items; shrink if fewer results.
     final listH = (_filtered.length.clamp(1, _visibleRows)) * _itemH;
     return SafeArea(
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+      child: AppGlassCard(
+        radius: 20,
+        surfaceAlpha: context.isDark ? 0.72 : 0.70,
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
@@ -1431,27 +1424,30 @@ class _PickerSheetState extends State<_PickerSheet> {
             if (widget.enableSearch)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _searchCtrl,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: widget.searchHint,
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              FocusScope.of(context).unfocus();
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: context.surfaceSoft,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                child: AppGlassCard(
+                  radius: 12,
+                  child: TextField(
+                    controller: _searchCtrl,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: widget.searchHint,
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                FocusScope.of(context).unfocus();
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                 ),

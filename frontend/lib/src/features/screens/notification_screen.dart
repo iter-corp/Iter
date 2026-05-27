@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -33,31 +35,80 @@ class NotificationScreen extends ConsumerStatefulWidget {
 
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   _NotificationCategory _selectedCategory = _NotificationCategory.activity;
+  List<AppNotification> _latestNotifications = const <AppNotification>[];
+  String? _latestUid;
+  final Set<_NotificationCategory> _openedCategories = {
+    _NotificationCategory.activity,
+  };
+  final Set<_NotificationCategory> _markedClosedCategories = {};
 
-  /// One-shot guard: auto-mark-all-as-read happens exactly once per screen
-  /// mount, on the first frame. Without the guard, [build] could re-trigger
-  /// the bulk update every time the notifications stream emits.
-  bool _autoMarkedRead = false;
+  /// Legacy auto-mark hook kept disabled; category close handles read state.
+  bool _legacyAutoMarkDisabled = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoMarkAllReadOnce();
-    });
   }
 
+  // ignore: unused_element
   Future<void> _autoMarkAllReadOnce() async {
-    if (_autoMarkedRead || !mounted) return;
+    if (_legacyAutoMarkDisabled || !mounted) return;
     final user = ref.read(authStateProvider).value;
     if (user == null) return;
-    _autoMarkedRead = true;
+    _legacyAutoMarkDisabled = true;
     try {
       await ref.read(notificationServiceProvider).markAllRead(user.uid);
     } catch (_) {
       // Best-effort — failure here shouldn't block the user from seeing
       // the screen. Snapshot will still surface notifications as-is.
     }
+  }
+
+  @override
+  void dispose() {
+    _markCategoryReadWhenClosed(_selectedCategory);
+    super.dispose();
+  }
+
+  bool _belongsToCategory(
+    AppNotification notification,
+    _NotificationCategory category,
+  ) {
+    return _categoryForType(notification.type) == category;
+  }
+
+  void _selectCategory(_NotificationCategory category) {
+    if (_selectedCategory == category) return;
+    _markCategoryReadWhenClosed(_selectedCategory);
+    setState(() {
+      _selectedCategory = category;
+      _openedCategories.add(category);
+      _markedClosedCategories.remove(category);
+    });
+  }
+
+  void _markCategoryReadWhenClosed(_NotificationCategory category) {
+    if (!_openedCategories.contains(category) ||
+        _markedClosedCategories.contains(category)) {
+      return;
+    }
+
+    final uid = _latestUid;
+    if (uid == null) return;
+
+    final ids = _latestNotifications
+        .where((n) => !n.read && _belongsToCategory(n, category))
+        .map((n) => n.id)
+        .toList();
+    if (ids.isEmpty) {
+      _markedClosedCategories.add(category);
+      return;
+    }
+
+    _markedClosedCategories.add(category);
+    unawaited(
+      ref.read(notificationServiceProvider).markNotificationsRead(uid, ids),
+    );
   }
 
   Future<void> _showItemActions(AppNotification notif) async {
@@ -228,6 +279,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final notifications =
         notificationsAsync.valueOrNull ?? const <AppNotification>[];
     final followRequests = followRequestsAsync.valueOrNull ?? const <String>[];
+    _latestUid = user?.uid;
+    _latestNotifications = notifications;
     final unreadByCategory = _buildUnreadCounts(
       notifications: notifications,
       followRequests: followRequests,
@@ -280,9 +333,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                           _selectedCategory == _NotificationCategory.activity,
                       unreadCount:
                           unreadByCategory[_NotificationCategory.activity] ?? 0,
-                      onTap: () => setState(() {
-                        _selectedCategory = _NotificationCategory.activity;
-                      }),
+                      onTap: () =>
+                          _selectCategory(_NotificationCategory.activity),
                     ),
                     const SizedBox(width: 8),
                     _CategoryChip(
@@ -291,9 +343,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                           _selectedCategory == _NotificationCategory.follow,
                       unreadCount:
                           unreadByCategory[_NotificationCategory.follow] ?? 0,
-                      onTap: () => setState(() {
-                        _selectedCategory = _NotificationCategory.follow;
-                      }),
+                      onTap: () =>
+                          _selectCategory(_NotificationCategory.follow),
                     ),
                     const SizedBox(width: 8),
                     _CategoryChip(
@@ -302,9 +353,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                           _selectedCategory == _NotificationCategory.event,
                       unreadCount:
                           unreadByCategory[_NotificationCategory.event] ?? 0,
-                      onTap: () => setState(() {
-                        _selectedCategory = _NotificationCategory.event;
-                      }),
+                      onTap: () => _selectCategory(_NotificationCategory.event),
                     ),
                   ],
                 ),
@@ -366,8 +415,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   // the top of the list (they're actionable).
                   final now = DateTime.now();
                   final today = DateTime(now.year, now.month, now.day);
-                  final yesterday =
-                      today.subtract(const Duration(days: 1));
+                  final yesterday = today.subtract(const Duration(days: 1));
                   final todayItems = <AppNotification>[];
                   final yesterdayItems = <AppNotification>[];
                   final earlierItems = <AppNotification>[];
@@ -392,13 +440,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     entries.addAll(todayItems.map(_NotifEntry.item));
                   }
                   if (yesterdayItems.isNotEmpty) {
-                    entries.add(
-                        _NotifEntry.header(context.t.notifGroupYesterday));
+                    entries
+                        .add(_NotifEntry.header(context.t.notifGroupYesterday));
                     entries.addAll(yesterdayItems.map(_NotifEntry.item));
                   }
                   if (earlierItems.isNotEmpty) {
-                    entries.add(
-                        _NotifEntry.header(context.t.notifGroupEarlier));
+                    entries
+                        .add(_NotifEntry.header(context.t.notifGroupEarlier));
                     entries.addAll(earlierItems.map(_NotifEntry.item));
                   }
 
@@ -408,7 +456,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     separatorBuilder: (_, i) {
                       // No top gap before a header (it carries its own
                       // padding); regular 4px between adjacent items.
-                      final next = i + 1 < entries.length ? entries[i + 1] : null;
+                      final next =
+                          i + 1 < entries.length ? entries[i + 1] : null;
                       if (next != null && next.isHeader) {
                         return const SizedBox(height: 10);
                       }
@@ -1068,7 +1117,6 @@ class _NotificationItem extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 // ─────────────────────────────────────────────

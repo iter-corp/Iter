@@ -10,6 +10,7 @@ import '../../model/post_model.dart';
 import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
+import '../../widgets/app_page_background.dart';
 import '../post_detail_screen.dart';
 import '../qa_thread_screen.dart';
 import 'admin_reports_toolbar.dart';
@@ -27,12 +28,13 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: context.surfaceSoft,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(context.t.adminDiscussReports),
-          backgroundColor: context.cardBg,
+          backgroundColor: Colors.transparent,
           foregroundColor: context.textPrimary,
           elevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
           actions: [
             if (resolved.isNotEmpty)
               TextButton.icon(
@@ -84,7 +86,8 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
             ],
           ),
         ),
-        body: reportsAsync.when(
+        body: AppPageBackground(
+          child: reportsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (_) => TabBarView(
@@ -102,6 +105,7 @@ class AdminDiscussReportsScreen extends ConsumerWidget {
                 emptySubtitle: context.t.adminClosedReportsMoveHere,
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -315,16 +319,11 @@ class _ReportTile extends ConsumerWidget {
         ? context.t.adminNoQuestionText
         : report.postCaption.trim();
     if (selecting) {
-      return Container(
+      return AppGlassCard(
         margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? const Color(0xFF7E3BE8) : context.borderColor,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
+        radius: 16,
+        emphasize: selected,
+        borderAlpha: selected ? 0.65 : null,
         child: CheckboxListTile(
           value: selected,
           onChanged: (v) => onSelectedChanged(v ?? false),
@@ -351,17 +350,10 @@ class _ReportTile extends ConsumerWidget {
     }
     return GestureDetector(
       onLongPress: onLongPress,
-      child: Container(
+      child: AppGlassCard(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: report.resolved
-              ? context.borderColor
-              : const Color(0xFFE04E5C).withValues(alpha: 0.4),
-        ),
-      ),
+      radius: 16,
+      borderAlpha: report.resolved ? null : 0.65,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(

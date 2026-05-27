@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_strings.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 
 /// Shared toolbar for the admin reports screens (post / discuss / profile /
 /// error). Owns the search field state, the select-mode toggle, and the
@@ -148,7 +149,7 @@ class _ReportsToolbarState extends State<ReportsToolbar> {
     final selecting = widget.controller.isSelecting;
     final t = context.t;
     return Material(
-      color: context.surfaceSoft,
+      color: Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
         child: Column(
@@ -156,25 +157,26 @@ class _ReportsToolbarState extends State<ReportsToolbar> {
             // Search field — always visible. Disabling it during selection
             // mode would be confusing; admins might want to search within
             // their selection.
-            TextField(
-              controller: _searchCtrl,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: t.adminReportsSearchHint,
-                prefixIcon: const Icon(Icons.search, size: 20),
-                suffixIcon: _searchCtrl.text.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: t.clear,
-                        icon: const Icon(Icons.close, size: 18),
-                        onPressed: () => _searchCtrl.clear(),
-                      ),
-                filled: true,
-                fillColor: context.cardBg,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            AppGlassCard(
+              radius: 16,
+              padding: EdgeInsets.zero,
+              child: TextField(
+                controller: _searchCtrl,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: t.adminReportsSearchHint,
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchCtrl.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: t.clear,
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => _searchCtrl.clear(),
+                        ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
               ),
             ),
