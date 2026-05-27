@@ -884,6 +884,9 @@ class AppStrings {
   String get storyPublish => _get('story_publish');
   String get textStoryHint => _get('text_story_hint');
   String get videoStoryTooLong => _get('video_story_too_long');
+  String videoStoryTooLarge(Object size) =>
+      _fmt('video_story_too_large', {'size': size});
+  String get videoStoryPreparing => _get('video_story_preparing');
   String get storyCreateMenuPhoto => _get('story_create_menu_photo');
   String get storyCreateMenuVideo => _get('story_create_menu_video');
   String get storyCreateMenuText => _get('story_create_menu_text');

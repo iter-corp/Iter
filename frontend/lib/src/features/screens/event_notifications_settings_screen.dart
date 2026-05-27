@@ -50,6 +50,8 @@ class _EventNotificationsSettingsScreenState
   bool get _allTypes => _prefs.types.isEmpty;
   bool get _allCountries => _prefs.countries.isEmpty;
 
+  String _countryKey(String country) => country.trim().toLowerCase();
+
   void _selectAllTypes() => setState(() => _prefs = _prefs.copyWith(types: []));
 
   void _toggleType(String t, int totalTypes) {
@@ -70,7 +72,7 @@ class _EventNotificationsSettingsScreenState
       setState(() => _prefs = _prefs.copyWith(countries: []));
 
   void _toggleCountry(String displayName, int totalCountries) {
-    final key = displayName.toLowerCase();
+    final key = _countryKey(displayName);
     final has = _prefs.countries.contains(key);
     final next = has
         ? _prefs.countries.where((x) => x != key).toList()
@@ -106,7 +108,7 @@ class _EventNotificationsSettingsScreenState
     final prefsAsync = ref.watch(eventNotifPrefsProvider);
     final cfg = ref.watch(adminConfigProvider).value ?? const AdminConfig();
     final eventTypes = cfg.eventTypes;
-    final eventCountries = cfg.eventCountries;
+    final eventCountries = kEventCountries;
     return Scaffold(
       backgroundColor: context.surfaceSoft,
       appBar: AppBar(
@@ -206,26 +208,47 @@ class _EventNotificationsSettingsScreenState
                   ),
                 ),
                 const SizedBox(height: 10),
+                if (!_allCountries) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildChoiceChip(
+                        label: context.t.eventNotifAllCountries,
+                        selected: false,
+                        onSelected: (_) => _selectAllCountries(),
+                      ),
+                      ...eventCountries
+                          .where((c) => _prefs.countries.contains(_countryKey(c)))
+                          .map((c) => _buildFilterChip(
+                                label: c,
+                                selected: true,
+                                onSelected: (_) =>
+                                    _toggleCountry(c, eventCountries.length),
+                              )),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _buildChoiceChip(
-                      label: context.t.eventNotifAllCountries,
-                      selected: _allCountries,
-                      onSelected: (_) => _selectAllCountries(),
-                    ),
+                    if (_allCountries)
+                      _buildChoiceChip(
+                        label: context.t.eventNotifAllCountries,
+                        selected: true,
+                        onSelected: (_) => _selectAllCountries(),
+                      ),
                     ...eventCountries.where((c) {
+                      final isSelected =
+                          !_allCountries && _prefs.countries.contains(_countryKey(c));
+                      if (isSelected) return false;
                       if (_countryQuery.isEmpty) return true;
-                      final isSelected = !_allCountries &&
-                          _prefs.countries.contains(c.toLowerCase());
-                      // Keep selected countries visible regardless of query
-                      // so the user can deselect them without clearing it.
-                      return isSelected ||
-                          c.toLowerCase().contains(_countryQuery);
+                      return c.toLowerCase().contains(_countryQuery);
                     }).map((c) {
                       final selected = !_allCountries &&
-                          _prefs.countries.contains(c.toLowerCase());
+                          _prefs.countries.contains(_countryKey(c));
                       return _buildFilterChip(
                         label: c,
                         selected: selected,

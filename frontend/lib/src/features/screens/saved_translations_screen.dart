@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/app_page_background.dart';
 
 /// Data returned when the user taps a saved entry — used to restore it into
 /// the Translate screen's inputs.
@@ -50,40 +51,49 @@ class SavedTranslationsScreen extends StatelessWidget {
             .orderBy('createdAt', descending: true);
 
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.savedTranslations),
-        backgroundColor: context.cardBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: uid == null
-          ? Center(child: Text(context.t.savedTranslationsSignInPrompt))
-          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: query!.snapshots(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snap.hasError) {
-                  return Center(
-                      child: Text(context.t.errorWithMessage(snap.error!)));
-                }
-                final items = snap.data?.docs
-                        .map(SavedTranslation.fromDoc)
-                        .toList() ??
-                    [];
-                if (items.isEmpty) {
-                  return _EmptyState();
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) => _SavedTile(item: items[i]),
-                );
-              },
-            ),
+      body: AppPageBackground(
+        child: uid == null
+            ? Center(child: Text(context.t.savedTranslationsSignInPrompt))
+            : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: query!.snapshots(),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) {
+                    return Center(
+                      child: Text(context.t.errorWithMessage(snap.error!)),
+                    );
+                  }
+                  final items = snap.data?.docs
+                          .map(SavedTranslation.fromDoc)
+                          .toList() ??
+                      [];
+                  if (items.isEmpty) {
+                    return _EmptyState();
+                  }
+                  return ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      24 + MediaQuery.of(context).padding.bottom,
+                    ),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) => _SavedTile(item: items[i]),
+                  );
+                },
+              ),
+      ),
     );
   }
 }
@@ -113,69 +123,76 @@ class _SavedTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: Colors.red.shade400,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
       onDismissed: (_) => _delete(context),
-      child: Material(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.pop(context, item),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      item.sourceLangLabel,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: context.textSecondary,
+      child: AppGlassCard(
+        radius: 16,
+        surfaceAlpha: context.isDark ? 0.42 : 0.36,
+        borderAlpha: context.isDark ? 0.14 : 0.50,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => Navigator.pop(context, item),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        item.sourceLangLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: context.textSecondary,
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Icon(Icons.arrow_forward,
-                          size: 14, color: context.textMuted),
-                    ),
-                    Text(
-                      item.targetLangLabel,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFCE5DE5),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          size: 14,
+                          color: context.textMuted,
+                        ),
                       ),
+                      Text(
+                        item.targetLangLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFCE5DE5),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.sourceText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.textSecondary,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  item.sourceText,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.textSecondary,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.translatedText,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: context.textPrimary,
+                  const SizedBox(height: 4),
+                  Text(
+                    item.translatedText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: context.textPrimary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

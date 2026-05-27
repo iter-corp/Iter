@@ -12,6 +12,7 @@ import '../../services/admin_service.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/personalization_fields.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -50,6 +51,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool _uploadingCover = false;
   String? _avatarUrl;
   String? _coverUrl;
+  File? _pendingAvatarFile;
+  File? _pendingCoverFile;
+
+  ImageProvider? get _avatarImage {
+    final pending = _pendingAvatarFile;
+    if (pending != null) return FileImage(pending);
+    final url = _avatarUrl?.trim();
+    if (url != null && url.isNotEmpty) return CachedNetworkImageProvider(url);
+    return null;
+  }
+
+  ImageProvider? get _coverImage {
+    final pending = _pendingCoverFile;
+    if (pending != null) return FileImage(pending);
+    final url = _coverUrl?.trim();
+    if (url != null && url.isNotEmpty) return CachedNetworkImageProvider(url);
+    return null;
+  }
 
   @override
   void dispose() {
@@ -122,8 +141,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return RegExp(r'^[a-z0-9._]{3,24}$').hasMatch(username);
   }
 
-  Future<void> _pickAndUploadAvatar() async {
-    if (_uploadingAvatar) return;
+  Future<void> _pickAvatar() async {
+    if (_saving || _uploadingAvatar) return;
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -132,26 +151,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       maxWidth: 1024,
     );
     if (picked == null) return;
-
-    setState(() => _uploadingAvatar = true);
-    try {
-      final url = await StorageService().uploadAvatar(File(picked.path));
-      final uid = ref.read(authServiceProvider).currentUser!.uid;
-      await ref.read(userServiceProvider).updateUser(uid, {'avatarUrl': url});
-      if (mounted) setState(() => _avatarUrl = url);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t.editProfileUploadFailed(e))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _uploadingAvatar = false);
-    }
+    if (mounted) setState(() => _pendingAvatarFile = File(picked.path));
   }
 
-  Future<void> _pickAndUploadCover() async {
-    if (_uploadingCover) return;
+  Future<void> _pickCover() async {
+    if (_saving || _uploadingCover) return;
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -160,22 +164,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       maxWidth: 1600,
     );
     if (picked == null) return;
-
-    setState(() => _uploadingCover = true);
-    try {
-      final url = await StorageService().uploadCover(File(picked.path));
-      final uid = ref.read(authServiceProvider).currentUser!.uid;
-      await ref.read(userServiceProvider).updateUser(uid, {'coverUrl': url});
-      if (mounted) setState(() => _coverUrl = url);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t.editProfileCoverUploadFailed(e))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _uploadingCover = false);
-    }
+    if (mounted) setState(() => _pendingCoverFile = File(picked.path));
   }
 
   Future<void> _save() async {
@@ -227,6 +216,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           (_gender == null || _gender == 'Prefer not to say') ? '' : _gender!;
       final applicableLevel =
           academicLevelAppliesTo(_profession) ? _academicLevel : null;
+      String? avatarUrlToSave;
+      String? coverUrlToSave;
+      if (_pendingAvatarFile != null) {
+        setState(() => _uploadingAvatar = true);
+        try {
+          avatarUrlToSave =
+              await StorageService().uploadAvatar(_pendingAvatarFile!);
+        } finally {
+          if (mounted) setState(() => _uploadingAvatar = false);
+        }
+        if (!mounted) return;
+      }
+      if (_pendingCoverFile != null) {
+        setState(() => _uploadingCover = true);
+        try {
+          coverUrlToSave =
+              await StorageService().uploadCover(_pendingCoverFile!);
+        } finally {
+          if (mounted) setState(() => _uploadingCover = false);
+        }
+        if (!mounted) return;
+      }
+
       await ref.read(userServiceProvider).updateUser(uid, {
         'name': nameToSave,
         'username': username,
@@ -240,6 +252,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'field': _field ?? '',
         'academicLevel': applicableLevel ?? '',
         'goals': _goals,
+        if (avatarUrlToSave != null) 'avatarUrl': avatarUrlToSave,
+        if (coverUrlToSave != null) 'coverUrl': coverUrlToSave,
       });
 
       // Keep FirebaseAuth profile displayName aligned for legacy fallbacks.
@@ -249,6 +263,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ?.updateDisplayName(nameToSave);
 
       if (mounted) {
+        setState(() {
+          if (avatarUrlToSave != null) {
+            _avatarUrl = avatarUrlToSave;
+            _pendingAvatarFile = null;
+          }
+          if (coverUrlToSave != null) {
+            _coverUrl = coverUrlToSave;
+            _pendingCoverFile = null;
+          }
+        });
         Navigator.pop(context);
         AppFeedback.showSuccessOn(messenger, updatedMsg);
       }
@@ -256,7 +280,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       AppFeedback.showErrorOn(
           messenger, strings.editProfileCouldNotSave(e));
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _uploadingAvatar = false;
+          _uploadingCover = false;
+        });
+      }
     }
   }
 
@@ -266,146 +296,147 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final cfg = ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
 
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
-      body: SafeArea(
-        child: userAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-          data: (user) {
-            if (user == null) {
-              return Center(child: Text(context.t.profileNoProfileData));
-            }
-            _hydrate(user, cfg);
-            return Column(
-              children: [
-                _Header(
-                  saving: _saving,
-                  onBack: () => Navigator.pop(context),
-                  onSave: _save,
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildCoverAndAvatar(),
-                        const SizedBox(height: 56),
-                        _CenterEditLink(
-                          label: context.t.editProfileChangePhoto,
-                          onTap: _pickAndUploadAvatar,
-                        ),
-                        const SizedBox(height: 4),
-                        _CenterEditLink(
-                          label: context.t.editProfileChangeCover,
-                          onTap: _pickAndUploadCover,
-                        ),
-                        const SizedBox(height: 24),
-                        _SectionLabel(text: context.t.onboardingAboutYou),
-                        _LabeledInput(
-                          label: context.t.editProfileName,
-                          icon: Icons.person_outline,
-                          controller: _nameController,
-                          hint: context.t.editProfileNameHint,
-                          maxLength: 40,
-                        ),
-                        _LabeledInput(
-                          label: context.t.username,
-                          icon: Icons.alternate_email,
-                          controller: _usernameController,
-                          hint: context.t.editProfileUsernameHint,
-                          maxLength: 24,
-                        ),
-                        _LabeledInput(
-                          label: context.t.bio,
-                          icon: Icons.short_text,
-                          controller: _bioController,
-                          hint: context.t.editProfileBioHint,
-                          maxLines: 4,
-                          maxLength: 160,
-                        ),
-                        _LabeledDropdown(
-                          label: context.t.onboardingGender,
-                          icon: Icons.person_outline,
-                          value: _gender,
-                          options: _genderOptions,
-                          optionLabel: _genderLabel,
-                          onChanged: (v) => setState(() => _gender = v),
-                          hint: context.t.editProfileSelectGender,
-                        ),
-                        const SizedBox(height: 8),
-                        _SectionLabel(text: context.t.editProfileInterestsGoals),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                          child: Text(
-                            context.t.editProfileInterestsDesc,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecondary,
-                            ),
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: SafeArea(
+          child: userAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+            data: (user) {
+              if (user == null) {
+                return Center(child: Text(context.t.profileNoProfileData));
+              }
+              _hydrate(user, cfg);
+              return Column(
+                children: [
+                  _Header(
+                    saving: _saving,
+                    onBack: () => Navigator.pop(context),
+                    onSave: _save,
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildCoverAndAvatar(),
+                          const SizedBox(height: 56),
+                          _CenterEditLink(
+                            label: context.t.editProfileChangePhoto,
+                            onTap: _pickAvatar,
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: context.cardBg,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color:
-                                    context.borderColor.withValues(alpha: 0.6),
-                                width: 1,
+                          const SizedBox(height: 4),
+                          _CenterEditLink(
+                            label: context.t.editProfileChangeCover,
+                            onTap: _pickCover,
+                          ),
+                          const SizedBox(height: 24),
+                          _SectionLabel(text: context.t.onboardingAboutYou),
+                          _LabeledInput(
+                            label: context.t.editProfileName,
+                            icon: Icons.person_outline,
+                            controller: _nameController,
+                            hint: context.t.editProfileNameHint,
+                            maxLength: 40,
+                          ),
+                          _LabeledInput(
+                            label: context.t.username,
+                            icon: Icons.alternate_email,
+                            controller: _usernameController,
+                            hint: context.t.editProfileUsernameHint,
+                            maxLength: 24,
+                          ),
+                          _LabeledInput(
+                            label: context.t.bio,
+                            icon: Icons.short_text,
+                            controller: _bioController,
+                            hint: context.t.editProfileBioHint,
+                            maxLines: 4,
+                            maxLength: 160,
+                          ),
+                          _LabeledDropdown(
+                            label: context.t.onboardingGender,
+                            icon: Icons.person_outline,
+                            value: _gender,
+                            options: _genderOptions,
+                            optionLabel: _genderLabel,
+                            onChanged: (v) => setState(() => _gender = v),
+                            hint: context.t.editProfileSelectGender,
+                          ),
+                          const SizedBox(height: 8),
+                          _SectionLabel(
+                              text: context.t.editProfileInterestsGoals),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                            child: Text(
+                              context.t.editProfileInterestsDesc,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondary,
                               ),
                             ),
-                            padding: const EdgeInsets.all(14),
-                            child: AboutYouEditor(
-                              profession: _profession,
-                              field: _field,
-                              academicLevel: _academicLevel,
-                              goals: _goals,
-                              professionOptions: cfg.profileProfessionOptions,
-                              fieldOptions: cfg.profileFieldOptions,
-                              academicLevelOptions:
-                                  cfg.profileAcademicLevelOptions,
-                              goalOptions: cfg.profileGoalOptions,
-                              onProfessionChanged: (v) =>
-                                  setState(() => _profession = v),
-                              onFieldChanged: (v) => setState(() => _field = v),
-                              onAcademicLevelChanged: (v) =>
-                                  setState(() => _academicLevel = v),
-                              onGoalsChanged: (v) => setState(() => _goals = v),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                            child: AppGlassCard(
+                              padding: const EdgeInsets.all(14),
+                              radius: 18,
+                              surfaceAlpha: context.isDark ? 0.24 : 0.52,
+                              borderAlpha: context.isDark ? 0.16 : 0.50,
+                              child: AboutYouEditor(
+                                profession: _profession,
+                                field: _field,
+                                academicLevel: _academicLevel,
+                                goals: _goals,
+                                professionOptions: cfg.profileProfessionOptions,
+                                fieldOptions: cfg.profileFieldOptions,
+                                academicLevelOptions:
+                                    cfg.profileAcademicLevelOptions,
+                                goalOptions: cfg.profileGoalOptions,
+                                onProfessionChanged: (v) =>
+                                    setState(() => _profession = v),
+                                onFieldChanged: (v) =>
+                                    setState(() => _field = v),
+                                onAcademicLevelChanged: (v) =>
+                                    setState(() => _academicLevel = v),
+                                onGoalsChanged: (v) =>
+                                    setState(() => _goals = v),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
   Widget _buildCoverAndAvatar() {
+    final coverImage = _coverImage;
+    final avatarImage = _avatarImage;
     return SizedBox(
       height: 180 + 52,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           GestureDetector(
-            onTap: _pickAndUploadCover,
+            onTap: _pickCover,
             child: Container(
               height: 180,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: context.inputFill,
-                image: _coverUrl != null
+                image: coverImage != null
                     ? DecorationImage(
-                        image: CachedNetworkImageProvider(_coverUrl!),
+                        image: coverImage,
                         fit: BoxFit.cover,
                       )
                     : null,
@@ -452,7 +483,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             right: 0,
             child: Center(
               child: GestureDetector(
-                onTap: _pickAndUploadAvatar,
+                onTap: _pickAvatar,
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -472,10 +503,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       CircleAvatar(
                         radius: 44,
                         backgroundColor: context.inputFill,
-                        backgroundImage: _avatarUrl != null
-                            ? CachedNetworkImageProvider(_avatarUrl!)
-                            : null,
-                        child: _avatarUrl == null
+                        backgroundImage: avatarImage,
+                        child: avatarImage == null
                             ? Icon(Icons.person,
                                 size: 44, color: context.textSecondary)
                             : null,
@@ -639,21 +668,11 @@ class _LabeledInput extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: context.borderColor.withValues(alpha: 0.6), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+      child: AppGlassCard(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        radius: 18,
+        surfaceAlpha: context.isDark ? 0.24 : 0.52,
+        borderAlpha: context.isDark ? 0.16 : 0.50,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -725,21 +744,11 @@ class _LabeledDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: context.borderColor.withValues(alpha: 0.6), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+      child: AppGlassCard(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+        radius: 18,
+        surfaceAlpha: context.isDark ? 0.24 : 0.52,
+        borderAlpha: context.isDark ? 0.16 : 0.50,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

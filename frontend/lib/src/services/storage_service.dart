@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -147,16 +148,20 @@ class StorageService {
 
     http.Response req;
     try {
-      req = await http.post(
-        edgeUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_anonKey',
-          'apikey': _anonKey,
-          'X-Firebase-Token': idToken,
-        },
-        body: reqBody,
-      );
+      req = await http
+          .post(
+            edgeUri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_anonKey',
+              'apikey': _anonKey,
+              'X-Firebase-Token': idToken,
+            },
+            body: reqBody,
+          )
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw StorageException('Upload setup timed out. Please try again.');
     } catch (e, st) {
       debugPrint('[StorageService] issue-upload-url network error: $e\n$st');
       rethrow;
@@ -166,7 +171,8 @@ class StorageService {
         'body=${req.body}');
 
     if (req.statusCode != 200) {
-      throw StorageException('issue-upload-url failed: ${req.statusCode} ${req.body}');
+      throw StorageException(
+          'issue-upload-url failed: ${req.statusCode} ${req.body}');
     }
 
     final data = jsonDecode(req.body) as Map<String, dynamic>;
@@ -183,15 +189,20 @@ class StorageService {
 
     http.Response upload;
     try {
-      upload = await http.put(
-        Uri.parse(uploadUrl),
-        headers: {
-          'Content-Type': contentType,
-          if (token != null) 'Authorization': 'Bearer $token',
-          'x-upsert': 'true',
-        },
-        body: bytes,
-      );
+      upload = await http
+          .put(
+            Uri.parse(uploadUrl),
+            headers: {
+              'Content-Type': contentType,
+              if (token != null) 'Authorization': 'Bearer $token',
+              'x-upsert': 'true',
+            },
+            body: bytes,
+          )
+          .timeout(const Duration(seconds: 90));
+    } on TimeoutException {
+      throw StorageException(
+          'Upload timed out. Try a smaller file or a stronger connection.');
     } catch (e, st) {
       debugPrint('[StorageService] PUT upload network error: $e\n$st');
       rethrow;
@@ -201,7 +212,8 @@ class StorageService {
         'body=${upload.body}');
 
     if (upload.statusCode != 200 && upload.statusCode != 201) {
-      throw StorageException('upload failed: ${upload.statusCode} ${upload.body}');
+      throw StorageException(
+          'upload failed: ${upload.statusCode} ${upload.body}');
     }
 
     debugPrint('[StorageService] SUCCESS publicUrl=$publicUrl');

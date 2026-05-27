@@ -686,6 +686,9 @@ const Map<String, String> ckbStrings = {
   'story_publish': 'بڵاوکردنەوە',
   'text_story_hint': 'شتێک بنووسە…',
   'video_story_too_long': 'ڤیدیۆکە زۆر درێژە. ستۆریەکان تەنها تا ٣٠ چرکە دەگرن.',
+  'video_story_too_large':
+      'قەبارەی ئەم کلیپە {size}MB ـە. ستۆری تەنها ڤیدیۆ تا 30MB باردەکات. کورتکردنەوەیەکی کورتتر هەڵبژێرە یان سەرەتا ڤیدیۆکە بچووک بکەرەوە.',
+  'video_story_preparing': 'ئامادەکردنی ڤیدیۆ…',
   'story_create_menu_photo': 'وێنە',
   'story_create_menu_video': 'ڤیدیۆ',
   'story_create_menu_text': 'دەق',

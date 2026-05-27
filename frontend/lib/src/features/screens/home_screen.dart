@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
@@ -39,6 +40,7 @@ enum _LocationStatus {
 const _kTravelFilterPurple = Color(0xFFB05ECC);
 const _kTravelAllOption = '__all_places__';
 const _kTravelCurrentOption = '__current_location__';
+const _kHomeModePrefsKey = 'home.selected_mode';
 
 class _PlaceSuggestion {
   final String name;
@@ -122,6 +124,7 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_loadSavedMode());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureViewerLocation();
     });
@@ -146,6 +149,43 @@ class _HomeBodyState extends ConsumerState<HomeBody>
     final focused = _searchFocus.hasFocus;
     if (focused != _searchFocused && mounted) {
       setState(() => _searchFocused = focused);
+    }
+  }
+
+  _HomeMode? _modeFromPrefs(String? value) {
+    return switch (value) {
+      'feed' => _HomeMode.feed,
+      'travel' => _HomeMode.travel,
+      'qa' => _HomeMode.qa,
+      _ => null,
+    };
+  }
+
+  Future<void> _loadSavedMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedMode = _modeFromPrefs(prefs.getString(_kHomeModePrefsKey));
+      if (!mounted || savedMode == null || savedMode == _mode) return;
+      setState(() => _mode = savedMode);
+
+      if (savedMode == _HomeMode.travel) {
+        await _ensureViewerLocation();
+        if (!mounted) return;
+        ref.invalidate(travelFeedProvider(_buildTravelQuery()));
+      } else if (savedMode == _HomeMode.qa) {
+        ref.invalidate(qaFeedProvider);
+      }
+    } catch (_) {
+      // Keep the default feed mode if local preferences are unavailable.
+    }
+  }
+
+  Future<void> _saveMode(_HomeMode mode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kHomeModePrefsKey, mode.name);
+    } catch (_) {
+      // Mode persistence should never block using the main page.
     }
   }
 
@@ -452,6 +492,7 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   Future<void> _switchMode(_HomeMode mode) async {
     if (_mode == mode) return;
     setState(() => _mode = mode);
+    unawaited(_saveMode(mode));
 
     if (mode == _HomeMode.travel) {
       // Resolve location silently — if it's off, the red in-feed

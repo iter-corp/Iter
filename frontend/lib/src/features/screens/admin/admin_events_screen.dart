@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -766,8 +767,6 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         _eventType.trim().isEmpty ? context.t.adminPickEventType : null;
     final countryError =
         _country.trim().isEmpty ? context.t.adminCountryRequired : null;
-    final fundsError =
-        _funds.trim().isEmpty ? context.t.adminPickFundingStatus : null;
     final descError = _descCtrl.text.trim().isEmpty
         ? context.t.adminDescriptionRequired
         : null;
@@ -777,14 +776,13 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
       _titleError = titleError;
       _eventTypeError = eventTypeError;
       _countryError = countryError;
-      _fundsError = fundsError;
+      _fundsError = null;
       _descError = descError;
       _imagesError = imagesError;
     });
     if (titleError != null ||
         eventTypeError != null ||
         countryError != null ||
-        fundsError != null ||
         descError != null ||
         imagesError != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -901,7 +899,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               label: context.t.adminFieldTitle,
               controller: _titleCtrl,
               hint: context.t.adminEnterEventTitle,
-              required: true,
+              maxLength: 50,
+              required: false,
               errorText: _titleError,
               textInputAction: TextInputAction.next,
               onChanged: (v) {
@@ -914,6 +913,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               label: context.t.adminFieldSubtitle,
               controller: _subtitleCtrl,
               hint: context.t.adminShortSubtitleOptional,
+              maxLength: 50,
               textInputAction: TextInputAction.next,
             ),
             _SearchablePickerField(
@@ -952,27 +952,46 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
             Consumer(
               builder: (context, ref, _) {
                 final hasCountry = _country.trim().isNotEmpty;
-                final cityOptions = hasCountry
-                    ? (ref.watch(worldCitiesProvider).value ?? const [])
-                        .where((c) =>
-                            c.countryName.toLowerCase() ==
-                            _country.trim().toLowerCase())
-                        .map((c) => c.name)
-                        .toSet()
-                        .toList()
-                    : <String>[];
-                cityOptions.sort();
+                final citiesAsync = ref.watch(worldCitiesProvider);
+                if (!hasCountry) {
+                  return _SearchablePickerField(
+                    placeholder: context.t.adminCityPickCountryFirst,
+                    sheetTitle: context.t.adminChooseCity,
+                    searchHint: context.t.adminSearchCity,
+                    options: const [],
+                    selected: null,
+                    enabled: false,
+                    onChanged: (_) {},
+                  );
+                }
+                if (citiesAsync.isLoading) {
+                  return _SearchablePickerField(
+                    placeholder: context.t.cityPickerLoading,
+                    sheetTitle: context.t.adminChooseCity,
+                    searchHint: context.t.adminSearchCity,
+                    options: const [],
+                    selected: _city.isEmpty ? null : _city,
+                    enabled: false,
+                    onChanged: (_) {},
+                  );
+                }
+                final cities = citiesAsync.value ?? const <CityOption>[];
+                final selectedCountry = normalizeCitySearch(_country);
+                final cityOptions = cities
+                    .where((c) =>
+                        normalizeCitySearch(c.countryName) ==
+                        selectedCountry)
+                    .map((c) => c.name)
+                    .toSet()
+                    .toList()
+                  ..sort();
                 return _SearchablePickerField(
-                  placeholder: hasCountry
-                      ? context.t.adminFieldCity
-                      : context.t.adminCityPickCountryFirst,
+                  placeholder: context.t.adminFieldCity,
                   sheetTitle: context.t.adminChooseCity,
                   searchHint: context.t.adminSearchCity,
                   options: cityOptions,
                   selected: _city.isEmpty ? null : _city,
-                  onChanged: hasCountry
-                      ? (v) => setState(() => _city = v)
-                      : (_) {},
+                  onChanged: (v) => setState(() => _city = v),
                 );
               },
             ),
@@ -1003,7 +1022,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               controller: _descCtrl,
               hint: context.t.adminDescribeTheEvent,
               maxLines: 4,
-              required: true,
+              required: false,
               errorText: _descError,
               textInputAction: TextInputAction.newline,
               onChanged: (v) {
@@ -1113,6 +1132,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     String? hint,
     int maxLines = 1,
     bool required = false,
+    int? maxLength,
     String? errorText,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
@@ -1130,6 +1150,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           onChanged: onChanged,
+          inputFormatters: [
+            if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
+          ],
           style: TextStyle(fontSize: 15, color: context.textPrimary),
           decoration: InputDecoration(
             labelText: label,
@@ -1143,6 +1166,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             errorText: errorText,
+            counterText: maxLength != null ? '' : null,
           ),
           validator: required
               ? (v) => (v == null || v.trim().isEmpty)
@@ -1243,6 +1267,7 @@ class _SearchablePickerField extends StatelessWidget {
   final String? selected;
   final ValueChanged<String> onChanged;
   final bool enableSearch;
+  final bool enabled;
 
   const _SearchablePickerField({
     required this.placeholder,
@@ -1252,6 +1277,7 @@ class _SearchablePickerField extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.enableSearch = true,
+    this.enabled = true,
   });
 
   Future<void> _open(BuildContext context) async {
@@ -1273,30 +1299,33 @@ class _SearchablePickerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _open(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.borderColor),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                selected ?? placeholder,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: selected != null
-                      ? context.textPrimary
-                      : context.textSecondary,
+      onTap: enabled ? () => _open(context) : null,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.72,
+        child: Container(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selected ?? placeholder,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: selected != null
+                        ? context.textPrimary
+                        : context.textSecondary,
+                  ),
                 ),
               ),
-            ),
-            Icon(Icons.arrow_drop_down, color: context.textSecondary),
-          ],
+              Icon(Icons.arrow_drop_down, color: context.textSecondary),
+            ],
+          ),
         ),
       ),
     );

@@ -12,6 +12,7 @@ import '../../theme/app_theme.dart';
 import '../../services/comment_service.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
+import '../widgets/app_page_background.dart';
 import 'post_detail_screen.dart';
 
 class QaThreadScreen extends ConsumerStatefulWidget {
@@ -136,15 +137,18 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
         final commentsAsync = ref.watch(commentsProvider(post.id));
 
         return Scaffold(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
             title: Text(isQuestionThread
                 ? context.t.qaQuestionThreadTitle
                 : context.t.qaDiscussionThreadTitle),
             foregroundColor: context.textPrimary,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
           ),
-          body: SafeArea(
-            child: Column(
+          body: AppPageBackground(
+            child: SafeArea(
+              child: Column(
               children: [
                 Expanded(
                   child: commentsAsync.when(
@@ -242,6 +246,7 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                   onSubmit: _submitAnswer,
                 ),
               ],
+              ),
             ),
           ),
         );
@@ -285,13 +290,11 @@ class _QuestionCard extends ConsumerWidget {
     final isAuthor = currentUid != null && currentUid == post.authorUid;
     final canReport = currentUid != null && currentUid != post.authorUid;
 
-    return Container(
+    return AppGlassCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.borderColor),
-      ),
+      radius: 20,
+      surfaceAlpha: context.isDark ? 0.24 : 0.52,
+      borderAlpha: context.isDark ? 0.16 : 0.50,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -689,12 +692,11 @@ class _EmbeddedPostCard extends ConsumerWidget {
     final postAsync = ref.watch(singlePostProvider(postId));
 
     return postAsync.when(
-      loading: () => Container(
+      loading: () => AppGlassCard(
         height: 70,
-        decoration: BoxDecoration(
-          color: context.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
-        ),
+        radius: 14,
+        surfaceAlpha: context.isDark ? 0.22 : 0.50,
+        borderAlpha: context.isDark ? 0.14 : 0.46,
         child: const Center(
           child: SizedBox(
             width: 20,
@@ -710,7 +712,7 @@ class _EmbeddedPostCard extends ConsumerWidget {
         final cap = src.caption.trim();
 
         return Material(
-          color: context.surfaceSoft,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -719,12 +721,10 @@ class _EmbeddedPostCard extends ConsumerWidget {
                 builder: (_) => PostDetailScreen(postId: src.id),
               ),
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.borderColor),
-              ),
-              clipBehavior: Clip.antiAlias,
+            child: AppGlassCard(
+              radius: 14,
+              surfaceAlpha: context.isDark ? 0.20 : 0.46,
+              borderAlpha: context.isDark ? 0.12 : 0.42,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -861,32 +861,15 @@ class _AnswerBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Answer cards: bumped from hairline border to a soft shadow +
-    // tinted background so each card reads as its own surface in a
-    // long thread, matching the share-recipient / notification card
-    // design used elsewhere.
-    return Container(
-      decoration: BoxDecoration(
-        color: highlighted
-            ? const Color(0xFF7E3BE8).withValues(alpha: 0.10)
-            : context.cardBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: highlighted
-              ? const Color(0xFF7E3BE8).withValues(alpha: 0.55)
-              : context.borderColor.withValues(alpha: 0.6),
-          width: highlighted ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: highlighted
-                ? const Color(0xFF7E3BE8).withValues(alpha: 0.15)
-                : Colors.black.withValues(alpha: 0.05),
-            blurRadius: highlighted ? 16 : 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return AppGlassCard(
+      radius: 20,
+      emphasize: highlighted,
+      surfaceAlpha: highlighted
+          ? (context.isDark ? 0.32 : 0.58)
+          : (context.isDark ? 0.24 : 0.52),
+      borderAlpha: highlighted
+          ? (context.isDark ? 0.26 : 0.58)
+          : (context.isDark ? 0.16 : 0.50),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1409,26 +1392,26 @@ class _AnswerComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        border: Border(top: BorderSide(color: context.borderColor)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: AppGlassCard(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        radius: 22,
+        surfaceAlpha: context.isDark ? 0.30 : 0.58,
+        borderAlpha: context.isDark ? 0.18 : 0.52,
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (replyTo != null) ...[
-              Container(
+              AppGlassCard(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: context.inputFill,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                radius: 12,
+                surfaceAlpha: context.isDark ? 0.18 : 0.44,
+                borderAlpha: context.isDark ? 0.12 : 0.38,
                 child: Row(
                   children: [
                     Expanded(
@@ -1463,6 +1446,12 @@ class _AnswerComposer extends StatelessWidget {
                     maxLines: 5,
                     textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
                       hintText: replyTo == null
                           ? context.t.qaWriteAnswerHint
                           : context.t.qaWriteReplyHint,
@@ -1486,6 +1475,7 @@ class _AnswerComposer extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

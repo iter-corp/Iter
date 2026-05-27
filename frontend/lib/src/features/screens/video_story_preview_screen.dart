@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_native_video_trimmer/flutter_native_video_trimmer.dart'
+    as native_trimmer;
 import 'package:video_player/video_player.dart';
 
 import '../../l10n/app_strings.dart';
@@ -26,12 +28,15 @@ class VideoStoryPreviewScreen extends StatefulWidget {
 class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     with WidgetsBindingObserver {
   static const Duration _maxStoryDuration = Duration(seconds: 30);
+  static const int _maxStoryVideoBytes = 30 * 1024 * 1024;
 
   VideoPlayerController? _controller;
   bool _uploading = false;
+  bool _preparingVideo = false;
   bool _muted = false;
   String? _initError;
   bool _tooLong = false;
+  int _videoFileSize = 0;
 
   // Trim window. The uploaded file isn't re-encoded — only `_trimStart`
   // and `_trimEnd` are persisted on the Story doc. The viewer clamps
@@ -93,6 +98,7 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
         return;
       }
       final size = await widget.file.length();
+      _videoFileSize = size;
       debugPrint('[VideoStorySetup] file size=$size bytes');
       if (size == 0) {
         if (mounted) setState(() => _initError = 'Empty video file');
@@ -236,14 +242,25 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     setState(() => _muted = next);
   }
 
+  bool get _hasTrimSelection =>
+      _trimStart > Duration.zero || _trimEnd < _videoDuration;
+  bool get _shouldExportVideo => _hasTrimSelection || _muted;
+
   Future<void> _publish() async {
     debugPrint('[VideoStoryPublish] === _publish() called ===');
     debugPrint('[VideoStoryPublish] state: _uploading=$_uploading '
         '_tooLong=$_tooLong file=${widget.file.path} '
         'overlays.count=${_overlays.length}');
-    if (_uploading || _tooLong) {
+    final tooLarge = _videoFileSize > _maxStoryVideoBytes && !_shouldExportVideo;
+    if (_uploading || _tooLong || tooLarge) {
       debugPrint('[VideoStoryPublish] ABORT: guard hit '
-          '(_uploading=$_uploading _tooLong=$_tooLong)');
+          '(_uploading=$_uploading _tooLong=$_tooLong tooLarge=$tooLarge)');
+      if (mounted && tooLarge) {
+        AppFeedback.showErrorOn(
+          ScaffoldMessenger.of(context),
+          context.t.videoStoryTooLarge(_formatMb(_videoFileSize)),
+        );
+      }
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
@@ -252,11 +269,13 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       _uploading = true;
     });
 
+    File uploadFile = widget.file;
     // Pre-upload file sanity check so we don't blame the network for a
     // missing/empty file.
     try {
       final exists = await widget.file.exists();
       final size = exists ? await widget.file.length() : -1;
+      _videoFileSize = size;
       debugPrint('[VideoStoryPublish] pre-upload file check: '
           'exists=$exists size=$size bytes path=${widget.file.path}');
       if (!exists) {
@@ -265,11 +284,27 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       if (size == 0) {
         throw Exception('Video file is empty');
       }
+      if (_shouldExportVideo) {
+        setState(() => _preparingVideo = true);
+        uploadFile = await _exportPreparedVideo();
+        if (!mounted) return;
+        setState(() => _preparingVideo = false);
+        final trimmedSize = await uploadFile.length();
+        if (trimmedSize > _maxStoryVideoBytes) {
+          throw StorageException(
+              context.t.videoStoryTooLarge(_formatMb(trimmedSize)));
+        }
+      } else if (size > _maxStoryVideoBytes) {
+        throw StorageException(context.t.videoStoryTooLarge(_formatMb(size)));
+      }
     } catch (e, st) {
       debugPrint('[VideoStoryPublish] pre-upload check failed: $e\n$st');
       if (!mounted) return;
-      setState(() => _uploading = false);
-      AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
+      setState(() {
+        _uploading = false;
+        _preparingVideo = false;
+      });
+      AppFeedback.showErrorOn(messenger, _storyPublishErrorMessage(e));
       return;
     }
 
@@ -277,7 +312,7 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     String url;
     try {
       debugPrint('[VideoStoryPublish] -> StorageService.uploadStoryVideo()');
-      url = await StorageService().uploadStoryVideo(widget.file);
+      url = await StorageService().uploadStoryVideo(uploadFile);
       final elapsed = DateTime.now().difference(uploadStart);
       debugPrint('[VideoStoryPublish] <- upload OK in ${elapsed.inMilliseconds}ms');
       debugPrint('[VideoStoryPublish] publicUrl=$url');
@@ -288,7 +323,7 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       debugPrint('[VideoStoryPublish] upload stacktrace:\n$st');
       if (!mounted) return;
       setState(() => _uploading = false);
-      AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
+      AppFeedback.showErrorOn(messenger, _storyPublishErrorMessage(e));
       return;
     }
 
@@ -296,16 +331,9 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     try {
       debugPrint('[VideoStoryPublish] -> StoryService.createStory() '
           'videoUrl.len=${url.length} overlays=${_overlays.length}');
-      // Persist the chosen trim window. The uploaded file is the full
-      // video; the viewer clamps playback to this range so re-encoding
-      // isn't needed.
-      final hasTrim = _trimStart > Duration.zero ||
-          _trimEnd < _videoDuration;
       final storyId = await StoryService().createStory(
         imageUrl: '',
         videoUrl: url,
-        videoTrimStartMs: hasTrim ? _trimStart.inMilliseconds : null,
-        videoTrimEndMs: hasTrim ? _trimEnd.inMilliseconds : null,
         overlays: _overlays,
       );
       final elapsed = DateTime.now().difference(docStart);
@@ -318,7 +346,7 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       debugPrint('[VideoStoryPublish] createStory stacktrace:\n$st');
       if (!mounted) return;
       setState(() => _uploading = false);
-      AppFeedback.showErrorOn(messenger, context.t.storyFailedPublish(e));
+      AppFeedback.showErrorOn(messenger, _storyPublishErrorMessage(e));
       return;
     }
 
@@ -406,6 +434,55 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     // Previously this used popUntil(isFirst) which dumped them back at
     // home and they'd have to re-enter the add-story flow from scratch.
     Navigator.of(context).pop();
+  }
+
+  Future<File> _exportPreparedVideo() async {
+    final startMs = _hasTrimSelection ? _trimStart.inMilliseconds : 0;
+    final endMs = _hasTrimSelection
+        ? _trimEnd.inMilliseconds
+        : _videoDuration.inMilliseconds;
+    debugPrint('[VideoStoryPublish] preparing video '
+        '$startMs..$endMs includeAudio=${!_muted}');
+    final trimmer = native_trimmer.VideoTrimmer();
+    try {
+      await trimmer.loadVideo(widget.file.path);
+      final outputPath = await trimmer.trimVideo(
+        startTimeMs: startMs,
+        endTimeMs: endMs,
+        includeAudio: !_muted,
+      ).timeout(
+        const Duration(seconds: 90),
+        onTimeout: () => null,
+      );
+      if (outputPath == null || outputPath.trim().isEmpty) {
+        throw StorageException('Could not prepare the video. Please try again.');
+      }
+      final file = File(outputPath);
+      if (!await file.exists() || await file.length() == 0) {
+        throw StorageException(
+            'The prepared video file is empty. Please try again.');
+      }
+      debugPrint('[VideoStoryPublish] prepared file path=${file.path} '
+          'size=${await file.length()} bytes');
+      return file;
+    } on MissingPluginException catch (e) {
+      debugPrint('[VideoStoryPublish] video trimmer plugin missing: $e');
+      throw StorageException(
+        'Video cutting is not available in this app build. Fully stop the app and rebuild it once.',
+      );
+    }
+  }
+
+  String _formatMb(int bytes) {
+    final mb = bytes / (1024 * 1024);
+    return mb >= 10 ? mb.toStringAsFixed(0) : mb.toStringAsFixed(1);
+  }
+
+  String _storyPublishErrorMessage(Object error) {
+    if (error is StorageException) {
+      return context.t.storyFailedPublish(error.message);
+    }
+    return context.t.storyFailedPublish(error);
   }
 
   @override
@@ -549,7 +626,9 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
                       ),
                     ),
                   const Spacer(),
-                  if (_tooLong)
+                  if (_tooLong ||
+                      (_videoFileSize > _maxStoryVideoBytes &&
+                          !_shouldExportVideo))
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: Container(
@@ -562,7 +641,11 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
                               color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Text(
-                          context.t.videoStoryTooLong,
+                          _videoFileSize > _maxStoryVideoBytes &&
+                                  !_shouldExportVideo
+                              ? context.t
+                                  .videoStoryTooLarge(_formatMb(_videoFileSize))
+                              : context.t.videoStoryTooLong,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -595,7 +678,11 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
                           ),
                           const Spacer(),
                           Opacity(
-                            opacity: _tooLong ? 0.5 : 1,
+                            opacity: (_tooLong ||
+                                    (_videoFileSize > _maxStoryVideoBytes &&
+                                        !_shouldExportVideo))
+                                ? 0.5
+                                : 1,
                             child: _PillButton(
                               label: context.t.storyPublish,
                               icon: Icons.send_rounded,
@@ -642,7 +729,22 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
               Container(
                 color: Colors.black.withValues(alpha: 0.55),
                 alignment: Alignment.center,
-                child: const CircularProgressIndicator(color: Colors.white),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: Colors.white),
+                    if (_preparingVideo) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        context.t.videoStoryPreparing,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
           ],
         ),

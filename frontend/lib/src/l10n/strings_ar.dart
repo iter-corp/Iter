@@ -687,6 +687,9 @@ const Map<String, String> arStrings = {
   'story_publish': 'نشر',
   'text_story_hint': 'اكتب شيئًا…',
   'video_story_too_long': 'الفيديو طويل جدًا. الحد الأقصى للقصص ٣٠ ثانية.',
+  'video_story_too_large':
+      'حجم هذا المقطع {size} ميجابايت. يمكن للقصص رفع فيديوهات حتى 30 ميجابايت. اختر قصّة أقصر أو اضغط الفيديو أولاً.',
+  'video_story_preparing': 'جارٍ تجهيز الفيديو…',
   'story_create_menu_photo': 'صورة',
   'story_create_menu_video': 'فيديو',
   'story_create_menu_text': 'نص',

@@ -15,6 +15,7 @@ import '../../services/post_service.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/location_map.dart';
 import 'camera_story_screen.dart';
 
@@ -388,13 +389,14 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     }
 
     return Scaffold(
-      backgroundColor: context.surfaceSoft,
-      body: GestureDetector(
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        behavior: HitTestBehavior.translucent,
-        child: SafeArea(
-          child: Column(
-            children: [
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: GestureDetector(
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          behavior: HitTestBehavior.translucent,
+          child: SafeArea(
+            child: Column(
+              children: [
               // HEADER
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
@@ -467,12 +469,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       const SizedBox(height: 16),
 
                       // CAPTION CARD
-                      Container(
-                        decoration: BoxDecoration(
-                          color: context.inputFill,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: context.borderColor),
-                        ),
+                      AppGlassCard(
+                        radius: 18,
+                        surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                        borderAlpha: context.isDark ? 0.14 : 0.50,
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                         child: TextField(
                           controller: _captionCtrl,
@@ -495,12 +495,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
                       const SizedBox(height: 16),
 
-                      Container(
-                        decoration: BoxDecoration(
-                          color: context.cardBg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: context.borderColor),
-                        ),
+                      AppGlassCard(
+                        radius: 18,
+                        surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                        borderAlpha: context.isDark ? 0.14 : 0.50,
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,6 +527,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                               value: _placeCityCtrl.text,
                               hintText: context.t.createPostCityHint,
                               icon: Icons.location_city_outlined,
+                              glassy: true,
                               onChanged: (city) {
                                 setState(() {
                                   _placeCityCtrl.text = city;
@@ -664,12 +663,11 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 20, top: 8),
                 child: Center(
-                  child: Container(
+                  child: AppGlassCard(
+                    radius: 30,
+                    surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                    borderAlpha: context.isDark ? 0.14 : 0.50,
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: context.surfaceSoft,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -680,7 +678,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -831,10 +830,14 @@ class _PostFormField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: context.inputFill,
+        color: context.isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.28),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: context.borderColor,
+          color: context.isDark
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.white.withValues(alpha: 0.50),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1033,39 +1036,39 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: context.cardBg,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: context.purpleSoft,
-                  borderRadius: BorderRadius.circular(10),
+    return AppGlassCard(
+      radius: 16,
+      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+      borderAlpha: context.isDark ? 0.14 : 0.50,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.purpleSoft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: const Color(0xFF7E3BE8)),
                 ),
-                child: Icon(icon, size: 20, color: const Color(0xFF7E3BE8)),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              const Icon(Icons.chevron_right, color: Color(0xFFB1B1B6)),
-            ],
+                const Spacer(),
+                const Icon(Icons.chevron_right, color: Color(0xFFB1B1B6)),
+              ],
+            ),
           ),
         ),
       ),

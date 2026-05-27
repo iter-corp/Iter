@@ -18,6 +18,7 @@ import '../../services/admin_service.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/share_app.dart';
+import '../widgets/app_page_background.dart';
 import 'admin/admin_events_screen.dart';
 import 'change_password_screen.dart';
 import 'contact_us_screen.dart';
@@ -49,16 +50,26 @@ class ProfileSettingsScreen extends ConsumerWidget {
         ref.watch(myProfileVisitorCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
-      backgroundColor: context.cardBg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(context.t.settings),
         centerTitle: false,
+        backgroundColor: Colors.transparent,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
+      body: AppPageBackground(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            24 + MediaQuery.of(context).padding.bottom,
+          ),
+          children: [
           _SectionHeader(title: context.t.account),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.email_outlined, color: AppColors.purple),
             title: Text(context.t.changeEmail),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
@@ -70,14 +81,14 @@ class ProfileSettingsScreen extends ConsumerWidget {
           // password" entry here was confusing and the resulting screen
           // had no "current password" to verify against.
           if (_isEmailPasswordUser())
-            ListTile(
+            _SettingsTile(
               leading: const Icon(Icons.lock_reset, color: AppColors.purple),
               title: Text(context.t.changePassword),
               trailing:
                   Icon(Icons.chevron_right, color: context.textSecondary),
               onTap: () => _changePassword(context),
             ),
-          ListTile(
+          _SettingsTile(
             leading: Icon(
               isPrivate ? Icons.lock_outline : Icons.lock_open,
               color: AppColors.purple,
@@ -101,7 +112,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
               },
             ),
           ),
-          ListTile(
+          _SettingsTile(
             leading:
                 const Icon(Icons.visibility_outlined, color: AppColors.purple),
             title: Text(context.t.profileVisitors),
@@ -144,7 +155,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
           ),
           _SectionHeader(title: context.t.settingsSectionNotifications),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.event_available_outlined,
                 color: AppColors.purple),
             title: Text(context.t.eventNotifTitle),
@@ -160,7 +171,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
           ),
           _SectionHeader(title: context.t.languageLabel),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.language, color: AppColors.purple),
             title: Text(context.t.appLanguage),
             subtitle: Text(
@@ -177,7 +188,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
             onTap: () => context.push('/language'),
           ),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.translate, color: AppColors.purple),
             title: Text(context.t.translationLanguage),
             subtitle: Text(
@@ -193,7 +204,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
             onTap: () => _pickLanguage(context, ref, current: preferredLang),
           ),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.bookmarks_outlined,
                 color: AppColors.purple),
             title: Text(context.t.savedTranslations),
@@ -205,7 +216,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
           ),
           _SectionHeader(title: context.t.appearance),
-          ListTile(
+          _SettingsTile(
             leading: Icon(
               isDark ? Icons.dark_mode : Icons.light_mode,
               color: isDark ? Colors.amber : Colors.grey,
@@ -219,7 +230,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
           ),
           _SectionHeader(title: context.t.settingsSectionInvite),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.ios_share, color: AppColors.purple),
             title: Text(context.t.settingsInviteFriends),
             subtitle: Text(
@@ -234,7 +245,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             },
           ),
           _SectionHeader(title: context.t.settingsSectionSupport),
-          ListTile(
+          _SettingsTile(
             leading:
                 const Icon(Icons.support_agent_outlined, color: AppColors.purple),
             title: Text(context.t.contactUs),
@@ -264,7 +275,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
           ),
           _SectionHeader(title: context.t.safety),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
             title: Text(context.t.blockedUsers),
             trailing: Icon(Icons.chevron_right, color: context.textSecondary),
@@ -276,7 +287,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
           // org_admin role granted via Contact us.
           if (isOrgAdmin && !isAdmin) ...[
             _SectionHeader(title: context.t.settingsSectionOrganization),
-            ListTile(
+            _SettingsTile(
               leading: const Icon(Icons.event_outlined,
                   color: AppColors.purple),
               title: Text(context.t.manageEvents,
@@ -295,7 +306,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
           ],
           if (isAdmin) ...[
             _SectionHeader(title: context.t.admin),
-            ListTile(
+            _SettingsTile(
               leading:
                   const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
               title: Text(
@@ -326,7 +337,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
             ),
           ],
           _SectionHeader(title: context.t.dangerZone),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title:
                 Text(context.t.logout, style: const TextStyle(color: Colors.red)),
@@ -341,7 +352,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
               }
             },
           ),
-          ListTile(
+          _SettingsTile(
             leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
             title: Text(
               context.t.deleteAccount,
@@ -353,7 +364,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
             onTap: () => _confirmDeleteAccount(context, ref),
           ),
           const SizedBox(height: 32),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -655,6 +667,43 @@ class ProfileSettingsScreen extends ConsumerWidget {
     } on FirebaseAuthException {
       return false;
     }
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final Widget? leading;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    this.leading,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppGlassCard(
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      radius: 16,
+      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+      borderAlpha: context.isDark ? 0.14 : 0.50,
+      child: ListTile(
+        leading: leading,
+        title: title,
+        subtitle: subtitle,
+        trailing: trailing,
+        onTap: onTap,
+        iconColor: AppColors.purple,
+        textColor: context.textPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
   }
 }
 

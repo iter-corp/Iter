@@ -32,6 +32,14 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'org_admin';
     }
 
+    function canManageNewEventNotification() {
+      return isOrgAdmin() &&
+        resource.data.type == 'new_event' &&
+        resource.data.targetId is string &&
+        exists(/databases/$(database)/documents/events/$(resource.data.targetId)) &&
+        get(/databases/$(database)/documents/events/$(resource.data.targetId)).data.createdByUid == request.auth.uid;
+    }
+
     function isChatParticipant(chatId) {
       return signedIn() &&
         request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
@@ -510,16 +518,21 @@ service cloud.firestore {
     }
 
     match /notifications/{uid}/items/{itemId} {
-      allow read: if isSelf(uid) || isAdmin();
+      allow get: if isSelf(uid) || isAdmin() ||
+        (isOrgAdmin() && itemId.matches('new_event_.*'));
+      allow list: if isSelf(uid) || isAdmin();
       allow update: if isSelf(uid);
-      allow delete: if isSelf(uid) || isAdmin() || resource.data.actorUid == request.auth.uid;
+      allow delete: if isSelf(uid) || isAdmin() || resource.data.actorUid == request.auth.uid || canManageNewEventNotification();
       // Normal notifications must name their author as the actor. Admins may
       // additionally fan out any system notification (actorUid == '') to any
       // user — used for new_event fan-out, role_update, and other admin-driven
       // system messages.
       allow create: if (signedIn() &&
           request.resource.data.actorUid == request.auth.uid)
-        || (isAdmin() && request.resource.data.actorUid == '');
+        || (isAdmin() && request.resource.data.actorUid == '')
+        || (isOrgAdmin() &&
+            request.resource.data.actorUid == '' &&
+            request.resource.data.type == 'new_event');
     }
 
     // ── Contact-us / support threads ──────────────────────────

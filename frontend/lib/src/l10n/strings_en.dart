@@ -739,6 +739,9 @@ const Map<String, String> enStrings = {
   'story_publish': 'Publish',
   'text_story_hint': 'Type something…',
   'video_story_too_long': 'Video is too long. Stories support up to 30 seconds.',
+  'video_story_too_large':
+      'This clip is {size}MB. Stories can upload videos up to 30MB. Choose a shorter cut or compress the video first.',
+  'video_story_preparing': 'Preparing video…',
   'story_create_menu_photo': 'Photo',
   'story_create_menu_video': 'Video',
   'story_create_menu_text': 'Text',

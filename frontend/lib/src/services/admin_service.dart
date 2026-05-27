@@ -1272,8 +1272,34 @@ class AdminService {
 
   /// Delete an event.
   Future<void> deleteEvent(String id) async {
+    await _deleteNewEventNotifications(id);
     final batch = _db.batch();
     batch.delete(_db.collection('events').doc(id));
     await batch.commit();
+  }
+
+  Future<void> _deleteNewEventNotifications(String eventId) async {
+    final usersSnap = await _db.collection('users').get();
+    var batch = _db.batch();
+    var writes = 0;
+
+    for (final userDoc in usersSnap.docs) {
+      final notifRef = _db
+          .collection('notifications')
+          .doc(userDoc.id)
+          .collection('items')
+          .doc('new_event_$eventId');
+      final notifSnap = await notifRef.get();
+      if (!notifSnap.exists) continue;
+      batch.delete(notifRef);
+      writes++;
+      if (writes >= 450) {
+        await batch.commit();
+        batch = _db.batch();
+        writes = 0;
+      }
+    }
+
+    if (writes > 0) await batch.commit();
   }
 }

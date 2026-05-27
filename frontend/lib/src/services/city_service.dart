@@ -359,6 +359,7 @@ class CityPickerField extends StatelessWidget {
 
   final String? hintText;
   final IconData icon;
+  final bool glassy;
 
   const CityPickerField({
     super.key,
@@ -367,6 +368,7 @@ class CityPickerField extends StatelessWidget {
     this.onClear,
     this.hintText,
     this.icon = Icons.location_city_outlined,
+    this.glassy = false,
   });
 
   @override
@@ -382,9 +384,19 @@ class CityPickerField extends StatelessWidget {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: context.inputFill,
+            color: glassy
+                ? (context.isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.white.withValues(alpha: 0.28))
+                : context.inputFill,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.borderColor),
+            border: Border.all(
+              color: glassy
+                  ? (context.isDark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : Colors.white.withValues(alpha: 0.50))
+                  : context.borderColor,
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           child: Row(
