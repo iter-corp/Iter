@@ -809,8 +809,8 @@ class PostService {
     return _posts
         .doc(postId)
         .collection('reposts')
-        .snapshots()
-        .map((s) => s.docs.length);
+        .snapshots(includeMetadataChanges: true)
+        .map((s) => s.size);
   }
 
   Stream<List<String>> streamRepostUserIds(String postId) {
@@ -818,7 +818,7 @@ class PostService {
         .doc(postId)
         .collection('reposts')
         .orderBy('createdAt', descending: true)
-        .snapshots()
+        .snapshots(includeMetadataChanges: true)
         .map((s) => s.docs.map((d) => d.id).toList());
   }
 

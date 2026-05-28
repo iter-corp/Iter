@@ -41,14 +41,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       {String fallback = 'Login failed'}) {
     switch (e.code) {
       case 'invalid-email':
-        return 'That email address looks invalid.';
-      case 'user-disabled':
-        return 'This account has been disabled.';
       case 'user-not-found':
       case 'wrong-password':
       case 'invalid-credential':
       case 'invalid-login-credentials':
         return 'Incorrect email or password.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
       case 'too-many-requests':
         return 'Too many attempts. Please try again in a few minutes.';
       case 'network-request-failed':
@@ -190,9 +189,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     hint: context.t.password,
                     prefixIcon: Icons.lock_outline,
                     isPassword: true,
-                    validator: (v) => (v == null || v.length < 6)
-                        ? context.t.loginMin6Chars
-                        : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return context.t.signupEnterPassword;
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 10),
                   Align(

@@ -342,7 +342,7 @@ const Map<String, String> enStrings = {
   'login_subtitle': 'Welcome back. Enter your details to continue.',
   'login_username_or_email': 'Username or email',
   'login_enter_username_or_email': 'Enter your username or email',
-  'login_min_6_chars': 'Min 6 characters',
+  'login_min_6_chars': 'Incorrect email or password.',
   'login_or': 'Or',
   'login_signing_in': 'Signing in...',
   'signup_subtitle': 'Please enter the code we just sent\nto email',

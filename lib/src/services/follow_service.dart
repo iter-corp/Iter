@@ -258,7 +258,7 @@ class FollowService {
     return _followersCol(uid)
         .where('status', isEqualTo: 'active')
         .snapshots()
-        .map((snap) {
+        .asyncMap((snap) async {
       final docs = snap.docs.toList();
       docs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
@@ -268,7 +268,7 @@ class FollowService {
         if (bCreatedAt == null) return -1;
         return bCreatedAt.compareTo(aCreatedAt);
       });
-      return docs.map((doc) => doc.id).toList();
+      return _existingRelationshipUids(docs);
     });
   }
 
@@ -276,7 +276,7 @@ class FollowService {
     return _followersCol(uid)
         .where('status', isEqualTo: 'pending')
         .snapshots()
-        .map((snap) {
+        .asyncMap((snap) async {
       final docs = snap.docs.toList();
       docs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
@@ -286,7 +286,7 @@ class FollowService {
         if (bCreatedAt == null) return -1;
         return bCreatedAt.compareTo(aCreatedAt);
       });
-      return docs.map((doc) => doc.id).toList();
+      return _existingRelationshipUids(docs);
     });
   }
 
@@ -294,7 +294,7 @@ class FollowService {
     return _followingCol(uid)
         .where('status', isEqualTo: 'active')
         .snapshots()
-        .map((snap) {
+        .asyncMap((snap) async {
       final docs = snap.docs.toList();
       docs.sort((a, b) {
         final aCreatedAt = (a.data()['createdAt'] as Timestamp?)?.toDate();
@@ -304,7 +304,38 @@ class FollowService {
         if (bCreatedAt == null) return -1;
         return bCreatedAt.compareTo(aCreatedAt);
       });
-      return docs.map((doc) => doc.id).toList();
+      return _existingRelationshipUids(docs);
     });
+  }
+
+  Future<List<String>> _existingRelationshipUids(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    if (docs.isEmpty) return const [];
+
+    final existing = <String>[];
+    final checks = await Future.wait(
+      docs.map((doc) async {
+        final uid = doc.id;
+        final exists = (await _userDoc(uid).get()).exists;
+        return (doc: doc, uid: uid, exists: exists);
+      }),
+    );
+
+    for (final check in checks) {
+      if (check.exists) {
+        existing.add(check.uid);
+        continue;
+      }
+
+      // Heal older stale relationship docs left behind by account deletion.
+      // If rules do not allow this caller to delete it, the filtered stream
+      // still keeps the deleted account out of the visible list.
+      try {
+        await check.doc.reference.delete();
+      } catch (_) {}
+    }
+
+    return existing;
   }
 }

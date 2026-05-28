@@ -782,26 +782,12 @@ class AdminService {
     }
 
     final userRef = _db.collection('users').doc(uid);
+    await _deleteFollowTraces(uid, userRef, includeCollectionGroupSweep: true);
     await _deleteSubcollection(userRef, 'followers');
     await _deleteSubcollection(userRef, 'following');
     await _deleteSubcollection(userRef, 'reposts');
     await _deleteSubcollection(userRef, 'saved');
     await _deleteSubcollection(userRef, 'savedTranslations');
-
-    final followersOfOthers = await _db
-        .collectionGroup('followers')
-        .where('uid', isEqualTo: uid)
-        .get();
-    for (final doc in followersOfOthers.docs) {
-      await doc.reference.delete();
-    }
-    final followingOfOthers = await _db
-        .collectionGroup('following')
-        .where('uid', isEqualTo: uid)
-        .get();
-    for (final doc in followingOfOthers.docs) {
-      await doc.reference.delete();
-    }
 
     await _deleteSubcollection(
         _db.collection('notifications').doc(uid), 'items');
@@ -879,6 +865,11 @@ class AdminService {
       await story.reference.delete();
     }
 
+    // Remove this user from other people's follow lists before we delete
+    // the user's own follow collections. This prevents the deleted account
+    // from remaining in others' follower/following lists.
+    await _deleteFollowTraces(uid, userRef);
+
     // Comments by this user are intentionally preserved; the comment tile
     // displays "deleted user" once the author doc is gone.
 
@@ -954,6 +945,67 @@ class AdminService {
     for (final doc in snap.docs) {
       await doc.reference.delete();
     }
+  }
+
+  Future<void> _deleteFollowTraces(
+    String uid,
+    DocumentReference<Map<String, dynamic>> userRef, {
+    bool includeCollectionGroupSweep = false,
+  }) async {
+    final refs = <String, DocumentReference<Map<String, dynamic>>>{};
+
+    void add(DocumentReference<Map<String, dynamic>> ref) {
+      refs[ref.path] = ref;
+    }
+
+    final followerSnap = await userRef.collection('followers').get();
+    for (final doc in followerSnap.docs) {
+      add(_db.collection('users').doc(doc.id).collection('following').doc(uid));
+    }
+
+    final followingSnap = await userRef.collection('following').get();
+    for (final doc in followingSnap.docs) {
+      add(_db.collection('users').doc(doc.id).collection('followers').doc(uid));
+    }
+
+    if (includeCollectionGroupSweep) {
+      final followersOfOthers = await _db
+          .collectionGroup('followers')
+          .where('uid', isEqualTo: uid)
+          .get();
+      for (final doc in followersOfOthers.docs) {
+        add(doc.reference);
+      }
+
+      final followingOfOthers = await _db
+          .collectionGroup('following')
+          .where('uid', isEqualTo: uid)
+          .get();
+      for (final doc in followingOfOthers.docs) {
+        add(doc.reference);
+      }
+    }
+
+    await _deleteRefsInBatches(refs.values);
+  }
+
+  Future<void> _deleteRefsInBatches(
+    Iterable<DocumentReference<Map<String, dynamic>>> refs,
+  ) async {
+    var batch = _db.batch();
+    var writes = 0;
+
+    for (final ref in refs) {
+      batch.delete(ref);
+      writes++;
+      if (writes >= 450) {
+        await batch.commit();
+        batch = _db.batch();
+        writes = 0;
+      }
+    }
+
+    if (writes > 0) await batch.commit();
   }
 
   // -------- Blacklist --------

@@ -302,8 +302,8 @@ service cloud.firestore {
           resource.data.authorUid == request.auth.uid || isAdmin()
         );
         // Two kinds of updates are allowed:
-        //   1. Any signed-in user can bump reaction counters on the
-        //      comment (helpfulCount / unhelpfulCount).
+        //   1. Any signed-in user can bump reaction / like counters on
+        //      the comment (helpfulCount / unhelpfulCount / likesCount).
         //   2. The comment's own author (or an admin) can edit the
         //      text. `affectedKeys().hasOnly([...])` already implies
         //      `authorUid` is untouched, so no need to also assert
@@ -313,7 +313,8 @@ service cloud.firestore {
         allow update: if signedIn() && (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'helpfulCount',
-            'unhelpfulCount'
+            'unhelpfulCount',
+            'likesCount'
           ]) ||
           (
             (resource.data.authorUid == request.auth.uid || isAdmin()) &&

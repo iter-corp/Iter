@@ -140,6 +140,7 @@ class CommentService {
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? privateSub;
     List<Comment> publicComments = const [];
     List<Comment> privateComments = const [];
+    List<Comment> lastEmitted = const [];
 
     void emitMerged() {
       final merged = [...publicComments, ...privateComments]..sort((a, b) {
@@ -155,6 +156,8 @@ class CommentService {
 
           return a.id.compareTo(b.id);
         });
+      if (_sameComments(lastEmitted, merged)) return;
+      lastEmitted = merged;
       if (!controller.isClosed) controller.add(merged);
     }
 
@@ -187,6 +190,31 @@ class CommentService {
     };
 
     return controller.stream;
+  }
+
+  bool _sameComments(List<Comment> a, List<Comment> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final left = a[i];
+      final right = b[i];
+      if (left.id != right.id ||
+          left.authorUid != right.authorUid ||
+          left.authorUsername != right.authorUsername ||
+          left.authorAvatar != right.authorAvatar ||
+          left.text != right.text ||
+          left.createdAt != right.createdAt ||
+          left.parentCommentId != right.parentCommentId ||
+          left.replyToUsername != right.replyToUsername ||
+          left.helpfulCount != right.helpfulCount ||
+          left.unhelpfulCount != right.unhelpfulCount ||
+          left.likesCount != right.likesCount ||
+          left.profanityFiltered != right.profanityFiltered ||
+          left.senderOnly != right.senderOnly) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> addComment({

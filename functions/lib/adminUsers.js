@@ -147,11 +147,42 @@ async function deleteDocsByField(collectionPath, field, equals) {
     }
     return deleted;
 }
+async function deleteCollectionGroupDocsById(collectionId, documentId) {
+    let deleted = 0;
+    while (true) {
+        const snap = await db
+            .collectionGroup(collectionId)
+            .where(admin.firestore.FieldPath.documentId(), '==', documentId)
+            .limit(200)
+            .get();
+        if (snap.empty)
+            break;
+        let batch = db.batch();
+        let writes = 0;
+        for (const doc of snap.docs) {
+            batch.delete(doc.ref);
+            writes += 1;
+            deleted += 1;
+            if (writes >= MAX_BATCH_WRITES) {
+                await batch.commit();
+                batch = db.batch();
+                writes = 0;
+            }
+        }
+        if (writes > 0) {
+            await batch.commit();
+        }
+    }
+    return deleted;
+}
 async function cleanupUserData(targetUid) {
     const deletedPosts = await deletePostsByAuthor(targetUid);
     const deletedComments = await deleteCommentsByAuthor(targetUid);
     const deletedStories = await deleteDocsByField('stories', 'authorUid', targetUid);
     const deletedLiveStreams = await deleteDocsByField('liveStreams', 'hostUid', targetUid);
+    await deleteCollectionGroupDocsById('followers', targetUid);
+    await deleteCollectionGroupDocsById('following', targetUid);
+    await deleteCollectionGroupDocsById('reposts', targetUid);
     await db.recursiveDelete(db.collection('notifications').doc(targetUid));
     await db.recursiveDelete(db.collection('feeds').doc(targetUid));
     return {

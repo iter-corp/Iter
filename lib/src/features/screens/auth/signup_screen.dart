@@ -66,7 +66,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       case 'email-already-in-use':
         return 'An account with this email already exists.';
       case 'weak-password':
-        return 'Password is too weak. Use at least 6 characters.';
+        return 'Password is too weak. Use at least 8 characters.';
       case 'network-request-failed':
         return 'Network error. Check your connection and try again.';
       default:
@@ -225,12 +225,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     obscured: _obscurePassword,
                     onToggleObscure: () =>
                         setState(() => _obscurePassword = !_obscurePassword),
-                    // Only surface the red "min 8 chars" pill once the user
-                    // has left the field with a too-short value. Hidden by
-                    // default and as soon as they type the 8th character.
-                    helperText: (_passTouched && _passCtrl.text.length < 8)
-                        ? t.signupPasswordMinLength
-                        : null,
                     touched: _passTouched,
                     onBlur: () {
                       if (!_passTouched) setState(() => _passTouched = true);
@@ -359,7 +353,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     required String? Function(String?) validator,
     TextInputType? keyboardType,
     bool isPassword = false,
-    String? helperText,
     bool touched = false,
     VoidCallback? onBlur,
     bool? obscured,
@@ -422,30 +415,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
               ),
             ),
-            if (helperText != null) _passwordHelper(helperText),
             if (field.hasError) _authFieldError(field.errorText!),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _passwordHelper(String text) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 16, top: 6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE53935),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-          ),
         ),
       ),
     );

@@ -337,7 +337,7 @@ const Map<String, String> arStrings = {
   'login_subtitle': 'مرحباً بعودتك. أدخل بياناتك للمتابعة.',
   'login_username_or_email': 'اسم المستخدم أو البريد الإلكتروني',
   'login_enter_username_or_email': 'أدخل اسم المستخدم أو البريد الإلكتروني',
-  'login_min_6_chars': '٦ أحرف كحد أدنى',
+  'login_min_6_chars': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
   'login_or': 'أو',
   'login_signing_in': 'جاري تسجيل الدخول...',
   'signup_subtitle':

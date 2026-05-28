@@ -342,7 +342,7 @@ const Map<String, String> ckbStrings = {
   'login_subtitle': 'بەخێربێیتەوە. زانیارییەکانت بنووسە بۆ بەردەوامبوون.',
   'login_username_or_email': 'ناوی بەکارهێنەر یان ئیمەیڵ',
   'login_enter_username_or_email': 'ناوی بەکارهێنەر یان ئیمەیڵەکەت بنووسە',
-  'login_min_6_chars': 'لانی کەم ٦ پیت',
+  'login_min_6_chars': 'ئیمەیڵ یان وشەی نهێنی هەڵەیە.',
   'login_or': 'یان',
   'login_signing_in': 'چوونەژوورەوە...',
   'signup_subtitle': 'تکایە ئەو کۆدە بنووسە کە ئێستا ناردمان\nبۆ ئیمەیڵەکەت',

@@ -53,6 +53,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
   final Set<String> _expandedParents = <String>{};
   final Map<String, GlobalKey> _commentKeys = {};
   bool _hasScrolledToHighlight = false;
+  int? _lastBackfilledPublicCount;
 
   /// The id we still want to paint with the purple highlight band. Seeded
   /// from `widget.highlightCommentId` on first build and cleared after a
@@ -136,7 +137,9 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
     // it in sync with the actual comments subcollection length.
     commentsAsync.whenData((list) {
       final publicCount = list.where((c) => !c.senderOnly).length;
-      if (publicCount != widget.post.commentsCount) {
+      if (publicCount != widget.post.commentsCount &&
+          publicCount != _lastBackfilledPublicCount) {
+        _lastBackfilledPublicCount = publicCount;
         FirebaseFirestore.instance
             .collection('posts')
             .doc(widget.post.id)
@@ -793,6 +796,7 @@ class _CommentTile extends ConsumerWidget {
                       children: [
                         StreamBuilder<bool>(
                           stream: isLikedStream,
+                          initialData: false,
                           builder: (context, likeSnap) {
                             final isLiked = likeSnap.data ?? false;
                             return GestureDetector(
@@ -815,6 +819,7 @@ class _CommentTile extends ConsumerWidget {
                                     const SizedBox(width: 4),
                                     StreamBuilder<int>(
                                       stream: likesCountStream,
+                                      initialData: comment.likesCount,
                                       builder: (context, countSnap) {
                                         final count = countSnap.data ?? 0;
                                         return Text(

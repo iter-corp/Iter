@@ -153,6 +153,9 @@ class _PostCardState extends ConsumerState<PostCard>
     final t = context.t;
     try {
       await ref.read(postServiceProvider).toggleRepost(widget.post.id);
+      ref.invalidate(repostsCountProvider(widget.post.id));
+      ref.invalidate(repostUserIdsProvider(widget.post.id));
+      ref.invalidate(isRepostedProvider(widget.post.id));
       AppFeedback.showSuccessOn(
         messenger,
         wasReposted ? t.postCardRepostRemoved : t.postCardRepostedToProfile,
