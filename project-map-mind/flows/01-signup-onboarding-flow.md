@@ -70,16 +70,20 @@ sequenceDiagram
    ```
    FirebaseAuth.createUserWithEmailAndPassword
    → set Firestore users/{uid} (full default doc with username: null, appIntroSeen: false, fcmTokens: [])
-   → user.sendEmailVerification() (try/catch — non-fatal)
+   → user.sendEmailVerification() (try/catch — non-fatal, but error is captured)
    → justSignedUp = true
+   → returns SignupResult(user, emailSendError)
    ```
    Firestore write at `users/{uid}` includes: `uid`, `email`, `username: null`, `handle: null`, `bio: ''`, `avatarUrl: null`, `gender: null`, `role: 'user'`, `suspended: false`, `isPrivate: false`, `appIntroSeen: false`, counts at 0, `fcmTokens: []`, `createdAt: serverTimestamp`.
 
-6. **Router observes the new user.** `_AuthListenable` in `app_router.dart` notifies on auth + user-doc change. Because `authServiceProvider.requiresEmailVerification` is true (email present + `emailVerified == false`), the redirect pushes `/otp?email=...`. The signup screen also explicitly calls `context.go('/otp?email=...')` after `signUp` resolves, so it lands there even faster.
+   The verification-email send is wrapped in try/catch so a transient failure does not abort signup — the auth user and Firestore doc are kept and the user can use Resend. The exception is logged via `debugPrint` and mapped to a user-readable string in `SignupResult.emailSendError`; before the fix this error was silently swallowed and users would land on an OTP screen waiting forever for mail that never sent.
+
+6. **Router observes the new user.** `_AuthListenable` in `app_router.dart` notifies on auth + user-doc change. Because `authServiceProvider.requiresEmailVerification` is true (email present + `emailVerified == false`), the redirect pushes `/otp?email=...`. The signup screen also explicitly calls `context.go('/otp?email=...&sendError=...')` after `signUp` resolves (the `sendError` query param is present only when the verification mail send failed), so it lands there even faster.
 
 7. **OTP screen.** [`OtpScreen`](../../lib/src/features/screens/auth/otp_screen.dart):
+   - Reads optional `sendError` from the route's query params; if present, pre-populates the error banner so the user knows to tap Resend instead of waiting for a mail that never sent.
    - "Verify" → `AuthService.reloadAndCheckEmailVerified()` reloads the FirebaseAuth user; if `emailVerified` is now true, navigates to `/onboarding`. Otherwise shows "open the link, then tap Verify".
-   - "Resend" → `AuthService.sendEmailVerification()`.
+   - "Resend" → `AuthService.sendEmailVerification()`. Failures are mapped per `FirebaseAuthException.code` (`too-many-requests`, `network-request-failed`, `user-not-found`/`no-current-user`, default) to actionable copy and logged via `debugPrint`. On success the banner reads "Verification email sent. Check your inbox (and spam)."
    - Back arrow → `AuthService.discardPendingSignup()` deletes `users/{uid}` and the Auth user (so the email can be reused), then `context.go('/signup')`.
 
 8. **Onboarding screen.** [`OnboardingScreen`](../../lib/src/features/screens/auth/onboarding_screen.dart) collects:
@@ -118,7 +122,7 @@ No Cloud Functions fire on these writes — `users/{uid}` triggers are not regis
 - **Email already exists (step 5).** `FirebaseAuthException(code: 'email-already-in-use')` → `SignupScreen` shows "An account with this email already exists."
 - **Weak password / invalid email.** Mapped to friendly strings in `_friendlyError`.
 - **Network error during signup.** Auth doc is not created; user sees "Network error. Check your connection and try again." `justSignedUp` stays false.
-- **Verification email failed to send (step 5).** Swallowed — OTP screen exposes "Resend" so the user can retry.
+- **Verification email failed to send (step 5).** Auth user and Firestore doc are kept (no rollback) so the user can retry via Resend. The exception is logged via `debugPrint` and carried in `SignupResult.emailSendError`; the signup screen forwards it as the `sendError` query param so the OTP screen pre-populates the error banner instead of appearing blank.
 - **OTP "Verify" with unverified email.** Inline error: "Please open the verification link in your email, then tap Verify."
 - **Username already taken (step 9).** `UserService.isUsernameTaken` returns true → inline error `context.t.authUsernameTaken`. Submit not committed.
 - **GPS denied / no location services.** Onboarding falls back to manual city entry; user can still proceed.
