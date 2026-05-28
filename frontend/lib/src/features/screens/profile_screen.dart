@@ -21,6 +21,7 @@ import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
+import 'blocked_users_screen.dart';
 import 'profile_settings_screen.dart';
 import 'qa_thread_screen.dart';
 
@@ -371,7 +372,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Icon(Icons.chevron_right, color: context.textSecondary),
                 onTap: () {
                   Navigator.pop(context);
-                  _showBlockedUsers(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BlockedUsersScreen(),
+                    ),
+                  );
                 },
               ),
               if (isAdmin)
@@ -412,96 +417,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     style: const TextStyle(color: Colors.redAccent)),
                 subtitle: Text(context.t.profileDeleteAccountSubtitle),
                 onTap: () => _confirmDeleteAccount(context, ref),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showBlockedUsers(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.65,
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.borderColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  context.t.blockedUsers,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: context.textPrimary,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Consumer(
-                  builder: (context, ref, _) {
-                    final blockedAsync = ref.watch(blockedUsersProvider);
-                    return blockedAsync.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (e, _) =>
-                          Center(child: Text(context.t.errorWithMessage(e))),
-                      data: (blockedUids) {
-                        if (blockedUids.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.block,
-                                    size: 48, color: context.textMuted),
-                                const SizedBox(height: 12),
-                                Text(
-                                  context.t.profileNoBlockedUsers,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: context.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  context.t.profileBlockedUsersHint,
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        return ListView.builder(
-                          itemCount: blockedUids.length,
-                          itemBuilder: (context, index) {
-                            final uid = blockedUids[index];
-                            return _BlockedUserTile(uid: uid);
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
               ),
             ],
           ),
@@ -570,8 +485,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content:
-                    Text(context.t.deleteFailed(e.message ?? e.code))),
+                content: Text(context.t.deleteFailed(e.message ?? e.code))),
           );
         }
         return;
@@ -758,8 +672,7 @@ class _VideoThumbState extends State<_VideoThumb> {
               color: Colors.black.withValues(alpha: 0.55),
             ),
             padding: const EdgeInsets.all(4),
-            child: const Icon(Icons.play_arrow,
-                color: Colors.white, size: 14),
+            child: const Icon(Icons.play_arrow, color: Colors.white, size: 14),
           ),
         ),
       ],
@@ -1229,56 +1142,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         itemCount: widget.posts.length,
         itemBuilder: (_, i) => PostCard(post: widget.posts[i]),
-      ),
-    );
-  }
-}
-
-class _BlockedUserTile extends ConsumerWidget {
-  final String uid;
-  const _BlockedUserTile({required this.uid});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userByUidProvider(uid));
-    final data = userAsync.valueOrNull;
-    final avatarUrl = data?['avatarUrl'] as String?;
-    final username = (data?['username'] as String?) ?? uid;
-
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: context.inputFill,
-        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-        child: avatarUrl == null ? const Icon(Icons.person, size: 18) : null,
-      ),
-      title: Text(username),
-      trailing: SizedBox(
-        height: 32,
-        child: OutlinedButton(
-          onPressed: () async {
-            final currentUser = ref.read(authServiceProvider).currentUser;
-            if (currentUser == null) return;
-            await ref.read(blockServiceProvider).unblockUser(
-                  currentUid: currentUser.uid,
-                  targetUid: uid,
-                );
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Colors.red, width: 1),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-          ),
-          child: Text(
-            context.t.unblock,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
       ),
     );
   }

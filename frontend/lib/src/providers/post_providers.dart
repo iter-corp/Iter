@@ -147,6 +147,11 @@ final repostsCountProvider = StreamProvider.family<int, String>((ref, postId) {
   return ref.watch(postServiceProvider).streamRepostsCount(postId);
 });
 
+final repostUserIdsProvider =
+    StreamProvider.family<List<String>, String>((ref, postId) {
+  return ref.watch(postServiceProvider).streamRepostUserIds(postId);
+});
+
 final userRepostsProvider =
     StreamProvider.family<List<Post>, String>((ref, uid) {
   final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));

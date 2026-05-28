@@ -407,8 +407,7 @@ class AppStrings {
   // ──────────────────────────────────────────────────────────────
   String get loginSubtitle => _get('login_subtitle');
   String get loginUsernameOrEmail => _get('login_username_or_email');
-  String get loginEnterUsernameOrEmail =>
-      _get('login_enter_username_or_email');
+  String get loginEnterUsernameOrEmail => _get('login_enter_username_or_email');
   String get loginMin6Chars => _get('login_min_6_chars');
   String get loginOr => _get('login_or');
   String get loginSigningIn => _get('login_signing_in');
@@ -419,13 +418,11 @@ class AppStrings {
   String get signupPasswordMinLength => _get('signup_password_min_length');
   String get signupPasswordLetterNumber =>
       _get('signup_password_letter_number');
-  String get signupSignInWithFacebook =>
-      _get('signup_sign_in_with_facebook');
+  String get signupSignInWithFacebook => _get('signup_sign_in_with_facebook');
   String get forgotPasswordSubtitle => _get('forgot_password_subtitle');
   String get forgotPasswordEmailSent => _get('forgot_password_email_sent');
   String get forgotPasswordCheckInbox => _get('forgot_password_check_inbox');
-  String get forgotPasswordBackToLogin =>
-      _get('forgot_password_back_to_login');
+  String get forgotPasswordBackToLogin => _get('forgot_password_back_to_login');
   String get forgotPasswordEmailAddress =>
       _get('forgot_password_email_address');
   String get forgotPasswordEnterEmail => _get('forgot_password_enter_email');
@@ -443,8 +440,7 @@ class AppStrings {
   String get onboardingGender => _get('onboarding_gender');
   String get onboardingGenderMale => _get('onboarding_gender_male');
   String get onboardingGenderFemale => _get('onboarding_gender_female');
-  String get onboardingGenderNonBinary =>
-      _get('onboarding_gender_non_binary');
+  String get onboardingGenderNonBinary => _get('onboarding_gender_non_binary');
   String get onboardingGenderOther => _get('onboarding_gender_other');
   String get onboardingMin3Chars => _get('onboarding_min_3_chars');
   String get onboardingName => _get('onboarding_name');
@@ -456,12 +452,10 @@ class AppStrings {
   String get onboardingWhereAreYou => _get('onboarding_where_are_you');
   String get onboardingGpsSet => _get('onboarding_gps_set');
   String get onboardingLocationDesc => _get('onboarding_location_desc');
-  String get onboardingUpdateLocation =>
-      _get('onboarding_update_location');
+  String get onboardingUpdateLocation => _get('onboarding_update_location');
   String get onboardingUseMyLocation => _get('onboarding_use_my_location');
   String get onboardingCity => _get('onboarding_city');
-  String get onboardingCityAutofilled =>
-      _get('onboarding_city_autofilled');
+  String get onboardingCityAutofilled => _get('onboarding_city_autofilled');
   String get onboardingCityHint => _get('onboarding_city_hint');
   String get appIntroPostsTitle => _get('app_intro_posts_title');
   String get appIntroPostsBody => _get('app_intro_posts_body');
@@ -603,8 +597,7 @@ class AppStrings {
   String get createPostVideoSizeLimit => _get('create_post_video_size_limit');
   String get createPostFollowersOnly => _get('create_post_followers_only');
   String get createPostPublic => _get('create_post_public');
-  String get createPostCurrentLocation =>
-      _get('create_post_current_location');
+  String get createPostCurrentLocation => _get('create_post_current_location');
   String get createPostYou => _get('create_post_you');
   String get createPostLocationServicesOff =>
       _get('create_post_location_services_off');
@@ -631,8 +624,8 @@ class AppStrings {
   String postCardCouldNotSave(Object error) =>
       _fmt('post_card_could_not_save', {'error': error});
   String get postCardRepostRemoved => _get('post_card_repost_removed');
-  String get postCardRepostedToProfile =>
-      _get('post_card_reposted_to_profile');
+  String get postCardRepostedToProfile => _get('post_card_reposted_to_profile');
+  String get postCardRepostedBy => _get('post_card_reposted_by');
   String postCardCouldNotRepost(Object error) =>
       _fmt('post_card_could_not_repost', {'error': error});
   String get postCardSendTo => _get('post_card_send_to');
@@ -642,8 +635,7 @@ class AppStrings {
       _fmt('post_card_shared_to', {'username': username});
   String get postCardEditCaption => _get('post_card_edit_caption');
   String get postCardMakePublic => _get('post_card_make_public');
-  String get postCardMakeFollowersOnly =>
-      _get('post_card_make_followers_only');
+  String get postCardMakeFollowersOnly => _get('post_card_make_followers_only');
   String get postCardCaptionHint => _get('post_card_caption_hint');
   String get postCardDeletePostTitle => _get('post_card_delete_post_title');
   String get postCardCannotBeUndone => _get('post_card_cannot_be_undone');
@@ -691,8 +683,7 @@ class AppStrings {
       _fmt('could_not_open_file_picker', {'error': error});
   String get couldNotReadFile => _get('could_not_read_file');
   String get fileTooLarge => _get('file_too_large');
-  String get microphonePermissionDenied =>
-      _get('microphone_permission_denied');
+  String get microphonePermissionDenied => _get('microphone_permission_denied');
   String get failedToRecordVoice => _get('failed_to_record_voice');
   String get recordingFileNotFound => _get('recording_file_not_found');
   String get voiceRecordingEmpty => _get('voice_recording_empty');
@@ -700,20 +691,17 @@ class AppStrings {
   String get failedUploadVoiceEmpty => _get('failed_upload_voice_empty');
   String voiceUploadFailed(Object error) =>
       _fmt('voice_upload_failed', {'error': error});
-  String get translationAutoDescription =>
-      _get('translation_auto_description');
+  String get translationAutoDescription => _get('translation_auto_description');
   String get autoTranslateIncoming => _get('auto_translate_incoming');
   String get translateInto => _get('translate_into');
   String autoTranslateOnTooltip(Object lang) =>
       _fmt('auto_translate_on_tooltip', {'lang': lang});
-  String get translationSettingsTooltip =>
-      _get('translation_settings_tooltip');
+  String get translationSettingsTooltip => _get('translation_settings_tooltip');
   String get groupSettings => _get('group_settings');
   String get sharedMedia => _get('shared_media');
   String get chatOptions => _get('chat_options');
   String get autoDeleteMessages => _get('auto_delete_messages');
-  String membersCount(Object count) =>
-      _fmt('members_count', {'count': count});
+  String membersCount(Object count) => _fmt('members_count', {'count': count});
   String get sayHello => _get('say_hello');
   String get youveBlockedUser => _get('youve_blocked_user');
   String get cantReplyConversation => _get('cant_reply_conversation');
@@ -732,8 +720,7 @@ class AppStrings {
       _fmt('failed_with_error', {'error': error});
   String get deleteChatQuestion => _get('delete_chat_question');
   String get deleteChatBody => _get('delete_chat_body');
-  String deleteFailed(Object error) =>
-      _fmt('delete_failed', {'error': error});
+  String deleteFailed(Object error) => _fmt('delete_failed', {'error': error});
   String recordingElapsed(Object time) =>
       _fmt('recording_elapsed', {'time': time});
   String get messageUnavailable => _get('message_unavailable');
@@ -742,8 +729,7 @@ class AppStrings {
   String get showTranslation => _get('show_translation');
   String translateToLang(Object lang) =>
       _fmt('translate_to_lang', {'lang': lang});
-  String get translateChangeInSettings =>
-      _get('translate_change_in_settings');
+  String get translateChangeInSettings => _get('translate_change_in_settings');
   String get showTranscript => _get('show_transcript');
   String get transcriptUnavailable => _get('transcript_unavailable');
   String translateVoiceToLang(Object lang) =>
@@ -784,8 +770,7 @@ class AppStrings {
   String adminPrefix(Object name) => _fmt('admin_prefix', {'name': name});
   String senderAdmin(Object name) => _fmt('sender_admin', {'name': name});
   String get onlyAdminCanSend => _get('only_admin_can_send');
-  String get eventMessagesNotEncrypted =>
-      _get('event_messages_not_encrypted');
+  String get eventMessagesNotEncrypted => _get('event_messages_not_encrypted');
   String get eventGroup => _get('event_group');
   String get forwardTo => _get('forward_to');
   String get noChatsYet => _get('no_chats_yet');
@@ -1007,8 +992,7 @@ class AppStrings {
       _fmt('events_no_events_matching', {'query': query});
   String eventsNoEventsInCity(Object city) =>
       _fmt('events_no_events_in_city', {'city': city});
-  String get eventsNewEventsAppearHere =>
-      _get('events_new_events_appear_here');
+  String get eventsNewEventsAppearHere => _get('events_new_events_appear_here');
   String get eventsTryDifferentKeywordLocation =>
       _get('events_try_different_keyword_location');
   String get eventsWantHostEvent => _get('events_want_host_event');
@@ -1033,25 +1017,21 @@ class AppStrings {
   String get eventsFilterByCityStepBody =>
       _get('events_filter_by_city_step_body');
   String get eventsSeeEventsOnMap => _get('events_see_events_on_map');
-  String get eventsSeeEventsOnMapBody =>
-      _get('events_see_events_on_map_body');
+  String get eventsSeeEventsOnMapBody => _get('events_see_events_on_map_body');
   String get eventsPlanYourTrip => _get('events_plan_your_trip');
   String get eventsPlanYourTripBody => _get('events_plan_your_trip_body');
   String get eventsGotIt => _get('events_got_it');
   String get eventGroupDeleteGroupTitle =>
       _get('event_group_delete_group_title');
-  String get eventGroupDeleteGroupBody =>
-      _get('event_group_delete_group_body');
+  String get eventGroupDeleteGroupBody => _get('event_group_delete_group_body');
   String eventGroupFailedToDelete(Object error) =>
       _fmt('event_group_failed_to_delete', {'error': error});
-  String get eventGroupLeaveGroupTitle =>
-      _get('event_group_leave_group_title');
+  String get eventGroupLeaveGroupTitle => _get('event_group_leave_group_title');
   String get eventGroupLeaveGroupBody => _get('event_group_leave_group_body');
   String eventGroupFailed(Object error) =>
       _fmt('event_group_failed', {'error': error});
   String get eventGroupSettingsTitle => _get('event_group_settings_title');
-  String get eventGroupPendingRequests =>
-      _get('event_group_pending_requests');
+  String get eventGroupPendingRequests => _get('event_group_pending_requests');
   String get eventGroupMembers => _get('event_group_members');
   String get eventGroupAddUser => _get('event_group_add_user');
   String get eventGroupDeleteGroup => _get('event_group_delete_group');
@@ -1071,8 +1051,7 @@ class AppStrings {
   String get eventGroupRemoveMemberBody =>
       _get('event_group_remove_member_body');
   String get eventGroupRemove => _get('event_group_remove');
-  String get eventGroupAddUserToGroup =>
-      _get('event_group_add_user_to_group');
+  String get eventGroupAddUserToGroup => _get('event_group_add_user_to_group');
   String get eventGroupNotFollowingAnyone =>
       _get('event_group_not_following_anyone');
   String eventGroupAddedToGroup(Object name) =>
@@ -1088,8 +1067,7 @@ class AppStrings {
       _get('event_notif_new_event_subtitle');
   String get eventNotifEventTypes => _get('event_notif_event_types');
   String get eventNotifAllTypesDesc => _get('event_notif_all_types_desc');
-  String get eventNotifCustomTypesDesc =>
-      _get('event_notif_custom_types_desc');
+  String get eventNotifCustomTypesDesc => _get('event_notif_custom_types_desc');
   String get eventNotifAllTypes => _get('event_notif_all_types');
   String get eventNotifCountries => _get('event_notif_countries');
   String get eventNotifAllCountriesDesc =>
@@ -1118,8 +1096,7 @@ class AppStrings {
   String get groupSettingsDeleteGroup => _get('group_settings_delete_group');
   String get groupSettingsMember => _get('group_settings_member');
   String get groupSettingsMembers => _get('group_settings_members');
-  String get groupSettingsUserFallback =>
-      _get('group_settings_user_fallback');
+  String get groupSettingsUserFallback => _get('group_settings_user_fallback');
   String get groupSettingsYouSuffix => _get('group_settings_you_suffix');
   String get groupSettingsAdmin => _get('group_settings_admin');
   String get groupSettingsMessagingPermissions =>
@@ -1136,8 +1113,7 @@ class AppStrings {
       _get('group_settings_enable_media_sharing');
   String get groupSettingsEnableMediaSharingDesc =>
       _get('group_settings_enable_media_sharing_desc');
-  String get groupSettingsSaveSettings =>
-      _get('group_settings_save_settings');
+  String get groupSettingsSaveSettings => _get('group_settings_save_settings');
   String eventDetailDeadline(Object date) =>
       _fmt('event_detail_deadline', {'date': date});
   String get eventDetailApplyBelow => _get('event_detail_apply_below');
@@ -1147,12 +1123,10 @@ class AppStrings {
       _get('event_detail_could_not_open_link');
   String get eventDetailApply => _get('event_detail_apply');
   String get eventDetailRegistration => _get('event_detail_registration');
-  String get eventDetailRequestPending =>
-      _get('event_detail_request_pending');
+  String get eventDetailRequestPending => _get('event_detail_request_pending');
   String get eventDetailApproved => _get('event_detail_approved');
   String get eventDetailRejectedRetry => _get('event_detail_rejected_retry');
-  String get eventRegRequestSubmitted =>
-      _get('event_reg_request_submitted');
+  String get eventRegRequestSubmitted => _get('event_reg_request_submitted');
   String eventRegFailed(Object error) =>
       _fmt('event_reg_failed', {'error': error});
   String get eventRegRegisterFor => _get('event_reg_register_for');
@@ -1203,8 +1177,7 @@ class AppStrings {
   String get adminTileBlacklistSubtitle =>
       _get('admin_tile_blacklist_subtitle');
   String get adminAppSettings => _get('admin_app_settings');
-  String get adminTileSettingsSubtitle =>
-      _get('admin_tile_settings_subtitle');
+  String get adminTileSettingsSubtitle => _get('admin_tile_settings_subtitle');
   String get adminUsersSearchHint => _get('admin_users_search_hint');
   String get adminNoUsersMatch => _get('admin_no_users_match');
   String get adminBadge => _get('admin_badge');
@@ -1248,8 +1221,7 @@ class AppStrings {
   String get adminCountryRequired => _get('admin_country_required');
   String get adminDescriptionRequired => _get('admin_description_required');
   String get adminAddAtLeastOneImage => _get('admin_add_at_least_one_image');
-  String get adminFixHighlightedFields =>
-      _get('admin_fix_highlighted_fields');
+  String get adminFixHighlightedFields => _get('admin_fix_highlighted_fields');
   String adminSaveFailed(Object error) =>
       _fmt('admin_save_failed', {'error': error});
   String get adminFieldTitle => _get('admin_field_title');
@@ -1273,11 +1245,9 @@ class AppStrings {
   String get adminRegistrationOrInfoLink =>
       _get('admin_registration_or_info_link');
   String get adminFieldPhone => _get('admin_field_phone');
-  String get adminContactPhoneOptional =>
-      _get('admin_contact_phone_optional');
+  String get adminContactPhoneOptional => _get('admin_contact_phone_optional');
   String get adminFieldEmail => _get('admin_field_email');
-  String get adminContactEmailOptional =>
-      _get('admin_contact_email_optional');
+  String get adminContactEmailOptional => _get('admin_contact_email_optional');
   String get adminFieldImages => _get('admin_field_images');
   String adminFieldIsRequired(Object label) =>
       _fmt('admin_field_is_required', {'label': label});
@@ -1291,8 +1261,7 @@ class AppStrings {
       _get('admin_discuss_reports_subtitle');
   // ── Admin > Discuss posts list screen ──
   String get adminDiscussPosts => _get('admin_discuss_posts');
-  String get adminDiscussPostsSubtitle =>
-      _get('admin_discuss_posts_subtitle');
+  String get adminDiscussPostsSubtitle => _get('admin_discuss_posts_subtitle');
   String get adminDiscussSearchHint => _get('admin_discuss_search_hint');
   String get adminDiscussNoPosts => _get('admin_discuss_no_posts');
   String get adminDiscussNoPostsMatch => _get('admin_discuss_no_posts_match');
@@ -1352,16 +1321,14 @@ class AppStrings {
   String get adminProfileReports => _get('admin_profile_reports');
   String get adminProfileReportsSubtitle =>
       _get('admin_profile_reports_subtitle');
-  String get adminErrorReportsSubtitle =>
-      _get('admin_error_reports_subtitle');
+  String get adminErrorReportsSubtitle => _get('admin_error_reports_subtitle');
   String get adminClearResolvedTitle => _get('admin_clear_resolved_title');
   String adminClearResolvedBody(Object count) =>
       _fmt('admin_clear_resolved_body', {'count': count});
   String get adminResolvedReportsCleared =>
       _get('admin_resolved_reports_cleared');
   String get adminClearResolved => _get('admin_clear_resolved');
-  String adminTabOpen(Object count) =>
-      _fmt('admin_tab_open', {'count': count});
+  String adminTabOpen(Object count) => _fmt('admin_tab_open', {'count': count});
   String adminTabResolved(Object count) =>
       _fmt('admin_tab_resolved', {'count': count});
   String get adminNoPostReports => _get('admin_no_post_reports');
@@ -1463,13 +1430,11 @@ class AppStrings {
   String get adminAnnouncementHint => _get('admin_announcement_hint');
   String get adminSectionMaintenance => _get('admin_section_maintenance');
   String get adminFlagMaintenance => _get('admin_flag_maintenance');
-  String get adminSectionMinAppVersion =>
-      _get('admin_section_min_app_version');
+  String get adminSectionMinAppVersion => _get('admin_section_min_app_version');
   String get adminMinVersionHint => _get('admin_min_version_hint');
   String get adminSectionContactEmail => _get('admin_section_contact_email');
   String get adminContactEmailHint => _get('admin_contact_email_hint');
-  String get adminSectionAppStoreLinks =>
-      _get('admin_section_app_store_links');
+  String get adminSectionAppStoreLinks => _get('admin_section_app_store_links');
   String get adminAppStoreLinksDesc => _get('admin_app_store_links_desc');
   String get adminIosUrlHint => _get('admin_ios_url_hint');
   String get adminAndroidUrlHint => _get('admin_android_url_hint');
@@ -1492,8 +1457,7 @@ class AppStrings {
       _get('profile_delete_account_subtitle');
   String get profileNoBlockedUsers => _get('profile_no_blocked_users');
   String get profileBlockedUsersHint => _get('profile_blocked_users_hint');
-  String get profileDeleteAccountTitle =>
-      _get('profile_delete_account_title');
+  String get profileDeleteAccountTitle => _get('profile_delete_account_title');
   String get profileDeleteAccountBody => _get('profile_delete_account_body');
   String get profileDeleteEverything => _get('profile_delete_everything');
   String get profileDeletingAccount => _get('profile_deleting_account');
@@ -1506,8 +1470,7 @@ class AppStrings {
   String get profileNoAnswersYet => _get('profile_no_answers_yet');
   String get profileNoQuestionsAskedSubtitle =>
       _get('profile_no_questions_asked_subtitle');
-  String get profileNoAnswersSubtitle =>
-      _get('profile_no_answers_subtitle');
+  String get profileNoAnswersSubtitle => _get('profile_no_answers_subtitle');
   String get profileQuestionsAsked => _get('profile_questions_asked');
   String get profileQuestionsAnswered => _get('profile_questions_answered');
   String get profileThreadsStarted => _get('profile_threads_started');
@@ -1525,8 +1488,7 @@ class AppStrings {
       _fmt('profile_visitors_count', {'count': count});
   String get profileNoVisitsYet => _get('profile_no_visits_yet');
   String get profileNoVisitsSubtitle => _get('profile_no_visits_subtitle');
-  String profileVisited(Object time) =>
-      _fmt('profile_visited', {'time': time});
+  String profileVisited(Object time) => _fmt('profile_visited', {'time': time});
   String profileVisitedTimes(Object time, Object count) =>
       _fmt('profile_visited_times', {'time': time, 'count': count});
   String profileVisitorVisits(Object name, Object count) =>
@@ -1542,19 +1504,16 @@ class AppStrings {
   String get userReportReasonHateSpeech =>
       _get('user_report_reason_hate_speech');
   String get userReportReasonNudity => _get('user_report_reason_nudity');
-  String get userReportReasonViolence =>
-      _get('user_report_reason_violence');
+  String get userReportReasonViolence => _get('user_report_reason_violence');
   String get userReportReasonOther => _get('user_report_reason_other');
-  String get userReportDetailsOptional =>
-      _get('user_report_details_optional');
+  String get userReportDetailsOptional => _get('user_report_details_optional');
   String get userNotFound => _get('user_not_found');
   String get userUnblocked => _get('user_unblocked');
   String get userBlocked => _get('user_blocked');
   String userFailedBlockUnblock(Object error) =>
       _fmt('user_failed_block_unblock', {'error': error});
   String get userYouBlockedThisUser => _get('user_you_blocked_this_user');
-  String get userBlockedContentHidden =>
-      _get('user_blocked_content_hidden');
+  String get userBlockedContentHidden => _get('user_blocked_content_hidden');
   String userFailedUnblock(Object error) =>
       _fmt('user_failed_unblock', {'error': error});
   String get userPrivateFollowPrompt => _get('user_private_follow_prompt');
@@ -1578,8 +1537,7 @@ class AppStrings {
   String get editProfileSelectGender => _get('edit_profile_select_gender');
   String get editProfilePreferNotToSay =>
       _get('edit_profile_prefer_not_to_say');
-  String get editProfileInterestsGoals =>
-      _get('edit_profile_interests_goals');
+  String get editProfileInterestsGoals => _get('edit_profile_interests_goals');
   String get editProfileInterestsDesc => _get('edit_profile_interests_desc');
   String get requestHiddenRequests => _get('request_hidden_requests');
   String get requestHiddenRequestsSubtitle =>
@@ -1600,11 +1558,9 @@ class AppStrings {
   String get aboutOptionEngineering => _get('about_option_engineering');
   String get aboutOptionScience => _get('about_option_science');
   String get aboutOptionEducation => _get('about_option_education');
-  String get aboutOptionSocialSciences =>
-      _get('about_option_social_sciences');
+  String get aboutOptionSocialSciences => _get('about_option_social_sciences');
   String get aboutOptionOther => _get('about_option_other');
-  String get aboutOptionUndergraduate =>
-      _get('about_option_undergraduate');
+  String get aboutOptionUndergraduate => _get('about_option_undergraduate');
   String get aboutOptionMasters => _get('about_option_masters');
   String get aboutOptionPhd => _get('about_option_phd');
   String get aboutOptionFaculty => _get('about_option_faculty');
@@ -1710,8 +1666,7 @@ class AppStrings {
   String get settingsSetPasswordSubtitle =>
       _get('settings_set_password_subtitle');
   String get settingsVisitorsSeeWho => _get('settings_visitors_see_who');
-  String get settingsVisitorsViewedOne =>
-      _get('settings_visitors_viewed_one');
+  String get settingsVisitorsViewedOne => _get('settings_visitors_viewed_one');
   String settingsVisitorsViewedMany(Object count) =>
       _fmt('settings_visitors_viewed_many', {'count': count});
   String get settingsEventNotifSubtitle =>
@@ -1723,15 +1678,12 @@ class AppStrings {
   String get settingsInviteFriends => _get('settings_invite_friends');
   String get settingsInviteFriendsSubtitle =>
       _get('settings_invite_friends_subtitle');
-  String get settingsContactUsSubtitle =>
-      _get('settings_contact_us_subtitle');
+  String get settingsContactUsSubtitle => _get('settings_contact_us_subtitle');
   String get settingsManageEventsSubtitle =>
       _get('settings_manage_events_subtitle');
   String get settingsAdminPanel => _get('settings_admin_panel');
-  String get settingsPreferredLanguage =>
-      _get('settings_preferred_language');
-  String get settingsBlockedUsersTitle =>
-      _get('settings_blocked_users_title');
+  String get settingsPreferredLanguage => _get('settings_preferred_language');
+  String get settingsBlockedUsersTitle => _get('settings_blocked_users_title');
   String get settingsBlockedUsersHint => _get('settings_blocked_users_hint');
   String get settingsCannotChangeEmailTitle =>
       _get('settings_cannot_change_email_title');
@@ -1743,15 +1695,13 @@ class AppStrings {
       _get('settings_set_password_dialog_body');
   String get settingsNewPassword => _get('settings_new_password');
   String get settingsConfirmPassword => _get('settings_confirm_password');
-  String get settingsAllFieldsRequired =>
-      _get('settings_all_fields_required');
+  String get settingsAllFieldsRequired => _get('settings_all_fields_required');
   String get settingsPasswordMin6 => _get('settings_password_min_6');
   String get settingsPasswordsDoNotMatch =>
       _get('settings_passwords_do_not_match');
   String get settingsPasswordSetSuccess =>
       _get('settings_password_set_success');
-  String get settingsSetPasswordButton =>
-      _get('settings_set_password_button');
+  String get settingsSetPasswordButton => _get('settings_set_password_button');
   String get settingsPasswordTooWeak => _get('settings_password_too_weak');
   String get settingsPasswordAlreadyLinked =>
       _get('settings_password_already_linked');
@@ -1767,12 +1717,10 @@ class AppStrings {
   String get settingsCurrentPassword => _get('settings_current_password');
   String get settingsNoEmailAccount => _get('settings_no_email_account');
   String get settingsEmailMustDiffer => _get('settings_email_must_differ');
-  String get settingsIncorrectPassword =>
-      _get('settings_incorrect_password');
+  String get settingsIncorrectPassword => _get('settings_incorrect_password');
   String get settingsSecurityReloginShort =>
       _get('settings_security_relogin_short');
-  String get settingsEmailAlreadyInUse =>
-      _get('settings_email_already_in_use');
+  String get settingsEmailAlreadyInUse => _get('settings_email_already_in_use');
   String get settingsEmailInvalid => _get('settings_email_invalid');
   String get settingsTooManyRequests => _get('settings_too_many_requests');
   String get settingsNetworkError => _get('settings_network_error');
@@ -1786,10 +1734,8 @@ class AppStrings {
       _get('settings_new_password_too_weak');
   String settingsResetEmailSent(Object email) =>
       _fmt('settings_reset_email_sent', {'email': email});
-  String get settingsEmailInvalidYours =>
-      _get('settings_email_invalid_yours');
-  String get settingsCouldNotSendReset =>
-      _get('settings_could_not_send_reset');
+  String get settingsEmailInvalidYours => _get('settings_email_invalid_yours');
+  String get settingsCouldNotSendReset => _get('settings_could_not_send_reset');
 
   // ── MERGE WITH DEMO (added) ──
   String get adminStatusRevoked => _get('admin_status_revoked');

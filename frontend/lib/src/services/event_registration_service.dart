@@ -144,28 +144,12 @@ class EventRegistrationService {
         );
   }
 
-  /// Approve a registration: marks it approved, adds the user to the event
-  /// chat's members subcollection, creates the event chat doc if missing,
-  /// and notifies the user in-app.
+  /// Approve a registration: marks it approved and notifies the user in-app.
   Future<void> approve(EventRegistration reg) async {
     final admin = _auth.currentUser;
     if (admin == null) throw Exception('Not signed in');
 
-    final chatRef = _db.collection('eventChats').doc(reg.eventId);
-    final memberRef = chatRef.collection('members').doc(reg.userUid);
-
     final batch = _db.batch();
-    batch.set(chatRef, {
-      'eventId': reg.eventId,
-      'eventTitle': reg.eventTitle,
-      'adminUid': admin.uid,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    batch.set(memberRef, {
-      'uid': reg.userUid,
-      'name': reg.name,
-      'joinedAt': FieldValue.serverTimestamp(),
-    });
     batch.update(_col.doc(reg.id), {
       'status': 'approved',
       'reviewedAt': FieldValue.serverTimestamp(),

@@ -232,7 +232,8 @@ const Map<String, String> enStrings = {
   'contact_type_label': 'Type',
   'contact_message_label': 'Message',
   'contact_how_can_we_help': 'How can we help?',
-  'contact_org_hint': 'Tell us about your event plans, what you manage, why you want to post events, any links.',
+  'contact_org_hint':
+      'Tell us about your event plans, what you manage, why you want to post events, any links.',
   'contact_send_request': 'Send request',
   'contact_please_write_message': 'Please write a message.',
   'contact_not_signed_in': 'Not signed in.',
@@ -245,8 +246,10 @@ const Map<String, String> enStrings = {
   'contact_reply_to_user': 'Reply to user…',
   'contact_reply_type_reply': 'Type a reply…',
   'contact_reply_org_hint': 'Tell Iter Team about your event plans…',
-  'contact_empty_message': 'Start the conversation with Iter Team. Your replies will stay in this one chat.',
-  'contact_empty_org_message': 'Tell Iter Team why you should be approved as an event manager and what events you want to post.',
+  'contact_empty_message':
+      'Start the conversation with Iter Team. Your replies will stay in this one chat.',
+  'contact_empty_org_message':
+      'Tell Iter Team why you should be approved as an event manager and what events you want to post.',
   'contact_iter_support': 'Iter support',
   'contact_yesterday': 'Yesterday',
   'contact_error_prefix': 'Error: {error}',
@@ -255,14 +258,17 @@ const Map<String, String> enStrings = {
   'contact_generic_failed': 'Failed: {error}',
   'contact_revoke_org_title': 'Revoke event manager access?',
   'contact_grant_org_title': 'Grant event manager access?',
-  'contact_revoke_org_body': 'This will remove event posting permissions and set role to user.',
-  'contact_grant_org_body': 'This will grant event posting permissions by making this user an event manager.',
+  'contact_revoke_org_body':
+      'This will remove event posting permissions and set role to user.',
+  'contact_grant_org_body':
+      'This will grant event posting permissions by making this user an event manager.',
   'contact_revoke': 'Revoke',
   'contact_grant': 'Grant',
   'contact_org_revoked': 'Event manager access revoked.',
   'contact_org_approved': 'Event manager approved.',
   'contact_delete_user_title': 'Delete user permanently?',
-  'contact_delete_user_body': 'This will delete ALL user data: posts, comments, stories, chats, followers, and notifications. Their email will be blacklisted.\n\nThis cannot be undone.',
+  'contact_delete_user_body':
+      'This will delete ALL user data: posts, comments, stories, chats, followers, and notifications. Their email will be blacklisted.\n\nThis cannot be undone.',
   'contact_delete_everything': 'Delete everything',
   'contact_deleting_all': 'Deleting all user data...',
   'contact_user_deleted': 'User deleted and blacklisted',
@@ -303,9 +309,11 @@ const Map<String, String> enStrings = {
       "Couldn't recognize speech. Make sure the source language matches what you're saying.",
   'translate_stt_no_speech':
       'No speech detected. Try again and speak closer to the mic.',
-  'translate_stt_audio': 'Mic audio error. Close other apps using the mic and retry.',
+  'translate_stt_audio':
+      'Mic audio error. Close other apps using the mic and retry.',
   'translate_stt_network': 'Network error. Speech recognition needs internet.',
-  'translate_stt_permission': 'Mic permission denied. Enable it in device settings.',
+  'translate_stt_permission':
+      'Mic permission denied. Enable it in device settings.',
   'translate_stt_generic': 'Mic error: {code}',
 
   // ── Admin ─────────────────────────────────────────────────────
@@ -532,6 +540,7 @@ const Map<String, String> enStrings = {
   'post_card_could_not_save': 'Could not save post: {error}',
   'post_card_repost_removed': 'Repost removed',
   'post_card_reposted_to_profile': 'Reposted to your profile',
+  'post_card_reposted_by': 'Reposted by',
   'post_card_could_not_repost': 'Could not repost: {error}',
   'post_card_send_to': 'Send to',
   'post_card_send': 'Send',
@@ -738,7 +747,8 @@ const Map<String, String> enStrings = {
   'story_failed_publish': 'Failed to publish story: {error}',
   'story_publish': 'Publish',
   'text_story_hint': 'Type something…',
-  'video_story_too_long': 'Video is too long. Stories support up to 30 seconds.',
+  'video_story_too_long':
+      'Video is too long. Stories support up to 30 seconds.',
   'video_story_too_large':
       'This clip is {size}MB. Stories can upload videos up to 30MB. Choose a shorter cut or compress the video first.',
   'video_story_preparing': 'Preparing video…',
@@ -830,8 +840,7 @@ const Map<String, String> enStrings = {
   'events_try_different_keyword': 'Try a different keyword or filter.',
   'events_no_events_matching': 'No events matching "{query}"',
   'events_no_events_in_city': 'No events in {city}',
-  'events_new_events_appear_here':
-      'New events will appear here when posted.',
+  'events_new_events_appear_here': 'New events will appear here when posted.',
   'events_try_different_keyword_location':
       'Try a different keyword or location.',
   'events_want_host_event': 'Want to host your own event?',
@@ -898,8 +907,7 @@ const Map<String, String> enStrings = {
   'event_notif_new_event_subtitle':
       'Get a push when a new event matching your filters is published.',
   'event_notif_event_types': 'Event types',
-  'event_notif_all_types_desc':
-      "You'll be notified about every type of event.",
+  'event_notif_all_types_desc': "You'll be notified about every type of event.",
   'event_notif_custom_types_desc':
       'Only the types you picked. Tap "All types" to reset.',
   'event_notif_all_types': 'All types',
@@ -965,8 +973,7 @@ const Map<String, String> enStrings = {
   'event_reg_too_short': 'Too short',
   'event_reg_submit_request': 'Submit request',
   'event_unavailable_title': 'Event not available',
-  'event_unavailable_body':
-      'This event was deleted or is no longer available.',
+  'event_unavailable_body': 'This event was deleted or is no longer available.',
   'event_unavailable_go_back': 'Go back',
   'create_group_failed': 'Failed: {error}',
   'create_group_new_group': 'New group',
@@ -1264,8 +1271,7 @@ const Map<String, String> enStrings = {
   'profile_no_answers_yet': 'No replies yet',
   'profile_no_questions_asked_subtitle':
       'Questions and discussions you start will appear here.',
-  'profile_no_answers_subtitle':
-      'Threads you reply to will appear here.',
+  'profile_no_answers_subtitle': 'Threads you reply to will appear here.',
   'profile_questions_asked': 'Threads Started',
   'profile_questions_answered': 'Replies',
   'profile_threads_started': 'Threads Started',
@@ -1274,8 +1280,7 @@ const Map<String, String> enStrings = {
   'profile_no_replies_yet': 'No replies yet',
   'profile_no_threads_started_subtitle':
       'Questions and discussions you start will appear here.',
-  'profile_no_replies_subtitle':
-      'Threads you reply to will appear here.',
+  'profile_no_replies_subtitle': 'Threads you reply to will appear here.',
   'profile_invite_friends': 'Invite friends',
   'profile_create_first_post': 'Create your first post',
   'profile_share_your_content': 'Share your content',
@@ -1307,8 +1312,7 @@ const Map<String, String> enStrings = {
       'Their posts, reposts and saved items are hidden, and they can\'t '
           'message you.',
   'user_failed_unblock': 'Failed to unblock: {error}',
-  'user_private_follow_prompt':
-      'Follow this account to see their contents.',
+  'user_private_follow_prompt': 'Follow this account to see their contents.',
   'edit_profile_upload_failed': 'Upload failed: {error}',
   'edit_profile_cover_upload_failed': 'Cover upload failed: {error}',
   'edit_profile_username_empty': 'Username can\'t be empty',
@@ -1453,7 +1457,8 @@ const Map<String, String> enStrings = {
 
   // ── VERSION GATE (added) ──
   'update_required_title': 'Update required',
-  'update_required_body': 'Please update to version {required} or newer to continue. You are on version {current}.',
+  'update_required_body':
+      'Please update to version {required} or newer to continue. You are on version {current}.',
 
   // ── FEED SEARCH (added) ──
   'home_search_posts': 'Search posts by caption...',
@@ -1465,7 +1470,7 @@ const Map<String, String> enStrings = {
   'post_card_discuss_created': 'Posted to Discuss',
   'post_card_discuss_failed': 'Could not create Discuss topic: {error}',
 
-    'qa_view_original_post': 'View original post',
+  'qa_view_original_post': 'View original post',
 
   // ── ADD POST TO STORY (added) ──
   'post_card_add_to_story': 'Add to your story',
@@ -1473,7 +1478,7 @@ const Map<String, String> enStrings = {
   'post_card_added_to_story': 'Added to your story',
   'post_card_story_failed': 'Could not add to story: {error}',
 
-    'story_tap_to_view_post': 'Tap to view post',
+  'story_tap_to_view_post': 'Tap to view post',
 
   // ── TRAVEL LOCATION BANNER (added) ──
   'travel_location_off_banner': 'Turn on location to see posts near you.',
@@ -1494,9 +1499,11 @@ const Map<String, String> enStrings = {
   'admin_search_by_username_or_caption': 'Search by username or caption',
   'admin_no_posts_match': 'No posts match your search',
   'create_post_blocked_title': 'Post blocked',
-  'create_post_blocked_body': 'This post cannot be published because its caption or place fields contain blocked words.',
+  'create_post_blocked_body':
+      'This post cannot be published because its caption or place fields contain blocked words.',
   'events_no_one_in_field': 'No one in this field has joined yet.',
-  'events_no_one_at_academic_level': 'No one at this academic level has joined yet.',
+  'events_no_one_at_academic_level':
+      'No one at this academic level has joined yet.',
   'events_filter_field': 'Field',
   'events_filter_level': 'Level',
   'events_no_matching_people': 'No matching people',

@@ -75,77 +75,98 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
         body: AppPageBackground(
           child: Column(
             children: [
-            // One shared search field above the tabs so the query persists
-            // and applies to whichever tab is active.
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: AppGlassCard(
-                radius: 16,
-                padding: EdgeInsets.zero,
-                child: TextField(
-                  onChanged: (v) => setState(() => _query = v),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: context.t.adminUsersSearchHint,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
+              // One shared search field above the tabs so the query persists
+              // and applies to whichever tab is active.
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      inputDecorationTheme: const InputDecorationTheme(
+                        filled: false,
+                        fillColor: Colors.transparent,
+                      ),
+                    ),
+                    child: TextField(
+                      onChanged: (v) => setState(() => _query = v),
+                      textAlignVertical: TextAlignVertical.center,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search),
+                        prefixIconConstraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 48),
+                        hintText: context.t.adminUsersSearchHint,
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-            Expanded(
-              child: usersAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text(context.t.errorWithMessage(e))),
-                data: (users) {
-                  final b = _bucket(users);
-                  return Column(
-                    children: [
-                      // Scrollable so longer translated labels (Arabic /
-                      // Kurdish) don't crowd or clip on small screens.
-                      Material(
-                        color: Colors.transparent,
-                        child: TabBar(
-                          isScrollable: true,
-                          labelColor: AppColors.purple,
-                          unselectedLabelColor: context.textSecondary,
-                          indicatorColor: AppColors.purple,
-                          tabs: [
-                            Tab(text: context.t.adminUsersTabAll(b.all.length)),
-                            Tab(
-                                text: context.t
-                                    .adminUsersTabAdmins(b.admins.length)),
-                            Tab(
-                                text: context.t.adminUsersTabEventManagers(
-                                    b.eventManagers.length)),
-                            Tab(
-                                text: context.t
-                                    .adminUsersTabRegular(b.regular.length)),
-                            Tab(
-                                text: context.t.adminUsersTabSuspended(
-                                    b.suspended.length)),
-                          ],
+              Expanded(
+                child: usersAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      Center(child: Text(context.t.errorWithMessage(e))),
+                  data: (users) {
+                    final b = _bucket(users);
+                    return Column(
+                      children: [
+                        // Scrollable so longer translated labels (Arabic /
+                        // Kurdish) don't crowd or clip on small screens.
+                        Material(
+                          color: Colors.transparent,
+                          child: TabBar(
+                            isScrollable: true,
+                            labelColor: AppColors.purple,
+                            unselectedLabelColor: context.textSecondary,
+                            indicatorColor: AppColors.purple,
+                            dividerColor: Colors.transparent,
+                            dividerHeight: 0,
+                            tabs: [
+                              Tab(
+                                  text:
+                                      context.t.adminUsersTabAll(b.all.length)),
+                              Tab(
+                                  text: context.t
+                                      .adminUsersTabAdmins(b.admins.length)),
+                              Tab(
+                                  text: context.t.adminUsersTabEventManagers(
+                                      b.eventManagers.length)),
+                              Tab(
+                                  text: context.t
+                                      .adminUsersTabRegular(b.regular.length)),
+                              Tab(
+                                  text: context.t.adminUsersTabSuspended(
+                                      b.suspended.length)),
+                            ],
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            _UsersList(users: b.all),
-                            _UsersList(users: b.admins),
-                            _UsersList(users: b.eventManagers),
-                            _UsersList(users: b.regular),
-                            _UsersList(users: b.suspended),
-                          ],
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _UsersList(users: b.all),
+                              _UsersList(users: b.admins),
+                              _UsersList(users: b.eventManagers),
+                              _UsersList(users: b.regular),
+                              _UsersList(users: b.suspended),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
             ],
           ),
         ),
@@ -173,14 +194,12 @@ class _UsersList extends StatelessWidget {
         final aRole = (a['role'] as String? ?? 'user');
         final bRole = (b['role'] as String? ?? 'user');
         if (aRole == bRole) {
-          final aName = (a['username'] as String? ??
-                  a['email'] as String? ??
-                  '')
-              .toLowerCase();
-          final bName = (b['username'] as String? ??
-                  b['email'] as String? ??
-                  '')
-              .toLowerCase();
+          final aName =
+              (a['username'] as String? ?? a['email'] as String? ?? '')
+                  .toLowerCase();
+          final bName =
+              (b['username'] as String? ?? b['email'] as String? ?? '')
+                  .toLowerCase();
           return aName.compareTo(bName);
         }
         if (aRole == 'admin') return -1;
@@ -189,8 +208,9 @@ class _UsersList extends StatelessWidget {
         if (bRole == 'org_admin') return 1;
         return 0;
       });
+    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom + 28;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPadding),
       itemCount: sorted.length,
       itemBuilder: (_, i) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -310,8 +330,9 @@ class _UserTile extends ConsumerWidget {
               ),
             PopupMenuItem(
               value: 'suspend',
-              child: Text(
-                  suspended ? context.t.adminUnsuspend : context.t.adminSuspend),
+              child: Text(suspended
+                  ? context.t.adminUnsuspend
+                  : context.t.adminSuspend),
             ),
             PopupMenuItem(
               value: 'delete',
@@ -395,8 +416,8 @@ class _UserTile extends ConsumerWidget {
       // ignore: avoid_print
       print('[admin] action=$action failed: $e\n$st');
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     }
   }

@@ -196,24 +196,39 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
                         child: AppGlassCard(
                           radius: 16,
                           padding: EdgeInsets.zero,
-                          child: TextField(
-                            controller: _searchCtrl,
-                            textInputAction: TextInputAction.search,
-                            decoration: InputDecoration(
-                              hintText: context.t.adminEventsSearchHint,
-                              prefixIcon: const Icon(Icons.search, size: 20),
-                              suffixIcon: _searchCtrl.text.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      tooltip: context.t.clear,
-                                      icon: const Icon(Icons.close, size: 18),
-                                      onPressed: () => _searchCtrl.clear(),
-                                    ),
-                              contentPadding:
-                                  const EdgeInsets.symmetric(vertical: 0),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              inputDecorationTheme: const InputDecorationTheme(
+                                filled: false,
+                                fillColor: Colors.transparent,
+                              ),
+                            ),
+                            child: TextField(
+                              controller: _searchCtrl,
+                              textInputAction: TextInputAction.search,
+                              textAlignVertical: TextAlignVertical.center,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                hintText: context.t.adminEventsSearchHint,
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                prefixIconConstraints: const BoxConstraints(
+                                    minWidth: 48, minHeight: 48),
+                                suffixIcon: _searchCtrl.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        tooltip: context.t.clear,
+                                        icon: const Icon(Icons.close, size: 18),
+                                        onPressed: () => _searchCtrl.clear(),
+                                      ),
+                                filled: false,
+                                fillColor: Colors.transparent,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                              ),
                             ),
                           ),
                         ),
@@ -1145,37 +1160,52 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: AppGlassCard(
-        radius: 12,
-        child: TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          textInputAction: textInputAction,
-          onChanged: onChanged,
-          inputFormatters: [
-            if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
-          ],
-          style: TextStyle(fontSize: 15, color: context.textPrimary),
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: hint ?? label,
-            filled: true,
-            fillColor: Colors.transparent,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+      child: FormField<String>(
+        initialValue: controller.text,
+        validator: (value) {
+          if (errorText != null) return errorText;
+          if (required && (value == null || value.trim().isEmpty)) {
+            return context.t.adminFieldIsRequired(label);
+          }
+          return null;
+        },
+        builder: (field) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppGlassCard(
+              radius: 12,
+              borderAlpha: field.hasError ? 0.7 : null,
+              child: TextField(
+                controller: controller,
+                maxLines: maxLines,
+                keyboardType: keyboardType,
+                textInputAction: textInputAction,
+                onChanged: (value) {
+                  field.didChange(value);
+                  onChanged?.call(value);
+                },
+                inputFormatters: [
+                  if (maxLength != null)
+                    LengthLimitingTextInputFormatter(maxLength),
+                ],
+                style: TextStyle(fontSize: 15, color: context.textPrimary),
+                decoration: InputDecoration(
+                  labelText: label,
+                  hintText: hint ?? label,
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  counterText: maxLength != null ? '' : null,
+                ),
+              ),
             ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            errorText: errorText,
-            counterText: maxLength != null ? '' : null,
-          ),
-          validator: required
-              ? (v) => (v == null || v.trim().isEmpty)
-                  ? context.t.adminFieldIsRequired(label)
-                  : null
-              : null,
+            if (field.hasError) _FieldError(text: field.errorText!),
+          ],
         ),
       ),
     );

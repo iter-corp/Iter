@@ -228,7 +228,8 @@ const Map<String, String> arStrings = {
   'contact_type_label': 'النوع',
   'contact_message_label': 'الرسالة',
   'contact_how_can_we_help': 'كيف يمكننا المساعدة؟',
-  'contact_org_hint': 'أخبرنا عن خطط فعالياتك وما تديره ولماذا تريد نشر فعاليات وأي روابط.',
+  'contact_org_hint':
+      'أخبرنا عن خطط فعالياتك وما تديره ولماذا تريد نشر فعاليات وأي روابط.',
   'contact_send_request': 'إرسال الطلب',
   'contact_please_write_message': 'يرجى كتابة رسالة.',
   'contact_not_signed_in': 'غير مسجل الدخول.',
@@ -241,8 +242,10 @@ const Map<String, String> arStrings = {
   'contact_reply_to_user': 'الرد على المستخدم…',
   'contact_reply_type_reply': 'اكتب رداً…',
   'contact_reply_org_hint': 'أخبر فريق Iter عن خطط فعالياتك…',
-  'contact_empty_message': 'ابدأ المحادثة مع فريق Iter. ستبقى ردودك في هذه المحادثة.',
-  'contact_empty_org_message': 'أخبر فريق Iter لماذا يجب أن تتم الموافقة عليك كمدير فعاليات وما الفعاليات التي تريد نشرها.',
+  'contact_empty_message':
+      'ابدأ المحادثة مع فريق Iter. ستبقى ردودك في هذه المحادثة.',
+  'contact_empty_org_message':
+      'أخبر فريق Iter لماذا يجب أن تتم الموافقة عليك كمدير فعاليات وما الفعاليات التي تريد نشرها.',
   'contact_iter_support': 'دعم Iter',
   'contact_yesterday': 'أمس',
   'contact_error_prefix': 'خطأ: {error}',
@@ -251,14 +254,17 @@ const Map<String, String> arStrings = {
   'contact_generic_failed': 'فشل: {error}',
   'contact_revoke_org_title': 'إلغاء صلاحية مدير الفعاليات؟',
   'contact_grant_org_title': 'منح صلاحية مدير الفعاليات؟',
-  'contact_revoke_org_body': 'سيؤدي ذلك إلى إزالة صلاحيات نشر الفعاليات وتعيين الدور إلى مستخدم.',
-  'contact_grant_org_body': 'سيؤدي ذلك إلى منح صلاحيات نشر الفعاليات بجعل هذا المستخدم مدير فعاليات.',
+  'contact_revoke_org_body':
+      'سيؤدي ذلك إلى إزالة صلاحيات نشر الفعاليات وتعيين الدور إلى مستخدم.',
+  'contact_grant_org_body':
+      'سيؤدي ذلك إلى منح صلاحيات نشر الفعاليات بجعل هذا المستخدم مدير فعاليات.',
   'contact_revoke': 'إلغاء',
   'contact_grant': 'منح',
   'contact_org_revoked': 'تم إلغاء صلاحية مدير الفعاليات.',
   'contact_org_approved': 'تمت الموافقة على مدير الفعاليات.',
   'contact_delete_user_title': 'حذف المستخدم نهائياً؟',
-  'contact_delete_user_body': 'سيؤدي ذلك إلى حذف جميع بيانات المستخدم: المنشورات، التعليقات، القصص، المحادثات، المتابعين، والإشعارات. سيتم إدراج بريده الإلكتروني في القائمة السوداء.\n\nلا يمكن التراجع عن هذا.',
+  'contact_delete_user_body':
+      'سيؤدي ذلك إلى حذف جميع بيانات المستخدم: المنشورات، التعليقات، القصص، المحادثات، المتابعين، والإشعارات. سيتم إدراج بريده الإلكتروني في القائمة السوداء.\n\nلا يمكن التراجع عن هذا.',
   'contact_delete_everything': 'حذف كل شيء',
   'contact_deleting_all': 'جاري حذف جميع بيانات المستخدم...',
   'contact_user_deleted': 'تم حذف المستخدم وإدراجه في القائمة السوداء',
@@ -334,17 +340,19 @@ const Map<String, String> arStrings = {
   'login_min_6_chars': '٦ أحرف كحد أدنى',
   'login_or': 'أو',
   'login_signing_in': 'جاري تسجيل الدخول...',
-  'signup_subtitle': 'يرجى إدخال الرمز الذي أرسلناه للتو\nإلى البريد الإلكتروني',
+  'signup_subtitle':
+      'يرجى إدخال الرمز الذي أرسلناه للتو\nإلى البريد الإلكتروني',
   'signup_enter_username': 'أدخل اسم مستخدم',
   'signup_enter_valid_email': 'أدخل بريداً إلكترونياً صالحاً',
   'signup_enter_password': 'أدخل كلمة المرور',
   'signup_password_min_length': 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل',
-  'signup_password_letter_number':
-      'يجب أن تحتوي كلمة المرور على حرف ورقم',
+  'signup_password_letter_number': 'يجب أن تحتوي كلمة المرور على حرف ورقم',
   'signup_sign_in_with_facebook': 'تسجيل الدخول باستخدام فيسبوك',
-  'forgot_password_subtitle': "لا تقلق! أدخل البريد الإلكتروني المرتبط\nبحسابك وسنرسل لك رابط إعادة التعيين.",
+  'forgot_password_subtitle':
+      "لا تقلق! أدخل البريد الإلكتروني المرتبط\nبحسابك وسنرسل لك رابط إعادة التعيين.",
   'forgot_password_email_sent': 'تم إرسال البريد الإلكتروني!',
-  'forgot_password_check_inbox': 'تحقق من صندوق الوارد للحصول على رابط إعادة تعيين كلمة المرور.\nتحقق أيضاً من مجلد البريد العشوائي.',
+  'forgot_password_check_inbox':
+      'تحقق من صندوق الوارد للحصول على رابط إعادة تعيين كلمة المرور.\nتحقق أيضاً من مجلد البريد العشوائي.',
   'forgot_password_back_to_login': 'العودة إلى تسجيل الدخول',
   'forgot_password_email_address': 'عنوان البريد الإلكتروني',
   'forgot_password_enter_email': 'أدخل عنوان بريدك الإلكتروني',
@@ -368,10 +376,12 @@ const Map<String, String> arStrings = {
   'onboarding_name_required': 'يرجى إدخال اسمك',
   'onboarding_about_you': 'نبذة عنك',
   'onboarding_optional': 'اختياري',
-  'onboarding_about_you_desc': 'يساعدنا في عرض الفعاليات والمنح والأشخاص الذين يتناسبون مع اهتماماتك. يمكنك التخطي وإضافة هذا لاحقاً.',
+  'onboarding_about_you_desc':
+      'يساعدنا في عرض الفعاليات والمنح والأشخاص الذين يتناسبون مع اهتماماتك. يمكنك التخطي وإضافة هذا لاحقاً.',
   'onboarding_where_are_you': 'أين أنت؟',
   'onboarding_gps_set': 'تم تحديد الموقع',
-  'onboarding_location_desc': 'يتيح لعلامة التبويب التواصل إظهار الأشخاص القريبين منك. اختياري — يمكنك التخطي وإدخال مدينتك فقط.',
+  'onboarding_location_desc':
+      'يتيح لعلامة التبويب التواصل إظهار الأشخاص القريبين منك. اختياري — يمكنك التخطي وإدخال مدينتك فقط.',
   'onboarding_update_location': 'تحديث الموقع',
   'onboarding_use_my_location': 'استخدام موقعي',
   'onboarding_city': 'المدينة',
@@ -412,7 +422,8 @@ const Map<String, String> arStrings = {
   'home_feed_prompt_title': 'لديك شيء تشاركه؟ انشره',
   'home_feed_prompt_subtitle': 'شارك التحديثات والصور واللحظات مع متابعيك.',
   'home_travel_prompt_title': 'مسافر إلى مكان ما؟ انشر من هناك',
-  'home_travel_prompt_subtitle': 'شارك اللحظات القائمة على الموقع ليتمكن الآخرون من اكتشافها.',
+  'home_travel_prompt_subtitle':
+      'شارك اللحظات القائمة على الموقع ليتمكن الآخرون من اكتشافها.',
   'home_search_questions_users': 'ابحث عن أسئلة أو مستخدمين...',
   'home_clear_search': 'مسح البحث',
   'home_ask_community': 'اسأل المجتمع',
@@ -421,12 +432,16 @@ const Map<String, String> arStrings = {
   'home_add_more_context': 'أضف المزيد من السياق (اختياري)...',
   'home_post_question': 'نشر السؤال',
   'home_search_place': 'ابحث عن مكان',
-  'home_location_services_off': 'خدمات الموقع قيد الإيقاف. قم بتشغيلها ليتمكن وضع السفر من إظهار المنشورات القريبة.',
+  'home_location_services_off':
+      'خدمات الموقع قيد الإيقاف. قم بتشغيلها ليتمكن وضع السفر من إظهار المنشورات القريبة.',
   'home_open_settings': 'افتح الإعدادات',
-  'home_location_permission_denied_travel': 'تم رفض إذن الموقع. يعمل وضع السفر بشكل أفضل مع موقعك.',
-  'home_location_permission_blocked': 'إذن الموقع محظور. قم بتمكينه في إعدادات التطبيق لاستخدام وضع السفر.',
+  'home_location_permission_denied_travel':
+      'تم رفض إذن الموقع. يعمل وضع السفر بشكل أفضل مع موقعك.',
+  'home_location_permission_blocked':
+      'إذن الموقع محظور. قم بتمكينه في إعدادات التطبيق لاستخدام وضع السفر.',
   'home_app_settings': 'إعدادات التطبيق',
-  'home_couldnt_get_location': "تعذر الحصول على موقعك. لا يزال بإمكانك البحث عن مكان يدوياً.",
+  'home_couldnt_get_location':
+      "تعذر الحصول على موقعك. لا يزال بإمكانك البحث عن مكان يدوياً.",
   'home_maintenance_mode': 'وضع الصيانة — قد تكون بعض الميزات غير متاحة.',
   'home_all_places': 'جميع الأماكن',
   'home_nearby': 'قريب',
@@ -475,19 +490,22 @@ const Map<String, String> arStrings = {
   'create_post_take_a_photo': 'التقاط صورة',
   'create_post_video_from_gallery': 'فيديو من المعرض',
   'create_post_record_a_video': 'تسجيل فيديو',
-  'create_post_video_size_limit': 'يجب أن تكون مقاطع الفيديو 30 ميجابايت أو أقل.',
+  'create_post_video_size_limit':
+      'يجب أن تكون مقاطع الفيديو 30 ميجابايت أو أقل.',
   'create_post_followers_only': 'للمتابعين فقط',
   'create_post_public': 'عام',
   'create_post_current_location': 'الموقع الحالي',
   'create_post_you': 'أنت',
-  'create_post_location_services_off': 'خدمات الموقع قيد الإيقاف. قم بتمكينها في إعدادات الجهاز.',
+  'create_post_location_services_off':
+      'خدمات الموقع قيد الإيقاف. قم بتمكينها في إعدادات الجهاز.',
   'create_post_location_permission_denied': 'تم رفض إذن الموقع.',
   'create_post_type_place_first': 'اكتب اسم المكان أو المدينة أولاً',
   'create_post_no_coordinates': 'لم يتم العثور على إحداثيات لـ "{query}"',
   'create_post_lookup_failed': 'فشل البحث: {error}',
   'create_post_add_caption_image_video': 'أضف تسمية توضيحية أو صورة أو فيديو',
   'create_post_could_not_read_video': 'تعذر قراءة الفيديو المحدد.',
-  'create_post_video_too_large': 'الفيديو كبير جداً ({size} ميجابايت). الحد الأقصى هو 30 ميجابايت — اختر مقطعاً أقصر أو اضغطه أولاً.',
+  'create_post_video_too_large':
+      'الفيديو كبير جداً ({size} ميجابايت). الحد الأقصى هو 30 ميجابايت — اختر مقطعاً أقصر أو اضغطه أولاً.',
   'create_post_published_with_content': 'تم نشر المنشور — تم رفع المحتوى',
   'create_post_published': 'تم نشر المنشور',
   'create_post_could_not_publish': 'تعذر نشر المنشور: {error}',
@@ -496,6 +514,7 @@ const Map<String, String> arStrings = {
   'post_card_could_not_save': 'تعذر حفظ المنشور: {error}',
   'post_card_repost_removed': 'تمت إزالة إعادة النشر',
   'post_card_reposted_to_profile': 'تمت إعادة النشر في ملفك الشخصي',
+  'post_card_reposted_by': 'أعادوا النشر',
   'post_card_could_not_repost': 'تعذر إعادة النشر: {error}',
   'post_card_send_to': 'إرسال إلى',
   'post_card_send': 'إرسال',
@@ -526,7 +545,8 @@ const Map<String, String> arStrings = {
   'file_subtitle': 'PDF، مستند، أرشيف، …',
   'location_label': 'الموقع',
   'location_subtitle': 'شارك موقعك الحالي',
-  'location_services_off': 'خدمات الموقع قيد الإيقاف. قم بتمكينها في إعدادات الجهاز.',
+  'location_services_off':
+      'خدمات الموقع قيد الإيقاف. قم بتمكينها في إعدادات الجهاز.',
   'location_perm_denied': 'تم رفض إذن الموقع.',
   'location_shared': 'تمت مشاركة الموقع',
   'could_not_share_location': 'تعذر مشاركة الموقع: {error}',
@@ -538,10 +558,12 @@ const Map<String, String> arStrings = {
   'failed_to_record_voice': 'فشل تسجيل الرسالة الصوتية',
   'recording_file_not_found': 'ملف التسجيل غير موجود',
   'voice_recording_empty': 'التسجيل الصوتي فارغ',
-  'voice_message_too_short': 'الرسالة الصوتية قصيرة جداً (الحد الأدنى 300 مللي ثانية)',
+  'voice_message_too_short':
+      'الرسالة الصوتية قصيرة جداً (الحد الأدنى 300 مللي ثانية)',
   'failed_upload_voice_empty': 'فشل رفع الرسالة الصوتية - رابط فارغ',
   'voice_upload_failed': 'فشل رفع الصوت: {error}',
-  'translation_auto_description': 'ترجمة رسائل الشخص الآخر تلقائياً إلى لغتك المفضلة. يمكنك دائماً النقر على أي رسالة لرؤية النص الأصلي.',
+  'translation_auto_description':
+      'ترجمة رسائل الشخص الآخر تلقائياً إلى لغتك المفضلة. يمكنك دائماً النقر على أي رسالة لرؤية النص الأصلي.',
   'auto_translate_incoming': 'الترجمة التلقائية للرسائل الواردة',
   'translate_into': 'ترجم إلى',
   'auto_translate_on_tooltip': 'الترجمة التلقائية مفعلة ({lang})',
@@ -552,7 +574,8 @@ const Map<String, String> arStrings = {
   'auto_delete_messages': 'الحذف التلقائي للرسائل',
   'members_count': '{count} أعضاء',
   'say_hello': 'قل مرحباً!',
-  'youve_blocked_user': 'لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر من ملفه الشخصي لإرسال رسائل.',
+  'youve_blocked_user':
+      'لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر من ملفه الشخصي لإرسال رسائل.',
   'cant_reply_conversation': 'لا يمكنك الرد على هذه المحادثة.',
   'attach': 'إرفاق',
   'write_a_message': 'اكتب رسالة',
@@ -560,12 +583,14 @@ const Map<String, String> arStrings = {
   'auto_delete_one_day': 'يوم واحد',
   'auto_delete_one_week': 'أسبوع واحد',
   'auto_delete_one_month': 'شهر واحد',
-  'auto_delete_period_description': 'تتم إزالة الرسائل الأقدم من الفترة المختارة. تبقى المحادثة نفسها في صندوق الوارد الخاص بك.',
+  'auto_delete_period_description':
+      'تتم إزالة الرسائل الأقدم من الفترة المختارة. تبقى المحادثة نفسها في صندوق الوارد الخاص بك.',
   'auto_delete_turned_off': 'تم إيقاف الحذف التلقائي',
   'auto_delete_set': 'الحذف التلقائي: الرسائل الأقدم من {period}',
   'failed_with_error': 'فشل: {error}',
   'delete_chat_question': 'حذف المحادثة؟',
-  'delete_chat_body': 'سيؤدي هذا إلى إزالة كل رسالة في هذه المحادثة بشكل دائم لكلا الشخصين. لن يمكن استرداد الصور والملاحظات الصوتية المرفوعة بالفعل. لا يمكن التراجع عن هذا.',
+  'delete_chat_body':
+      'سيؤدي هذا إلى إزالة كل رسالة في هذه المحادثة بشكل دائم لكلا الشخصين. لن يمكن استرداد الصور والملاحظات الصوتية المرفوعة بالفعل. لا يمكن التراجع عن هذا.',
   'delete_failed': 'فشل الحذف: {error}',
   'recording_elapsed': 'جاري التسجيل… {time}',
   'message_unavailable': 'الرسالة غير متاحة',
@@ -583,7 +608,8 @@ const Map<String, String> arStrings = {
   'delete_for_everyone_question': 'حذف لدى الجميع؟',
   'delete_for_both_question': 'حذف لدى كلا الشخصين؟',
   'delete_for_me_question': 'حذف من عندي؟',
-  'delete_for_everyone_body': 'ستتم إزالة هذه الرسالة لدى جميع أطراف هذه المحادثة.',
+  'delete_for_everyone_body':
+      'ستتم إزالة هذه الرسالة لدى جميع أطراف هذه المحادثة.',
   'delete_for_me_body': 'ستتم إزالة هذه الرسالة فقط من سجل محادثاتك.',
   'message_deleted_everyone': 'تم حذف الرسالة لدى الجميع',
   'message_deleted_you': 'تم حذف الرسالة لديك',
@@ -610,7 +636,8 @@ const Map<String, String> arStrings = {
   'admin_prefix': 'المسؤول: {name}',
   'sender_admin': '{name} · مسؤول',
   'only_admin_can_send': 'المسؤول فقط يمكنه إرسال الرسائل. يمكنك التفاعل.',
-  'event_messages_not_encrypted': 'رسائل مجموعة الفعالية ليست مشفرة من طرف إلى طرف.',
+  'event_messages_not_encrypted':
+      'رسائل مجموعة الفعالية ليست مشفرة من طرف إلى طرف.',
   'event_group': 'مجموعة الفعالية',
   'forward_to': 'توجيه إلى…',
   'no_chats_yet': 'لا توجد محادثات بعد',
@@ -651,12 +678,15 @@ const Map<String, String> arStrings = {
   'removes_group_all_messages': 'يحذف المجموعة وجميع الرسائل',
   'removes_conversation_both': 'يحذف المحادثة لكلا الطرفين',
   'delete_this_chat_question': 'حذف هذه المحادثة؟',
-  'delete_chat_group_body': 'سيتم حذف جميع الرسائل في “{name}” نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
-  'delete_chat_one_to_one_body': 'سيتم حذف جميع الرسائل مع {name} نهائياً لكلاكما. لا يمكن التراجع عن هذا الإجراء.',
+  'delete_chat_group_body':
+      'سيتم حذف جميع الرسائل في “{name}” نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
+  'delete_chat_one_to_one_body':
+      'سيتم حذف جميع الرسائل مع {name} نهائياً لكلاكما. لا يمكن التراجع عن هذا الإجراء.',
   'chat_deleted': 'تم حذف المحادثة',
   'failed_to_delete': 'فشل الحذف: {error}',
   'delete_event_group_question': 'حذف مجموعة الفعالية؟',
-  'delete_event_group_body': 'سيتم حذف جميع الرسائل في “{title}” نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
+  'delete_event_group_body':
+      'سيتم حذف جميع الرسائل في “{title}” نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
   'group_deleted': 'تم حذف المجموعة',
   'new_messages_count': '{count} {label} جديدة',
   'remove_from_favorites': 'إزالة من المفضلة',
@@ -698,7 +728,8 @@ const Map<String, String> arStrings = {
   'story_create_menu_photo': 'صورة',
   'story_create_menu_video': 'فيديو',
   'story_create_menu_text': 'نص',
-  'story_photo_permission_denied': 'تم رفض إذن الصور. قم بتمكينه في الإعدادات لاختيار الصور.',
+  'story_photo_permission_denied':
+      'تم رفض إذن الصور. قم بتمكينه في الإعدادات لاختيار الصور.',
   'story_open_settings': 'فتح الإعدادات',
   'camera_no_cameras_found': 'لم يتم العثور على كاميرات',
   'camera_init_failed': 'فشل تهيئة الكاميرا: {error}',
@@ -783,11 +814,13 @@ const Map<String, String> arStrings = {
   'events_no_events_matching': 'لا توجد فعاليات تطابق "{query}"',
   'events_no_events_in_city': 'لا توجد فعاليات في {city}',
   'events_new_events_appear_here': 'ستظهر الفعاليات الجديدة هنا عند نشرها.',
-  'events_try_different_keyword_location': 'جرب كلمة مفتاحية أو موقعاً مختلفاً.',
+  'events_try_different_keyword_location':
+      'جرب كلمة مفتاحية أو موقعاً مختلفاً.',
   'events_want_host_event': 'هل تريد استضافة فعاليتك الخاصة؟',
   'events_tap_contact_admin': 'انقر للتواصل مع فريق الإدارة.',
   'events_become_event_admin': 'كن مسؤول فعالية',
-  'events_become_admin_body': "أرسل لنا رسالة بريد إلكتروني باسمك، ووصف قصير للفعالية التي ترغب في استضافتها، والسبب. سنرد عليك.",
+  'events_become_admin_body':
+      "أرسل لنا رسالة بريد إلكتروني باسمك، ووصف قصير للفعالية التي ترغب في استضافتها، والسبب. سنرد عليك.",
   'events_email_copied': 'تم نسخ البريد الإلكتروني',
   'events_for_you': 'لك',
   'events_see_more': 'رؤية المزيد',
@@ -798,19 +831,25 @@ const Map<String, String> arStrings = {
   'events_travel_mode': 'وضع السفر',
   'events_quick_start_guide': 'دليل البدء السريع',
   'events_switch_travel_feed': 'التبديل إلى خلاصة السفر',
-  'events_switch_travel_feed_body': 'في الصفحة الرئيسية، انقر على زر تبديل السفر لرؤية المنشورات من الأشخاص في أماكن أخرى — وليس فقط أولئك الذين تتابعهم.',
+  'events_switch_travel_feed_body':
+      'في الصفحة الرئيسية، انقر على زر تبديل السفر لرؤية المنشورات من الأشخاص في أماكن أخرى — وليس فقط أولئك الذين تتابعهم.',
   'events_filter_by_city_step': 'تصفية حسب البلد',
-  'events_filter_by_city_step_body': 'في قسم الفعاليات، انقر على "تصفية حسب البلد" لتضييق نطاق الفعاليات إلى وجهة معينة.',
+  'events_filter_by_city_step_body':
+      'في قسم الفعاليات، انقر على "تصفية حسب البلد" لتضييق نطاق الفعاليات إلى وجهة معينة.',
   'events_see_events_on_map': 'رؤية الفعاليات على الخريطة',
-  'events_see_events_on_map_body': 'استخدم زر الخريطة بجوار تصفية المدينة لإسقاط دبابيس لكل فعالية وانقر على أي دبوس لمعاينته.',
+  'events_see_events_on_map_body':
+      'استخدم زر الخريطة بجوار تصفية المدينة لإسقاط دبابيس لكل فعالية وانقر على أي دبوس لمعاينته.',
   'events_plan_your_trip': 'خطط لرحلتك',
-  'events_plan_your_trip_body': 'افتح أي فعالية واستخدم اختصارات الفنادق ورحلات الطيران لبدء التخطيط قبل الذهاب.',
+  'events_plan_your_trip_body':
+      'افتح أي فعالية واستخدم اختصارات الفنادق ورحلات الطيران لبدء التخطيط قبل الذهاب.',
   'events_got_it': 'فهمت ذلك',
   'event_group_delete_group_title': 'حذف المجموعة؟',
-  'event_group_delete_group_body': 'سيتم حذف المجموعة وجميع رسائلها نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
+  'event_group_delete_group_body':
+      'سيتم حذف المجموعة وجميع رسائلها نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
   'event_group_failed_to_delete': 'فشل الحذف: {error}',
   'event_group_leave_group_title': 'مغادرة المجموعة؟',
-  'event_group_leave_group_body': "ستتوقف عن تلقي الرسائل الخاصة بهذه الفعالية. يمكنك التسجيل مجدداً لاحقاً.",
+  'event_group_leave_group_body':
+      "ستتوقف عن تلقي الرسائل الخاصة بهذه الفعالية. يمكنك التسجيل مجدداً لاحقاً.",
   'event_group_failed': 'فشل: {error}',
   'event_group_settings_title': 'إعدادات المجموعة',
   'event_group_pending_requests': 'الطلبات المعلقة',
@@ -827,7 +866,8 @@ const Map<String, String> arStrings = {
   'event_group_member_fallback': 'عضو',
   'event_group_admin_badge': 'مسؤول',
   'event_group_remove_member_title': 'إزالة {name}؟',
-  'event_group_remove_member_body': "سيتوقفون عن تلقي الرسائل وسيتم إعلامهم بذلك.",
+  'event_group_remove_member_body':
+      "سيتوقفون عن تلقي الرسائل وسيتم إعلامهم بذلك.",
   'event_group_remove': 'إزالة',
   'event_group_add_user_to_group': 'إضافة مستخدم للمجموعة',
   'event_group_not_following_anyone': "أنت لا تتابع أحداً بعد.",
@@ -837,22 +877,27 @@ const Map<String, String> arStrings = {
   'event_notif_saved': 'تم حفظ إعدادات إشعارات الفعالية',
   'event_notif_could_not_save': 'تعذر الحفظ: {error}',
   'event_notif_new_event_notifications': 'إشعارات الفعالية الجديدة',
-  'event_notif_new_event_subtitle': 'احصل على إشعار منبثق عند نشر فعالية جديدة تطابق فلاتر التصفية الخاصة بك.',
+  'event_notif_new_event_subtitle':
+      'احصل على إشعار منبثق عند نشر فعالية جديدة تطابق فلاتر التصفية الخاصة بك.',
   'event_notif_event_types': 'أنواع الفعاليات',
   'event_notif_all_types_desc': "سيتم إعلامك بجميع أنواع الفعاليات.",
-  'event_notif_custom_types_desc': 'الأنواع التي اخترتها فقط. انقر على "جميع الأنواع" لإعادة التعيين.',
+  'event_notif_custom_types_desc':
+      'الأنواع التي اخترتها فقط. انقر على "جميع الأنواع" لإعادة التعيين.',
   'event_notif_all_types': 'جميع الأنواع',
   'event_notif_countries': 'البلدان',
   'event_notif_all_countries_desc': "سيتم إعلامك بالفعاليات في أي بلد.",
-  'event_notif_custom_countries_desc': 'فقط الفعاليات في البلدان التي اخترتها. انقر على "جميع البلدان" لإعادة التعيين.',
+  'event_notif_custom_countries_desc':
+      'فقط الفعاليات في البلدان التي اخترتها. انقر على "جميع البلدان" لإعادة التعيين.',
   'event_notif_all_countries': 'جميع البلدان',
   'group_settings_delete_group_title': 'حذف المجموعة؟',
-  'group_settings_delete_group_body': 'سيتم حذف المجموعة "{name}" وجميع رسائلها نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
+  'group_settings_delete_group_body':
+      'سيتم حذف المجموعة "{name}" وجميع رسائلها نهائياً لجميع الأعضاء. لا يمكن التراجع عن هذا الإجراء.',
   'group_settings_failed_to_delete': 'فشل الحذف: {error}',
   'group_settings_saved': 'تم حفظ الإعدادات',
   'group_settings_error': 'خطأ: {error}',
   'group_settings_leave_group_title': 'مغادرة المجموعة؟',
-  'group_settings_leave_group_body': 'ستتوقف عن تلقي الرسائل من "{name}". يمكن لمسؤول إعادتك.',
+  'group_settings_leave_group_body':
+      'ستتوقف عن تلقي الرسائل من "{name}". يمكن لمسؤول إعادتك.',
   'group_settings_failed_to_leave': 'فشل المغادرة: {error}',
   'group_settings_group_not_found': 'المجموعة غير موجودة',
   'group_settings_leave_group': 'مغادرة المجموعة',
@@ -864,15 +909,19 @@ const Map<String, String> arStrings = {
   'group_settings_admin': 'مسؤول',
   'group_settings_messaging_permissions': 'صلاحيات المراسلة',
   'group_settings_restrict_messaging': 'تقييد المراسلة',
-  'group_settings_restrict_messaging_desc': 'يمكن لمسؤولي المجموعة فقط إرسال الرسائل. يمكن للأعضاء الاستمرار في عرض الرسائل.',
+  'group_settings_restrict_messaging_desc':
+      'يمكن لمسؤولي المجموعة فقط إرسال الرسائل. يمكن للأعضاء الاستمرار في عرض الرسائل.',
   'group_settings_admin_only_mode': 'وضع المسؤول فقط',
-  'group_settings_admin_only_mode_desc': 'يمكن لمسؤولي المجموعة فقط إرسال الرسائل (بديل للتقييد).',
+  'group_settings_admin_only_mode_desc':
+      'يمكن لمسؤولي المجموعة فقط إرسال الرسائل (بديل للتقييد).',
   'group_settings_enable_media_sharing': 'تمكين مشاركة الوسائط',
-  'group_settings_enable_media_sharing_desc': 'السماح للأعضاء بمشاركة الصور وإرسال رسائل صوتية.',
+  'group_settings_enable_media_sharing_desc':
+      'السماح للأعضاء بمشاركة الصور وإرسال رسائل صوتية.',
   'group_settings_save_settings': 'حفظ الإعدادات',
   'event_detail_deadline': 'الموعد النهائي {date}',
   'event_detail_apply_below': 'إذا كنت ترغب في الانضمام، يمكنك\nالتقديم أدناه:',
-  'event_detail_register_below': 'إذا كنت ترغب في أن تصبح واحداً منا، يمكنك\nالتسجيل أدناه:',
+  'event_detail_register_below':
+      'إذا كنت ترغب في أن تصبح واحداً منا، يمكنك\nالتسجيل أدناه:',
   'event_detail_contact': 'تواصل',
   'event_detail_could_not_open_link': 'تعذر فتح رابط التقديم',
   'event_detail_apply': 'تقديم',
@@ -919,13 +968,16 @@ const Map<String, String> arStrings = {
   'admin_tile_users_subtitle': 'بحث، إيقاف، ترقية',
   'admin_tile_posts_title': 'المنشورات',
   'admin_tile_posts_subtitle': 'مراجعة وحذف المنشورات',
-  'admin_tile_reports_subtitle': 'تقارير المنشورات، النقاشات، الملفات الشخصية، والأخطاء',
+  'admin_tile_reports_subtitle':
+      'تقارير المنشورات، النقاشات، الملفات الشخصية، والأخطاء',
   'admin_tile_contact_subtitle': 'صندوق الوارد + سجل الرسائل وطلبات المنظمات',
   'admin_tile_events_subtitle': 'إنشاء / تعديل / حذف الفعاليات',
   'admin_blacklisted_emails': 'رسائل البريد الإلكتروني المحظورة',
-  'admin_tile_blacklist_subtitle': 'المستخدمون المحذوفون الذين لا يمكنهم إعادة التسجيل',
+  'admin_tile_blacklist_subtitle':
+      'المستخدمون المحذوفون الذين لا يمكنهم إعادة التسجيل',
   'admin_app_settings': 'إعدادات التطبيق',
-  'admin_tile_settings_subtitle': 'تبديل الميزات، الإعلانات، روابط المتجر، الصيانة',
+  'admin_tile_settings_subtitle':
+      'تبديل الميزات، الإعلانات، روابط المتجر، الصيانة',
   'admin_users_search_hint': 'ابحث باسم المستخدم أو البريد الإلكتروني',
   'admin_no_users_match': 'لا يوجد مستخدمون مطابقون',
   'admin_badge': 'مسؤول',
@@ -936,7 +988,8 @@ const Map<String, String> arStrings = {
   'admin_unsuspend': 'إلغاء الإيقاف',
   'admin_delete_user': 'حذف المستخدم',
   'admin_delete_user_permanently_title': 'حذف المستخدم نهائياً؟',
-  'admin_delete_user_permanently_body': 'سيؤدي هذا إلى حذف جميع بيانات المستخدم: المنشورات والتعليقات والقصص والمحادثات والمتابعين والإشعارات. وسيُضاف بريده الإلكتروني إلى القائمة السوداء.\n\nلا يمكن التراجع عن هذا.',
+  'admin_delete_user_permanently_body':
+      'سيؤدي هذا إلى حذف جميع بيانات المستخدم: المنشورات والتعليقات والقصص والمحادثات والمتابعين والإشعارات. وسيُضاف بريده الإلكتروني إلى القائمة السوداء.\n\nلا يمكن التراجع عن هذا.',
   'admin_delete_everything': 'حذف كل شيء',
   'admin_deleting_all_user_data': 'جاري حذف جميع بيانات المستخدم...',
   'admin_user_deleted_blacklisted': 'تم حذف المستخدم وإضافته للقائمة السوداء',
@@ -944,7 +997,8 @@ const Map<String, String> arStrings = {
   'admin_unknown': 'غير معروف',
   'admin_new_event': 'فعالية جديدة',
   'admin_edit_event': 'تعديل الفعالية',
-  'admin_no_events_yet': 'لا توجد فعاليات بعد. انقر على "فعالية جديدة" لإضافة واحدة.',
+  'admin_no_events_yet':
+      'لا توجد فعاليات بعد. انقر على "فعالية جديدة" لإضافة واحدة.',
   'admin_events_search_hint': 'البحث بالعنوان أو الكاتب أو الموقع…',
   'admin_filters': 'الفلاتر',
   'admin_filter_type': 'النوع',
@@ -994,7 +1048,8 @@ const Map<String, String> arStrings = {
   'admin_clear_deadline': 'مسح الموعد النهائي',
   'admin_no_results': 'لا توجد نتائج',
   'admin_post_reports': 'تقارير المنشورات',
-  'admin_post_reports_subtitle': 'مراجعة التقارير المقدمة من المستخدمين حول المنشورات',
+  'admin_post_reports_subtitle':
+      'مراجعة التقارير المقدمة من المستخدمين حول المنشورات',
   'admin_discuss_reports': 'تقارير النقاشات',
   'admin_discuss_posts': 'منشورات النقاش',
   'admin_discuss_posts_subtitle': 'مراجعة وحذف منشورات النقاش/الأسئلة والأجوبة',
@@ -1028,10 +1083,8 @@ const Map<String, String> arStrings = {
   'admin_users_event_manager_badge': 'مدير فعاليات',
   'admin_users_revoke_event_manager': 'إلغاء صلاحية مدير الفعاليات',
   'admin_users_grant_event_manager': 'منح صلاحية مدير الفعاليات',
-  'admin_users_revoke_event_manager_title':
-      'إلغاء صلاحية مدير الفعاليات؟',
-  'admin_users_grant_event_manager_title':
-      'منح صلاحية مدير الفعاليات؟',
+  'admin_users_revoke_event_manager_title': 'إلغاء صلاحية مدير الفعاليات؟',
+  'admin_users_grant_event_manager_title': 'منح صلاحية مدير الفعاليات؟',
   'admin_users_revoke_event_manager_body':
       'سيؤدي ذلك إلى إزالة صلاحيات نشر الفعاليات وتعيين الدور كمستخدم.',
   'admin_users_grant_event_manager_body':
@@ -1043,7 +1096,8 @@ const Map<String, String> arStrings = {
   'admin_profile_reports_subtitle': 'مراجعة تقارير الإساءة في الملفات الشخصية',
   'admin_error_reports_subtitle': 'الأخطاء العامة في التطبيق وتشخيصات الأعطال',
   'admin_clear_resolved_title': 'مسح التقارير المحلولة؟',
-  'admin_clear_resolved_body': 'سيؤدي هذا إلى حذف {count} تقرير(تقارير) محلولة.',
+  'admin_clear_resolved_body':
+      'سيؤدي هذا إلى حذف {count} تقرير(تقارير) محلولة.',
   'admin_resolved_reports_cleared': 'تم مسح التقارير المحلولة',
   'admin_clear_resolved': 'مسح المحلولة',
   'admin_tab_open': 'مفتوحة ({count})',
@@ -1075,9 +1129,11 @@ const Map<String, String> arStrings = {
   'admin_delete_report_title': 'حذف التقرير؟',
   'admin_delete_report_body': 'سيؤدي هذا إلى إزالة التقرير من القائمة.',
   'admin_take_down_post_title': 'إزالة المنشور؟',
-  'admin_take_down_post_body': 'سيؤدي هذا إلى إزالة المنشور المُبلَّغ عنه وتحديد التقرير كمحلول.',
+  'admin_take_down_post_body':
+      'سيؤدي هذا إلى إزالة المنشور المُبلَّغ عنه وتحديد التقرير كمحلول.',
   'admin_take_down_thread_title': 'إزالة الموضوع؟',
-  'admin_take_down_thread_body': 'سيؤدي هذا إلى إزالة الموضوع المُبلَّغ عنه وتحديد التقرير كمحلول.',
+  'admin_take_down_thread_body':
+      'سيؤدي هذا إلى إزالة الموضوع المُبلَّغ عنه وتحديد التقرير كمحلول.',
   'admin_delete_report': 'حذف التقرير',
   'admin_take_down_post': 'إزالة المنشور',
   'admin_take_down_thread': 'إزالة الموضوع',
@@ -1086,7 +1142,8 @@ const Map<String, String> arStrings = {
   'admin_thread_taken_down': 'تمت إزالة الموضوع وحل التقرير',
   'admin_action_failed': 'فشل الإجراء: {error}',
   'admin_remove_user_title': 'إزالة المستخدم؟',
-  'admin_remove_user_body': 'سيؤدي هذا إلى إزالة حساب هذا المستخدم وبياناته نهائياً. لا يمكن التراجع عن هذا الإجراء.',
+  'admin_remove_user_body':
+      'سيؤدي هذا إلى إزالة حساب هذا المستخدم وبياناته نهائياً. لا يمكن التراجع عن هذا الإجراء.',
   'admin_remove_user': 'إزالة المستخدم',
   'admin_user_removed': 'تمت إزالة المستخدم',
   'admin_cleared_solved_reports': 'تم مسح {count} تقرير(تقارير) محلولة',
@@ -1097,7 +1154,8 @@ const Map<String, String> arStrings = {
   'admin_no_unsolved_errors': 'لا توجد أخطاء غير محلولة 🎉',
   'admin_captured_errors_here': 'أخطاء التطبيق الملتقطة ستظهر هنا.',
   'admin_nothing_solved_yet': 'لم يتم حل أي شيء بعد',
-  'admin_solved_reports_move_here': 'التقارير التي تحددها كمحلولة تنتقل إلى هنا.',
+  'admin_solved_reports_move_here':
+      'التقارير التي تحددها كمحلولة تنتقل إلى هنا.',
   'admin_most_frequent': 'الأكثر تكراراً (القائمة الحالية)',
   'admin_unknown_screen': 'شاشة غير معروفة',
   'admin_page_screen': 'الصفحة / الشاشة',
@@ -1132,22 +1190,28 @@ const Map<String, String> arStrings = {
   'admin_flag_reposts': 'إعادة النشر مفعلة',
   'admin_flag_translate': 'الترجمة مفعلة',
   'admin_section_announcement': 'إعلان',
-  'admin_announcement_hint': 'يظهر في أعلى الشاشة الرئيسية. اتركه فارغاً لإخفائه.',
+  'admin_announcement_hint':
+      'يظهر في أعلى الشاشة الرئيسية. اتركه فارغاً لإخفائه.',
   'admin_section_maintenance': 'الصيانة',
   'admin_flag_maintenance': 'وضع الصيانة (لافتة قراءة فقط)',
   'admin_section_min_app_version': 'الحد الأدنى لإصدار التطبيق',
   'admin_min_version_hint': 'مثل: 1.0.0',
   'admin_section_contact_email': 'بريد التواصل',
-  'admin_contact_email_hint': 'البريد الإلكتروني الموضح في رابط "كن مسؤول فعالية"',
+  'admin_contact_email_hint':
+      'البريد الإلكتروني الموضح في رابط "كن مسؤول فعالية"',
   'admin_section_app_store_links': 'روابط متجر التطبيقات (دعوة الأصدقاء)',
-  'admin_app_store_links_desc': 'تُستخدم بواسطة زر "دعوة الأصدقاء" في الملف الشخصي. يختار التطبيق الرابط المناسب لمنصة المستخدم.',
+  'admin_app_store_links_desc':
+      'تُستخدم بواسطة زر "دعوة الأصدقاء" في الملف الشخصي. يختار التطبيق الرابط المناسب لمنصة المستخدم.',
   'admin_ios_url_hint': 'رابط متجر iOS App Store (https://apps.apple.com/...)',
-  'admin_android_url_hint': 'رابط Google Play (https://play.google.com/store/apps/details?id=...)',
+  'admin_android_url_hint':
+      'رابط Google Play (https://play.google.com/store/apps/details?id=...)',
   'admin_section_event_types': 'أنواع الفعاليات',
-  'admin_event_types_desc': 'هۆڵبژاردنانەی بەڕێوەبەران لێیان هەڵدەبژێرن کاتی دروستکردنی بۆنە, و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
+  'admin_event_types_desc':
+      'هۆڵبژاردنانەی بەڕێوەبەران لێیان هەڵدەبژێرن کاتی دروستکردنی بۆنە, و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
   'admin_add_event_type': 'إضافة نوع فعالية',
   'admin_section_event_countries': 'بلدان الفعاليات',
-  'admin_event_countries_desc': 'البلدان التي يضع المسؤولون علامة للفعاليات بها، ويقوم المستخدمون بتصفية الإشعارات بناءً عليها.',
+  'admin_event_countries_desc':
+      'البلدان التي يضع المسؤولون علامة للفعاليات بها، ويقوم المستخدمون بتصفية الإشعارات بناءً عليها.',
   'admin_add_country': 'إضافة بلد',
 
   // ── PROFILE SCREENS (added) ──
@@ -1160,17 +1224,20 @@ const Map<String, String> arStrings = {
   'profile_no_blocked_users': 'لا يوجد مستخدمون محظورون',
   'profile_blocked_users_hint': 'المستخدمون الذين قمت بحظرهم سيظهرون هنا.',
   'profile_delete_account_title': 'حذف حسابك؟',
-  'profile_delete_account_body': 'سيؤدي هذا إلى حذف ملفك الشخصي ومنشوراتك وتعليقاتك وقصصك ومتابعيك وإشعاراتك نهائياً. لا يمكن التراجع عن هذا.',
+  'profile_delete_account_body':
+      'سيؤدي هذا إلى حذف ملفك الشخصي ومنشوراتك وتعليقاتك وقصصك ومتابعيك وإشعاراتك نهائياً. لا يمكن التراجع عن هذا.',
   'profile_delete_everything': 'حذف كل شيء',
   'profile_deleting_account': 'جاري حذف حسابك...',
-  'profile_reauth_required': 'لدواعي الأمان، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى والمحاولة.',
+  'profile_reauth_required':
+      'لدواعي الأمان، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى والمحاولة.',
   'profile_no_reposts_yet': 'لا توجد إعادات نشر بعد',
   'profile_no_reposts_subtitle': 'المنشورات التي تعيد نشرها ستظهر هنا.',
   'profile_no_saved_posts': 'لا توجد منشورات محفوظة',
   'profile_no_saved_subtitle': 'احفظ المنشورات لمشاهدتها هنا لاحقاً.',
   'profile_no_questions_asked': 'لم يتم طرح أي أسئلة بعد',
   'profile_no_answers_yet': 'لا توجد إجابات بعد',
-  'profile_no_questions_asked_subtitle': 'الأسئلة التي تطرحها في النقاش ستظهر هنا.',
+  'profile_no_questions_asked_subtitle':
+      'الأسئلة التي تطرحها في النقاش ستظهر هنا.',
   'profile_no_answers_subtitle': 'الأسئلة التي أجبت عليها ستظهر هنا.',
   'profile_questions_asked': 'الأسئلة المطروحة',
   'profile_questions_answered': 'الأسئلة المجابة',
@@ -1187,7 +1254,8 @@ const Map<String, String> arStrings = {
   'profile_create': 'إنشاء',
   'profile_visitors_count': '{count} زوار',
   'profile_no_visits_yet': 'لا توجد زيارات للملف الشخصي بعد',
-  'profile_no_visits_subtitle': 'عندما يفتح مستخدمون آخرون ملفك الشخصي، سيظهرون هنا.',
+  'profile_no_visits_subtitle':
+      'عندما يفتح مستخدمون آخرون ملفك الشخصي، سيظهرون هنا.',
   'profile_visited': 'زار {time}',
   'profile_visited_times': 'زار {time} · الإجمالي {count}×',
   'profile_visitor_visits': '{name} · {count}× زيارات',
@@ -1204,15 +1272,18 @@ const Map<String, String> arStrings = {
   'user_not_found': 'المستخدم غير موجود',
   'user_unblocked': 'تم إلغاء حظر المستخدم',
   'user_blocked': 'تم حظر المستخدم',
-  'user_failed_block_unblock': 'فشل الحظر/إلغاء الحظر: {error}\nهل قمت بنشر قواعد Firestore؟',
+  'user_failed_block_unblock':
+      'فشل الحظر/إلغاء الحظر: {error}\nهل قمت بنشر قواعد Firestore؟',
   'user_you_blocked_this_user': 'لقد قمت بحظر هذا المستخدم',
-  'user_blocked_content_hidden': 'منشوراتهم وإعادات النشر والعناصر المحفوظة مخفية، ولا يمكنهم مراسلتك.',
+  'user_blocked_content_hidden':
+      'منشوراتهم وإعادات النشر والعناصر المحفوظة مخفية، ولا يمكنهم مراسلتك.',
   'user_failed_unblock': 'فشل إلغاء الحظر: {error}',
   'user_private_follow_prompt': 'تابع هذا الحساب لرؤية محتواه.',
   'edit_profile_upload_failed': 'فشل الرفع: {error}',
   'edit_profile_cover_upload_failed': 'فشل رفع صورة الغلاف: {error}',
   'edit_profile_username_empty': 'لا يمكن أن يكون اسم المستخدم فارغاً',
-  'edit_profile_username_invalid': 'يجب أن يكون اسم المستخدم من 3-24 حرفاً ويستخدم فقط a-z و 0-9 و . أو _',
+  'edit_profile_username_invalid':
+      'يجب أن يكون اسم المستخدم من 3-24 حرفاً ويستخدم فقط a-z و 0-9 و . أو _',
   'edit_profile_username_taken': 'اسم المستخدم مستخدم بالفعل',
   'edit_profile_updated': 'تم تحديث الملف الشخصي',
   'edit_profile_could_not_save': 'تعذر حفظ الملف الشخصي: {error}',
@@ -1225,9 +1296,11 @@ const Map<String, String> arStrings = {
   'edit_profile_select_gender': 'اختر الجنس',
   'edit_profile_prefer_not_to_say': 'أفضل عدم القول',
   'edit_profile_interests_goals': 'الاهتمامات والأهداف',
-  'edit_profile_interests_desc': 'يساعدنا في إبراز الفعاليات والمنح والأشخاص ذوي الصلة بك. كل ذلك اختياري.',
+  'edit_profile_interests_desc':
+      'يساعدنا في إبراز الفعاليات والمنح والأشخاص ذوي الصلة بك. كل ذلك اختياري.',
   'request_hidden_requests': 'الطلبات المخفية',
-  'request_hidden_requests_subtitle': 'الطلبات التي تحتوي على رسائل قد تكون مسيئة أو غير مرغوب فيها تُنقل إلى هذا المجلد.',
+  'request_hidden_requests_subtitle':
+      'الطلبات التي تحتوي على رسائل قد تكون مسيئة أو غير مرغوب فيها تُنقل إلى هذا المجلد.',
   'about_editor_i_am_a': 'أنا…',
   'about_editor_field': 'المجال',
   'about_editor_academic_level': 'المستوى الأكاديمي',
@@ -1289,13 +1362,11 @@ const Map<String, String> arStrings = {
   'settings_invite_friends_subtitle': 'شارك رابط تطبيق Iter مع أصدقائك',
   'settings_contact_us_subtitle':
       'أرسل رسالة لفريق Iter أو قدّم طلباً لنشر الفعاليات',
-  'settings_manage_events_subtitle':
-      'أنشئ وعدّل الفعاليات نيابةً عن منظمتك',
+  'settings_manage_events_subtitle': 'أنشئ وعدّل الفعاليات نيابةً عن منظمتك',
   'settings_admin_panel': 'لوحة الإدارة',
   'settings_preferred_language': 'اللغة المفضلة',
   'settings_blocked_users_title': 'المستخدمون المحظورون',
-  'settings_blocked_users_hint':
-      'افتح ملف مستخدم لحظره أو إلغاء حظره من هناك.',
+  'settings_blocked_users_hint': 'افتح ملف مستخدم لحظره أو إلغاء حظره من هناك.',
   'settings_cannot_change_email_title': 'لا يمكن تغيير البريد الإلكتروني',
   'settings_cannot_change_email_body':
       'بريدك الإلكتروني هو بريد حساب Google الخاص بك. '
@@ -1333,8 +1404,7 @@ const Map<String, String> arStrings = {
   'settings_email_invalid': 'عنوان البريد الإلكتروني يبدو غير صالح.',
   'settings_too_many_requests':
       'محاولات كثيرة جداً. يرجى الانتظار ثم المحاولة مرة أخرى.',
-  'settings_network_error':
-      'خطأ في الشبكة. تحقق من اتصالك ثم حاول مرة أخرى.',
+  'settings_network_error': 'خطأ في الشبكة. تحقق من اتصالك ثم حاول مرة أخرى.',
   'settings_email_change_not_enabled':
       'تغيير البريد الإلكتروني غير مفعّل في إعدادات المصادقة.',
   'settings_confirm_new_password': 'تأكيد كلمة المرور الجديدة',
@@ -1348,7 +1418,8 @@ const Map<String, String> arStrings = {
 
   // ── VERSION GATE (added) ──
   'update_required_title': 'التحديث مطلوب',
-  'update_required_body': 'يرجى التحديث إلى الإصدار {required} أو أحدث للمتابعة. أنت تستخدم الإصدار {current}.',
+  'update_required_body':
+      'يرجى التحديث إلى الإصدار {required} أو أحدث للمتابعة. أنت تستخدم الإصدار {current}.',
 
   // ── FEED SEARCH (added) ──
   'home_search_posts': 'ابحث في المنشورات حسب التسمية التوضيحية...',
@@ -1360,7 +1431,7 @@ const Map<String, String> arStrings = {
   'post_card_discuss_created': 'تم النشر في النقاش',
   'post_card_discuss_failed': 'تعذر إنشاء موضوع النقاش: {error}',
 
-    'qa_view_original_post': 'عرض المنشور الأصلي',
+  'qa_view_original_post': 'عرض المنشور الأصلي',
 
   // ── ADD POST TO STORY (added) ──
   'post_card_add_to_story': 'أضف إلى قصتك',
@@ -1368,7 +1439,7 @@ const Map<String, String> arStrings = {
   'post_card_added_to_story': 'تمت الإضافة إلى قصتك',
   'post_card_story_failed': 'تعذرت الإضافة إلى القصة: {error}',
 
-    'story_tap_to_view_post': 'انقر لعرض المنشور',
+  'story_tap_to_view_post': 'انقر لعرض المنشور',
 
   // ── TRAVEL LOCATION BANNER (added) ──
   'travel_location_off_banner': 'فعّل الموقع لرؤية المنشورات القريبة منك.',
@@ -1386,12 +1457,15 @@ const Map<String, String> arStrings = {
   // ── MERGE WITH DEMO (added) ──
   'admin_status_revoked': 'مُلغى',
   'admin_pick_funding_status': 'اختر حالة التمويل',
-  'admin_search_by_username_or_caption': 'ابحث باسم المستخدم أو التسمية التوضيحية',
+  'admin_search_by_username_or_caption':
+      'ابحث باسم المستخدم أو التسمية التوضيحية',
   'admin_no_posts_match': 'لا توجد منشورات تطابق بحثك',
   'create_post_blocked_title': 'تم حظر المنشور',
-  'create_post_blocked_body': 'لا يمكن نشر هذا المنشور لأن التسمية التوضيحية أو حقول المكان تحتوي على كلمات محظورة.',
+  'create_post_blocked_body':
+      'لا يمكن نشر هذا المنشور لأن التسمية التوضيحية أو حقول المكان تحتوي على كلمات محظورة.',
   'events_no_one_in_field': 'لم ينضم أحد في هذا المجال بعد.',
-  'events_no_one_at_academic_level': 'لم ينضم أحد في هذا المستوى الأكاديمي بعد.',
+  'events_no_one_at_academic_level':
+      'لم ينضم أحد في هذا المستوى الأكاديمي بعد.',
   'events_filter_field': 'المجال',
   'events_filter_level': 'المستوى',
   'events_no_matching_people': 'لا يوجد أشخاص مطابقون',

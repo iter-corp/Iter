@@ -525,6 +525,7 @@ const Map<String, String> ckbStrings = {
   'post_card_could_not_save': 'نەتوانرا پۆستەکە پاشەکەوت بکرێت: {error}',
   'post_card_repost_removed': 'ڕیپۆست لابرا',
   'post_card_reposted_to_profile': 'ڕیپۆست کرا بۆ پڕۆفایلەکەت',
+  'post_card_reposted_by': 'ڕیپۆست کرا لەلایەن',
   'post_card_could_not_repost': 'نەتوانرا ڕیپۆست بکرێت: {error}',
   'post_card_send_to': 'ناردن بۆ',
   'post_card_send': 'ناردن',

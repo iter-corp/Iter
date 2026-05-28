@@ -33,115 +33,133 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
       body: AppPageBackground(
         child: Column(
           children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: AppGlassCard(
-              radius: 16,
-              padding: EdgeInsets.zero,
-              child: TextField(
-                onChanged: (v) => setState(() => _query = v),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: context.t.adminSearchByUsernameOrCaption,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: AppGlassCard(
+                radius: 16,
+                padding: EdgeInsets.zero,
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    inputDecorationTheme: const InputDecorationTheme(
+                      filled: false,
+                      fillColor: Colors.transparent,
+                    ),
+                  ),
+                  child: TextField(
+                    onChanged: (v) => setState(() => _query = v),
+                    textAlignVertical: TextAlignVertical.center,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search),
+                      prefixIconConstraints:
+                          const BoxConstraints(minWidth: 48, minHeight: 48),
+                      hintText: context.t.adminSearchByUsernameOrCaption,
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: postsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text(context.t.errorWithMessage(e))),
-              data: (allPosts) {
-                final q = _query.trim().toLowerCase();
-                final posts = q.isEmpty
-                    ? allPosts
-                    : allPosts.where((p) {
-                        final author = (p['authorUsername'] as String? ?? '')
-                            .toLowerCase();
-                        final caption =
-                            (p['caption'] as String? ?? '').toLowerCase();
-                        return author.contains(q) || caption.contains(q);
-                      }).toList();
-                if (posts.isEmpty) {
-                  return Center(
-                      child: Text(
-                          q.isEmpty
-                              ? context.t.noPosts
-                              : context.t.adminNoPostsMatch,
-                          style: TextStyle(color: context.textSecondary)));
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  itemCount: posts.length,
-                  itemBuilder: (_, i) {
-                    final p = posts[i];
-                    final imgs =
-                        (p['imageUrls'] as List?)?.cast<String>() ?? const [];
-                    final url = imgs.isNotEmpty ? imgs.first : null;
-                    final caption = (p['caption'] as String? ?? '').trim();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: AppGlassCard(
-                        radius: 16,
-                        child: ListTile(
-                          onTap: () {
-                            final postId = (p['id'] as String? ?? '').trim();
-                            if (postId.isEmpty) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    PostDetailScreen(postId: postId),
+            Expanded(
+              child: postsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) =>
+                    Center(child: Text(context.t.errorWithMessage(e))),
+                data: (allPosts) {
+                  final q = _query.trim().toLowerCase();
+                  final posts = q.isEmpty
+                      ? allPosts
+                      : allPosts.where((p) {
+                          final author = (p['authorUsername'] as String? ?? '')
+                              .toLowerCase();
+                          final caption =
+                              (p['caption'] as String? ?? '').toLowerCase();
+                          return author.contains(q) || caption.contains(q);
+                        }).toList();
+                  if (posts.isEmpty) {
+                    return Center(
+                        child: Text(
+                            q.isEmpty
+                                ? context.t.noPosts
+                                : context.t.adminNoPostsMatch,
+                            style: TextStyle(color: context.textSecondary)));
+                  }
+                  final bottomPadding =
+                      MediaQuery.viewPaddingOf(context).bottom + 28;
+                  return ListView.builder(
+                    padding: EdgeInsets.fromLTRB(12, 0, 12, bottomPadding),
+                    itemCount: posts.length,
+                    itemBuilder: (_, i) {
+                      final p = posts[i];
+                      final imgs =
+                          (p['imageUrls'] as List?)?.cast<String>() ?? const [];
+                      final url = imgs.isNotEmpty ? imgs.first : null;
+                      final caption = (p['caption'] as String? ?? '').trim();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AppGlassCard(
+                          radius: 16,
+                          child: ListTile(
+                            onTap: () {
+                              final postId = (p['id'] as String? ?? '').trim();
+                              if (postId.isEmpty) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PostDetailScreen(postId: postId),
+                                ),
+                              );
+                            },
+                            leading: SizedBox(
+                              width: 52,
+                              height: 52,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: url != null
+                                    ? CachedNetworkImage(
+                                        imageUrl: url, fit: BoxFit.cover)
+                                    : Container(
+                                        color: context.inputFill,
+                                        child: Icon(Icons.text_fields,
+                                            color: context.textSecondary),
+                                      ),
                               ),
-                            );
-                          },
-                          leading: SizedBox(
-                            width: 52,
-                            height: 52,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: url != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: url, fit: BoxFit.cover)
-                                  : Container(
-                                      color: context.inputFill,
-                                      child: Icon(Icons.text_fields,
-                                          color: context.textSecondary),
-                                    ),
+                            ),
+                            title: Text(
+                              caption.isEmpty
+                                  ? context.t.adminNoCaption
+                                  : caption,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              context.t.adminPostByAuthor(p['authorUsername'] ??
+                                  context.t.adminUnknown),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: context.textSecondary, fontSize: 12),
+                            ),
+                            trailing: IconButton(
+                              onPressed: () =>
+                                  _delete(context, ref, p['id'] as String),
+                              icon: const Icon(Icons.delete, color: Colors.red),
                             ),
                           ),
-                          title: Text(
-                            caption.isEmpty
-                                ? context.t.adminNoCaption
-                                : caption,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            context.t.adminPostByAuthor(
-                                p['authorUsername'] ?? context.t.adminUnknown),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: context.textSecondary, fontSize: 12),
-                          ),
-                          trailing: IconButton(
-                            onPressed: () =>
-                                _delete(context, ref, p['id'] as String),
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
           ],
         ),
       ),
@@ -171,8 +189,8 @@ class _AdminPostsScreenState extends ConsumerState<AdminPostsScreen> {
         await ref.read(adminServiceProvider).deletePost(postId);
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.failedWithError(e))));
         }
       }
     }

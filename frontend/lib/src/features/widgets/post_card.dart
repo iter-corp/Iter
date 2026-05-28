@@ -13,6 +13,7 @@ import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
+import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../providers/story_providers.dart';
 import '../../services/translate_service.dart';
@@ -350,8 +351,7 @@ class _PostCardState extends ConsumerState<PostCard>
                             ? Curves.easeOutBack.transform(v / 0.35) * 1.0
                             : v < 0.65
                                 ? 1.0
-                                : 1.0 -
-                                    0.1 * ((v - 0.65) / 0.35);
+                                : 1.0 - 0.1 * ((v - 0.65) / 0.35);
                         final opacity = v < 0.35
                             ? (v / 0.35).clamp(0.0, 1.0)
                             : v < 0.65
@@ -425,6 +425,13 @@ class _PostCardState extends ConsumerState<PostCard>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (!_captionBoxLowered &&
+                              repostsEnabled &&
+                              currentUid != null)
+                            _RepostBubbleCluster(
+                              postId: post.id,
+                              viewerUid: currentUid,
+                            ),
                           if (isMulti) ...[
                             Center(
                               child: _frostedPanel(
@@ -549,10 +556,10 @@ class _PostCardState extends ConsumerState<PostCard>
                                                 Consumer(
                                                   builder: (_, ref, __) {
                                                     final count = ref
-                                                        .watch(
-                                                            repostsCountProvider(
-                                                                post.id))
-                                                        .value ??
+                                                            .watch(
+                                                                repostsCountProvider(
+                                                                    post.id))
+                                                            .value ??
                                                         0;
                                                     return Text(
                                                       '$count',
@@ -1001,8 +1008,8 @@ class _PostCardState extends ConsumerState<PostCard>
                       child: inboxAsync.when(
                         loading: () =>
                             const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Center(
-                            child: Text(context.t.homeErrorPrefix(e))),
+                        error: (e, _) =>
+                            Center(child: Text(context.t.homeErrorPrefix(e))),
                         data: (convs) {
                           if (convs.isEmpty) {
                             return Center(
@@ -1031,8 +1038,7 @@ class _PostCardState extends ConsumerState<PostCard>
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(context.t
-                                            .postCardSharedTo(
-                                                c.otherUsername)),
+                                            .postCardSharedTo(c.otherUsername)),
                                       ),
                                     );
                                   }
@@ -1076,9 +1082,8 @@ class _PostCardState extends ConsumerState<PostCard>
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.t;
     try {
-      final storyImage = widget.post.imageUrls.isNotEmpty
-          ? widget.post.imageUrls.first
-          : '';
+      final storyImage =
+          widget.post.imageUrls.isNotEmpty ? widget.post.imageUrls.first : '';
       await ref.read(storyServiceProvider).createStory(
             imageUrl: storyImage,
             sharedPostId: widget.post.id,
@@ -1108,6 +1113,252 @@ class _PostCardState extends ConsumerState<PostCard>
           Text(text, style: const TextStyle(color: Colors.white)),
         ],
       ],
+    );
+  }
+}
+
+class _RepostBubbleCluster extends ConsumerWidget {
+  final String postId;
+  final String viewerUid;
+
+  const _RepostBubbleCluster({
+    required this.postId,
+    required this.viewerUid,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repostUids =
+        ref.watch(repostUserIdsProvider(postId)).valueOrNull ?? const [];
+    final following =
+        ref.watch(followingProvider(viewerUid)).valueOrNull ?? const [];
+    final followingSet = following.toSet();
+    final visibleUids =
+        repostUids.where((uid) => followingSet.contains(uid)).toList();
+
+    if (visibleUids.isEmpty) return const SizedBox.shrink();
+
+    final shown = visibleUids.take(2).toList();
+    final hasOverflow = visibleUids.length > 2;
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 8, bottom: 6),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: SizedBox(
+          width: hasOverflow ? 132 : (shown.length == 1 ? 48 : 84),
+          height: 54,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (var i = 0; i < shown.length; i++)
+                PositionedDirectional(
+                  start: i == 0 ? 0 : 34,
+                  top: i == 0 ? 10 : 0,
+                  child: _RepostBubble(uid: shown[i]),
+                ),
+              if (hasOverflow)
+                PositionedDirectional(
+                  start: 78,
+                  top: 12,
+                  child: _RepostMoreButton(
+                    uids: visibleUids,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RepostBubble extends ConsumerWidget {
+  final String uid;
+
+  const _RepostBubble({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(userByUidProvider(uid)).valueOrNull;
+    final avatar = (user?['avatarUrl'] as String?) ?? '';
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openUserProfile(context, uid: uid),
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: 0.24),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.72),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(2),
+        child: CircleAvatar(
+          backgroundColor: Colors.white.withValues(alpha: 0.16),
+          backgroundImage:
+              avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
+          child: avatar.isEmpty
+              ? const Icon(Icons.person, color: Colors.white, size: 18)
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _RepostMoreButton extends StatelessWidget {
+  final List<String> uids;
+
+  const _RepostMoreButton({required this.uids});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showRepostUsers(context, uids),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withValues(alpha: 0.34),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.24),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.more_horiz_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRepostUsers(BuildContext context, List<String> uids) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) => _RepostUsersSheet(uids: uids),
+    );
+  }
+}
+
+class _RepostUsersSheet extends StatelessWidget {
+  final List<String> uids;
+
+  const _RepostUsersSheet({required this.uids});
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height * 0.55;
+    return SafeArea(
+      child: SizedBox(
+        height: height,
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  context.t.postCardRepostedBy,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: EdgeInsets.fromLTRB(
+                  12,
+                  0,
+                  12,
+                  18 + MediaQuery.paddingOf(context).bottom,
+                ),
+                itemCount: uids.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, i) => _RepostUserRow(uid: uids[i]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RepostUserRow extends ConsumerWidget {
+  final String uid;
+
+  const _RepostUserRow({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(userByUidProvider(uid)).valueOrNull;
+    final username = (user?['username'] as String?) ?? '';
+    final avatar = (user?['avatarUrl'] as String?) ?? '';
+
+    return ListTile(
+      onTap: () => openUserProfile(context, uid: uid),
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: context.inputFill,
+        backgroundImage:
+            avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
+        child: avatar.isEmpty
+            ? Icon(Icons.person, color: context.textSecondary)
+            : null,
+      ),
+      title: Text(
+        username.isEmpty ? uid : username,
+        style: TextStyle(
+          color: context.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: Icon(Icons.chevron_right, color: context.textSecondary),
     );
   }
 }
@@ -1298,205 +1549,206 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
       key: ValueKey('postvid:${widget.url}'),
       onVisibilityChanged: _onVisibilityChanged,
       child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (_showControls) {
-          _togglePlay();
-        } else {
-          _showControlsThenAutoHide();
-        }
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(color: Colors.black),
-          if (ready)
-            FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: c.value.size.width,
-                height: c.value.size.height,
-                child: VideoPlayer(c),
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (_showControls) {
+            _togglePlay();
+          } else {
+            _showControlsThenAutoHide();
+          }
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: Colors.black),
+            if (ready)
+              FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: c.value.size.width,
+                  height: c.value.size.height,
+                  child: VideoPlayer(c),
+                ),
+              )
+            else
+              const Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.white),
+                ),
               ),
-            )
-          else
-            const Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Colors.white),
-              ),
-            ),
-          // Center play/pause hint
-          if (ready && _showControls)
-            Center(
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: _showControls ? 1 : 0,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _togglePlay,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black.withValues(alpha: 0.45),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                      size: 36,
+            // Center play/pause hint
+            if (ready && _showControls)
+              Center(
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 180),
+                  opacity: _showControls ? 1 : 0,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _togglePlay,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.45),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                        size: 36,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          // Bottom control bar (scrub + times). Positioned just above
-          // the measured caption / action panel so multi-line captions
-          // can't push the panel over the scrubber. When the user
-          // lowers the panel (chevron tap), it shifts off-screen and
-          // the scrubber drops near the bottom edge.
-          if (ready)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: 12,
-              right: 12,
-              bottom: widget.captionPanelLowered
-                  // Lowered: panel is hidden, scrubber sits near the
-                  // bottom edge with just enough room for a finger.
-                  ? 48
-                  // Raised: clear the panel + 12 px gap + the panel's
-                  // own 12 px bottom offset. Falls back to 105 (the
-                  // old static value) before the post-frame measure
-                  // has populated the height.
-                  : (widget.captionPanelHeight > 0
-                      ? widget.captionPanelHeight + 24
-                      : 105),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: _showControls ? 1 : 0,
-                child: IgnorePointer(
-                  ignoring: !_showControls,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.18)),
-                        ),
-                        child: Row(
-                          children: [
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: _togglePlay,
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  isPlaying ? Icons.pause : Icons.play_arrow,
+            // Bottom control bar (scrub + times). Positioned just above
+            // the measured caption / action panel so multi-line captions
+            // can't push the panel over the scrubber. When the user
+            // lowers the panel (chevron tap), it shifts off-screen and
+            // the scrubber drops near the bottom edge.
+            if (ready)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                left: 12,
+                right: 12,
+                bottom: widget.captionPanelLowered
+                    // Lowered: panel is hidden, scrubber sits near the
+                    // bottom edge with just enough room for a finger.
+                    ? 48
+                    // Raised: clear the panel + 12 px gap + the panel's
+                    // own 12 px bottom offset. Falls back to 105 (the
+                    // old static value) before the post-frame measure
+                    // has populated the height.
+                    : (widget.captionPanelHeight > 0
+                        ? widget.captionPanelHeight + 24
+                        : 105),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 180),
+                  opacity: _showControls ? 1 : 0,
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.18)),
+                          ),
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _togglePlay,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(
+                                    isPlaying ? Icons.pause : Icons.play_arrow,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _fmt(position),
+                                style: const TextStyle(
                                   color: Colors.white,
-                                  size: 22,
+                                  fontSize: 11,
+                                  fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _fmt(position),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontFeatures: [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 2.5,
-                                  activeTrackColor: Colors.white,
-                                  inactiveTrackColor:
-                                      Colors.white.withValues(alpha: 0.3),
-                                  thumbColor: Colors.white,
-                                  overlayColor:
-                                      Colors.white.withValues(alpha: 0.15),
-                                  thumbShape: const RoundSliderThumbShape(
-                                      enabledThumbRadius: 6),
-                                  overlayShape: const RoundSliderOverlayShape(
-                                      overlayRadius: 14),
-                                ),
-                                child: Slider(
-                                  min: 0,
-                                  max: maxMs <= 0 ? 1 : maxMs,
-                                  value: posMs.clamp(0, maxMs <= 0 ? 1 : maxMs),
-                                  onChangeStart: (_) {
-                                    _scrubbing = true;
-                                    _hideTimer?.cancel();
-                                  },
-                                  onChanged: (v) {
-                                    setState(() {
-                                      _scrubPosition =
-                                          Duration(milliseconds: v.toInt());
-                                    });
-                                  },
-                                  onChangeEnd: (v) async {
-                                    await _controller?.seekTo(
-                                        Duration(milliseconds: v.toInt()));
-                                    _scrubbing = false;
-                                    _scheduleHide();
-                                  },
+                              Expanded(
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 2.5,
+                                    activeTrackColor: Colors.white,
+                                    inactiveTrackColor:
+                                        Colors.white.withValues(alpha: 0.3),
+                                    thumbColor: Colors.white,
+                                    overlayColor:
+                                        Colors.white.withValues(alpha: 0.15),
+                                    thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 6),
+                                    overlayShape: const RoundSliderOverlayShape(
+                                        overlayRadius: 14),
+                                  ),
+                                  child: Slider(
+                                    min: 0,
+                                    max: maxMs <= 0 ? 1 : maxMs,
+                                    value:
+                                        posMs.clamp(0, maxMs <= 0 ? 1 : maxMs),
+                                    onChangeStart: (_) {
+                                      _scrubbing = true;
+                                      _hideTimer?.cancel();
+                                    },
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _scrubPosition =
+                                            Duration(milliseconds: v.toInt());
+                                      });
+                                    },
+                                    onChangeEnd: (v) async {
+                                      await _controller?.seekTo(
+                                          Duration(milliseconds: v.toInt()));
+                                      _scrubbing = false;
+                                      _scheduleHide();
+                                    },
+                                  ),
                                 ),
                               ),
-                            ),
-                            Text(
-                              _fmt(duration),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontFeatures: [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: _toggleMute,
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  _muted ? Icons.volume_off : Icons.volume_up,
+                              Text(
+                                _fmt(duration),
+                                style: const TextStyle(
                                   color: Colors.white,
-                                  size: 18,
+                                  fontSize: 11,
+                                  fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 2),
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: _openFullscreen,
-                              child: const Padding(
-                                padding: EdgeInsets.all(4),
-                                child: Icon(
-                                  Icons.fullscreen,
-                                  color: Colors.white,
-                                  size: 20,
+                              const SizedBox(width: 4),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _toggleMute,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(
+                                    _muted ? Icons.volume_off : Icons.volume_up,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 2),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _openFullscreen,
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.fullscreen,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1962,8 +2214,8 @@ Future<void> discussPost(
 
   try {
     // If a Discuss topic already exists, just open it.
-    var topicId =
-        post.discussTopicId ?? await postService.findDiscussTopicForPost(post.id);
+    var topicId = post.discussTopicId ??
+        await postService.findDiscussTopicForPost(post.id);
 
     if (topicId == null) {
       // New topic — ask the user to type their question first.
@@ -2130,8 +2382,7 @@ class _OwnerMenu extends StatelessWidget {
             child: Row(children: [
               const Icon(Icons.delete_outline, size: 18, color: Colors.red),
               const SizedBox(width: 8),
-              Text(context.t.delete,
-                  style: const TextStyle(color: Colors.red)),
+              Text(context.t.delete, style: const TextStyle(color: Colors.red)),
             ]),
           ),
         ],
@@ -2171,8 +2422,8 @@ class _OwnerMenu extends StatelessWidget {
             );
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(context.t.postCardFailed(e))));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.postCardFailed(e))));
         }
       }
     }
@@ -2216,8 +2467,8 @@ class _OwnerMenu extends StatelessWidget {
         ref.invalidate(travelFeedProvider);
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(context.t.postCardFailed(e))));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.t.postCardFailed(e))));
         }
       }
     }
@@ -2273,8 +2524,7 @@ class _ViewerMenu extends StatelessWidget {
             child: Row(children: [
               const Icon(Icons.flag_outlined, size: 18, color: Colors.red),
               const SizedBox(width: 8),
-              Text(context.t.report,
-                  style: const TextStyle(color: Colors.red)),
+              Text(context.t.report, style: const TextStyle(color: Colors.red)),
             ]),
           ),
         ],
@@ -2696,8 +2946,7 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
                           Clipboard.setData(ClipboardData(text: _translated!));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content:
-                                  Text(context.t.commentTranslationCopied),
+                              content: Text(context.t.commentTranslationCopied),
                             ),
                           );
                         },
@@ -2797,8 +3046,8 @@ class _ShareRecipientCard extends StatelessWidget {
               GestureDetector(
                 onTap: onSend,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
@@ -2808,8 +3057,7 @@ class _ShareRecipientCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            const Color(0xFFB05ECC).withValues(alpha: 0.35),
+                        color: const Color(0xFFB05ECC).withValues(alpha: 0.35),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),

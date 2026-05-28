@@ -316,39 +316,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     required String? Function(String?) validator,
     bool isPassword = false,
   }) {
-    return AppGlassCard(
-      radius: 16,
-      child: TextFormField(
-        controller: controller,
-        validator: validator,
-        obscureText: isPassword ? _obscurePassword : false,
-        style: TextStyle(fontSize: 14, color: context.textPrimary),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
-          prefixIcon: Icon(prefixIcon, size: 20, color: context.textMuted),
-          suffixIcon: isPassword
-              ? IconButton(
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    size: 20,
-                    color: context.textMuted,
-                  ),
-                  onPressed: () {
-                    setState(() => _obscurePassword = !_obscurePassword);
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          focusedErrorBorder: InputBorder.none,
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+    return FormField<String>(
+      initialValue: controller.text,
+      validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      builder: (field) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppGlassCard(
+            radius: 16,
+            borderAlpha: field.hasError ? 0.7 : null,
+            child: TextField(
+              controller: controller,
+              obscureText: isPassword ? _obscurePassword : false,
+              onChanged: field.didChange,
+              style: TextStyle(fontSize: 14, color: context.textPrimary),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+                prefixIcon:
+                    Icon(prefixIcon, size: 20, color: context.textMuted),
+                suffixIcon: isPassword
+                    ? IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 20,
+                          color: context.textMuted,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+          if (field.hasError) _authFieldError(field.errorText!),
+        ],
+      ),
+    );
+  }
+
+  Widget _authFieldError(String text) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 16, top: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.redAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
