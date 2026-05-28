@@ -775,11 +775,11 @@ class _CommentTile extends ConsumerWidget {
                     ),
                   ),
                   if (senderOnlyLabel)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        'Visible only to you',
-                        style: TextStyle(
+                        context.t.visibleOnlyToYou,
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFFB00020),

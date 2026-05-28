@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
+
 // ─────────────────────────────────────────────
 // Public overlay model + composer + placed-overlay widget, shared
 // between [StoryPreviewScreen] (image stories) and
@@ -816,7 +818,7 @@ class _FontStyleChip extends StatelessWidget {
           color: Colors.black.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Center(child: Text('Aa', style: _style)),
+        child: Center(child: Text(context.t.storyTextFontSample, style: _style)),
       ),
     );
   }

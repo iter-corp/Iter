@@ -459,6 +459,11 @@ const Map<String, String> arStrings = {
   'qa_could_not_save_reaction': 'تعذر حفظ التفاعل: {error}',
   'qa_write_answer_hint': 'اكتب إجابتك...',
   'qa_write_reply_hint': 'اكتب ردك...',
+  'qa_view_replies': 'عرض الردود ({count})',
+  'comment_delete_title': 'حذف التعليق؟',
+  'comment_delete_body': 'هل أنت متأكد أنك تريد حذف هذا التعليق؟',
+  'home_whats_your_discussion': 'ما الذي تريد مناقشته؟',
+  'home_post_discussion': 'نشر النقاش',
   'create_post_new_post': 'منشور جديد',
   'create_post_caption_hint': "ماذا يحدث؟ شارك لحظتك…",
   'create_post_place': 'المكان',
@@ -1169,6 +1174,13 @@ const Map<String, String> arStrings = {
   'profile_no_answers_subtitle': 'الأسئلة التي أجبت عليها ستظهر هنا.',
   'profile_questions_asked': 'الأسئلة المطروحة',
   'profile_questions_answered': 'الأسئلة المجابة',
+  'profile_threads_started': 'المواضيع التي بدأتها',
+  'profile_replies': 'الردود',
+  'profile_no_threads_started': 'لم تبدأ أي موضوع بعد',
+  'profile_no_replies_yet': 'لا توجد ردود بعد',
+  'profile_no_threads_started_subtitle':
+      'الأسئلة والنقاشات التي تبدأها ستظهر هنا.',
+  'profile_no_replies_subtitle': 'المواضيع التي ترد عليها ستظهر هنا.',
   'profile_invite_friends': 'دعوة الأصدقاء',
   'profile_create_first_post': 'أنشئ منشورك الأول',
   'profile_share_your_content': 'شارك محتواك',
@@ -1391,4 +1403,125 @@ const Map<String, String> arStrings = {
   'city_picker_select': 'اختر المدينة',
   'city_picker_loading': 'جارٍ تحميل المدن…',
   'city_picker_all': 'كل المدن',
+
+  // ── ADMIN — DELETE CONVERSATION / REPORT (added) ──
+  'admin_delete_conversation_tooltip': 'حذف المحادثة',
+  'admin_delete_conversation_title': 'حذف المحادثة؟',
+  'admin_delete_conversation_body':
+      'سيؤدي هذا إلى إزالة هذه المحادثة وجميع رسائلها بشكل نهائي.',
+  'admin_conversation_deleted': 'تم حذف المحادثة',
+
+  'admin_delete_report_discuss_body':
+      'سيؤدي هذا إلى إزالة هذا البلاغ دون اتخاذ أي إجراء على الموضوع.',
+  'admin_delete_report_post_body':
+      'سيؤدي هذا إلى إزالة هذا البلاغ دون اتخاذ أي إجراء على المنشور.',
+  'admin_delete_report_user_body':
+      'سيؤدي هذا إلى إزالة هذا البلاغ دون اتخاذ أي إجراء على المستخدم.',
+
+  // ── ADMIN SETTINGS (added) ──
+  'admin_settings_section_professions': 'المهن في الملف الشخصي',
+  'admin_settings_section_professions_desc':
+      'الخيارات المعروضة في إعداد/تحرير الملف الشخصي للمهنة.',
+  'admin_settings_add_profession': 'إضافة مهنة',
+  'admin_settings_section_fields': 'مجالات الملف الشخصي',
+  'admin_settings_section_fields_desc':
+      'الخيارات المعروضة في إعداد/تحرير الملف الشخصي للمجال.',
+  'admin_settings_add_field': 'إضافة مجال',
+  'admin_settings_section_academic_levels': 'المستويات الأكاديمية للملف الشخصي',
+  'admin_settings_section_academic_levels_desc':
+      'الخيارات المعروضة في إعداد/تحرير الملف الشخصي للمستوى الأكاديمي.',
+  'admin_settings_add_academic_level': 'إضافة مستوى أكاديمي',
+  'admin_settings_section_goals': 'أهداف الملف الشخصي',
+  'admin_settings_section_goals_desc':
+      'الخيارات المعروضة في إعداد/تحرير الملف الشخصي للأهداف.',
+  'admin_settings_add_goal': 'إضافة هدف',
+  'admin_settings_section_profanity': 'الكلمات النابية (بالإنجليزية)',
+  'admin_settings_section_profanity_desc':
+      'كلمات تُفعّل الإشراف على المرسل فقط في الدردشة المباشرة والجماعية.',
+  'admin_settings_add_profanity': 'إضافة كلمة نابية',
+
+  // ── ADMIN EVENTS — FUNDS PICKER (added) ──
+  'admin_events_funds_placeholder': 'التمويل',
+  'admin_events_funds_sheet_title': 'اختر حالة التمويل',
+  'admin_events_funds_search_hint': 'ابحث في حالات التمويل...',
+
+  // ── HOME — DISCUSS BLOCKED + CITY SEARCH (added) ──
+  'home_question_blocked_title': 'تم حظر السؤال',
+  'home_question_blocked_body':
+      'لا يمكنك نشر سؤال النقاش هذا لأنه يحتوي على كلمات محظورة.',
+  'home_filter_by_city': 'تصفية حسب المدينة',
+  'home_filter_by_country': 'تصفية حسب البلد',
+
+  // ── EVENT SCREEN FILTERS (added) ──
+  'events_filter_by_type': 'تصفية الفعاليات حسب النوع',
+  'events_filter_by_field': 'تصفية حسب المجال',
+  'events_filter_by_academic_level': 'تصفية حسب المستوى الأكاديمي',
+
+  // ── REPORT REASONS (shared) ──
+  'report_reason_spam': 'سبام أو احتيال',
+  'report_reason_spam_profile': 'حساب سبام أو احتيال',
+  'report_reason_impersonation': 'انتحال شخصية',
+  'report_reason_harassment': 'تحرش أو تنمر',
+  'report_reason_hate': 'خطاب كراهية',
+  'report_reason_violence': 'عنف أو تهديدات',
+  'report_reason_nudity': 'عُري أو محتوى جنسي',
+  'report_reason_misinformation': 'معلومات مضللة',
+  'report_reason_other': 'شيء آخر',
+
+  // ── MAP ATTRIBUTION (added) ──
+  'map_attribution_short': '© OpenStreetMap',
+  'map_attribution_long': 'مساهمو OpenStreetMap',
+
+  // ── STORY TEXT OVERLAY (added) ──
+  'story_text_font_sample': 'أأ',
+
+  // ── SHARED VISIBLE-ONLY-TO-YOU ──
+  'visible_only_to_you': 'مرئي لك فقط',
+
+  // ── CHAT — message previews / reply nav snacks ──
+  'chat_voice_message_preview': 'رسالة صوتية',
+  'chat_photo_preview': 'صورة',
+  'chat_sticker_preview': 'ملصق',
+  'chat_shared_post_preview': 'منشور مشارَك',
+  'chat_encrypted_preview': '🔒 رسالة مشفّرة',
+  'chat_reply_no_longer_in_view': 'الرسالة الأصلية لم تعد ظاهرة',
+  'chat_reply_was_deleted': 'تم حذف الرسالة الأصلية',
+
+  // ── EVENT FILTER CHIP ──
+  'events_filter_by_type_chip': 'تصفية حسب النوع',
+
+  // ── HOME / TRAVEL FILTER SHEET ──
+  'home_location_unavailable': 'الموقع غير متاح',
+  'home_current_location': 'الموقع الحالي',
+  'home_no_matches': 'لا توجد نتائج',
+  'home_default_show_travel': 'افتراضي: عرض منشورات السفر من كل مكان.',
+  'home_use_my_current_location': 'استخدام موقعي الحالي',
+  'home_travel_filter_title': 'تصفية السفر',
+  'home_no_places_found_travel': 'لا توجد أماكن في منشورات السفر.',
+  'home_matching_places': 'الأماكن المطابقة',
+  'home_popular_cities_countries': 'المدن/البلدان الشائعة',
+  'home_unknown_city_country': 'مدينة/بلد غير معروف',
+  'home_from_travel_posts': 'من منشورات السفر',
+  'home_apply_filter': 'تطبيق {filter}',
+  'home_filter_by_city_country': 'تصفية حسب المدينة/البلد',
+
+  // ── NOTIFICATIONS ──
+  'notif_role_updated_default': 'تم تحديث دورك',
+
+  // ── PROFILE ──
+  'profile_no_name': 'بدون اسم',
+
+  // ── POST CARD ROTATE TOOLTIP ──
+  'post_card_switch_portrait': 'التبديل إلى الوضع الرأسي',
+  'post_card_switch_landscape': 'التبديل إلى الوضع الأفقي',
+
+  // ── VIDEO STORY UPLOAD ERRORS ──
+  'video_empty_file': 'ملف الفيديو فارغ',
+
+  // ── FEATURE-DISABLED PLACEHOLDER ──
+  'feature_check_back_later': 'تحقّق لاحقاً.',
+  'feature_currently_disabled': '{feature} معطّل حالياً',
+
+  // ── AUTH — onboarding username check ──
+  'auth_username_taken': 'اسم المستخدم مستخدم بالفعل',
 };

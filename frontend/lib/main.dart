@@ -117,16 +117,22 @@ Future<void> main() async {
   });
 }
 
-Future<void> _configureSystemUi() async {
+Future<void> _configureSystemUi({Brightness? appBrightness}) async {
   if (kIsWeb) return;
 
+  // [appBrightness] picks the icon brightness so the status bar stays
+  // legible against the app background. Defaults to light app
+  // (= dark icons) for the very first paint before MaterialApp has a
+  // theme; on lifecycle resume we pass the active theme brightness in.
+  final isDark = appBrightness == Brightness.dark;
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
+    SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
       systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
@@ -165,7 +171,14 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_configureSystemUi());
+      // Re-apply the overlay with the *current* theme brightness so the
+      // status bar icons stay legible. The old call hardcoded light-mode
+      // (dark icons) and briefly flashed invisible icons in dark mode
+      // on resume before MaterialApp.builder corrected it.
+      final isDark = ref.read(themeModeProvider) == ThemeMode.dark;
+      unawaited(_configureSystemUi(
+        appBrightness: isDark ? Brightness.dark : Brightness.light,
+      ));
       // Restore the "online" flag after returning from background. The
       // onDisconnect handler set in PresenceService.setOnline already
       // flips us back to offline if the socket drops, so we re-register

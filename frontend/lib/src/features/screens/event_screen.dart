@@ -200,7 +200,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
 
   Future<void> _onEventTypeTap() async {
     final chosen = await _pickFromSheet(
-      title: 'Filter events by type',
+      title: context.t.eventsFilterByType,
       options: kEventTypes,
       selected: _selectedEventType,
     );
@@ -262,7 +262,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
       if (fields.isEmpty) return;
 
       final chosen = await _pickFromSheet(
-        title: 'Filter by field',
+        title: context.t.eventsFilterByField,
         options: fields,
         selected: _selectedField,
       );
@@ -285,7 +285,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
       if (levels.isEmpty) return;
 
       final chosen = await _pickFromSheet(
-        title: 'Filter by academic level',
+        title: context.t.eventsFilterByAcademicLevel,
         options: levels,
         selected: _selectedAcademicLevel,
       );
@@ -1421,7 +1421,7 @@ class _EventFilterBar extends StatelessWidget {
             child: _EventFilterChip(
               active: typeActive,
               icon: Icons.tune_rounded,
-              label: typeActive ? selectedType! : 'Filter by type',
+              label: typeActive ? selectedType! : context.t.eventsFilterByTypeChip,
               onTap: onTypeTap,
               onClear: onClearType,
             ),
@@ -2512,9 +2512,9 @@ class _EventsMapViewState extends State<_EventsMapView> {
               userAgentPackageName: 'com.coil.app',
             ),
             MarkerLayer(markers: markers),
-            const RichAttributionWidget(
+            RichAttributionWidget(
               attributions: [
-                TextSourceAttribution('OpenStreetMap contributors'),
+                TextSourceAttribution(context.t.mapAttributionLong),
               ],
             ),
           ],

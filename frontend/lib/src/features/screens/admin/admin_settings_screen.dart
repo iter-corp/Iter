@@ -375,18 +375,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                 onRemove: _removeEventType,
               ),
               const SizedBox(height: 16),
-              _section('Profile professions'),
+              _section(context.t.adminSettingsSectionProfessions),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Choices shown in profile setup/edit for profession.',
+                  context.t.adminSettingsSectionProfessionsDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.profileProfessionOptions,
                 controller: _newProfessionCtrl,
-                hint: 'Add a profession',
+                hint: context.t.adminSettingsAddProfession,
                 errorText: _newProfessionError,
                 onInputChanged: (_) {
                   if (_newProfessionError != null) {
@@ -397,18 +397,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                 onRemove: _removeProfession,
               ),
               const SizedBox(height: 16),
-              _section('Profile fields'),
+              _section(context.t.adminSettingsSectionFields),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Choices shown in profile setup/edit for field.',
+                  context.t.adminSettingsSectionFieldsDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.profileFieldOptions,
                 controller: _newFieldCtrl,
-                hint: 'Add a field',
+                hint: context.t.adminSettingsAddField,
                 errorText: _newFieldError,
                 onInputChanged: (_) {
                   if (_newFieldError != null)
@@ -418,18 +418,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                 onRemove: _removeField,
               ),
               const SizedBox(height: 16),
-              _section('Profile academic levels'),
+              _section(context.t.adminSettingsSectionAcademicLevels),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Choices shown in profile setup/edit for academic level.',
+                  context.t.adminSettingsSectionAcademicLevelsDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.profileAcademicLevelOptions,
                 controller: _newAcademicLevelCtrl,
-                hint: 'Add an academic level',
+                hint: context.t.adminSettingsAddAcademicLevel,
                 errorText: _newAcademicLevelError,
                 onInputChanged: (_) {
                   if (_newAcademicLevelError != null) {
@@ -440,18 +440,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                 onRemove: _removeAcademicLevel,
               ),
               const SizedBox(height: 16),
-              _section('Profile goals'),
+              _section(context.t.adminSettingsSectionGoals),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Choices shown in profile setup/edit for goals.',
+                  context.t.adminSettingsSectionGoalsDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.profileGoalOptions,
                 controller: _newGoalCtrl,
-                hint: 'Add a goal',
+                hint: context.t.adminSettingsAddGoal,
                 errorText: _newGoalError,
                 onInputChanged: (_) {
                   if (_newGoalError != null)
@@ -461,18 +461,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                 onRemove: _removeGoal,
               ),
               const SizedBox(height: 16),
-              _section('Profanity words (English)'),
+              _section(context.t.adminSettingsSectionProfanity),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 child: Text(
-                  'Words that trigger sender-only moderation in direct and group chat.',
+                  context.t.adminSettingsSectionProfanityDesc,
                   style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
               ),
               _editableList(
                 items: _cfg.profanityWordsEn,
                 controller: _newProfanityCtrl,
-                hint: 'Add a profanity word',
+                hint: context.t.adminSettingsAddProfanity,
                 errorText: _newProfanityError,
                 onInputChanged: (_) {
                   if (_newProfanityError != null) {

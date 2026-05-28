@@ -1300,16 +1300,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// If the target widget is not currently mounted (off-screen), we seek by
   /// stream index and retry ensureVisible before showing an error toast.
   Future<void> _scrollToMessage(String messageId) async {
+    final noLongerInView = context.t.chatReplyNoLongerInView;
+    final wasDeleted = context.t.chatReplyWasDeleted;
     if (await _ensureMessageVisible(messageId)) return;
 
     if (_messageOrder.isEmpty) {
-      _showReplyNavSnack('Original message is no longer in view');
+      _showReplyNavSnack(noLongerInView);
       return;
     }
 
     final targetIndex = _messageOrder.indexOf(messageId);
     if (targetIndex < 0) {
-      _showReplyNavSnack('Original message was deleted');
+      _showReplyNavSnack(wasDeleted);
       return;
     }
 
@@ -1323,7 +1325,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final totalItems = _messageOrder.length + _pending.length;
     if (totalItems <= 0) {
-      _showReplyNavSnack('Original message is no longer in view');
+      _showReplyNavSnack(noLongerInView);
       return;
     }
 
@@ -1353,7 +1355,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (await _ensureMessageVisible(messageId)) return;
     }
 
-    _showReplyNavSnack('Original message is no longer in view');
+    _showReplyNavSnack(noLongerInView);
   }
 
   /// Records how far from the bottom of the rendered content the
@@ -1411,12 +1413,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   String _previewOf(ChatMessage m) {
-    if (m.encryptedUnreadable) return '🔒 Encrypted message';
-    if (m.stickerUrl != null && m.stickerUrl!.isNotEmpty) return 'Sticker';
-    if (m.voiceUrl != null && m.voiceUrl!.isNotEmpty) return 'Voice message';
-    if (m.imageUrl != null && m.imageUrl!.isNotEmpty) return 'Photo';
+    if (m.encryptedUnreadable) return context.t.chatEncryptedPreview;
+    if (m.stickerUrl != null && m.stickerUrl!.isNotEmpty) {
+      return context.t.chatStickerPreview;
+    }
+    if (m.voiceUrl != null && m.voiceUrl!.isNotEmpty) {
+      return context.t.chatVoiceMessagePreview;
+    }
+    if (m.imageUrl != null && m.imageUrl!.isNotEmpty) {
+      return context.t.chatPhotoPreview;
+    }
     if (m.sharedPostId != null && m.sharedPostId!.isNotEmpty) {
-      return 'Shared post';
+      return context.t.chatSharedPostPreview;
     }
     return m.text;
   }
@@ -2969,9 +2977,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, right: 4),
                   child: Text(
-                    'Visible only to you',
-                    style: TextStyle(
-                      color: const Color(0xFFB00020),
+                    context.t.visibleOnlyToYou,
+                    style: const TextStyle(
+                      color: Color(0xFFB00020),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),

@@ -113,7 +113,16 @@ class _EventNotificationsSettingsScreenState
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(context.t.eventNotifTitle),
+        title: Text(
+          context.t.eventNotifTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          // Smaller than the default 20sp so longer translations
+          // (Arabic/Kurdish) fit on a single line alongside the
+          // back arrow and the Save action.
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        titleSpacing: 8,
         backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
@@ -318,6 +327,10 @@ class _EventNotificationsSettingsScreenState
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
+        // Longer translations (Arabic/Kurdish) wrap the title to a
+        // second line; isThreeLine gives the tile vertical room for
+        // the wrapped title plus the subtitle.
+        isThreeLine: true,
         activeThumbColor: Colors.white,
         activeTrackColor: AppColors.purple,
         inactiveThumbColor: context.textSecondary,
@@ -336,39 +349,21 @@ class _EventNotificationsSettingsScreenState
             size: 20,
           ),
         ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: value ? AppColors.purple : context.textPrimary,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: value
-                    ? AppColors.purple
-                    : context.textSecondary.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                value ? context.t.on : context.t.off,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  color: value ? Colors.white : context.textSecondary,
-                ),
-              ),
-            ),
-          ],
+        // Dropped the ON/OFF chip that used to live next to the title.
+        // The Switch thumb itself already communicates state and the
+        // chip was squeezing the title into a 2-line wrap on Arabic /
+        // Kurdish.
+        title: Text(
+          title,
+          maxLines: 2,
+          softWrap: true,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+            color: value ? AppColors.purple : context.textPrimary,
+          ),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),

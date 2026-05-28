@@ -145,6 +145,8 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
             foregroundColor: context.textPrimary,
             backgroundColor: Colors.transparent,
             elevation: 0,
+            flexibleSpace:
+                const AppPageBackground(child: SizedBox.expand()),
           ),
           body: AppPageBackground(
             child: SafeArea(
@@ -570,7 +572,7 @@ class _QuestionCard extends ConsumerWidget {
                               setSheetState(() => selectedReason = value);
                             },
                             title: Text(
-                              reason,
+                              context.t.reportReasonLabel(reason),
                               style: TextStyle(color: context.textPrimary),
                             ),
                           ),
@@ -992,7 +994,7 @@ class _AnswerReactionBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!enabled) {
       return Text(
-        'Visible only to you',
+        context.t.visibleOnlyToYou,
         style: TextStyle(
           fontSize: compact ? 11 : 12,
           fontWeight: FontWeight.w700,
@@ -1358,11 +1360,11 @@ class _AnswerRow extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Visible only to you',
-                  style: TextStyle(
+                  context.t.visibleOnlyToYou,
+                  style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFFB00020),
+                    color: Color(0xFFB00020),
                   ),
                 ),
               ),

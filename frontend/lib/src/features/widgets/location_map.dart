@@ -124,10 +124,10 @@ class MapPreview extends StatelessWidget {
                         color: Colors.black.withValues(alpha: 0.45),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        '© OpenStreetMap',
-                        style:
-                            TextStyle(color: Colors.white70, fontSize: 9),
+                      child: Text(
+                        context.t.mapAttributionShort,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 9),
                       ),
                     ),
                   ],
@@ -257,10 +257,10 @@ class LocationMapScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const RichAttributionWidget(
+                RichAttributionWidget(
                   attributions: [
                     TextSourceAttribution(
-                      'OpenStreetMap contributors',
+                      context.t.mapAttributionLong,
                     ),
                   ],
                 ),

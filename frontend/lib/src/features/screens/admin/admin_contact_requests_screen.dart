@@ -259,28 +259,26 @@ class _AdminRequestTile extends ConsumerWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'Delete conversation',
+                tooltip: context.t.adminDeleteConversationTooltip,
                 icon: const Icon(Icons.delete_outline,
                     size: 18, color: Colors.red),
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Delete conversation?'),
-                      content: const Text(
-                        'This will permanently remove this contact thread and all its messages.',
-                      ),
+                      title: Text(context.t.adminDeleteConversationTitle),
+                      content: Text(context.t.adminDeleteConversationBody),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
+                          child: Text(context.t.cancel),
                         ),
                         FilledButton(
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.red,
                           ),
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Delete'),
+                          child: Text(context.t.delete),
                         ),
                       ],
                     ),
@@ -291,10 +289,12 @@ class _AdminRequestTile extends ConsumerWidget {
                         .read(contactRequestServiceProvider)
                         .deleteRequest(request.id);
                     if (!context.mounted) return;
-                    AppFeedback.showSuccess(context, 'Conversation deleted');
+                    AppFeedback.showSuccess(
+                        context, context.t.adminConversationDeleted);
                   } catch (e) {
                     if (!context.mounted) return;
-                    AppFeedback.showError(context, 'Failed: $e');
+                    AppFeedback.showError(
+                        context, context.t.failedWithError(e));
                   }
                 },
               ),

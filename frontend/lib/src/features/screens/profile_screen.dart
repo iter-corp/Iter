@@ -161,7 +161,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ProfileNameBio(
                     name: (user['name'] as String?) ??
                         (user['username'] as String?) ??
-                        'No name',
+                        context.t.profileNoName,
                     handle: (user['handle'] as String?) ??
                         ((user['username'] as String?) != null
                             ? '@${user['username']}'

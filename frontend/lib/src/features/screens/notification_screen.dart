@@ -793,7 +793,7 @@ class _NotificationItem extends ConsumerWidget {
             break;
           case 'role_update':
             title = (notif.title ?? '').trim().isEmpty
-                ? 'Your role was updated'
+                ? context.t.notifRoleUpdatedDefault
                 : notif.title!.trim();
             final details = (notif.subtitle ?? '').trim();
             subtitle = details.isEmpty

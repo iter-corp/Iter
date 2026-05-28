@@ -1760,8 +1760,8 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
                               : Icons.screen_rotation,
                           onTap: _toggleLandscape,
                           tooltip: _isLandscape
-                              ? 'Switch to portrait'
-                              : 'Switch to landscape',
+                              ? context.t.postCardSwitchPortrait
+                              : context.t.postCardSwitchLandscape,
                         ),
                       ],
                     ),
@@ -2345,7 +2345,7 @@ class _ViewerMenu extends StatelessWidget {
                               setSheetState(() => selectedReason = value);
                             },
                             title: Text(
-                              reason,
+                              context.t.reportReasonLabel(reason),
                               style: TextStyle(color: context.textPrimary),
                             ),
                           ),

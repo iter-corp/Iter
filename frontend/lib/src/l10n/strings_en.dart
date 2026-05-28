@@ -1510,4 +1510,125 @@ const Map<String, String> enStrings = {
   'city_picker_select': 'Select city',
   'city_picker_loading': 'Loading cities…',
   'city_picker_all': 'All cities',
+
+  // ── ADMIN — DELETE CONVERSATION / REPORT (added) ──
+  'admin_delete_conversation_tooltip': 'Delete conversation',
+  'admin_delete_conversation_title': 'Delete conversation?',
+  'admin_delete_conversation_body':
+      'This will permanently remove this contact thread and all its messages.',
+  'admin_conversation_deleted': 'Conversation deleted',
+
+  'admin_delete_report_discuss_body':
+      'This will remove this report without taking any action on the thread.',
+  'admin_delete_report_post_body':
+      'This will remove this report without taking any action on the post.',
+  'admin_delete_report_user_body':
+      'This will remove this report without taking any action on the user.',
+
+  // ── ADMIN SETTINGS (added) ──
+  'admin_settings_section_professions': 'Profile professions',
+  'admin_settings_section_professions_desc':
+      'Choices shown in profile setup/edit for profession.',
+  'admin_settings_add_profession': 'Add a profession',
+  'admin_settings_section_fields': 'Profile fields',
+  'admin_settings_section_fields_desc':
+      'Choices shown in profile setup/edit for field.',
+  'admin_settings_add_field': 'Add a field',
+  'admin_settings_section_academic_levels': 'Profile academic levels',
+  'admin_settings_section_academic_levels_desc':
+      'Choices shown in profile setup/edit for academic level.',
+  'admin_settings_add_academic_level': 'Add an academic level',
+  'admin_settings_section_goals': 'Profile goals',
+  'admin_settings_section_goals_desc':
+      'Choices shown in profile setup/edit for goals.',
+  'admin_settings_add_goal': 'Add a goal',
+  'admin_settings_section_profanity': 'Profanity words (English)',
+  'admin_settings_section_profanity_desc':
+      'Words that trigger sender-only moderation in direct and group chat.',
+  'admin_settings_add_profanity': 'Add a profanity word',
+
+  // ── ADMIN EVENTS — FUNDS PICKER (added) ──
+  'admin_events_funds_placeholder': 'Funds',
+  'admin_events_funds_sheet_title': 'Choose funding status',
+  'admin_events_funds_search_hint': 'Search funding status...',
+
+  // ── HOME — DISCUSS BLOCKED + CITY SEARCH (added) ──
+  'home_question_blocked_title': 'Question blocked',
+  'home_question_blocked_body':
+      'You cannot post this Discuss question because it contains blocked words.',
+  'home_filter_by_city': 'Filter by city',
+  'home_filter_by_country': 'Filter by country',
+
+  // ── EVENT SCREEN FILTERS (added) ──
+  'events_filter_by_type': 'Filter events by type',
+  'events_filter_by_field': 'Filter by field',
+  'events_filter_by_academic_level': 'Filter by academic level',
+
+  // ── REPORT REASONS (shared) ──
+  'report_reason_spam': 'Spam or scam',
+  'report_reason_spam_profile': 'Spam or scam profile',
+  'report_reason_impersonation': 'Impersonation',
+  'report_reason_harassment': 'Harassment or bullying',
+  'report_reason_hate': 'Hate speech',
+  'report_reason_violence': 'Violence or threats',
+  'report_reason_nudity': 'Nudity or sexual content',
+  'report_reason_misinformation': 'Misinformation',
+  'report_reason_other': 'Something else',
+
+  // ── MAP ATTRIBUTION (added) ──
+  'map_attribution_short': '© OpenStreetMap',
+  'map_attribution_long': 'OpenStreetMap contributors',
+
+  // ── STORY TEXT OVERLAY (added) ──
+  'story_text_font_sample': 'Aa',
+
+  // ── SHARED VISIBLE-ONLY-TO-YOU (sender-only profanity badge) ──
+  'visible_only_to_you': 'Visible only to you',
+
+  // ── CHAT — message previews / reply nav snacks ──
+  'chat_voice_message_preview': 'Voice message',
+  'chat_photo_preview': 'Photo',
+  'chat_sticker_preview': 'Sticker',
+  'chat_shared_post_preview': 'Shared post',
+  'chat_encrypted_preview': '🔒 Encrypted message',
+  'chat_reply_no_longer_in_view': 'Original message is no longer in view',
+  'chat_reply_was_deleted': 'Original message was deleted',
+
+  // ── EVENT FILTER CHIP ──
+  'events_filter_by_type_chip': 'Filter by type',
+
+  // ── HOME / TRAVEL FILTER SHEET ──
+  'home_location_unavailable': 'Location unavailable',
+  'home_current_location': 'Current location',
+  'home_no_matches': 'No matches',
+  'home_default_show_travel': 'Default: show travel posts from anywhere.',
+  'home_use_my_current_location': 'Use my current location',
+  'home_travel_filter_title': 'Travel Filter',
+  'home_no_places_found_travel': 'No places found in travel posts.',
+  'home_matching_places': 'Matching places',
+  'home_popular_cities_countries': 'Popular cities/countries',
+  'home_unknown_city_country': 'Unknown city/country',
+  'home_from_travel_posts': 'From travel posts',
+  'home_apply_filter': 'Apply {filter}',
+  'home_filter_by_city_country': 'Filter by city/country',
+
+  // ── NOTIFICATIONS ──
+  'notif_role_updated_default': 'Your role was updated',
+
+  // ── PROFILE ──
+  'profile_no_name': 'No name',
+
+  // ── POST CARD ROTATE TOOLTIP ──
+  'post_card_switch_portrait': 'Switch to portrait',
+  'post_card_switch_landscape': 'Switch to landscape',
+
+  // ── VIDEO STORY UPLOAD ERRORS ──
+  'video_empty_file': 'Empty video file',
+
+  // ── FEATURE-DISABLED PLACEHOLDER ──
+  'feature_check_back_later': 'Check back later.',
+  'feature_currently_disabled': '{feature} is currently disabled',
+
+  // ── AUTH — onboarding username check ──
+  'auth_username_taken': 'Username already taken',
 };

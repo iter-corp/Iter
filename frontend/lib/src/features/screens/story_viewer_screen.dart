@@ -2393,7 +2393,8 @@ class _VideoStoryPlayer extends StatefulWidget {
   State<_VideoStoryPlayer> createState() => _VideoStoryPlayerState();
 }
 
-class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
+class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
+    with WidgetsBindingObserver {
   VideoPlayerController? _controller;
   bool _failed = false;
   // Cached effective trim window resolved against the actual video
@@ -2407,15 +2408,31 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
   // ticking jerkily / appearing not to move. A periodic poll gives the
   // bar a smooth 60ms update cadence regardless of platform.
   Timer? _positionTimer;
+  // Last known playhead position. Remembered across app-background so
+  // we can resume where the user left off after recreating the
+  // controller on AppLifecycleState.resumed.
+  Duration _lastKnownPosition = Duration.zero;
+  // True while we've torn down the codec because the app went to
+  // background. The next `resumed` event recreates the controller; we
+  // also short-circuit `build` to a spinner so the broken-image
+  // placeholder doesn't flash in.
+  bool _suspended = false;
+  // Guards against overlapping setup calls — `initialize()` is async
+  // and the lifecycle observer can fire while one is in flight,
+  // racing on `_controller`.
+  bool _setupInFlight = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.pausedNotifier?.addListener(_onPausedChanged);
     _setup();
   }
 
-  Future<void> _setup() async {
+  Future<void> _setup({Duration resumeFrom = Duration.zero}) async {
+    if (_setupInFlight) return;
+    _setupInFlight = true;
     try {
       final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
       await c.initialize();
@@ -2440,8 +2457,13 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
       final hasTrim =
           widget.trimStart != null || widget.trimEnd != null;
       await c.setLooping(!hasTrim);
-      if (hasTrim) {
-        await c.seekTo(_effectiveStart);
+      // Pick a seek target: the explicit resume position from the
+      // lifecycle handler wins; otherwise honor the trim start.
+      final seekTarget = resumeFrom > Duration.zero
+          ? (resumeFrom > _effectiveEnd ? _effectiveStart : resumeFrom)
+          : (hasTrim ? _effectiveStart : null);
+      if (seekTarget != null) {
+        await c.seekTo(seekTarget);
       }
       // Tick listener handles trim wraparound (seek back to start when
       // the playhead reaches the trim end). Position updates for the
@@ -2458,19 +2480,55 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
       }
       _startPositionTimer();
       // Tell the viewer the first frame is ready so it can start the
-      // progress timer (sized to the effective playback window). Done
-      // AFTER play() so the user doesn't see a black frame while the
-      // bar is already counting down.
-      final effective = _effectiveEnd - _effectiveStart;
-      widget.onReady?.call(effective);
-      if (mounted) setState(() {});
+      // progress timer (sized to the effective playback window). On a
+      // post-resume recreate we skip this — the parent's progress bar
+      // is already running off the previous onReady callback and
+      // re-arming it would restart the timer from zero.
+      if (resumeFrom == Duration.zero) {
+        final effective = _effectiveEnd - _effectiveStart;
+        widget.onReady?.call(effective);
+      }
+      if (mounted) setState(() => _suspended = false);
     } catch (_) {
       // Even on failure, signal "ready" so the viewer doesn't sit on a
       // spinner forever — the broken-image placeholder will render and
       // the timer will advance to the next story. Use the default
       // story tick when we have no real duration to report.
-      widget.onReady?.call(_kStoryDuration);
+      if (resumeFrom == Duration.zero) {
+        widget.onReady?.call(_kStoryDuration);
+      }
       if (mounted) setState(() => _failed = true);
+    } finally {
+      _setupInFlight = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Android releases the video codec's output surface when the
+    // activity is backgrounded; coming back, `VideoPlayerController`
+    // is stuck on a black frame even though it still reports
+    // `isInitialized=true`. So on `paused` we tear the controller
+    // down, and on `resumed` we rebuild it from the last known
+    // position.
+    //
+    // We deliberately do NOT react to `inactive` or `hidden` — those
+    // fire on transient focus loss (notification shade, permission
+    // dialogs, transient overlays) and tearing the codec down every
+    // time was overly aggressive and produced visible glitches.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      final c = _controller;
+      if (c != null && c.value.isInitialized) {
+        _lastKnownPosition = c.value.position;
+      }
+      _stopPositionTimer();
+      _controller?.removeListener(_onTick);
+      unawaited(_controller?.dispose() ?? Future.value());
+      _controller = null;
+      if (mounted) setState(() => _suspended = true);
+    } else if (state == AppLifecycleState.resumed && _suspended) {
+      unawaited(_setup(resumeFrom: _lastKnownPosition));
     }
   }
 
@@ -2505,12 +2563,14 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
     }
   }
 
-  /// Drives the story progress bar via a per-frame callback so the
-  /// motion is smooth at the display refresh rate. The raw video
-  /// `position` only updates a few times per second on Android, so
-  /// between native ticks we extrapolate using wall-clock delta from
-  /// the last reported position — that gives a continuous fill
-  /// matching what the user sees on screen.
+  /// Drives the story progress bar at ~60ms cadence. We deliberately
+  /// do NOT use `scheduleFrameCallback` to re-arm — that runs once per
+  /// vsync (~16ms on 60Hz) and asserts inside `SchedulerBinding` if
+  /// rescheduling outside a frame phase, which surfaced as a
+  /// "Exception caught by scheduler library" crash mid-playback. The
+  /// raw video `position` only updates a few times per second on
+  /// Android, so between native ticks we extrapolate using wall-clock
+  /// delta from the last reported position.
   Duration _lastReportedPos = Duration.zero;
   DateTime _lastReportedAt = DateTime.now();
 
@@ -2518,27 +2578,18 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
     _stopPositionTimer();
     _lastReportedPos = _controller?.value.position ?? Duration.zero;
     _lastReportedAt = DateTime.now();
-    _scheduleFrame();
-  }
-
-  void _scheduleFrame() {
-    _positionTimer = Timer(Duration.zero, () {
-      WidgetsBinding.instance.scheduleFrameCallback((_) => _onFrame());
-    });
+    _positionTimer = Timer.periodic(
+      const Duration(milliseconds: 60),
+      (_) => _onFrame(),
+    );
   }
 
   void _onFrame() {
     if (!mounted) return;
     final c = _controller;
-    if (c == null || !c.value.isInitialized) {
-      _scheduleFrame();
-      return;
-    }
+    if (c == null || !c.value.isInitialized) return;
     final cb = widget.onPositionUpdate;
-    if (cb == null) {
-      _scheduleFrame();
-      return;
-    }
+    if (cb == null) return;
     final nativePos = c.value.position;
     // If the native position has advanced, snap our anchor to it. If
     // it hasn't (between native ticks), extrapolate by the wall-clock
@@ -2564,7 +2615,6 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
       final frac = (intoMs / windowMs).clamp(0.0, 1.0);
       cb(frac);
     }
-    _scheduleFrame();
   }
 
   void _stopPositionTimer() {
@@ -2574,6 +2624,7 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopPositionTimer();
     widget.pausedNotifier?.removeListener(_onPausedChanged);
     _controller?.removeListener(_onTick);
@@ -2590,6 +2641,10 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer> {
     }
     final c = _controller;
     if (c == null || !c.value.isInitialized) {
+      // Covers both the initial-load case and the brief window after a
+      // post-resume recreate before `initialize()` returns. Showing a
+      // spinner here also masks the dark frame that used to leak
+      // through when the codec surface was released on backgrounding.
       return const Center(
         child: CircularProgressIndicator(color: Colors.white),
       );

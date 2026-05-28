@@ -1003,9 +1003,9 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                 },
               ),
               _SearchablePickerField(
-                placeholder: 'Funds',
-                sheetTitle: 'Choose funding status',
-                searchHint: 'Search funding status...',
+                placeholder: context.t.adminEventsFundsPlaceholder,
+                sheetTitle: context.t.adminEventsFundsSheetTitle,
+                searchHint: context.t.adminEventsFundsSearchHint,
                 options: fundsOptions,
                 selected: _funds.isEmpty ? null : _funds,
                 enableSearch: false,

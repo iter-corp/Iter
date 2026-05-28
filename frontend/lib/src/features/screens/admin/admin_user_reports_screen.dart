@@ -469,28 +469,27 @@ class _ReportTile extends ConsumerWidget {
                   child: Text(context.t.adminRemoveUser),
                 ),
                 IconButton(
-                  tooltip: 'Delete report',
+                  tooltip: context.t.adminDeleteReport,
                   icon: const Icon(Icons.delete_outline,
                       size: 18, color: Colors.red),
                   onPressed: () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text('Delete report?'),
-                        content: const Text(
-                          'This will remove this report without taking any action on the user.',
-                        ),
+                        title: Text(context.t.adminDeleteReportTitle),
+                        content:
+                            Text(context.t.adminDeleteReportUserBody),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
+                            child: Text(context.t.cancel),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.red,
                             ),
                             onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('Delete'),
+                            child: Text(context.t.delete),
                           ),
                         ],
                       ),
@@ -501,10 +500,12 @@ class _ReportTile extends ConsumerWidget {
                           .read(adminServiceProvider)
                           .deleteUserProfileReport(report.id);
                       if (!context.mounted) return;
-                      AppFeedback.showSuccess(context, 'Report deleted');
+                      AppFeedback.showSuccess(
+                          context, context.t.adminReportDeleted);
                     } catch (e) {
                       if (!context.mounted) return;
-                      AppFeedback.showError(context, 'Failed: $e');
+                      AppFeedback.showError(
+                          context, context.t.failedWithError(e));
                     }
                   },
                 ),

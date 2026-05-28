@@ -110,13 +110,18 @@ class _HomeBodyState extends ConsumerState<HomeBody>
   bool _searchFocused = false;
   double? _viewerLat;
   double? _viewerLng;
-  String _viewerCity = 'Location unavailable';
+  String _viewerCity = '';
   bool _resolvingLocation = false;
+
+  /// Localized label for the resolved city. Empty internally means
+  /// "not resolved yet"; UI surfaces a translated "Location unavailable"
+  /// fallback so this never leaks raw English to non-English users.
+  String _viewerCityLabel(BuildContext context) =>
+      _viewerCity.isEmpty ? context.t.homeLocationUnavailable : _viewerCity;
 
   String _defaultCityQuery() {
     final raw = _viewerCity.trim();
     if (raw.isEmpty) return '';
-    if (raw.toLowerCase() == 'location unavailable') return '';
     return raw.split(',').first.trim();
   }
 
@@ -435,10 +440,10 @@ class _HomeBodyState extends ConsumerState<HomeBody>
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _TravelFilterSheet(
-        title: 'Filter by city/country',
+        title: context.t.homeFilterByCityCountry,
         options: options,
         selected: selected,
-        currentLocationLabel: _viewerCity,
+        currentLocationLabel: _viewerCityLabel(context),
         showCurrentLocation: _viewerLat != null && _viewerLng != null,
       ),
     );
@@ -451,7 +456,9 @@ class _HomeBodyState extends ConsumerState<HomeBody>
       }
       if (chosen == _kTravelCurrentOption) {
         _selectedPlace = _PlaceSuggestion(
-          name: _viewerCity.isEmpty ? 'Current location' : _viewerCity,
+          name: _viewerCity.isEmpty
+              ? context.t.homeCurrentLocation
+              : _viewerCity,
           city: '',
           lat: _viewerLat,
           lng: _viewerLng,
@@ -609,7 +616,9 @@ class _HomeBodyState extends ConsumerState<HomeBody>
               : () {
                   setState(() {
                     _selectedPlace = _PlaceSuggestion(
-                      name: _viewerCity.isNotEmpty ? _viewerCity : 'Nearby',
+                      name: _viewerCity.isNotEmpty
+                          ? _viewerCity
+                          : context.t.homeNearby,
                       city: '',
                       lat: _viewerLat,
                       lng: _viewerLng,
@@ -1009,13 +1018,15 @@ class _TravelFilterSheetState extends State<_TravelFilterSheet> {
       if (widget.showCurrentLocation) _kTravelCurrentOption,
       ...widget.options,
     ];
+    final allPlacesLabel = context.t.homeAllPlaces;
+    final currentLocLabel = context.t.homeCurrentLocation;
     final filtered = _q.isEmpty
         ? options
         : options.where((o) {
             final label = o == _kTravelAllOption
-                ? 'All places'
+                ? allPlacesLabel
                 : o == _kTravelCurrentOption
-                    ? 'Current location · ${widget.currentLocationLabel}'
+                    ? '$currentLocLabel · ${widget.currentLocationLabel}'
                     : o;
             return label.toLowerCase().contains(_q);
           }).toList();
@@ -1068,7 +1079,7 @@ class _TravelFilterSheetState extends State<_TravelFilterSheet> {
                           style: TextButton.styleFrom(
                             foregroundColor: _kTravelFilterPurple,
                           ),
-                          child: const Text('Clear'),
+                          child: Text(context.t.clear),
                         ),
                     ],
                   ),
@@ -1079,7 +1090,7 @@ class _TravelFilterSheetState extends State<_TravelFilterSheet> {
                     controller: _search,
                     style: TextStyle(fontSize: 14, color: context.textPrimary),
                     decoration: InputDecoration(
-                      hintText: 'Search city',
+                      hintText: context.t.cityPickerSearchHint,
                       hintStyle: TextStyle(
                         fontSize: 14,
                         color: context.textSecondary,
@@ -1100,7 +1111,7 @@ class _TravelFilterSheetState extends State<_TravelFilterSheet> {
                           const BoxConstraints(minWidth: 40, minHeight: 40),
                       suffixIcon: _q.isNotEmpty
                           ? IconButton(
-                              tooltip: 'Clear search',
+                              tooltip: context.t.clearSearch,
                               onPressed: () {
                                 _search.clear();
                                 FocusScope.of(context).unfocus();
@@ -1139,7 +1150,7 @@ class _TravelFilterSheetState extends State<_TravelFilterSheet> {
                           child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Text(
-                              'No matches',
+                              context.t.homeNoMatches,
                               style: TextStyle(color: context.textSecondary),
                             ),
                           ),
@@ -1151,9 +1162,9 @@ class _TravelFilterSheetState extends State<_TravelFilterSheet> {
                           itemBuilder: (context, i) {
                             final opt = filtered[i];
                             final label = opt == _kTravelAllOption
-                                ? 'All places'
+                                ? allPlacesLabel
                                 : opt == _kTravelCurrentOption
-                                    ? 'Current location · ${widget.currentLocationLabel}'
+                                    ? '$currentLocLabel · ${widget.currentLocationLabel}'
                                     : opt;
                             final isSel = opt == widget.selected;
                             return Padding(
@@ -1882,7 +1893,7 @@ class _QaThreadCard extends ConsumerWidget {
                               setSheetState(() => selectedReason = value);
                             },
                             title: Text(
-                              reason,
+                              context.t.reportReasonLabel(reason),
                               style: TextStyle(color: context.textPrimary),
                             ),
                           ),
@@ -2438,14 +2449,12 @@ class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
         await showDialog<void>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Question blocked'),
-            content: const Text(
-              'You cannot post this Discuss question because it contains blocked words.',
-            ),
+            title: Text(context.t.homeQuestionBlockedTitle),
+            content: Text(context.t.homeQuestionBlockedBody),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('OK'),
+                child: Text(context.t.ok),
               ),
             ],
           ),
@@ -2792,7 +2801,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                     style: TextStyle(color: context.textPrimary),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.location_city, size: 18),
-                      hintText: 'Filter by city',
+                      hintText: context.t.homeFilterByCity,
                       hintStyle: TextStyle(color: context.textSecondary),
                       isDense: true,
                       border: InputBorder.none,
@@ -2806,7 +2815,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                     style: TextStyle(color: context.textPrimary),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.public, size: 18),
-                      hintText: 'Filter by country',
+                      hintText: context.t.homeFilterByCountry,
                       hintStyle: TextStyle(color: context.textSecondary),
                       isDense: true,
                       border: InputBorder.none,
@@ -2857,26 +2866,27 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
     );
   }
 
-  _PlaceSuggestion _typedFilter() {
+  _PlaceSuggestion _typedFilter(BuildContext context) {
     final city = _cityCtrl.text.trim();
     final country = _countryCtrl.text.trim();
     final query = [city, country].where((v) => v.isNotEmpty).join(', ');
     return _PlaceSuggestion(
-      name: query.isEmpty ? 'All places' : query,
+      name: query.isEmpty ? context.t.homeAllPlaces : query,
       city: '',
       queryText: query,
     );
   }
 
   Widget _allPlacesCard(BuildContext context) {
+    final allPlacesLabel = context.t.homeAllPlaces;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.pop(
           context,
-          const _PlaceSuggestion(
-            name: 'All places',
+          _PlaceSuggestion(
+            name: allPlacesLabel,
             city: '',
           ),
         ),
@@ -2905,7 +2915,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'All places',
+                      allPlacesLabel,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: context.textPrimary,
@@ -2913,7 +2923,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Default: show travel posts from anywhere.',
+                      context.t.homeDefaultShowTravel,
                       style: TextStyle(
                         fontSize: 12,
                         color: context.textSecondary,
@@ -2930,6 +2940,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
   }
 
   Widget _currentLocationCard(BuildContext context) {
+    final useCurrentLabel = context.t.homeUseMyCurrentLocation;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2937,7 +2948,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
         onTap: () => Navigator.pop(
           context,
           _PlaceSuggestion(
-            name: 'Use my current location',
+            name: useCurrentLabel,
             city: widget.currentLocationLabel,
             lat: widget.currentLat,
             lng: widget.currentLng,
@@ -2969,7 +2980,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Use my current location',
+                      useCurrentLabel,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: context.textPrimary,
@@ -2998,7 +3009,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
     final city = _cityCtrl.text.trim();
     final country = _countryCtrl.text.trim();
     final hasQuery = city.isNotEmpty || country.isNotEmpty;
-    final typedFilter = _typedFilter();
+    final typedFilter = _typedFilter(context);
 
     return Scaffold(
       backgroundColor: context.surfaceSoft,
@@ -3014,7 +3025,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                     icon: const Icon(Icons.arrow_back),
                   ),
                   Text(
-                    'Travel Filter',
+                    context.t.homeTravelFilterTitle,
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -3039,7 +3050,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                       onPressed: () => Navigator.pop(context, typedFilter),
                       icon: const Icon(Icons.tune),
                       label: Text(
-                        'Apply ${typedFilter.queryText}',
+                        context.t.homeApplyFilter(typedFilter.queryText ?? ''),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -3058,7 +3069,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                         : _results.isEmpty
                             ? Center(
                                 child: Text(
-                                  'No places found in travel posts.',
+                                  context.t.homeNoPlacesFoundTravel,
                                   style:
                                       TextStyle(color: context.textSecondary),
                                 ),
@@ -3068,7 +3079,7 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                                   if (!hasQuery &&
                                       widget.recents.isNotEmpty) ...[
                                     Text(
-                                      'Recent',
+                                      context.t.homeRecent,
                                       style: TextStyle(
                                         color: context.textSecondary,
                                         fontWeight: FontWeight.w700,
@@ -3093,8 +3104,8 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                                   ],
                                   Text(
                                     hasQuery
-                                        ? 'Matching places'
-                                        : 'Popular cities/countries',
+                                        ? context.t.homeMatchingPlaces
+                                        : context.t.homePopularCitiesCountries,
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontWeight: FontWeight.w700,
@@ -3134,8 +3145,8 @@ class _PlaceSearchScreenState extends ConsumerState<_PlaceSearchScreen> {
                                         ),
                                         subtitle: Text(
                                           p.city.isEmpty
-                                              ? 'Unknown city/country'
-                                              : 'From travel posts',
+                                              ? context.t.homeUnknownCityCountry
+                                              : context.t.homeFromTravelPosts,
                                           style: TextStyle(
                                               color: context.textSecondary),
                                         ),
@@ -3218,7 +3229,7 @@ class _MaintenanceBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Maintenance mode — some features may be unavailable.',
+              context.t.homeMaintenanceMode,
               style: TextStyle(fontSize: 13, color: context.textPrimary),
             ),
           ),

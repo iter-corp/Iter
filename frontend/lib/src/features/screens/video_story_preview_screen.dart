@@ -101,7 +101,7 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       _videoFileSize = size;
       debugPrint('[VideoStorySetup] file size=$size bytes');
       if (size == 0) {
-        if (mounted) setState(() => _initError = 'Empty video file');
+        if (mounted) setState(() => _initError = context.t.videoEmptyFile);
         return;
       }
     } catch (e, st) {

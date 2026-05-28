@@ -1817,6 +1817,171 @@ class AppStrings {
   String get cityPickerSelect => _get('city_picker_select');
   String get cityPickerLoading => _get('city_picker_loading');
   String get cityPickerAll => _get('city_picker_all');
+
+  // ── Admin — delete conversation / report (added) ──
+  String get adminDeleteConversationTooltip =>
+      _get('admin_delete_conversation_tooltip');
+  String get adminDeleteConversationTitle =>
+      _get('admin_delete_conversation_title');
+  String get adminDeleteConversationBody =>
+      _get('admin_delete_conversation_body');
+  String get adminConversationDeleted => _get('admin_conversation_deleted');
+  String get adminDeleteReportDiscussBody =>
+      _get('admin_delete_report_discuss_body');
+  String get adminDeleteReportPostBody =>
+      _get('admin_delete_report_post_body');
+  String get adminDeleteReportUserBody =>
+      _get('admin_delete_report_user_body');
+
+  // ── Admin settings ──
+  String get adminSettingsSectionProfessions =>
+      _get('admin_settings_section_professions');
+  String get adminSettingsSectionProfessionsDesc =>
+      _get('admin_settings_section_professions_desc');
+  String get adminSettingsAddProfession =>
+      _get('admin_settings_add_profession');
+  String get adminSettingsSectionFields =>
+      _get('admin_settings_section_fields');
+  String get adminSettingsSectionFieldsDesc =>
+      _get('admin_settings_section_fields_desc');
+  String get adminSettingsAddField => _get('admin_settings_add_field');
+  String get adminSettingsSectionAcademicLevels =>
+      _get('admin_settings_section_academic_levels');
+  String get adminSettingsSectionAcademicLevelsDesc =>
+      _get('admin_settings_section_academic_levels_desc');
+  String get adminSettingsAddAcademicLevel =>
+      _get('admin_settings_add_academic_level');
+  String get adminSettingsSectionGoals =>
+      _get('admin_settings_section_goals');
+  String get adminSettingsSectionGoalsDesc =>
+      _get('admin_settings_section_goals_desc');
+  String get adminSettingsAddGoal => _get('admin_settings_add_goal');
+  String get adminSettingsSectionProfanity =>
+      _get('admin_settings_section_profanity');
+  String get adminSettingsSectionProfanityDesc =>
+      _get('admin_settings_section_profanity_desc');
+  String get adminSettingsAddProfanity =>
+      _get('admin_settings_add_profanity');
+
+  // ── Admin events — funds picker ──
+  String get adminEventsFundsPlaceholder =>
+      _get('admin_events_funds_placeholder');
+  String get adminEventsFundsSheetTitle =>
+      _get('admin_events_funds_sheet_title');
+  String get adminEventsFundsSearchHint =>
+      _get('admin_events_funds_search_hint');
+
+  // ── Home — discuss blocked + city search ──
+  String get homeQuestionBlockedTitle => _get('home_question_blocked_title');
+  String get homeQuestionBlockedBody => _get('home_question_blocked_body');
+  String get homeFilterByCity => _get('home_filter_by_city');
+  String get homeFilterByCountry => _get('home_filter_by_country');
+
+  // ── Event screen filters ──
+  String get eventsFilterByType => _get('events_filter_by_type');
+  String get eventsFilterByField => _get('events_filter_by_field');
+  String get eventsFilterByAcademicLevel =>
+      _get('events_filter_by_academic_level');
+
+  // ── Report reasons (shared) ──
+  String get reportReasonSpam => _get('report_reason_spam');
+  String get reportReasonSpamProfile => _get('report_reason_spam_profile');
+  String get reportReasonImpersonation => _get('report_reason_impersonation');
+  String get reportReasonHarassment => _get('report_reason_harassment');
+  String get reportReasonHate => _get('report_reason_hate');
+  String get reportReasonViolence => _get('report_reason_violence');
+  String get reportReasonNudity => _get('report_reason_nudity');
+  String get reportReasonMisinformation =>
+      _get('report_reason_misinformation');
+  String get reportReasonOther => _get('report_reason_other');
+
+  // ── Map attribution ──
+  String get mapAttributionShort => _get('map_attribution_short');
+  String get mapAttributionLong => _get('map_attribution_long');
+
+  // ── Story text overlay ──
+  String get storyTextFontSample => _get('story_text_font_sample');
+
+  // ── Shared visible-only-to-you ──
+  String get visibleOnlyToYou => _get('visible_only_to_you');
+
+  // ── Chat — message previews / reply nav snacks ──
+  String get chatVoiceMessagePreview => _get('chat_voice_message_preview');
+  String get chatPhotoPreview => _get('chat_photo_preview');
+  String get chatStickerPreview => _get('chat_sticker_preview');
+  String get chatSharedPostPreview => _get('chat_shared_post_preview');
+  String get chatEncryptedPreview => _get('chat_encrypted_preview');
+  String get chatReplyNoLongerInView => _get('chat_reply_no_longer_in_view');
+  String get chatReplyWasDeleted => _get('chat_reply_was_deleted');
+
+  // ── Event filter chip ──
+  String get eventsFilterByTypeChip => _get('events_filter_by_type_chip');
+
+  // ── Home / travel filter sheet ──
+  String get homeLocationUnavailable => _get('home_location_unavailable');
+  String get homeCurrentLocation => _get('home_current_location');
+  String get homeNoMatches => _get('home_no_matches');
+  String get homeDefaultShowTravel => _get('home_default_show_travel');
+  String get homeUseMyCurrentLocation => _get('home_use_my_current_location');
+  String get homeTravelFilterTitle => _get('home_travel_filter_title');
+  String get homeNoPlacesFoundTravel => _get('home_no_places_found_travel');
+  String get homeMatchingPlaces => _get('home_matching_places');
+  String get homePopularCitiesCountries =>
+      _get('home_popular_cities_countries');
+  String get homeUnknownCityCountry => _get('home_unknown_city_country');
+  String get homeFromTravelPosts => _get('home_from_travel_posts');
+  String homeApplyFilter(Object filter) =>
+      _fmt('home_apply_filter', {'filter': filter});
+  String get homeFilterByCityCountry => _get('home_filter_by_city_country');
+
+  // ── Notifications ──
+  String get notifRoleUpdatedDefault => _get('notif_role_updated_default');
+
+  // ── Profile ──
+  String get profileNoName => _get('profile_no_name');
+
+  // ── Post card rotate tooltip ──
+  String get postCardSwitchPortrait => _get('post_card_switch_portrait');
+  String get postCardSwitchLandscape => _get('post_card_switch_landscape');
+
+  // ── Video story upload errors ──
+  String get videoEmptyFile => _get('video_empty_file');
+
+  // ── Feature disabled placeholder ──
+  String get featureCheckBackLater => _get('feature_check_back_later');
+  String featureCurrentlyDisabled(Object feature) =>
+      _fmt('feature_currently_disabled', {'feature': feature});
+
+  // ── Auth — onboarding username check ──
+  String get authUsernameTaken => _get('auth_username_taken');
+
+  /// Localized label for a backend report-reason string. Reasons are
+  /// stored in Firestore as English so admin tools stay readable, but
+  /// the UI shows the translated version.
+  String reportReasonLabel(String englishReason) {
+    switch (englishReason) {
+      case 'Spam or scam':
+        return reportReasonSpam;
+      case 'Spam or scam profile':
+        return reportReasonSpamProfile;
+      case 'Impersonation':
+        return reportReasonImpersonation;
+      case 'Harassment or bullying':
+        return reportReasonHarassment;
+      case 'Hate speech':
+        return reportReasonHate;
+      case 'Violence or threats':
+        return reportReasonViolence;
+      case 'Nudity or sexual content':
+        return reportReasonNudity;
+      case 'Misinformation':
+        return reportReasonMisinformation;
+      case 'Something else':
+        return reportReasonOther;
+      default:
+        return englishReason;
+    }
+  }
 }
 
 /// Convenience accessor: `context.t.settings`.

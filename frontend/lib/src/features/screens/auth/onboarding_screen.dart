@@ -140,7 +140,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       final taken =
           await userService.isUsernameTaken(username, excludeUid: uid);
       if (taken) {
-        setState(() => _error = 'Username already taken');
+        setState(() => _error = context.t.authUsernameTaken);
         return;
       }
 
