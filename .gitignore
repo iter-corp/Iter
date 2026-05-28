@@ -1,24 +1,81 @@
-frontend/build/
-frontend/.dart_tool/
-frontend/.gradle/
-frontend/android/.gradle/
-frontend/android/app/build/
-frontend/android/build/
-frontend/ios/Pods/
-frontend/ios/Flutter/Flutter.framework/
-frontend/ios/Flutter/Flutter.podspec
+# ─────────────────────────────────────────────
+# Miscellaneous
+# ─────────────────────────────────────────────
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# ─────────────────────────────────────────────
+# IntelliJ / Android Studio
+# ─────────────────────────────────────────────
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# ─────────────────────────────────────────────
+# Flutter / Dart / Pub
+# ─────────────────────────────────────────────
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication / obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Studio places build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+
+# iOS native build artifacts
+ios/Pods/
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+
+# Generic build artifacts
 *.apk
 *.so
 *.dill
+
+# ─────────────────────────────────────────────
+# Node / Firebase tooling
+# ─────────────────────────────────────────────
 node_modules
 
+# ─────────────────────────────────────────────
 # Service account keys — NEVER commit these.
+# ─────────────────────────────────────────────
 service-account.json
 **/service-account*.json
 *-firebase-adminsdk-*.json
 
+# ─────────────────────────────────────────────
 # Secrets / environment files — NEVER commit.
+# ─────────────────────────────────────────────
 .env
 .env.*
-frontend/.env
-frontend/.env.*

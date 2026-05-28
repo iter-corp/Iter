@@ -5,21 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "frontend",
-            "cwd": "frontend",
+            "name": "coil",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "frontend (profile mode)",
-            "cwd": "frontend",
+            "name": "coil (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "frontend (release mode)",
-            "cwd": "frontend",
+            "name": "coil (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"
