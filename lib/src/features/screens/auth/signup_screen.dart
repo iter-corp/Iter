@@ -111,12 +111,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signUp(
+      final result = await ref.read(authServiceProvider).signUp(
             email: _emailCtrl.text,
             password: _passCtrl.text,
           );
       if (!mounted) return;
-      context.go('/otp?email=${Uri.encodeComponent(_emailCtrl.text.trim())}');
+      final emailParam = Uri.encodeComponent(_emailCtrl.text.trim());
+      final sendErr = result?.emailSendError;
+      final errParam =
+          sendErr == null ? '' : '&sendError=${Uri.encodeComponent(sendErr)}';
+      context.go('/otp?email=$emailParam$errParam');
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {

@@ -131,6 +131,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/otp',
         builder: (_, state) => OtpScreen(
           email: state.uri.queryParameters['email'],
+          initialError: state.uri.queryParameters['sendError'],
         ),
       ),
       GoRoute(

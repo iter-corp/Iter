@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,9 +11,14 @@ import '../../../theme/app_theme.dart';
 import '../../widgets/primary_action_button.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
-  const OtpScreen({super.key, this.email});
+  const OtpScreen({super.key, this.email, this.initialError});
 
   final String? email;
+
+  /// Surfaced when the signup flow's verification-email send failed — the
+  /// user lands here already knowing they need to tap Resend, instead of
+  /// waiting indefinitely for mail that never arrived.
+  final String? initialError;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -23,6 +29,15 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   bool _resending = false;
   bool _canceling = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialError?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _error = initial;
+    }
+  }
 
   Future<void> _verify() async {
     setState(() {
@@ -57,11 +72,36 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       await ref.read(authServiceProvider).sendEmailVerification();
       if (mounted) {
         setState(() {
-          _error = 'Verification email sent. Check your inbox.';
+          _error = 'Verification email sent. Check your inbox (and spam).';
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+    } on FirebaseAuthException catch (e) {
+      // Map known Firebase codes to actionable copy. Most common in practice:
+      // too-many-requests (quota), network-request-failed, and template-misconfig
+      // surfacing as other codes — all silently swallowed before this fix.
+      debugPrint('sendEmailVerification resend failed: ${e.code} ${e.message}');
+      if (!mounted) return;
+      String msg;
+      switch (e.code) {
+        case 'too-many-requests':
+          msg = 'Too many attempts. Wait a few minutes and try again.';
+          break;
+        case 'network-request-failed':
+          msg = 'Network error. Check your connection and try again.';
+          break;
+        case 'user-not-found':
+        case 'no-current-user':
+          msg = 'Account not found. Please sign up again.';
+          break;
+        default:
+          msg = 'Could not send verification email (${e.code}).';
+      }
+      setState(() => _error = msg);
+    } catch (e, st) {
+      debugPrint('sendEmailVerification resend failed: $e\n$st');
+      if (mounted) {
+        setState(() => _error = 'Could not send verification email.');
+      }
     } finally {
       if (mounted) setState(() => _resending = false);
     }

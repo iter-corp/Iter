@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -24,6 +25,17 @@ class GoogleAuthFlowException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Result of a sign-up attempt. The auth user is created either way; the
+/// verification-email send is best-effort and may fail independently (rate
+/// limits, template misconfiguration, transient network). The OTP screen
+/// uses [emailSendError] to surface "we couldn't send — tap Resend" rather
+/// than leaving the user staring at an inbox that will never get the mail.
+class SignupResult {
+  final User user;
+  final String? emailSendError;
+  const SignupResult({required this.user, this.emailSendError});
 }
 
 class AuthService {
@@ -52,6 +64,29 @@ class AuthService {
     if (user != null && !user.emailVerified) {
       await user.sendEmailVerification();
     }
+  }
+
+  /// Maps a verification-send failure to a user-readable string. Returns null
+  /// on success. Kept out of the OTP screen so resend and signup share the
+  /// exact same error messaging.
+  String _verificationSendError(Object e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'too-many-requests':
+          return 'Too many attempts. Wait a few minutes and tap Resend.';
+        case 'network-request-failed':
+          return 'Network error sending the verification email. Tap Resend.';
+        case 'user-not-found':
+        case 'no-current-user':
+          return 'Account not found. Please sign up again.';
+        case 'invalid-recipient-email':
+        case 'invalid-email':
+          return 'That email address was rejected by the mail server.';
+        default:
+          return 'Could not send verification email (${e.code}). Tap Resend.';
+      }
+    }
+    return 'Could not send verification email. Tap Resend.';
   }
 
   Future<bool> reloadAndCheckEmailVerified() async {
@@ -168,7 +203,7 @@ class AuthService {
     }
   }
 
-  Future<User?> signUp({
+  Future<SignupResult?> signUp({
     required String email,
     required String password,
   }) async {
@@ -177,36 +212,42 @@ class AuthService {
       password: password,
     );
     final user = cred.user;
-    if (user != null) {
-      justSignedUp = true;
-      await _db.collection('users').doc(user.uid).set({
-        'uid': user.uid,
-        'email': user.email,
-        'username': null,
-        'handle': null,
-        'bio': '',
-        'avatarUrl': null,
-        'coverUrl': null,
-        'gender': null,
-        'role': 'user',
-        'suspended': false,
-        'isPrivate': false,
-        'appIntroSeen': false,
-        'followersCount': 0,
-        'followingCount': 0,
-        'postsCount': 0,
-        'fcmTokens': <String>[],
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      try {
-        await user.sendEmailVerification();
-      } catch (_) {
-        // The OTP/verification screen exposes a resend action, so a transient
-        // mail-send failure should not leave behind a created account plus a
-        // failed signup screen.
-      }
+    if (user == null) return null;
+
+    justSignedUp = true;
+    await _db.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'email': user.email,
+      'username': null,
+      'handle': null,
+      'bio': '',
+      'avatarUrl': null,
+      'coverUrl': null,
+      'gender': null,
+      'role': 'user',
+      'suspended': false,
+      'isPrivate': false,
+      'appIntroSeen': false,
+      'followersCount': 0,
+      'followingCount': 0,
+      'postsCount': 0,
+      'fcmTokens': <String>[],
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    String? sendError;
+    try {
+      await user.sendEmailVerification();
+    } catch (e, st) {
+      // Don't tear down the account on a send failure — the OTP screen
+      // exposes a Resend action — but DO surface the failure so the user
+      // isn't left staring at an inbox the mail will never reach. Log the
+      // underlying error too so failures (quota, template, network) are
+      // diagnosable instead of silently swallowed.
+      debugPrint('sendEmailVerification failed during signUp: $e\n$st');
+      sendError = _verificationSendError(e);
     }
-    return user;
+    return SignupResult(user: user, emailSendError: sendError);
   }
 
   Future<User?> signIn({
