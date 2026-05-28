@@ -92,6 +92,14 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   /// flight video-ready signal from the previous story can be ignored.
   int _navToken = 0;
 
+  /// True once we've started closing the viewer, so the close (a
+  /// `Navigator.pop`) can never run twice. A video reaching its end can
+  /// fire the completion callback from two sources in the same frame
+  /// (the controller listener and the position timer); without this
+  /// guard the last story would pop the viewer AND then pop the screen
+  /// beneath it, leaving a black screen.
+  bool _closing = false;
+
   /// Resume the progress bar after a pause (long-press release, modal
   /// dismiss, etc). Image / text stories run on the AnimationController
   /// so we just `forward()`. Video stories are driven by the player's
@@ -446,6 +454,11 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   }
 
   void _next() {
+    // Re-entry guard: a video's completion can be observed by both the
+    // controller listener and the position timer in the same frame, so
+    // _next() can be invoked twice back-to-back. Ignore the second call
+    // once we're already tearing the viewer down.
+    if (_closing) return;
     if (_index < _stories.length - 1) {
       setState(() => _index++);
       _startCurrent();
@@ -471,6 +484,11 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       });
       _startCurrent();
     } else {
+      // Last story of the last group finished — close the viewer.
+      // Guard against a double pop (see [_closing]); popping twice would
+      // dismiss the screen underneath and leave a black screen.
+      if (_closing) return;
+      _closing = true;
       if (mounted) Navigator.pop(context);
     }
   }
@@ -659,7 +677,14 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           if (!mounted) return;
           if (_progress.isAnimating) _progress.stop();
           _progress.value = frac;
-          if (frac >= 1.0) _next();
+        },
+        // Advance when the video actually finishes. Driven by the
+        // player's controller (real EOF / trim-end) rather than the
+        // polled progress fraction, so it fires exactly once and the
+        // video never replays into a black frame.
+        onCompleted: () {
+          if (!mounted) return;
+          _next();
         },
         // Re-key per story so a new VideoPlayerController is created
         // whenever the user advances past the current story — otherwise
@@ -2379,6 +2404,13 @@ class _VideoStoryPlayer extends StatefulWidget {
   // drive the story progress bar straight from the video's clock so
   // the bar can never drift relative to the visible frames.
   final ValueChanged<double>? onPositionUpdate;
+  // Called exactly once when the video reaches the end of its effective
+  // playback window. The viewer uses this to advance to the next story.
+  // We drive auto-advance from here (the controller's real position)
+  // rather than from [onPositionUpdate] reaching 1.0, because the
+  // polled progress fraction can miss the exact end frame and is purely
+  // for the visual bar.
+  final VoidCallback? onCompleted;
   const _VideoStoryPlayer({
     super.key,
     required this.url,
@@ -2387,6 +2419,7 @@ class _VideoStoryPlayer extends StatefulWidget {
     this.onReady,
     this.pausedNotifier,
     this.onPositionUpdate,
+    this.onCompleted,
   });
 
   @override
@@ -2401,7 +2434,10 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
   // duration once `initialize()` returns.
   Duration _effectiveStart = Duration.zero;
   Duration _effectiveEnd = Duration.zero;
-  bool _seeking = false;
+  // True once we've fired [onCompleted] for this playback so the
+  // end-of-window detection can't advance the story more than once
+  // (the listener and the position timer can both observe the end).
+  bool _completed = false;
   // Polls `c.value.position` every ~60ms to feed the story progress
   // bar. VideoPlayerController.addListener only fires on coarse state
   // changes (not on every painted frame), so the progress bar was
@@ -2451,12 +2487,14 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
         _effectiveStart = Duration.zero;
         _effectiveEnd = total;
       }
-      // Looping is disabled when a trim is present so we can manually
-      // seek back to [trimStart] in the position listener. When there
-      // is no trim, native looping is still cheaper.
+      // Never loop natively. A story video should play once and then
+      // auto-advance to the next story; native looping made it replay
+      // (and, after the first wraparound, the codec surface ended up in
+      // a bad state showing a black frame). End-of-window is detected in
+      // [_onTick] which fires [onCompleted] exactly once.
       final hasTrim =
           widget.trimStart != null || widget.trimEnd != null;
-      await c.setLooping(!hasTrim);
+      await c.setLooping(false);
       // Pick a seek target: the explicit resume position from the
       // lifecycle handler wins; otherwise honor the trim start.
       final seekTarget = resumeFrom > Duration.zero
@@ -2548,19 +2586,38 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
   }
 
   void _onTick() {
-    // Listener fires only on coarse state changes. Its job here is to
-    // catch the trim-window wraparound — the smooth position updates
-    // for the progress bar come from `_positionTimer` instead.
+    // The controller listener fires only on coarse state changes. We use
+    // it as one of two completion signals; the periodic position timer
+    // (`_onFrame`) is the other, because on iOS the listener doesn't
+    // reliably fire a tick exactly at end-of-file.
+    _maybeComplete();
+  }
+
+  /// Detects the end of the effective playback window and advances the
+  /// story exactly once. Called from BOTH the controller listener
+  /// (`_onTick`) and the 60ms position timer (`_onFrame`) — whichever
+  /// observes the end first wins, and the `_completed` guard makes the
+  /// other a no-op.
+  void _maybeComplete() {
     final c = _controller;
-    if (c == null || !c.value.isInitialized || _seeking) return;
-    final pos = c.value.position;
-    if (pos >= _effectiveEnd) {
-      _seeking = true;
-      c.seekTo(_effectiveStart).whenComplete(() {
-        _seeking = false;
-        if (mounted) c.play();
-      });
-    }
+    if (c == null || !c.value.isInitialized || _completed) return;
+    final v = c.value;
+    // Three independent end signals, any of which means "done":
+    //  - playhead crossed the (possibly trimmed) end of the window
+    //  - the plugin's explicit end-of-file flag
+    //  - the controller stopped playing at/near the full duration
+    //    (iOS sometimes parks `position` a few ms short of `duration`
+    //    and clears `isPlaying` instead of setting `isCompleted`)
+    final pos = v.position;
+    final nearFullEnd = !v.isPlaying &&
+        v.duration > Duration.zero &&
+        pos >= v.duration - const Duration(milliseconds: 250);
+    final reachedEnd = pos >= _effectiveEnd || v.isCompleted || nearFullEnd;
+    if (!reachedEnd) return;
+    _completed = true;
+    // Pin the progress bar to full so it doesn't visibly snap back.
+    widget.onPositionUpdate?.call(1.0);
+    widget.onCompleted?.call();
   }
 
   /// Drives the story progress bar at ~60ms cadence. We deliberately
@@ -2588,6 +2645,8 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
     if (!mounted) return;
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
+    // Always check for completion, even if no progress callback is wired.
+    _maybeComplete();
     final cb = widget.onPositionUpdate;
     if (cb == null) return;
     final nativePos = c.value.position;
