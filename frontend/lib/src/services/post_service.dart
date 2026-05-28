@@ -289,9 +289,8 @@ class PostService {
     final username = userDoc.data()?['username'] as String? ?? 'user';
     final avatar = userDoc.data()?['avatarUrl'] as String?;
 
-    final caption = question.trim().isEmpty
-        ? 'Discussion about a post'
-        : question.trim();
+    final caption =
+        question.trim().isEmpty ? 'Discussion about a post' : question.trim();
 
     final ref = await _posts.add({
       'authorUid': user.uid,
@@ -812,6 +811,15 @@ class PostService {
         .collection('reposts')
         .snapshots()
         .map((s) => s.docs.length);
+  }
+
+  Stream<List<String>> streamRepostUserIds(String postId) {
+    return _posts
+        .doc(postId)
+        .collection('reposts')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => d.id).toList());
   }
 
   Future<void> toggleSave(String postId) async {

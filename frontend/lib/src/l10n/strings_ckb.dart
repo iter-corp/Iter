@@ -228,7 +228,8 @@ const Map<String, String> ckbStrings = {
   'contact_type_label': 'جۆر',
   'contact_message_label': 'پەیام',
   'contact_how_can_we_help': 'چۆن دەتوانین یارمەتیت بدەین؟',
-  'contact_org_hint': 'باسمان بکە لەسەر پلانەکانی بۆنەکانت، چی بەڕێوەدەبەیت، بۆچی دەتەوێت بۆنە بڵاوبکەیتەوە، هەر بەستەرێک.',
+  'contact_org_hint':
+      'باسمان بکە لەسەر پلانەکانی بۆنەکانت، چی بەڕێوەدەبەیت، بۆچی دەتەوێت بۆنە بڵاوبکەیتەوە، هەر بەستەرێک.',
   'contact_send_request': 'ناردنی داواکاری',
   'contact_please_write_message': 'تکایە پەیامێک بنووسە.',
   'contact_not_signed_in': 'چوونەژوورەوەت نەکردووە.',
@@ -236,29 +237,36 @@ const Map<String, String> ckbStrings = {
   'contact_type_message': 'پەیام',
   'contact_type_message_desc': 'پرسیار، فیدباک، یان ڕاپۆرتی کێشە.',
   'contact_type_org': 'بەڕێوەبەری بۆنە',
-  'contact_type_org_desc': 'پەسەندبکرێیت بۆ بەڕێوەبردن و بڵاوکردنەوەی بۆنە لە Iter.',
+  'contact_type_org_desc':
+      'پەسەندبکرێیت بۆ بەڕێوەبردن و بڵاوکردنەوەی بۆنە لە Iter.',
   'contact_iter_team': 'تیمی Iter',
   'contact_reply_to_user': 'وەڵامدانەوەی بەکارهێنەر…',
   'contact_reply_type_reply': 'وەڵامێک بنووسە…',
   'contact_reply_org_hint': 'بە تیمی Iter بڵێ دەربارەی پلانەکانی بۆنەکانت…',
-  'contact_empty_message': 'گفتوگۆ لەگەڵ تیمی Iter دەستپێبکە. وەڵامەکانت لەم چاتە دەمێننەوە.',
-  'contact_empty_org_message': 'بە تیمی Iter بڵێ بۆچی پێویستە وەک بەڕێوەبەری بۆنە پەسەندبکرێیت و چ بۆنەیەک دەتەوێت بڵاوبکەیتەوە.',
+  'contact_empty_message':
+      'گفتوگۆ لەگەڵ تیمی Iter دەستپێبکە. وەڵامەکانت لەم چاتە دەمێننەوە.',
+  'contact_empty_org_message':
+      'بە تیمی Iter بڵێ بۆچی پێویستە وەک بەڕێوەبەری بۆنە پەسەندبکرێیت و چ بۆنەیەک دەتەوێت بڵاوبکەیتەوە.',
   'contact_iter_support': 'پشتگیری Iter',
   'contact_yesterday': 'دوێنێ',
   'contact_error_prefix': 'هەڵە: {error}',
   'contact_failed_send': 'ناردن سەرکەوتوو نەبوو: {error}',
-  'contact_could_not_update_type': 'نەتوانرا جۆری داواکاری نوێ بکرێتەوە: {error}',
+  'contact_could_not_update_type':
+      'نەتوانرا جۆری داواکاری نوێ بکرێتەوە: {error}',
   'contact_generic_failed': 'سەرکەوتوو نەبوو: {error}',
   'contact_revoke_org_title': 'دەسەڵاتی بەڕێوەبەری بۆنە بسڕێتەوە؟',
   'contact_grant_org_title': 'دەسەڵاتی بەڕێوەبەری بۆنە بدرێت؟',
-  'contact_revoke_org_body': 'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە لادەبات و ڕۆڵ دەکات بە بەکارهێنەر.',
-  'contact_grant_org_body': 'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە دەدات بەوەی ئەم بەکارهێنەرە بکات بە بەڕێوەبەری بۆنە.',
+  'contact_revoke_org_body':
+      'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە لادەبات و ڕۆڵ دەکات بە بەکارهێنەر.',
+  'contact_grant_org_body':
+      'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە دەدات بەوەی ئەم بەکارهێنەرە بکات بە بەڕێوەبەری بۆنە.',
   'contact_revoke': 'سڕینەوە',
   'contact_grant': 'پێدان',
   'contact_org_revoked': 'دەسەڵاتی بەڕێوەبەری بۆنە سڕایەوە.',
   'contact_org_approved': 'بەڕێوەبەری بۆنە پەسەندکرا.',
   'contact_delete_user_title': 'بەکارهێنەرەکە بە تەواوی بسڕێتەوە؟',
-  'contact_delete_user_body': 'ئەمە هەموو زانیاری بەکارهێنەرەکە دەسڕێتەوە: پۆست، کۆمێنت، چیرۆک، چات، فۆلۆوەرەکان و ئاگادارکردنەوەکان. ئیمەیڵەکەی دەخرێتە لیستی ڕەشەوە.\n\nناتوانرێت بگەڕێندرێتەوە.',
+  'contact_delete_user_body':
+      'ئەمە هەموو زانیاری بەکارهێنەرەکە دەسڕێتەوە: پۆست، کۆمێنت، چیرۆک، چات، فۆلۆوەرەکان و ئاگادارکردنەوەکان. ئیمەیڵەکەی دەخرێتە لیستی ڕەشەوە.\n\nناتوانرێت بگەڕێندرێتەوە.',
   'contact_delete_everything': 'سڕینەوەی هەموو شت',
   'contact_deleting_all': 'سڕینەوەی هەموو زانیاری بەکارهێنەرەکە...',
   'contact_user_deleted': 'بەکارهێنەرەکە سڕایەوە و خرایە لیستی ڕەش',
@@ -293,8 +301,7 @@ const Map<String, String> ckbStrings = {
   'translate_saved': 'وەرگێڕان پاشەکەوت کرا!',
   'translate_removed_from_saved': 'وەرگێڕان لە پاشەکەوتکراوەکان لابرا',
   'translate_unavailable': 'وەرگێڕان بەردەست نییە',
-  'translate_mic_not_available':
-      'مایکرۆفۆن بەردەست نییە. ڕێگەپێدانەکە بپشکنە.',
+  'translate_mic_not_available': 'مایکرۆفۆن بەردەست نییە. ڕێگەپێدانەکە بپشکنە.',
   'translate_stt_unsupported':
       'گواستنەوەی دەنگ بۆ نووسین بۆ {lang} لەسەر ئەم ئامێرە پشتگیری ناکرێت.',
   'translate_stt_no_match':
@@ -342,14 +349,14 @@ const Map<String, String> ckbStrings = {
   'signup_enter_username': 'ناوی بەکارهێنەرێک بنووسە',
   'signup_enter_valid_email': 'ئیمەیڵێکی دروست بنووسە',
   'signup_enter_password': 'وشەی نهێنی بنووسە',
-  'signup_password_min_length':
-      'پێویستە وشەی نهێنی لانیکەم ٨ پیت بێت',
-  'signup_password_letter_number':
-      'پێویستە وشەی نهێنی پیت و ژمارەی تێدا بێت',
+  'signup_password_min_length': 'پێویستە وشەی نهێنی لانیکەم ٨ پیت بێت',
+  'signup_password_letter_number': 'پێویستە وشەی نهێنی پیت و ژمارەی تێدا بێت',
   'signup_sign_in_with_facebook': 'چوونەژوورەوە بە فەیسبووک',
-  'forgot_password_subtitle': "نیگەران مەبە! ئەو ئیمەیڵە بنووسە کە پەیوەستە بە\nهەژمارەکەتەوە و لینکی گۆڕینت بۆ دەنێرین.",
+  'forgot_password_subtitle':
+      "نیگەران مەبە! ئەو ئیمەیڵە بنووسە کە پەیوەستە بە\nهەژمارەکەتەوە و لینکی گۆڕینت بۆ دەنێرین.",
   'forgot_password_email_sent': 'ئیمەیڵ نێردرا!',
-  'forgot_password_check_inbox': 'سەیری ئینبۆکسەکەت بکە بۆ لینکی گۆڕینی وشەی نهێنی.\nهەروەها سەیری فۆڵدەری سپام بکە.',
+  'forgot_password_check_inbox':
+      'سەیری ئینبۆکسەکەت بکە بۆ لینکی گۆڕینی وشەی نهێنی.\nهەروەها سەیری فۆڵدەری سپام بکە.',
   'forgot_password_back_to_login': 'گەڕانەوە بۆ چوونەژوورەوە',
   'forgot_password_email_address': 'ناونیشانی ئیمەیڵ',
   'forgot_password_enter_email': 'ناونیشانی ئیمەیڵەکەت بنووسە',
@@ -373,18 +380,22 @@ const Map<String, String> ckbStrings = {
   'onboarding_name_required': 'تکایە ناوەکەت بنووسە',
   'onboarding_about_you': 'دەربارەی تۆ',
   'onboarding_optional': 'ئارەزوومەندانە',
-  'onboarding_about_you_desc': 'یارمەتیمان دەدات بۆنە، سکۆلەرشیپ و ئەو کەسانەت پیشان بدەین کە لەگەڵ ئارەزووەکانت دەگونجێن. دەتوانیت بیپەڕێنیت و دواتر زیادی بکەیت.',
+  'onboarding_about_you_desc':
+      'یارمەتیمان دەدات بۆنە، سکۆلەرشیپ و ئەو کەسانەت پیشان بدەین کە لەگەڵ ئارەزووەکانت دەگونجێن. دەتوانیت بیپەڕێنیت و دواتر زیادی بکەیت.',
   'onboarding_where_are_you': 'تۆ لە کوێیت؟',
   'onboarding_gps_set': 'شوێن دیاریکرا',
-  'onboarding_location_desc': 'ڕێگە دەدات تابی Connect خەڵکی نزیکت پیشان بدات. ئارەزوومەندانەیە — دەتوانیت بیپەڕێنیت و تەنها شارەکەت بنووسیت.',
+  'onboarding_location_desc':
+      'ڕێگە دەدات تابی Connect خەڵکی نزیکت پیشان بدات. ئارەزوومەندانەیە — دەتوانیت بیپەڕێنیت و تەنها شارەکەت بنووسیت.',
   'onboarding_update_location': 'نوێکردنەوەی شوێن',
   'onboarding_use_my_location': 'شوێنەکەم بەکاربهێنە',
   'onboarding_city': 'شار',
-  'onboarding_city_autofilled': 'خۆکارانە پڕکراوەتەوە — گەر پێویست بوو دەستکاری بکە',
+  'onboarding_city_autofilled':
+      'خۆکارانە پڕکراوەتەوە — گەر پێویست بوو دەستکاری بکە',
   'onboarding_city_hint': 'بۆ نموونە: پاریس',
   'splash_app_name': 'Iter',
   'home_feed': 'نوێکارییەکان',
-  'home_mode_feed_subtitle': 'نوێترین پۆستەکان لەلایەن ئەو کەسانەی شوێنیان دەکەویت',
+  'home_mode_feed_subtitle':
+      'نوێترین پۆستەکان لەلایەن ئەو کەسانەی شوێنیان دەکەویت',
   'home_mode_travel_subtitle': 'پۆستەکانی شوێنە نزیکەکانی خۆت ببینە',
   'home_mode_discuss_subtitle': 'پرسیار بکە، وەڵامەکان هاوبەش بکە',
   'home_travel_short': 'گەشت',
@@ -396,7 +407,8 @@ const Map<String, String> ckbStrings = {
   'home_no_posts_create_first': 'هیچ پۆستێک نییە هێشتا. یەکەم پۆست دروست بکە!',
   'home_question_actions': 'کردارەکانی پرسیار',
   'home_delete_question_title': 'سڕینەوەی پرسیار؟',
-  'home_delete_question_body': 'ئەمە بە یەکجاری پرسیارەکەت لە گفتوگۆ دەسڕێتەوە.',
+  'home_delete_question_body':
+      'ئەمە بە یەکجاری پرسیارەکەت لە گفتوگۆ دەسڕێتەوە.',
   'home_question_deleted': 'پرسیار سڕایەوە',
   'home_could_not_delete': 'نەتوانرا بسڕدرێتەوە: {error}',
   'home_report_question_menu': 'ڕاپۆرتکردنی پرسیار',
@@ -406,7 +418,8 @@ const Map<String, String> ckbStrings = {
   'home_answers_count': '{count} وەڵام',
   'home_helpful_count': '{count} بەسوود',
   'home_write_answer': 'نووسینی وەڵام',
-  'home_pick_reason_question': 'ئەو هۆکارە هەڵبژێرە کە زۆرترین گونجاوە بۆ ئەم پرسیارە.',
+  'home_pick_reason_question':
+      'ئەو هۆکارە هەڵبژێرە کە زۆرترین گونجاوە بۆ ئەم پرسیارە.',
   'home_extra_details_optional': 'زانیاری زیاتر (ئارەزوومەندانە)',
   'home_send_report': 'ناردنی ڕاپۆرت',
   'home_report_sent_admins': 'ڕاپۆرت نێردرا بۆ بەڕێوەبەران',
@@ -415,9 +428,11 @@ const Map<String, String> ckbStrings = {
   'home_qa_prompt_subtitle': 'وەڵامی خێرا لە خەڵکی نزیکتەوە وەربگرە.',
   'home_ask': 'بپرسە',
   'home_feed_prompt_title': 'شتێکت هەیە بۆ هاوبەشکردن؟ پۆستی بکە',
-  'home_feed_prompt_subtitle': 'نوێکارییەکان، وێنەکان، و ساتەکان لەگەڵ فیدەکەت هاوبەش بکە.',
+  'home_feed_prompt_subtitle':
+      'نوێکارییەکان، وێنەکان، و ساتەکان لەگەڵ فیدەکەت هاوبەش بکە.',
   'home_travel_prompt_title': 'گەشت دەکەیت بۆ شوێنێک؟ لەوێوە پۆست بکە',
-  'home_travel_prompt_subtitle': 'ئەو ساتانەی پەیوەستن بە شوێنەوە هاوبەش بکە تا خەڵکی تر بیانبینن.',
+  'home_travel_prompt_subtitle':
+      'ئەو ساتانەی پەیوەستن بە شوێنەوە هاوبەش بکە تا خەڵکی تر بیانبینن.',
   'home_search_questions_users': 'گەڕان بۆ پرسیارەکان یان بەکارهێنەران...',
   'home_clear_search': 'پاککردنەوەی گەڕان',
   'home_ask_community': 'لە کۆمەڵگە بپرسە',
@@ -426,13 +441,18 @@ const Map<String, String> ckbStrings = {
   'home_add_more_context': 'زانیاری زیاتر زیاد بکە (ئارەزوومەندانە)...',
   'home_post_question': 'بڵاوکردنەوەی پرسیار',
   'home_search_place': 'گەڕان بۆ شوێن',
-  'home_location_services_off': 'خزمەتگوزارییەکانی شوێن کوژاوەتەوە. دایبگیرسێنە تا دۆخی گەشت پۆستە نزیکەکانت پیشان بدات.',
+  'home_location_services_off':
+      'خزمەتگوزارییەکانی شوێن کوژاوەتەوە. دایبگیرسێنە تا دۆخی گەشت پۆستە نزیکەکانت پیشان بدات.',
   'home_open_settings': 'کردنەوەی ڕێکخستنەکان',
-  'home_location_permission_denied_travel': 'مۆڵەتی شوێن ڕەتکرایەوە. دۆخی گەشت باشتر کار دەکات بە هەبوونی شوێنەکەت.',
-  'home_location_permission_blocked': 'مۆڵەتی شوێن بلۆککراوە. لە ڕێکخستنەکانی ئەپەکەدا چالاکی بکە بۆ بەکارهێنانی دۆخی گەشت.',
+  'home_location_permission_denied_travel':
+      'مۆڵەتی شوێن ڕەتکرایەوە. دۆخی گەشت باشتر کار دەکات بە هەبوونی شوێنەکەت.',
+  'home_location_permission_blocked':
+      'مۆڵەتی شوێن بلۆککراوە. لە ڕێکخستنەکانی ئەپەکەدا چالاکی بکە بۆ بەکارهێنانی دۆخی گەشت.',
   'home_app_settings': 'ڕێکخستنەکانی ئەپ',
-  'home_couldnt_get_location': "نەتوانرا شوێنەکەت بدۆزرێتەوە. هێشتا دەتوانیت بەدەستی بەدوای شوێنێکدا بگەڕێیت.",
-  'home_maintenance_mode': 'دۆخی چاککردنەوە — لەوانەیە هەندێک تایبەتمەندی بەردەست نەبن.',
+  'home_couldnt_get_location':
+      "نەتوانرا شوێنەکەت بدۆزرێتەوە. هێشتا دەتوانیت بەدەستی بەدوای شوێنێکدا بگەڕێیت.",
+  'home_maintenance_mode':
+      'دۆخی چاککردنەوە — لەوانەیە هەندێک تایبەتمەندی بەردەست نەبن.',
   'home_all_places': 'هەموو شوێنەکان',
   'home_nearby': 'نزیک',
   'home_nearby_city': 'نزیک · {city}',
@@ -478,14 +498,18 @@ const Map<String, String> ckbStrings = {
   'create_post_public': 'گشتی',
   'create_post_current_location': 'شوێنی ئێستا',
   'create_post_you': 'تۆ',
-  'create_post_location_services_off': 'خزمەتگوزارییەکانی شوێن کوژاوەتەوە. لە ڕێکخستنەکانی ئامێرەکەت چالاکیان بکە.',
+  'create_post_location_services_off':
+      'خزمەتگوزارییەکانی شوێن کوژاوەتەوە. لە ڕێکخستنەکانی ئامێرەکەت چالاکیان بکە.',
   'create_post_location_permission_denied': 'مۆڵەتی شوێن ڕەتکرایەوە.',
   'create_post_type_place_first': 'سەرەتا ناوی شوێن یان شارێک بنووسە',
   'create_post_no_coordinates': 'هیچ پۆتانێک نەدۆزرایەوە بۆ "{query}"',
   'create_post_lookup_failed': 'دۆزینەوە شکستی هێنا: {error}',
-  'create_post_add_caption_image_video': 'کاپشنێک، وێنەیەک، یان ڤیدیۆیەک زیاد بکە',
-  'create_post_could_not_read_video': 'نەتوانرا ڤیدیۆ هەڵبژێردراوەکە بخوێنرێتەوە.',
-  'create_post_video_too_large': 'ڤیدیۆکە زۆر گەورەیە ({size}MB). قەبارەی ڕێگەپێدراو 30MBـە — ڤیدیۆیەکی کورتتر هەڵبژێرە یان سەرەتا قەبارەکەی بچووک بکەرەوە.',
+  'create_post_add_caption_image_video':
+      'کاپشنێک، وێنەیەک، یان ڤیدیۆیەک زیاد بکە',
+  'create_post_could_not_read_video':
+      'نەتوانرا ڤیدیۆ هەڵبژێردراوەکە بخوێنرێتەوە.',
+  'create_post_video_too_large':
+      'ڤیدیۆکە زۆر گەورەیە ({size}MB). قەبارەی ڕێگەپێدراو 30MBـە — ڤیدیۆیەکی کورتتر هەڵبژێرە یان سەرەتا قەبارەکەی بچووک بکەرەوە.',
   'create_post_published_with_content': 'پۆست بڵاوکرایەوە — ناوەڕۆکەکە بارکرا',
   'create_post_published': 'پۆست بڵاوکرایەوە',
   'create_post_could_not_publish': 'نەتوانرا پۆستەکە بڵاوبکرێتەوە: {error}',
@@ -494,10 +518,12 @@ const Map<String, String> ckbStrings = {
   'post_card_could_not_save': 'نەتوانرا پۆستەکە پاشەکەوت بکرێت: {error}',
   'post_card_repost_removed': 'ڕیپۆست لابرا',
   'post_card_reposted_to_profile': 'ڕیپۆست کرا بۆ پڕۆفایلەکەت',
+  'post_card_reposted_by': 'ڕیپۆست کرا لەلایەن',
   'post_card_could_not_repost': 'نەتوانرا ڕیپۆست بکرێت: {error}',
   'post_card_send_to': 'ناردن بۆ',
   'post_card_send': 'ناردن',
-  'post_card_no_conversations': 'هیچ گفتوگۆیەک نییە هێشتا.\nسەرەتا چاتێک دەستپێبکە.',
+  'post_card_no_conversations':
+      'هیچ گفتوگۆیەک نییە هێشتا.\nسەرەتا چاتێک دەستپێبکە.',
   'post_card_shared_to': 'هاوبەشکرا بۆ {username}',
   'post_card_edit_caption': 'دەستکاری کاپشن',
   'post_card_make_public': 'بیکە بە گشتی',
@@ -507,7 +533,8 @@ const Map<String, String> ckbStrings = {
   'post_card_cannot_be_undone': 'ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'post_card_failed': 'شکستی هێنا: {error}',
   'post_card_report_post': 'ڕاپۆرتکردنی پۆست',
-  'post_card_pick_reason_post': 'ئەو هۆکارە هەڵبژێرە کە زۆرترین گونجاوە بۆ ئەم پۆستە.',
+  'post_card_pick_reason_post':
+      'ئەو هۆکارە هەڵبژێرە کە زۆرترین گونجاوە بۆ ئەم پۆستە.',
   'post_card_report_sent_admins': 'ڕاپۆرت نێردرا بۆ بەڕێوەبەران',
   'post_card_read_more': 'زیاتر بخوێنەوە',
   'post_card_show_less': 'کەمتر پیشان بدە',
@@ -522,7 +549,8 @@ const Map<String, String> ckbStrings = {
   'file_subtitle': 'PDF، بەڵگەنامە، ئەرشیڤ، …',
   'location_label': 'شوێن',
   'location_subtitle': 'شوێنی ئێستات هاوبەش بکە',
-  'location_services_off': 'خزمەتگوزارییەکانی شوێن کوژاوەتەوە. لە ڕێکخستنەکانی ئامێرەکەت چالاکیان بکە.',
+  'location_services_off':
+      'خزمەتگوزارییەکانی شوێن کوژاوەتەوە. لە ڕێکخستنەکانی ئامێرەکەت چالاکیان بکە.',
   'location_perm_denied': 'مۆڵەتی شوێن ڕەتکرایەوە.',
   'location_shared': 'شوێن هاوبەش کرا',
   'could_not_share_location': 'نەتوانرا شوێنەکە هاوبەش بکرێت: {error}',
@@ -537,7 +565,8 @@ const Map<String, String> ckbStrings = {
   'voice_message_too_short': 'نامەی دەنگی زۆر کورتە (لانی کەم 300ms)',
   'failed_upload_voice_empty': 'بارکردنی نامەی دەنگی شکستی هێنا - لینکی بەتاڵ',
   'voice_upload_failed': 'بارکردنی دەنگ شکستی هێنا: {error}',
-  'translation_auto_description': 'خۆکارانە نامەکانی کەسەکەی تر وەردەگێڕێتە سەر زمانە دڵخوازەکەت. هێشتا دەتوانیت پەنجە بنێیت بە هەر نامەیەکدا بۆ بینینی ڕەسەنەکەی.',
+  'translation_auto_description':
+      'خۆکارانە نامەکانی کەسەکەی تر وەردەگێڕێتە سەر زمانە دڵخوازەکەت. هێشتا دەتوانیت پەنجە بنێیت بە هەر نامەیەکدا بۆ بینینی ڕەسەنەکەی.',
   'auto_translate_incoming': 'وەرگێڕانی خۆکاریی نامە هاتووەکان',
   'translate_into': 'وەرگێڕان بۆ',
   'auto_translate_on_tooltip': 'وەرگێڕانی خۆکار هەڵکراوە ({lang})',
@@ -548,7 +577,8 @@ const Map<String, String> ckbStrings = {
   'auto_delete_messages': 'سڕینەوەی خۆکاریی نامەکان',
   'members_count': '{count} ئەندام',
   'say_hello': 'سڵاو بکە!',
-  'youve_blocked_user': 'تۆ ئەم بەکارهێنەرەت بلۆک کردووە. لە پڕۆفایلەکەیەوە بلۆکەکەی لاببە بۆ ناردنی نامە.',
+  'youve_blocked_user':
+      'تۆ ئەم بەکارهێنەرەت بلۆک کردووە. لە پڕۆفایلەکەیەوە بلۆکەکەی لاببە بۆ ناردنی نامە.',
   'cant_reply_conversation': 'ناتوانیت وەڵامی ئەم گفتوگۆیە بدەیتەوە.',
   'attach': 'هاوپێچکردن',
   'write_a_message': 'نامەیەک بنووسە',
@@ -556,12 +586,14 @@ const Map<String, String> ckbStrings = {
   'auto_delete_one_day': '١ ڕۆژ',
   'auto_delete_one_week': '١ هەفتە',
   'auto_delete_one_month': '١ مانگ',
-  'auto_delete_period_description': 'ئەو نامانەی کۆنترن لە ماوە دیاریکراوەکە لادەبرێن. چاتەکە خۆی لە ئینبۆکسەکەت دەمێنێتەوە.',
+  'auto_delete_period_description':
+      'ئەو نامانەی کۆنترن لە ماوە دیاریکراوەکە لادەبرێن. چاتەکە خۆی لە ئینبۆکسەکەت دەمێنێتەوە.',
   'auto_delete_turned_off': 'سڕینەوەی خۆکار کوژایەوە',
   'auto_delete_set': 'سڕینەوەی خۆکار: نامە کۆنترەکان لە {period}',
   'failed_with_error': 'شکستی هێنا: {error}',
   'delete_chat_question': 'سڕینەوەی چات؟',
-  'delete_chat_body': 'ئەمە بە یەکجاری هەموو نامەیەکی ئەم چاتە بۆ هەردوو کەسەکە دەسڕێتەوە. ئەو وێنە و دەنگانەی پێشتر بارکراون ناتوانرێت لە چاتەکەدا بگەڕێندرێنەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'delete_chat_body':
+      'ئەمە بە یەکجاری هەموو نامەیەکی ئەم چاتە بۆ هەردوو کەسەکە دەسڕێتەوە. ئەو وێنە و دەنگانەی پێشتر بارکراون ناتوانرێت لە چاتەکەدا بگەڕێندرێنەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'delete_failed': 'سڕینەوە شکستی هێنا: {error}',
   'recording_elapsed': 'تۆماردەکات… {time}',
   'message_unavailable': 'نامە بەردەست نییە',
@@ -605,8 +637,10 @@ const Map<String, String> ckbStrings = {
   'admin_label': 'بەڕێوەبەر',
   'admin_prefix': 'بەڕێوەبەر: {name}',
   'sender_admin': '{name} · بەڕێوەبەر',
-  'only_admin_can_send': 'تەنها بەڕێوەبەر دەتوانێت نامە بنێرێت. دەتوانیت کاردانەوەت هەبێت.',
-  'event_messages_not_encrypted': 'نامەکانی گروپی بۆنە لە سەرەتاوە بۆ کۆتایی پارێزراو نین.',
+  'only_admin_can_send':
+      'تەنها بەڕێوەبەر دەتوانێت نامە بنێرێت. دەتوانیت کاردانەوەت هەبێت.',
+  'event_messages_not_encrypted':
+      'نامەکانی گروپی بۆنە لە سەرەتاوە بۆ کۆتایی پارێزراو نین.',
   'event_group': 'گروپی بۆنە',
   'forward_to': 'ناردن بۆ…',
   'no_chats_yet': 'هیچ چاتێک نییە هێشتا',
@@ -647,12 +681,15 @@ const Map<String, String> ckbStrings = {
   'removes_group_all_messages': 'گروپەکە و هەموو نامەکان لادەبات',
   'removes_conversation_both': 'گفتوگۆکە بۆ هەردووکتان لادەبات',
   'delete_this_chat_question': 'ئەم چاتە بسڕێتەوە؟',
-  'delete_chat_group_body': 'هەموو نامەکانی ناو “{name}” بە یەکجاری بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
-  'delete_chat_one_to_one_body': 'هەموو نامەکانی لەگەڵ {name} بە یەکجاری بۆ هەردووکتان دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'delete_chat_group_body':
+      'هەموو نامەکانی ناو “{name}” بە یەکجاری بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'delete_chat_one_to_one_body':
+      'هەموو نامەکانی لەگەڵ {name} بە یەکجاری بۆ هەردووکتان دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'chat_deleted': 'چات سڕایەوە',
   'failed_to_delete': 'سڕینەوە شکستی هێنا: {error}',
   'delete_event_group_question': 'گروپی بۆنەکە بسڕێتەوە؟',
-  'delete_event_group_body': 'هەموو نامەکانی ناو “{title}” بە یەکجاری بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'delete_event_group_body':
+      'هەموو نامەکانی ناو “{title}” بە یەکجاری بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'group_deleted': 'گروپ سڕایەوە',
   'new_messages_count': '{count} {label}ـی نوێ',
   'remove_from_favorites': 'لابردن لە دڵخوازەکان',
@@ -685,14 +722,16 @@ const Map<String, String> ckbStrings = {
   'story_failed_publish': 'بڵاوکردنەوەی ستۆری شکستی هێنا: {error}',
   'story_publish': 'بڵاوکردنەوە',
   'text_story_hint': 'شتێک بنووسە…',
-  'video_story_too_long': 'ڤیدیۆکە زۆر درێژە. ستۆریەکان تەنها تا ٣٠ چرکە دەگرن.',
+  'video_story_too_long':
+      'ڤیدیۆکە زۆر درێژە. ستۆریەکان تەنها تا ٣٠ چرکە دەگرن.',
   'video_story_too_large':
       'قەبارەی ئەم کلیپە {size}MB ـە. ستۆری تەنها ڤیدیۆ تا 30MB باردەکات. کورتکردنەوەیەکی کورتتر هەڵبژێرە یان سەرەتا ڤیدیۆکە بچووک بکەرەوە.',
   'video_story_preparing': 'ئامادەکردنی ڤیدیۆ…',
   'story_create_menu_photo': 'وێنە',
   'story_create_menu_video': 'ڤیدیۆ',
   'story_create_menu_text': 'دەق',
-  'story_photo_permission_denied': 'مۆڵەتی وێنە ڕەتکرایەوە. لە ڕێکخستنەکان چالاکی بکە بۆ هەڵبژاردنی وێنە.',
+  'story_photo_permission_denied':
+      'مۆڵەتی وێنە ڕەتکرایەوە. لە ڕێکخستنەکان چالاکی بکە بۆ هەڵبژاردنی وێنە.',
   'story_open_settings': 'کردنەوەی ڕێکخستنەکان',
   'camera_no_cameras_found': 'هیچ کامێرایەک نەدۆزرایەوە',
   'camera_init_failed': 'ئامادەکردنی کامێرا شکستی هێنا: {error}',
@@ -765,7 +804,8 @@ const Map<String, String> ckbStrings = {
   'events_joined_years_ago': '{years} ساڵ پێش ئێستا بەشداریکرد',
   'events_posts_count': '{count} پۆست',
   'events_very_active': 'زۆر چالاک',
-  'events_no_one_nearby': 'کەس لە نزیکت نییە هێشتا — کەسێکی نزیکت بانگهێشت بکە.',
+  'events_no_one_nearby':
+      'کەس لە نزیکت نییە هێشتا — کەسێکی نزیکت بانگهێشت بکە.',
   'events_no_one_from_city': 'هیچ کەسێک لە شارەکەی تۆ هێشتا بەشداری نەکردووە.',
   'events_be_first_say_hi': 'یەکەم کەس بە سڵاو بکە — کەسێک بانگهێشت بکە.',
   'events_no_people_yet': 'هیچ کەسێک نییە هێشتا',
@@ -774,12 +814,16 @@ const Map<String, String> ckbStrings = {
   'events_try_different_keyword': 'وشەیەکی تر یان پاڵاوتنێکی تر تاقی بکەرەوە.',
   'events_no_events_matching': 'هیچ بۆنەیەک نییە کە لەگەڵ "{query}" بگونجێت',
   'events_no_events_in_city': 'هیچ بۆنەیەک نییە لە {city}',
-  'events_new_events_appear_here': 'بۆنە نوێیەکان لێرە دەردەکەون کاتێک پۆست دەکرێن.',
-  'events_try_different_keyword_location': 'وشەیەکی تر یان شوێنێکی تر تاقی بکەرەوە.',
+  'events_new_events_appear_here':
+      'بۆنە نوێیەکان لێرە دەردەکەون کاتێک پۆست دەکرێن.',
+  'events_try_different_keyword_location':
+      'وشەیەکی تر یان شوێنێکی تر تاقی بکەرەوە.',
   'events_want_host_event': 'دەتەوێت بۆنەی خۆت ڕێکبخەیت؟',
-  'events_tap_contact_admin': 'پەنجە بنێ بۆ پەیوەندیگرتن بە تیمی بەڕێوەبەرانەوە.',
+  'events_tap_contact_admin':
+      'پەنجە بنێ بۆ پەیوەندیگرتن بە تیمی بەڕێوەبەرانەوە.',
   'events_become_event_admin': 'ببە بە بەڕێوەبەری بۆنە',
-  'events_become_admin_body': "ئیمەیڵێکمان بۆ بنێرە لەگەڵ ناوەکەت، وەسفێکی کورتی ئەو بۆنەیەی دەتەوێت ڕێکی بخەیت، و هۆکارەکەی. وەڵامت دەدەینەوە.",
+  'events_become_admin_body':
+      "ئیمەیڵێکمان بۆ بنێرە لەگەڵ ناوەکەت، وەسفێکی کورتی ئەو بۆنەیەی دەتەوێت ڕێکی بخەیت، و هۆکارەکەی. وەڵامت دەدەینەوە.",
   'events_email_copied': 'ئیمەیڵ کۆپیکرا',
   'events_for_you': 'بۆ تۆ',
   'events_see_more': 'زیاتر ببینە',
@@ -790,19 +834,25 @@ const Map<String, String> ckbStrings = {
   'events_travel_mode': 'دۆخی گەشت',
   'events_quick_start_guide': 'ڕێبەری دەستپێکی خێرا',
   'events_switch_travel_feed': 'گۆڕین بۆ فیدی گەشت',
-  'events_switch_travel_feed_body': 'لە سەرەکی، پەنجە بنێ بە دوگمەی گەشت بۆ بینینی پۆستی ئەو کەسانەی لە شوێنەکانی ترن — نەک تەنها ئەوانەی فۆڵۆوت کردوون.',
+  'events_switch_travel_feed_body':
+      'لە سەرەکی، پەنجە بنێ بە دوگمەی گەشت بۆ بینینی پۆستی ئەو کەسانەی لە شوێنەکانی ترن — نەک تەنها ئەوانەی فۆڵۆوت کردوون.',
   'events_filter_by_city_step': 'پاڵاوتن بەپێی وڵات',
-  'events_filter_by_city_step_body': 'لە بۆنەکان، پەنجە بنێ بە "پاڵاوتن بەپێی وڵات" بۆ دیاریکردنی بۆنەکان لە شوێنێکی دیاریکراو.',
+  'events_filter_by_city_step_body':
+      'لە بۆنەکان، پەنجە بنێ بە "پاڵاوتن بەپێی وڵات" بۆ دیاریکردنی بۆنەکان لە شوێنێکی دیاریکراو.',
   'events_see_events_on_map': 'بینینی بۆنەکان لەسەر نەخشە',
-  'events_see_events_on_map_body': 'دوگمەی نەخشە لە تەنیشت پاڵاوتنی شار بەکاربهێنە بۆ بینینی نیشانە بۆ هەموو بۆنەیەک و پەنجە بنێ بە هەر نیشانەیەک بۆ بینینی.',
+  'events_see_events_on_map_body':
+      'دوگمەی نەخشە لە تەنیشت پاڵاوتنی شار بەکاربهێنە بۆ بینینی نیشانە بۆ هەموو بۆنەیەک و پەنجە بنێ بە هەر نیشانەیەک بۆ بینینی.',
   'events_plan_your_trip': 'پلانی گەشتەکەت دابنێ',
-  'events_plan_your_trip_body': 'هەر بۆنەیەک بکەرەوە و کورتکراوەکانی ئوتێل و فڕۆکە بەکاربهێنە بۆ دانانی پلان پێش ڕۆیشتنت.',
+  'events_plan_your_trip_body':
+      'هەر بۆنەیەک بکەرەوە و کورتکراوەکانی ئوتێل و فڕۆکە بەکاربهێنە بۆ دانانی پلان پێش ڕۆیشتنت.',
   'events_got_it': 'تێگەیشتم',
   'event_group_delete_group_title': 'سڕینەوەی گروپ؟',
-  'event_group_delete_group_body': 'ئەمە بە یەکجاری گروپەکە و هەموو نامەکانی بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'event_group_delete_group_body':
+      'ئەمە بە یەکجاری گروپەکە و هەموو نامەکانی بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'event_group_failed_to_delete': 'سڕینەوە شکستی هێنا: {error}',
   'event_group_leave_group_title': 'جێهێشتنی گروپ؟',
-  'event_group_leave_group_body': "نامەکانت پێناگات بۆ ئەم بۆنەیە. دەتوانیت دواتر دووبارە خۆت تۆمار بکەیتەوە.",
+  'event_group_leave_group_body':
+      "نامەکانت پێناگات بۆ ئەم بۆنەیە. دەتوانیت دواتر دووبارە خۆت تۆمار بکەیتەوە.",
   'event_group_failed': 'شکستی هێنا: {error}',
   'event_group_settings_title': 'ڕێکخستنەکانی گروپ',
   'event_group_pending_requests': 'داواکارییە هەڵپەسێردراوەکان',
@@ -829,22 +879,28 @@ const Map<String, String> ckbStrings = {
   'event_notif_saved': 'ڕێکخستنی ئاگادارکردنەوەکانی بۆنە پاشەکەوتکرا',
   'event_notif_could_not_save': 'نەتوانرا پاشەکەوت بکرێت: {error}',
   'event_notif_new_event_notifications': 'ئاگادارکردنەوەکانی بۆنەی نوێ',
-  'event_notif_new_event_subtitle': 'ئاگادارکردنەوەیەک وەربگرە کاتێک بۆنەیەکی نوێ بەپێی پاڵاوتنەکانت بڵاودەکرێتەوە.',
+  'event_notif_new_event_subtitle':
+      'ئاگادارکردنەوەیەک وەربگرە کاتێک بۆنەیەکی نوێ بەپێی پاڵاوتنەکانت بڵاودەکرێتەوە.',
   'event_notif_event_types': 'جۆرەکانی بۆنە',
   'event_notif_all_types_desc': "ئاگادار دەکرێیتەوە بۆ هەموو جۆرەکانی بۆنە.",
-  'event_notif_custom_types_desc': 'تەنها ئەو جۆرانەی هەڵتبژاردوون. پەنجە بنێ بە "هەموو جۆرەکان" بۆ گەڕاندنەوەی باری سەرەتایی.',
+  'event_notif_custom_types_desc':
+      'تەنها ئەو جۆرانەی هەڵتبژاردوون. پەنجە بنێ بە "هەموو جۆرەکان" بۆ گەڕاندنەوەی باری سەرەتایی.',
   'event_notif_all_types': 'هەموو جۆرەکان',
   'event_notif_countries': 'وڵاتەکان',
-  'event_notif_all_countries_desc': "ئاگادار دەکرێیتەوە بۆ بۆنەکان لە هەر وڵاتێک.",
-  'event_notif_custom_countries_desc': 'تەنها بۆنەکان لەو وڵاتانەی هەڵتبژاردوون. پەنجە بنێ بە "هەموو وڵاتەکان" بۆ گەڕاندنەوەی باری سەرەتایی.',
+  'event_notif_all_countries_desc':
+      "ئاگادار دەکرێیتەوە بۆ بۆنەکان لە هەر وڵاتێک.",
+  'event_notif_custom_countries_desc':
+      'تەنها بۆنەکان لەو وڵاتانەی هەڵتبژاردوون. پەنجە بنێ بە "هەموو وڵاتەکان" بۆ گەڕاندنەوەی باری سەرەتایی.',
   'event_notif_all_countries': 'هەموو وڵاتەکان',
   'group_settings_delete_group_title': 'سڕینەوەی گروپ؟',
-  'group_settings_delete_group_body': 'ئەمە بە یەکجاری گروپی "{name}" و هەموو نامەکانی بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'group_settings_delete_group_body':
+      'ئەمە بە یەکجاری گروپی "{name}" و هەموو نامەکانی بۆ هەموو ئەندامێک دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'group_settings_failed_to_delete': 'سڕینەوە شکستی هێنا: {error}',
   'group_settings_saved': 'ڕێکخستنەکان پاشەکەوت کران',
   'group_settings_error': 'هەڵە: {error}',
   'group_settings_leave_group_title': 'جێهێشتنی گروپ؟',
-  'group_settings_leave_group_body': 'چیتر نامەکانت لە "{name}"ەوە پێناگات. دەتوانیت لەلایەن بەڕێوەبەرێکەوە زیادبکرێیتەوە.',
+  'group_settings_leave_group_body':
+      'چیتر نامەکانت لە "{name}"ەوە پێناگات. دەتوانیت لەلایەن بەڕێوەبەرێکەوە زیادبکرێیتەوە.',
   'group_settings_failed_to_leave': 'جێهێشتن شکستی هێنا: {error}',
   'group_settings_group_not_found': 'گروپ نەدۆزرایەوە',
   'group_settings_leave_group': 'جێهێشتنی گروپ',
@@ -856,15 +912,20 @@ const Map<String, String> ckbStrings = {
   'group_settings_admin': 'بەڕێوەبەر',
   'group_settings_messaging_permissions': 'مۆڵەتەکانی ناردنی نامە',
   'group_settings_restrict_messaging': 'سنووردارکردنی ناردنی نامە',
-  'group_settings_restrict_messaging_desc': 'تەنها بەڕێوەبەرانی گروپ دەتوانن نامە بنێرن. ئەندامان هێشتا دەتوانن نامەکان ببینن.',
+  'group_settings_restrict_messaging_desc':
+      'تەنها بەڕێوەبەرانی گروپ دەتوانن نامە بنێرن. ئەندامان هێشتا دەتوانن نامەکان ببینن.',
   'group_settings_admin_only_mode': 'دۆخی تەنها بەڕێوەبەر',
-  'group_settings_admin_only_mode_desc': 'تەنها بەڕێوەبەرانی گروپ دەتوانن نامە بنێرن (وەک جێگرەوەیەک بۆ سنووردارکردن).',
+  'group_settings_admin_only_mode_desc':
+      'تەنها بەڕێوەبەرانی گروپ دەتوانن نامە بنێرن (وەک جێگرەوەیەک بۆ سنووردارکردن).',
   'group_settings_enable_media_sharing': 'چالاککردنی هاوبەشکردنی میدیا',
-  'group_settings_enable_media_sharing_desc': 'ڕێگەدان بە ئەندامان بۆ هاوبەشکردنی وێنە و ناردنی نامەی دەنگی.',
+  'group_settings_enable_media_sharing_desc':
+      'ڕێگەدان بە ئەندامان بۆ هاوبەشکردنی وێنە و ناردنی نامەی دەنگی.',
   'group_settings_save_settings': 'پاشەکەوتکردنی ڕێکخستنەکان',
   'event_detail_deadline': 'دوا مۆڵەت {date}',
-  'event_detail_apply_below': 'ئەگەر دەتەوێت بەشداری بکەیت، دەتوانیت\nلە خوارەوە داواکاری پێشکەش بکەیت:',
-  'event_detail_register_below': 'ئەگەر دەتەوێت ببیت بە یەکێک لە ئێمە، دەتوانیت\nلە خوارەوە خۆت تۆمار بکەیت:',
+  'event_detail_apply_below':
+      'ئەگەر دەتەوێت بەشداری بکەیت، دەتوانیت\nلە خوارەوە داواکاری پێشکەش بکەیت:',
+  'event_detail_register_below':
+      'ئەگەر دەتەوێت ببیت بە یەکێک لە ئێمە، دەتوانیت\nلە خوارەوە خۆت تۆمار بکەیت:',
   'event_detail_contact': 'پەیوەندی',
   'event_detail_could_not_open_link': 'نەتوانرا لینکی داواکاری بکرێتەوە',
   'event_detail_apply': 'پێشکەشکردن',
@@ -872,7 +933,8 @@ const Map<String, String> ckbStrings = {
   'event_detail_request_pending': 'داواکاری هەڵپەسێردراوە',
   'event_detail_approved': 'قبوڵکرا ✓',
   'event_detail_rejected_retry': 'ڕەتکرایەوە — پەنجە بنێ بۆ هەوڵدانەوە',
-  'event_reg_request_submitted': 'داواکاری پێشکەشکرا. لە چاوەڕوانی قبوڵکردنی بەڕێوەبەردایە.',
+  'event_reg_request_submitted':
+      'داواکاری پێشکەشکرا. لە چاوەڕوانی قبوڵکردنی بەڕێوەبەردایە.',
   'event_reg_failed': 'شکستی هێنا: {error}',
   'event_reg_register_for': 'خۆتۆمارکردن بۆ',
   'event_reg_full_name': 'ناوی تەواو',
@@ -910,12 +972,15 @@ const Map<String, String> ckbStrings = {
   'admin_tile_posts_title': 'پۆستەکان',
   'admin_tile_posts_subtitle': 'پێداچوونەوە و سڕینەوەی پۆستەکان',
   'admin_tile_reports_subtitle': 'ڕاپۆرتەکانی پۆست، گفتوگۆ، پڕۆفایل، و هەڵەکان',
-  'admin_tile_contact_subtitle': 'ئینبۆکس + مێژووی نامەکان و داواکاری ڕێکخراوەکان',
+  'admin_tile_contact_subtitle':
+      'ئینبۆکس + مێژووی نامەکان و داواکاری ڕێکخراوەکان',
   'admin_tile_events_subtitle': 'دروستکردن / دەستکاری / سڕینەوەی بۆنەکان',
   'admin_blacklisted_emails': 'ئیمەیڵە بلۆککراوەکان',
-  'admin_tile_blacklist_subtitle': 'ئەو بەکارهێنەرە سڕاوانەی ناتوانن دووبارە خۆیان تۆمار بکەنەوە',
+  'admin_tile_blacklist_subtitle':
+      'ئەو بەکارهێنەرە سڕاوانەی ناتوانن دووبارە خۆیان تۆمار بکەنەوە',
   'admin_app_settings': 'ڕێکخستنەکانی ئەپ',
-  'admin_tile_settings_subtitle': 'تایبەتمەندییەکان، ڕاگەیاندن، لینکەکانی ستۆر، چاککردنەوە',
+  'admin_tile_settings_subtitle':
+      'تایبەتمەندییەکان، ڕاگەیاندن، لینکەکانی ستۆر، چاککردنەوە',
   'admin_users_search_hint': 'گەڕان بەپێی ناوی بەکارهێنەر یان ئیمەیڵ',
   'admin_no_users_match': 'هیچ بەکارهێنەرێک نەدۆزرایەوە',
   'admin_badge': 'بەڕێوەبەر',
@@ -926,7 +991,8 @@ const Map<String, String> ckbStrings = {
   'admin_unsuspend': 'لابردنی سڕکردن',
   'admin_delete_user': 'سڕینەوەی بەکارهێنەر',
   'admin_delete_user_permanently_title': 'بەکارهێنەرەکە بە یەکجاری بسڕێتەوە؟',
-  'admin_delete_user_permanently_body': 'ئەمە هەموو داتای بەکارهێنەر دەسڕێتەوە: پۆست، کۆمێنت، ستۆری، چات، فۆڵۆوەر، و ئاگادارکردنەوەکان. ئیمەیڵەکەشی دەخرێتە لیستی ڕەشەوە.\n\nئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'admin_delete_user_permanently_body':
+      'ئەمە هەموو داتای بەکارهێنەر دەسڕێتەوە: پۆست، کۆمێنت، ستۆری، چات، فۆڵۆوەر، و ئاگادارکردنەوەکان. ئیمەیڵەکەشی دەخرێتە لیستی ڕەشەوە.\n\nئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'admin_delete_everything': 'سڕینەوەی هەموو شتێک',
   'admin_deleting_all_user_data': 'سڕینەوەی هەموو داتای بەکارهێنەر...',
   'admin_user_deleted_blacklisted': 'بەکارهێنەر سڕایەوە و خرایە لیستی ڕەشەوە',
@@ -934,7 +1000,8 @@ const Map<String, String> ckbStrings = {
   'admin_unknown': 'نەناسراو',
   'admin_new_event': 'بۆنەی نوێ',
   'admin_edit_event': 'دەستکاری بۆنە',
-  'admin_no_events_yet': 'هیچ بۆنەیەک نییە هێشتا. پەنجە بنێ بە "بۆنەی نوێ" بۆ زیادکردنی یەکێک.',
+  'admin_no_events_yet':
+      'هیچ بۆنەیەک نییە هێشتا. پەنجە بنێ بە "بۆنەی نوێ" بۆ زیادکردنی یەکێک.',
   'admin_events_search_hint': 'گەڕان بە ناونیشان، نووسەر، شوێن…',
   'admin_filters': 'فلتەرەکان',
   'admin_filter_type': 'جۆر',
@@ -984,7 +1051,8 @@ const Map<String, String> ckbStrings = {
   'admin_clear_deadline': 'سڕینەوەی دوا مۆڵەت',
   'admin_no_results': 'هیچ ئەنجامێک نییە',
   'admin_post_reports': 'ڕاپۆرتەکانی پۆست',
-  'admin_post_reports_subtitle': 'پێداچوونەوە بۆ ڕاپۆرتەکانی بەکارهێنەران لەسەر پۆستەکان',
+  'admin_post_reports_subtitle':
+      'پێداچوونەوە بۆ ڕاپۆرتەکانی بەکارهێنەران لەسەر پۆستەکان',
   'admin_discuss_reports': 'ڕاپۆرتەکانی گفتوگۆ',
   'admin_discuss_posts': 'پۆستەکانی گفتوگۆ',
   'admin_discuss_posts_subtitle':
@@ -1002,8 +1070,7 @@ const Map<String, String> ckbStrings = {
   'admin_reports_select_none': 'لابردنی دیاریکردن',
   'admin_reports_cancel_selection': 'پاشگەزبوونەوە',
   'admin_reports_selected_count': '{count} دیاریکراوە',
-  'admin_reports_delete_selected_title':
-      'سڕینەوەی {count} ڕاپۆرت؟',
+  'admin_reports_delete_selected_title': 'سڕینەوەی {count} ڕاپۆرت؟',
   'admin_reports_delete_selected_body':
       'ڕاپۆرتە دیاریکراوەکان بە یەکجاری دەسڕێنەوە. کاریگەری لەسەر پۆست/بەکارهێنەرە بنەڕەتییەکان نییە.',
   'admin_reports_delete_all': 'سڕینەوەی هەموو',
@@ -1022,17 +1089,18 @@ const Map<String, String> ckbStrings = {
   'admin_users_grant_event_manager': 'پێدانی بەڕێوەبەری بۆنە',
   'admin_users_revoke_event_manager_title':
       'دەسەڵاتی بەڕێوەبەری بۆنە هەڵبگیرێت؟',
-  'admin_users_grant_event_manager_title':
-      'دەسەڵاتی بەڕێوەبەری بۆنە بدرێت؟',
+  'admin_users_grant_event_manager_title': 'دەسەڵاتی بەڕێوەبەری بۆنە بدرێت؟',
   'admin_users_revoke_event_manager_body':
       'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە لادەبات و ڕۆڵەکە دەکات بە بەکارهێنەر.',
   'admin_users_grant_event_manager_body':
       'ئەمە دەسەڵاتی بڵاوکردنەوەی بۆنە دەدات بە کردنی ئەم بەکارهێنەرە بە بەڕێوەبەری بۆنە.',
   'admin_users_revoke': 'هەڵگرتن',
   'admin_users_grant': 'پێدان',
-  'admin_discuss_reports_subtitle': 'پێداچوونەوە بۆ ڕاپۆرتەکان لەسەر بابەتەکانی گفتوگۆ',
+  'admin_discuss_reports_subtitle':
+      'پێداچوونەوە بۆ ڕاپۆرتەکان لەسەر بابەتەکانی گفتوگۆ',
   'admin_profile_reports': 'ڕاپۆرتەکانی پڕۆفایل',
-  'admin_profile_reports_subtitle': 'پێداچوونەوە بۆ ڕاپۆرتەکانی پێشێلکاری لە پڕۆفایلەکان',
+  'admin_profile_reports_subtitle':
+      'پێداچوونەوە بۆ ڕاپۆرتەکانی پێشێلکاری لە پڕۆفایلەکان',
   'admin_error_reports_subtitle': 'هەڵە گشتییەکانی ئەپەکە و پشکنینی کێشەکان',
   'admin_clear_resolved_title': 'ڕاپۆرتە چارەسەرکراوەکان بسڕێنەوە؟',
   'admin_clear_resolved_body': 'ئەمە {count} ڕاپۆرتی چارەسەرکراو دەسڕێتەوە.',
@@ -1067,9 +1135,11 @@ const Map<String, String> ckbStrings = {
   'admin_delete_report_title': 'ڕاپۆرتەکە بسڕێتەوە؟',
   'admin_delete_report_body': 'ئەمە ڕاپۆرتەکە لە لیستەکە لادەبات.',
   'admin_take_down_post_title': 'پۆستەکە لاببرێت؟',
-  'admin_take_down_post_body': 'ئەمە پۆستە ڕاپۆرتکراوەکە لادەبات و ڕاپۆرتەکە وەک چارەسەرکراو دیاری دەکات.',
+  'admin_take_down_post_body':
+      'ئەمە پۆستە ڕاپۆرتکراوەکە لادەبات و ڕاپۆرتەکە وەک چارەسەرکراو دیاری دەکات.',
   'admin_take_down_thread_title': 'بابەتەکە لاببرێت؟',
-  'admin_take_down_thread_body': 'ئەمە بابەتە ڕاپۆرتکراوەکە لادەبات و ڕاپۆرتەکە وەک چارەسەرکراو دیاری دەکات.',
+  'admin_take_down_thread_body':
+      'ئەمە بابەتە ڕاپۆرتکراوەکە لادەبات و ڕاپۆرتەکە وەک چارەسەرکراو دیاری دەکات.',
   'admin_delete_report': 'سڕینەوەی ڕاپۆرت',
   'admin_take_down_post': 'لابردنی پۆست',
   'admin_take_down_thread': 'لابردنی بابەت',
@@ -1078,7 +1148,8 @@ const Map<String, String> ckbStrings = {
   'admin_thread_taken_down': 'بابەت لابرا و ڕاپۆرت چارەسەرکرا',
   'admin_action_failed': 'هەنگاوەکە شکستی هێنا: {error}',
   'admin_remove_user_title': 'بەکارهێنەرەکە لاببرێت؟',
-  'admin_remove_user_body': 'ئەمە بە یەکجاری هەژماری ئەم بەکارهێنەرە و داتاکانی لادەبات. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'admin_remove_user_body':
+      'ئەمە بە یەکجاری هەژماری ئەم بەکارهێنەرە و داتاکانی لادەبات. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'admin_remove_user': 'لابردنی بەکارهێنەر',
   'admin_user_removed': 'بەکارهێنەر لابرا',
   'admin_cleared_solved_reports': 'پاککرایەوە: {count} ڕاپۆرتی چارەسەرکراو',
@@ -1089,7 +1160,8 @@ const Map<String, String> ckbStrings = {
   'admin_no_unsolved_errors': 'هیچ هەڵەیەکی چارەسەرنەکراو نییە 🎉',
   'admin_captured_errors_here': 'هەڵەکانی ئەپەکە لێرە دەردەکەون.',
   'admin_nothing_solved_yet': 'هیچ شتێک چارەسەر نەکراوە هێشتا',
-  'admin_solved_reports_move_here': 'ئەو ڕاپۆرتانەی وەک چارەسەرکراو دیارییان دەکەیت دەگوازرێنەوە بۆ ئێرە.',
+  'admin_solved_reports_move_here':
+      'ئەو ڕاپۆرتانەی وەک چارەسەرکراو دیارییان دەکەیت دەگوازرێنەوە بۆ ئێرە.',
   'admin_most_frequent': 'زۆرترین دووبارەبووەوە (لیستی ئێستا)',
   'admin_unknown_screen': 'شاشەی نەناسراو',
   'admin_page_screen': 'پەڕە / شاشە',
@@ -1105,7 +1177,8 @@ const Map<String, String> ckbStrings = {
   'admin_no_blacklisted_emails': 'هیچ ئیمەیڵێکی بلۆککراو نییە',
   'admin_deleted_on': 'سڕایەوە لە {date}',
   'admin_remove_from_blacklist_title': 'لابردن لە لیستی ڕەش؟',
-  'admin_allow_to_register_again': 'ڕێگە بدرێت بە {email} دووبارە خۆی تۆمار بکاتەوە؟',
+  'admin_allow_to_register_again':
+      'ڕێگە بدرێت بە {email} دووبارە خۆی تۆمار بکاتەوە؟',
   'admin_remove_from_blacklist_tooltip': 'لابردن لە لیستی ڕەش',
   'admin_could_not_load': 'نەتوانرا باربکرێت: {error}',
   'admin_no_requests': 'هیچ داواکارییەک نییە.',
@@ -1124,44 +1197,59 @@ const Map<String, String> ckbStrings = {
   'admin_flag_reposts': 'ڕیپۆست چالاککراوە',
   'admin_flag_translate': 'وەرگێڕان چالاککراوە',
   'admin_section_announcement': 'ڕاگەیاندن',
-  'admin_announcement_hint': 'لە سەرەوەی شاشەی سەرەکی دەردەکەوێت. بەتاڵی جێبهێڵە بۆ شاردنەوەی.',
+  'admin_announcement_hint':
+      'لە سەرەوەی شاشەی سەرەکی دەردەکەوێت. بەتاڵی جێبهێڵە بۆ شاردنەوەی.',
   'admin_section_maintenance': 'چاککردنەوە',
   'admin_flag_maintenance': 'دۆخی چاککردنەوە (لایلۆنی تەنها بۆ خوێندنەوە)',
   'admin_section_min_app_version': 'کەمترین وەشانی ئەپ',
   'admin_min_version_hint': 'بۆ نموونە: 1.0.0',
   'admin_section_contact_email': 'ئیمەیڵی پەیوەندی',
-  'admin_contact_email_hint': 'ئەو ئیمەیڵەی لە لینکی "ببە بە بەڕێوەبەری بۆنە" پیشان دەدرێت',
-  'admin_section_app_store_links': 'لینکەکانی ستۆری ئەپەکە (بانگهێشتکردنی هاوڕێیان)',
-  'admin_app_store_links_desc': 'لەلایەن دوگمەی "بانگهێشتکردنی هاوڕێیان"ـەوە لە پڕۆفایلدا بەکاردێت. ئەپەکە لینکی گونجاو هەڵدەبژێرێت بۆ پلاتفۆرمی بەکارهێنەر.',
+  'admin_contact_email_hint':
+      'ئەو ئیمەیڵەی لە لینکی "ببە بە بەڕێوەبەری بۆنە" پیشان دەدرێت',
+  'admin_section_app_store_links':
+      'لینکەکانی ستۆری ئەپەکە (بانگهێشتکردنی هاوڕێیان)',
+  'admin_app_store_links_desc':
+      'لەلایەن دوگمەی "بانگهێشتکردنی هاوڕێیان"ـەوە لە پڕۆفایلدا بەکاردێت. ئەپەکە لینکی گونجاو هەڵدەبژێرێت بۆ پلاتفۆرمی بەکارهێنەر.',
   'admin_ios_url_hint': 'لینک بۆ iOS App Store (https://apps.apple.com/...)',
-  'admin_android_url_hint': 'لینک بۆ Google Play (https://play.google.com/store/apps/details?id=...)',
+  'admin_android_url_hint':
+      'لینک بۆ Google Play (https://play.google.com/store/apps/details?id=...)',
   'admin_section_event_types': 'جۆرەکانی بۆنە',
-  'admin_event_types_desc': 'ئەو هەڵبژاردانەی بەڕێوەبەران لێیان هەڵدەبژێرن کاتی دروستکردنی بۆنە، و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
+  'admin_event_types_desc':
+      'ئەو هەڵبژاردانەی بەڕێوەبەران لێیان هەڵدەبژێرن کاتی دروستکردنی بۆنە، و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
   'admin_add_event_type': 'زیادکردنی جۆری بۆنە',
   'admin_section_event_countries': 'وڵاتەکانی بۆنە',
-  'admin_event_countries_desc': 'ئەو وڵاتانەی بەڕێوەبەران بۆنەکانیانی پێوە دەبەستنەوە، و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
+  'admin_event_countries_desc':
+      'ئەو وڵاتانەی بەڕێوەبەران بۆنەکانیانی پێوە دەبەستنەوە، و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
   'admin_add_country': 'زیادکردنی وڵات',
   'profile_no_users_yet': 'هیچ بەکارهێنەرێک نییە هێشتا',
   'profile_no_profile_data': 'هیچ زانیارییەکی پڕۆفایل نییە',
   'profile_only_followers_can_see': 'تەنها فۆڵۆوەرز دەتوانن پۆستەکانت ببینن',
   'profile_anyone_can_see': 'هەر کەسێک دەتوانێت پۆستەکانت ببینێت',
   'profile_admin_panel': 'پانێڵی بەڕێوەبەر',
-  'profile_delete_account_subtitle': 'هەژمارەکەت و هەموو داتاکانت بە یەکجاری دەسڕێتەوە.',
+  'profile_delete_account_subtitle':
+      'هەژمارەکەت و هەموو داتاکانت بە یەکجاری دەسڕێتەوە.',
   'profile_no_blocked_users': 'هیچ بەکارهێنەرێکی بلۆککراو نییە',
-  'profile_blocked_users_hint': 'ئەو بەکارهێنەرانەی بلۆکت کردوون لێرە دەردەکەون.',
+  'profile_blocked_users_hint':
+      'ئەو بەکارهێنەرانەی بلۆکت کردوون لێرە دەردەکەون.',
   'profile_delete_account_title': 'هەژمارەکەت بسڕێتەوە؟',
-  'profile_delete_account_body': 'ئەمە بە یەکجاری پڕۆفایل، پۆست، کۆمێنت، ستۆری، فۆڵۆوەر، و ئاگادارکردنەوەکانت دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
+  'profile_delete_account_body':
+      'ئەمە بە یەکجاری پڕۆفایل، پۆست، کۆمێنت، ستۆری، فۆڵۆوەر، و ئاگادارکردنەوەکانت دەسڕێتەوە. ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'profile_delete_everything': 'سڕینەوەی هەموو شتێک',
   'profile_deleting_account': 'سڕینەوەی هەژمارەکەت...',
-  'profile_reauth_required': 'لەبەر هۆکاری ئاسایش، تکایە بچۆ دەرەوە و دووبارە بچۆرەوە ژوورەوە، پاشان هەوڵ بدەرەوە.',
+  'profile_reauth_required':
+      'لەبەر هۆکاری ئاسایش، تکایە بچۆ دەرەوە و دووبارە بچۆرەوە ژوورەوە، پاشان هەوڵ بدەرەوە.',
   'profile_no_reposts_yet': 'هیچ ڕیپۆستێک نییە هێشتا',
-  'profile_no_reposts_subtitle': 'ئەو پۆستانەی ڕیپۆستیان دەکەیت لێرە دەردەکەون.',
+  'profile_no_reposts_subtitle':
+      'ئەو پۆستانەی ڕیپۆستیان دەکەیت لێرە دەردەکەون.',
   'profile_no_saved_posts': 'هیچ پۆستێکی پاشەکەوتکراو نییە',
-  'profile_no_saved_subtitle': 'پۆستەکان پاشەکەوت بکە بۆ ئەوەی دواتر لێرە بیانبینیت.',
+  'profile_no_saved_subtitle':
+      'پۆستەکان پاشەکەوت بکە بۆ ئەوەی دواتر لێرە بیانبینیت.',
   'profile_no_questions_asked': 'هیچ پرسیارێک نەکراوە هێشتا',
   'profile_no_answers_yet': 'هیچ وەڵامێک نییە هێشتا',
-  'profile_no_questions_asked_subtitle': 'ئەو پرسیارانەی لە گفتوگۆ دەیکەیت لێرە دەردەکەون.',
-  'profile_no_answers_subtitle': 'ئەو پرسیارانەی وەڵامت داونەتەوە لێرە دەردەکەون.',
+  'profile_no_questions_asked_subtitle':
+      'ئەو پرسیارانەی لە گفتوگۆ دەیکەیت لێرە دەردەکەون.',
+  'profile_no_answers_subtitle':
+      'ئەو پرسیارانەی وەڵامت داونەتەوە لێرە دەردەکەون.',
   'profile_questions_asked': 'پرسیارە کراوەکان',
   'profile_questions_answered': 'پرسیارە وەڵامدراوەکان',
   'profile_invite_friends': 'بانگهێشتکردنی هاوڕێیان',
@@ -1170,7 +1258,8 @@ const Map<String, String> ckbStrings = {
   'profile_create': 'دروستکردن',
   'profile_visitors_count': '{count} سەردانکەر',
   'profile_no_visits_yet': 'هیچ سەردانێکی پڕۆفایل نییە هێشتا',
-  'profile_no_visits_subtitle': 'کاتێک بەکارهێنەرانی تر پڕۆفایلەکەت دەکەنەوە، لێرە دەردەکەون.',
+  'profile_no_visits_subtitle':
+      'کاتێک بەکارهێنەرانی تر پڕۆفایلەکەت دەکەنەوە، لێرە دەردەکەون.',
   'profile_visited': 'سەردانیکرا لە {time}',
   'profile_visited_times': 'سەردانیکرا لە {time} · کۆی گشتی {count}×',
   'profile_visitor_visits': '{name} · {count}× سەردانەکان',
@@ -1187,15 +1276,18 @@ const Map<String, String> ckbStrings = {
   'user_not_found': 'بەکارهێنەر نەدۆزرایەوە',
   'user_unblocked': 'بەکارهێنەر بلۆکی لەسەر لابرا',
   'user_blocked': 'بەکارهێنەر بلۆک کرا',
-  'user_failed_block_unblock': 'بلۆککردن/لابردنی بلۆک شکستی هێنا: {error}\nئایا یاساکانی Firestoreـت بڵاوکردووەتەوە؟',
+  'user_failed_block_unblock':
+      'بلۆککردن/لابردنی بلۆک شکستی هێنا: {error}\nئایا یاساکانی Firestoreـت بڵاوکردووەتەوە؟',
   'user_you_blocked_this_user': 'تۆ ئەم بەکارهێنەرەت بلۆک کردووە',
-  'user_blocked_content_hidden': 'پۆست، ڕیپۆست، و بابەتە پاشەکەوتکراوەکانیان شاراوەن، و ناتوانن نامەت بۆ بنێرن.',
+  'user_blocked_content_hidden':
+      'پۆست، ڕیپۆست، و بابەتە پاشەکەوتکراوەکانیان شاراوەن، و ناتوانن نامەت بۆ بنێرن.',
   'user_failed_unblock': 'لابردنی بلۆک شکستی هێنا: {error}',
   'user_private_follow_prompt': 'فۆڵۆوی ئەم هەژمارە بکە بۆ بینینی ناوەڕۆکەکەی.',
   'edit_profile_upload_failed': 'بارکردن شکستی هێنا: {error}',
   'edit_profile_cover_upload_failed': 'بارکردنی کەڤەر شکستی هێنا: {error}',
   'edit_profile_username_empty': 'ناوی بەکارهێنەر نابێت بەتاڵ بێت',
-  'edit_profile_username_invalid': 'ناوی بەکارهێنەر دەبێت 3-24 پیت بێت و تەنها a-z، 0-9، . یان _ بەکاربهێنێت',
+  'edit_profile_username_invalid':
+      'ناوی بەکارهێنەر دەبێت 3-24 پیت بێت و تەنها a-z، 0-9، . یان _ بەکاربهێنێت',
   'edit_profile_username_taken': 'ناوی بەکارهێنەر پێشتر گیراوە',
   'edit_profile_updated': 'پڕۆفایل نوێکرایەوە',
   'edit_profile_could_not_save': 'نەتوانرا پڕۆفایل پاشەکەوت بکرێت: {error}',
@@ -1208,9 +1300,11 @@ const Map<String, String> ckbStrings = {
   'edit_profile_select_gender': 'ڕەگەز هەڵبژێرە',
   'edit_profile_prefer_not_to_say': 'پێم باشترە نەیڵێم',
   'edit_profile_interests_goals': 'ئارەزووەکان و ئامانجەکان',
-  'edit_profile_interests_desc': 'یارمەتیمان دەدات بۆنە، سکۆلەرشیپ و ئەو کەسانە دەربخەین کە پەیوەندیت پێیانەوە هەیە. هەمووی ئارەزوومەندانەیە.',
+  'edit_profile_interests_desc':
+      'یارمەتیمان دەدات بۆنە، سکۆلەرشیپ و ئەو کەسانە دەربخەین کە پەیوەندیت پێیانەوە هەیە. هەمووی ئارەزوومەندانەیە.',
   'request_hidden_requests': 'داواکارییە شاراوەکان',
-  'request_hidden_requests_subtitle': 'ئەو داواکارییانەی نامەیان تێدایە کە لەوانەیە سووکایەتیپێکردن یان نەخوازراو بن، دەگوازرێنەوە بۆ ئەم فۆڵدەرە.',
+  'request_hidden_requests_subtitle':
+      'ئەو داواکارییانەی نامەیان تێدایە کە لەوانەیە سووکایەتیپێکردن یان نەخوازراو بن، دەگوازرێنەوە بۆ ئەم فۆڵدەرە.',
   'about_editor_i_am_a': 'من…',
   'about_editor_field': 'بوار',
   'about_editor_academic_level': 'ئاستی ئەکادیمی',
@@ -1281,9 +1375,8 @@ const Map<String, String> ckbStrings = {
   'settings_blocked_users_hint':
       'پرۆفایلی بەکارهێنەرێک بکەرەوە بۆ بلۆککردن یان لابردنی بلۆک لەوێ.',
   'settings_cannot_change_email_title': 'ناتوانرێت ئیمەیڵ بگۆڕدرێت',
-  'settings_cannot_change_email_body':
-      'ئیمەیڵەکەت ئیمەیڵی هەژماری گووگڵەکەتە. '
-          'تەنها لە ڕێگەی ڕێکخستنەکانی هەژماری گووگڵتەوە لە myaccount.google.com دەگۆڕدرێت.',
+  'settings_cannot_change_email_body': 'ئیمەیڵەکەت ئیمەیڵی هەژماری گووگڵەکەتە. '
+      'تەنها لە ڕێگەی ڕێکخستنەکانی هەژماری گووگڵتەوە لە myaccount.google.com دەگۆڕدرێت.',
   'settings_verification_email_sent':
       'ئیمەیڵی پشتڕاستکردنەوە نێردرا. سندووقی هاتووەکەت بپشکنە بۆ پشتڕاستکردنەوەی ناونیشانی نوێ.',
   'settings_set_password_dialog_body':
@@ -1333,7 +1426,8 @@ const Map<String, String> ckbStrings = {
 
   // ── VERSION GATE (added) ──
   'update_required_title': 'نوێکردنەوە پێویستە',
-  'update_required_body': 'تکایە نوێی بکەرەوە بۆ وەشانی {required} یان نوێتر بۆ بەردەوامبوون. تۆ لەسەر وەشانی {current}ـیت.',
+  'update_required_body':
+      'تکایە نوێی بکەرەوە بۆ وەشانی {required} یان نوێتر بۆ بەردەوامبوون. تۆ لەسەر وەشانی {current}ـیت.',
 
   // ── FEED SEARCH (added) ──
   'home_search_posts': 'گەڕان لە پۆستەکان بەپێی کاپشن...',
@@ -1345,7 +1439,7 @@ const Map<String, String> ckbStrings = {
   'post_card_discuss_created': 'بڵاوکرایەوە بۆ گفتوگۆ',
   'post_card_discuss_failed': 'نەتوانرا بابەتی گفتوگۆ دروست بکرێت: {error}',
 
-    'qa_view_original_post': 'بینینی پۆستی ڕەسەن',
+  'qa_view_original_post': 'بینینی پۆستی ڕەسەن',
 
   // ── ADD POST TO STORY (added) ──
   'post_card_add_to_story': 'زیادکردن بۆ ستۆرییەکەت',
@@ -1353,7 +1447,7 @@ const Map<String, String> ckbStrings = {
   'post_card_added_to_story': 'زیادکرا بۆ ستۆرییەکەت',
   'post_card_story_failed': 'نەتوانرا زیاد بکرێت بۆ ستۆری: {error}',
 
-    'story_tap_to_view_post': 'پەنجە بنێ بۆ بینینی پۆست',
+  'story_tap_to_view_post': 'پەنجە بنێ بۆ بینینی پۆست',
 
   // ── TRAVEL LOCATION BANNER (added) ──
   'travel_location_off_banner': 'شوێن چالاک بکە بۆ بینینی پۆستە نزیکەکانت.',
@@ -1371,12 +1465,15 @@ const Map<String, String> ckbStrings = {
   // ── MERGE WITH DEMO (added) ──
   'admin_status_revoked': 'هەڵوەشێنراوەتەوە',
   'admin_pick_funding_status': 'دۆخی پاڵپشتی دارایی هەڵبژێرە',
-  'admin_search_by_username_or_caption': 'گەڕان بەپێی ناوی بەکارهێنەر یان کاپشن',
+  'admin_search_by_username_or_caption':
+      'گەڕان بەپێی ناوی بەکارهێنەر یان کاپشن',
   'admin_no_posts_match': 'هیچ پۆستێک نییە کە لەگەڵ گەڕانەکەت بگونجێت',
   'create_post_blocked_title': 'پۆست بلۆککرا',
-  'create_post_blocked_body': 'ئەم پۆستە ناتوانرێت بڵاوبکرێتەوە چونکە کاپشن یان خانەکانی شوێن وشەی بلۆککراویان تێدایە.',
+  'create_post_blocked_body':
+      'ئەم پۆستە ناتوانرێت بڵاوبکرێتەوە چونکە کاپشن یان خانەکانی شوێن وشەی بلۆککراویان تێدایە.',
   'events_no_one_in_field': 'هیچ کەسێک لەم بوارەدا بەشداری نەکردووە هێشتا.',
-  'events_no_one_at_academic_level': 'هیچ کەسێک لەم ئاستە ئەکادیمییەدا بەشداری نەکردووە هێشتا.',
+  'events_no_one_at_academic_level':
+      'هیچ کەسێک لەم ئاستە ئەکادیمییەدا بەشداری نەکردووە هێشتا.',
   'events_filter_field': 'بوار',
   'events_filter_level': 'ئاست',
   'events_no_matching_people': 'هیچ کەسێکی گونجاو نییە',

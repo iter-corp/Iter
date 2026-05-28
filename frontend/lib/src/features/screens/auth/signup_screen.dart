@@ -199,7 +199,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 30),
-                  _buildTextField(
+                  _buildAuthTextField(
                     controller: _emailCtrl,
                     hint: t.email,
                     prefixIcon: Icons.email_outlined,
@@ -217,7 +217,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 14),
-                  _buildTextField(
+                  _buildAuthTextField(
                     controller: _passCtrl,
                     hint: t.password,
                     prefixIcon: Icons.lock_outline,
@@ -242,7 +242,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     validator: (value) => _validatePassword(value, t),
                   ),
                   const SizedBox(height: 14),
-                  _buildTextField(
+                  _buildAuthTextField(
                     controller: _confirmCtrl,
                     hint: t.confirmPassword,
                     prefixIcon: Icons.lock_outline,
@@ -352,6 +352,120 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
+  Widget _buildAuthTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData prefixIcon,
+    required String? Function(String?) validator,
+    TextInputType? keyboardType,
+    bool isPassword = false,
+    String? helperText,
+    bool touched = false,
+    VoidCallback? onBlur,
+    bool? obscured,
+    VoidCallback? onToggleObscure,
+  }) {
+    final isObscured = isPassword ? (obscured ?? true) : false;
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (!hasFocus) onBlur?.call();
+      },
+      canRequestFocus: false,
+      child: FormField<String>(
+        initialValue: controller.text,
+        validator: validator,
+        autovalidateMode: touched
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
+        builder: (field) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppGlassCard(
+              radius: 16,
+              borderAlpha: field.hasError ? 0.7 : null,
+              child: TextField(
+                controller: controller,
+                keyboardType: keyboardType,
+                obscureText: isObscured,
+                onChanged: field.didChange,
+                autofillHints: isPassword
+                    ? const [AutofillHints.newPassword]
+                    : keyboardType == TextInputType.emailAddress
+                        ? const [AutofillHints.email]
+                        : null,
+                style: TextStyle(fontSize: 14, color: context.textPrimary),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+                  prefixIcon:
+                      Icon(prefixIcon, size: 20, color: context.textMuted),
+                  suffixIcon: isPassword
+                      ? IconButton(
+                          icon: Icon(
+                            isObscured
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            size: 20,
+                            color: context.textMuted,
+                          ),
+                          onPressed: onToggleObscure,
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+            if (helperText != null) _passwordHelper(helperText),
+            if (field.hasError) _authFieldError(field.errorText!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _passwordHelper(String text) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 16, top: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE53935),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _authFieldError(String text) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 16, top: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.redAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,

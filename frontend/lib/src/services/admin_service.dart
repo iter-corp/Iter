@@ -1261,21 +1261,37 @@ class AdminService {
       payload['deadline'] = Timestamp.fromDate(payload['deadline'] as DateTime);
     }
     await _db.collection('events').doc(id).update(payload);
-    // Keep the chat doc's title mirrored when the admin renames the event.
-    if (payload.containsKey('title')) {
-      await _db
-          .collection('eventChats')
-          .doc(id)
-          .set({'eventTitle': payload['title']}, SetOptions(merge: true));
-    }
   }
 
   /// Delete an event.
   Future<void> deleteEvent(String id) async {
     await _deleteNewEventNotifications(id);
+    await _deleteEventChatArtifacts(id);
     final batch = _db.batch();
     batch.delete(_db.collection('events').doc(id));
     await batch.commit();
+  }
+
+  Future<void> _deleteEventChatArtifacts(String eventId) async {
+    final chatRef = _db.collection('eventChats').doc(eventId);
+    await _deleteCollectionDocs(chatRef.collection('messages'));
+    await _deleteCollectionDocs(chatRef.collection('members'));
+    await chatRef.delete().catchError((_) {});
+  }
+
+  Future<void> _deleteCollectionDocs(
+    CollectionReference<Map<String, dynamic>> col,
+  ) async {
+    while (true) {
+      final snap = await col.limit(400).get();
+      if (snap.docs.isEmpty) return;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < 400) return;
+    }
   }
 
   Future<void> _deleteNewEventNotifications(String eventId) async {

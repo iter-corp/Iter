@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
-import '../../providers/event_chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../model/post_model.dart';
@@ -18,7 +17,6 @@ import '../widgets/event_detail.dart';
 import '../widgets/event_unavailable_screen.dart';
 import '../widgets/notification_tile.dart';
 import 'chat_screen.dart';
-import 'event_chat_screen.dart';
 import 'event_screen.dart';
 import 'post_detail_screen.dart';
 import 'qa_thread_screen.dart';
@@ -649,12 +647,6 @@ class _NotificationItem extends ConsumerWidget {
             subtitle = context.t.timeAgo(notif.createdAt);
             trailingType = NotificationType.followBack;
             if (currentUser != null) {
-              onFollow = () => ref.read(followServiceProvider).follow(
-                    currentUid: currentUser.uid,
-                    targetUid: notif.actorUid,
-                    isPrivate: false,
-                  );
-
               final isFollowingAsync =
                   ref.watch(isFollowingProvider(notif.actorUid));
               final isFollowing =
@@ -662,7 +654,21 @@ class _NotificationItem extends ConsumerWidget {
 
               trailingWidget = _FollowStateButton(
                 isFollowing: isFollowing,
-                onTap: isFollowing ? null : onFollow,
+                onTap: () {
+                  final followService = ref.read(followServiceProvider);
+                  if (isFollowing) {
+                    followService.unfollow(
+                      currentUid: currentUser.uid,
+                      targetUid: notif.actorUid,
+                    );
+                  } else {
+                    followService.follow(
+                      currentUid: currentUser.uid,
+                      targetUid: notif.actorUid,
+                      isPrivate: false,
+                    );
+                  }
+                },
               );
             }
             break;
@@ -826,14 +832,6 @@ class _NotificationItem extends ConsumerWidget {
           trailingWidget = _PostThumbnail(postId: notif.targetId!);
         }
 
-        // Inline accept/reject buttons for event invitations.
-        if (notif.type == 'event_invited' && notif.targetId != null) {
-          trailingWidget = _InviteActions(
-            eventId: notif.targetId!,
-            onDone: onMarkRead,
-          );
-        }
-
         final tile = GestureDetector(
           onTap: () {
             onMarkRead?.call();
@@ -940,7 +938,7 @@ class _NotificationItem extends ConsumerWidget {
       case 'event_approved':
       case 'event_invited':
         if (notif.targetId != null) {
-          _openEventChatFromNotification(context, notif);
+          _openEventDetailFromNotification(context, notif.targetId!);
         }
         break;
       case 'new_event':
@@ -1065,31 +1063,6 @@ class _NotificationItem extends ConsumerWidget {
     );
   }
 
-  /// Resolves the event chat metadata and navigates into it.
-  Future<void> _openEventChatFromNotification(
-    BuildContext context,
-    AppNotification notif,
-  ) async {
-    final db = FirebaseFirestore.instance;
-    final snap = await db.collection('eventChats').doc(notif.targetId!).get();
-    final d = snap.data() ?? {};
-    final adminUid = (d['adminUid'] as String?) ?? '';
-
-    if (!context.mounted) return;
-    final title =
-        (d['eventTitle'] as String?) ?? context.t.notifEventFallbackTitle;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EventChatScreen(
-          eventId: notif.targetId!,
-          eventTitle: title,
-          adminUid: adminUid,
-        ),
-      ),
-    );
-  }
-
   /// Resolves the chat metadata + actor info, then navigates to ChatScreen.
   Future<void> _openChatFromNotification(
     BuildContext context,
@@ -1123,90 +1096,6 @@ class _NotificationItem extends ConsumerWidget {
 // Invite actions — Accept (stay in the group) / Reject (leave the group).
 // Shown inline on `event_invited` notifications.
 // ─────────────────────────────────────────────
-
-class _InviteActions extends ConsumerStatefulWidget {
-  final String eventId;
-  final VoidCallback? onDone;
-
-  const _InviteActions({required this.eventId, this.onDone});
-
-  @override
-  ConsumerState<_InviteActions> createState() => _InviteActionsState();
-}
-
-class _InviteActionsState extends ConsumerState<_InviteActions> {
-  bool _busy = false;
-
-  Future<void> _accept() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      widget.onDone?.call();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _reject() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await ref.read(eventChatServiceProvider).leaveGroup(widget.eventId);
-      widget.onDone?.call();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.t.failedWithError(e))));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          onTap: _busy ? null : _reject,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE04E5C)),
-            ),
-            child: Text(
-              context.t.notifReject,
-              style: const TextStyle(
-                  color: Color(0xFFE04E5C),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        InkWell(
-          onTap: _busy ? null : _accept,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: const Color(0xFFB44FFF),
-            ),
-            child: Text(
-              context.t.notifAccept,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 // ─────────────────────────────────────────────
 // Follow Request actions

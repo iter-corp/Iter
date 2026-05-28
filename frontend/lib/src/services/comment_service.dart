@@ -27,6 +27,7 @@ class Comment {
   final String? replyToUsername;
   final int helpfulCount;
   final int unhelpfulCount;
+  final int likesCount;
   final bool profanityFiltered;
   final bool senderOnly;
 
@@ -41,6 +42,7 @@ class Comment {
     this.replyToUsername,
     this.helpfulCount = 0,
     this.unhelpfulCount = 0,
+    this.likesCount = 0,
     this.profanityFiltered = false,
     this.senderOnly = false,
   });
@@ -60,6 +62,7 @@ class Comment {
       replyToUsername: d['replyToUsername'] as String?,
       helpfulCount: (d['helpfulCount'] as num?)?.toInt() ?? 0,
       unhelpfulCount: (d['unhelpfulCount'] as num?)?.toInt() ?? 0,
+      likesCount: (d['likesCount'] as num?)?.toInt() ?? 0,
       profanityFiltered: d['profanityFiltered'] == true,
       senderOnly: d['senderOnly'] == true,
     );
@@ -109,6 +112,25 @@ class CommentService {
     return _comments(postId).snapshots().map((s) => s.docs.length);
   }
 
+  Future<void> _backfillMissingLikesCount(
+    String postId,
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    for (final doc in docs) {
+      if (doc.data().containsKey('likesCount')) continue;
+      try {
+        final likesSnap = await _likes(postId, doc.id).get();
+        await doc.reference.set(
+          {'likesCount': likesSnap.docs.length},
+          SetOptions(merge: true),
+        );
+      } catch (_) {
+        // Best-effort migration for older comments. A failed backfill should
+        // not prevent the comment list from rendering.
+      }
+    }
+  }
+
   Stream<List<Comment>> streamComments(
     String postId, {
     required String viewerUid,
@@ -120,8 +142,19 @@ class CommentService {
     List<Comment> privateComments = const [];
 
     void emitMerged() {
-      final merged = [...publicComments, ...privateComments]
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final merged = [...publicComments, ...privateComments]..sort((a, b) {
+          final aIsMine = a.authorUid == viewerUid;
+          final bIsMine = b.authorUid == viewerUid;
+          if (aIsMine != bIsMine) return aIsMine ? -1 : 1;
+
+          final likesCompare = b.likesCount.compareTo(a.likesCount);
+          if (likesCompare != 0) return likesCompare;
+
+          final timeCompare = b.createdAt.compareTo(a.createdAt);
+          if (timeCompare != 0) return timeCompare;
+
+          return a.id.compareTo(b.id);
+        });
       if (!controller.isClosed) controller.add(merged);
     }
 
@@ -130,6 +163,7 @@ class CommentService {
           .orderBy('createdAt', descending: false)
           .snapshots()
           .listen((snap) {
+        unawaited(_backfillMissingLikesCount(postId, snap.docs));
         publicComments = snap.docs.map(Comment.fromDoc).toList();
         emitMerged();
       }, onError: (Object e, StackTrace st) {
@@ -180,6 +214,7 @@ class CommentService {
       'authorAvatar': authorAvatar,
       'text': trimmed,
       'createdAt': FieldValue.serverTimestamp(),
+      'likesCount': 0,
       'helpfulCount': 0,
       'unhelpfulCount': 0,
       if (isProfanityFiltered) 'profanityFiltered': true,
@@ -318,8 +353,7 @@ class CommentService {
       if (currentUid == null || currentUid.isEmpty) {
         throw ArgumentError('currentUid is required for sender-only edits');
       }
-      final privateRef =
-          _privateComments(postId, currentUid).doc(commentId);
+      final privateRef = _privateComments(postId, currentUid).doc(commentId);
       if (flagged) {
         // Still bad — update in place, keep the flags.
         await privateRef.update({
@@ -351,8 +385,8 @@ class CommentService {
         // new doc is public, no flags.
       });
       batch.delete(privateRef);
-      batch.update(_postRef(postId),
-          {'commentsCount': FieldValue.increment(1)});
+      batch
+          .update(_postRef(postId), {'commentsCount': FieldValue.increment(1)});
       await batch.commit();
       return;
     }
@@ -453,16 +487,26 @@ class CommentService {
     required String uid,
   }) async {
     final likeRef = _likes(postId, commentId).doc(uid);
+    final commentRef = _comments(postId).doc(commentId);
     bool wasLiked = false;
     await _db.runTransaction((tx) async {
       final snap = await tx.get(likeRef);
+      final commentSnap = await tx.get(commentRef);
+      if (!commentSnap.exists) return;
+
       wasLiked = snap.exists;
       if (wasLiked) {
+        final currentCount =
+            (commentSnap.data()?['likesCount'] as num?)?.toInt() ?? 1;
         tx.delete(likeRef);
+        tx.update(commentRef, {
+          'likesCount': currentCount > 0 ? currentCount - 1 : 0,
+        });
       } else {
         tx.set(likeRef, {
           'createdAt': FieldValue.serverTimestamp(),
         });
+        tx.update(commentRef, {'likesCount': FieldValue.increment(1)});
       }
     });
 

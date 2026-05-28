@@ -26,6 +26,26 @@ class ChangePasswordScreen extends StatefulWidget {
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
+class _FieldError extends StatelessWidget {
+  final String text;
+  const _FieldError(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 14, top: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.redAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _currentPassCtrl = TextEditingController();
   final _newPassCtrl = TextEditingController();
@@ -175,23 +195,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   InputDecoration _fieldDecoration({
     required String label,
     required Widget suffixIcon,
-    String? errorText,
   }) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: context.textSecondary),
       filled: false,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       enabledBorder: InputBorder.none,
       border: InputBorder.none,
       focusedBorder: InputBorder.none,
-      // When errorText is set Flutter automatically swaps to the error
-      // border colors, so the field outlines red as the user types.
-      errorText: errorText,
       suffixIcon: suffixIcon,
-      suffixIconConstraints:
-          const BoxConstraints(minWidth: 44, minHeight: 44),
+      suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
     );
   }
 
@@ -241,21 +255,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   radius: 16,
                   padding: EdgeInsets.zero,
                   child: TextField(
-                  controller: _currentPassCtrl,
-                  obscureText: _obscureCurrent,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: _fieldDecoration(
-                    label: context.t.settingsCurrentPassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureCurrent
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                    controller: _currentPassCtrl,
+                    obscureText: _obscureCurrent,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: _fieldDecoration(
+                      label: context.t.settingsCurrentPassword,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureCurrent
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureCurrent = !_obscureCurrent),
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureCurrent = !_obscureCurrent),
                     ),
-                  ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -263,19 +277,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   radius: 16,
                   padding: EdgeInsets.zero,
                   child: TextField(
-                  controller: _newPassCtrl,
-                  obscureText: _obscureNew,
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: _fieldDecoration(
-                    label: context.t.settingsNewPassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureNew ? Icons.visibility_off : Icons.visibility,
+                    controller: _newPassCtrl,
+                    obscureText: _obscureNew,
+                    autofillHints: const [AutofillHints.newPassword],
+                    decoration: _fieldDecoration(
+                      label: context.t.settingsNewPassword,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureNew ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureNew = !_obscureNew),
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureNew = !_obscureNew),
                     ),
-                  ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -283,49 +297,50 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   radius: 16,
                   padding: EdgeInsets.zero,
                   child: TextField(
-                  controller: _confirmPassCtrl,
-                  obscureText: _obscureConfirm,
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: _fieldDecoration(
-                    label: context.t.settingsConfirmNewPassword,
-                  // Live mismatch error — `_confirmError` is null until the
-                  // user has typed something AND the value differs from the
-                  // new-password field, so it doesn't yell at them while
-                  // they're still in the middle of typing the same value.
-                    errorText: _confirmError,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirm
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                    controller: _confirmPassCtrl,
+                    obscureText: _obscureConfirm,
+                    autofillHints: const [AutofillHints.newPassword],
+                    decoration: _fieldDecoration(
+                      label: context.t.settingsConfirmNewPassword,
+                      // Live mismatch error — `_confirmError` is null until the
+                      // user has typed something AND the value differs from the
+                      // new-password field, so it doesn't yell at them while
+                      // they're still in the middle of typing the same value.
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirm
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
-                  ),
                 ),
-              const SizedBox(height: 8),
-              // "Forgot current password?" — navigates to the same
-              // forgot-password screen used from the login page rather
-              // than firing a reset email inline. Keeping it as a single
-              // flow means the user gets the full email-entry +
-              // confirmation UX they're already familiar with.
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed:
-                      _loading ? null : () => context.push('/forgot-password'),
-                  child: Text(context.t.forgotPassword),
-                ),
-              ),
-              if (_error != null) ...[
+                if (_confirmError != null) _FieldError(_confirmError!),
                 const SizedBox(height: 8),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                // "Forgot current password?" — navigates to the same
+                // forgot-password screen used from the login page rather
+                // than firing a reset email inline. Keeping it as a single
+                // flow means the user gets the full email-entry +
+                // confirmation UX they're already familiar with.
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => context.push('/forgot-password'),
+                    child: Text(context.t.forgotPassword),
+                  ),
                 ),
-              ],
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 SizedBox(
                   height: 48,

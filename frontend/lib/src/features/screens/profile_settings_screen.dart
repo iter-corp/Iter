@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +7,6 @@ import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
-import '../../providers/block_providers.dart';
 import '../../providers/contact_request_providers.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/preferred_language_provider.dart';
@@ -20,6 +18,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/share_app.dart';
 import '../widgets/app_page_background.dart';
 import 'admin/admin_events_screen.dart';
+import 'blocked_users_screen.dart';
 import 'change_password_screen.dart';
 import 'contact_us_screen.dart';
 import 'event_notifications_settings_screen.dart';
@@ -68,264 +67,202 @@ class ProfileSettingsScreen extends ConsumerWidget {
             24 + MediaQuery.of(context).padding.bottom,
           ),
           children: [
-          _SectionHeader(title: context.t.account),
-          _SettingsTile(
-            leading: const Icon(Icons.email_outlined, color: AppColors.purple),
-            title: Text(context.t.changeEmail),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-            onTap: () => _changeEmail(context),
-          ),
-          // Only users who actually have a password to change see this row.
-          // Pure-Google (or pure-Apple) accounts manage their password
-          // through the provider, not in this app — exposing a "Set
-          // password" entry here was confusing and the resulting screen
-          // had no "current password" to verify against.
-          if (_isEmailPasswordUser())
-            _SettingsTile(
-              leading: const Icon(Icons.lock_reset, color: AppColors.purple),
-              title: Text(context.t.changePassword),
-              trailing:
-                  Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => _changePassword(context),
-            ),
-          _SettingsTile(
-            leading: Icon(
-              isPrivate ? Icons.lock_outline : Icons.lock_open,
-              color: AppColors.purple,
-            ),
-            title: Text(context.t.privateAccount),
-            subtitle: Text(
-              isPrivate
-                  ? context.t.profileOnlyFollowersCanSee
-                  : context.t.profileAnyoneCanSee,
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Switch.adaptive(
-              value: isPrivate,
-              activeTrackColor: AppColors.purple,
-              onChanged: (val) async {
-                final uid = ref.read(authServiceProvider).currentUser?.uid;
-                if (uid == null) return;
-                await ref
-                    .read(userServiceProvider)
-                    .updateUser(uid, {'isPrivate': val});
-              },
-            ),
-          ),
-          _SettingsTile(
-            leading:
-                const Icon(Icons.visibility_outlined, color: AppColors.purple),
-            title: Text(context.t.profileVisitors),
-            subtitle: Text(
-              visitorCount == 0
-                  ? context.t.settingsVisitorsSeeWho
-                  : (visitorCount == 1
-                      ? context.t.settingsVisitorsViewedOne
-                      : context.t.settingsVisitorsViewedMany(visitorCount)),
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (visitorCount > 0)
-                  Container(
-                    margin: const EdgeInsetsDirectional.only(end: 6),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: context.purpleSoft,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '$visitorCount',
-                      style: const TextStyle(
-                        color: Color(0xFFB05ECC),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                Icon(Icons.chevron_right, color: context.textSecondary),
-              ],
-            ),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const ProfileVisitorsScreen(),
-              ),
-            ),
-          ),
-          _SectionHeader(title: context.t.settingsSectionNotifications),
-          _SettingsTile(
-            leading: const Icon(Icons.event_available_outlined,
-                color: AppColors.purple),
-            title: Text(context.t.eventNotifTitle),
-            subtitle: Text(
-              context.t.settingsEventNotifSubtitle,
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const EventNotificationsSettingsScreen(),
-              ),
-            ),
-          ),
-          _SectionHeader(title: context.t.languageLabel),
-          _SettingsTile(
-            leading: const Icon(Icons.language, color: AppColors.purple),
-            title: Text(context.t.appLanguage),
-            subtitle: Text(
-              context.t.settingsAppLanguageSubtitle,
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Text(
-              uiLanguage.nativeName,
-              textDirection: uiLanguage.direction,
-              style: const TextStyle(
-                color: AppColors.purple,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: () => context.push('/language'),
-          ),
-          _SettingsTile(
-            leading: const Icon(Icons.translate, color: AppColors.purple),
-            title: Text(context.t.translationLanguage),
-            subtitle: Text(
-              context.t.settingsTranslationLanguageSubtitle,
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Text(
-              _languageLabel(preferredLang),
-              style: TextStyle(
-                color: context.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: () => _pickLanguage(context, ref, current: preferredLang),
-          ),
-          _SettingsTile(
-            leading: const Icon(Icons.bookmarks_outlined,
-                color: AppColors.purple),
-            title: Text(context.t.savedTranslations),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const SavedTranslationsScreen(),
-              ),
-            ),
-          ),
-          _SectionHeader(title: context.t.appearance),
-          _SettingsTile(
-            leading: Icon(
-              isDark ? Icons.dark_mode : Icons.light_mode,
-              color: isDark ? Colors.amber : Colors.grey,
-            ),
-            title: Text(context.t.darkMode),
-            trailing: Switch.adaptive(
-              value: isDark,
-              activeTrackColor: AppColors.purple,
-              onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
-            ),
-            onTap: () => ref.read(themeModeProvider.notifier).toggle(),
-          ),
-          _SectionHeader(title: context.t.settingsSectionInvite),
-          _SettingsTile(
-            leading: const Icon(Icons.ios_share, color: AppColors.purple),
-            title: Text(context.t.settingsInviteFriends),
-            subtitle: Text(
-              context.t.settingsInviteFriendsSubtitle,
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-            onTap: () {
-              final cfg = ref.read(adminConfigProvider).valueOrNull ??
-                  const AdminConfig();
-              shareInviteLink(context, cfg);
-            },
-          ),
-          _SectionHeader(title: context.t.settingsSectionSupport),
-          _SettingsTile(
-            leading:
-                const Icon(Icons.support_agent_outlined, color: AppColors.purple),
-            title: Text(context.t.contactUs),
-            subtitle: Text(
-              context.t.settingsContactUsSubtitle,
-              style: TextStyle(fontSize: 12, color: context.textSecondary),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (hasUnreadReply)
-                  Container(
-                    width: 9,
-                    height: 9,
-                    margin: const EdgeInsetsDirectional.only(end: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.purple,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: context.cardBg, width: 1),
-                    ),
-                  ),
-                Icon(Icons.chevron_right, color: context.textSecondary),
-              ],
-            ),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ContactUsScreen()),
-            ),
-          ),
-          _SectionHeader(title: context.t.safety),
-          _SettingsTile(
-            leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
-            title: Text(context.t.blockedUsers),
-            trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-            onTap: () => _showBlockedUsers(context),
-          ),
-          // Approved event managers land here with event-posting rights
-          // but no other admin tooling. Full admins see the broader
-          // "Admin panel" entry below; this tile is for the limited
-          // org_admin role granted via Contact us.
-          if (isOrgAdmin && !isAdmin) ...[
-            _SectionHeader(title: context.t.settingsSectionOrganization),
-            _SettingsTile(
-              leading: const Icon(Icons.event_outlined,
-                  color: AppColors.purple),
-              title: Text(context.t.manageEvents,
-                  style: const TextStyle(
-                      color: AppColors.purple,
-                      fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                context.t.settingsManageEventsSubtitle,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
-              ),
-            ),
-          ],
-          if (isAdmin) ...[
-            _SectionHeader(title: context.t.admin),
+            _SectionHeader(title: context.t.account),
             _SettingsTile(
               leading:
-                  const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
-              title: Text(
-                context.t.profileAdminPanel,
-                style: const TextStyle(
-                  color: Color(0xFF7E3BE8),
-                  fontWeight: FontWeight.w600,
-                ),
+                  const Icon(Icons.email_outlined, color: AppColors.purple),
+              title: Text(context.t.changeEmail),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () => _changeEmail(context),
+            ),
+            // Only users who actually have a password to change see this row.
+            // Pure-Google (or pure-Apple) accounts manage their password
+            // through the provider, not in this app — exposing a "Set
+            // password" entry here was confusing and the resulting screen
+            // had no "current password" to verify against.
+            if (_isEmailPasswordUser())
+              _SettingsTile(
+                leading: const Icon(Icons.lock_reset, color: AppColors.purple),
+                title: Text(context.t.changePassword),
+                trailing:
+                    Icon(Icons.chevron_right, color: context.textSecondary),
+                onTap: () => _changePassword(context),
+              ),
+            _SettingsTile(
+              leading: Icon(
+                isPrivate ? Icons.lock_outline : Icons.lock_open,
+                color: AppColors.purple,
+              ),
+              title: Text(context.t.privateAccount),
+              subtitle: Text(
+                isPrivate
+                    ? context.t.profileOnlyFollowersCanSee
+                    : context.t.profileAnyoneCanSee,
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing: Switch.adaptive(
+                value: isPrivate,
+                activeTrackColor: AppColors.purple,
+                onChanged: (val) async {
+                  final uid = ref.read(authServiceProvider).currentUser?.uid;
+                  if (uid == null) return;
+                  await ref
+                      .read(userServiceProvider)
+                      .updateUser(uid, {'isPrivate': val});
+                },
+              ),
+            ),
+            _SettingsTile(
+              leading: const Icon(Icons.visibility_outlined,
+                  color: AppColors.purple),
+              title: Text(context.t.profileVisitors),
+              subtitle: Text(
+                visitorCount == 0
+                    ? context.t.settingsVisitorsSeeWho
+                    : (visitorCount == 1
+                        ? context.t.settingsVisitorsViewedOne
+                        : context.t.settingsVisitorsViewedMany(visitorCount)),
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (hasNewReports || hasUnreadContact)
+                  if (visitorCount > 0)
+                    Container(
+                      margin: const EdgeInsetsDirectional.only(end: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: context.purpleSoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$visitorCount',
+                        style: const TextStyle(
+                          color: Color(0xFFB05ECC),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  Icon(Icons.chevron_right, color: context.textSecondary),
+                ],
+              ),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileVisitorsScreen(),
+                ),
+              ),
+            ),
+            _SectionHeader(title: context.t.settingsSectionNotifications),
+            _SettingsTile(
+              leading: const Icon(Icons.event_available_outlined,
+                  color: AppColors.purple),
+              title: Text(context.t.eventNotifTitle),
+              subtitle: Text(
+                context.t.settingsEventNotifSubtitle,
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EventNotificationsSettingsScreen(),
+                ),
+              ),
+            ),
+            _SectionHeader(title: context.t.languageLabel),
+            _SettingsTile(
+              leading: const Icon(Icons.language, color: AppColors.purple),
+              title: Text(context.t.appLanguage),
+              subtitle: Text(
+                context.t.settingsAppLanguageSubtitle,
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing: Text(
+                uiLanguage.nativeName,
+                textDirection: uiLanguage.direction,
+                style: const TextStyle(
+                  color: AppColors.purple,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () => context.push('/language'),
+            ),
+            _SettingsTile(
+              leading: const Icon(Icons.translate, color: AppColors.purple),
+              title: Text(context.t.translationLanguage),
+              subtitle: Text(
+                context.t.settingsTranslationLanguageSubtitle,
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing: Text(
+                _languageLabel(preferredLang),
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () => _pickLanguage(context, ref, current: preferredLang),
+            ),
+            _SettingsTile(
+              leading:
+                  const Icon(Icons.bookmarks_outlined, color: AppColors.purple),
+              title: Text(context.t.savedTranslations),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SavedTranslationsScreen(),
+                ),
+              ),
+            ),
+            _SectionHeader(title: context.t.appearance),
+            _SettingsTile(
+              leading: Icon(
+                isDark ? Icons.dark_mode : Icons.light_mode,
+                color: isDark ? Colors.amber : Colors.grey,
+              ),
+              title: Text(context.t.darkMode),
+              trailing: Switch.adaptive(
+                value: isDark,
+                activeTrackColor: AppColors.purple,
+                onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+              ),
+              onTap: () => ref.read(themeModeProvider.notifier).toggle(),
+            ),
+            _SectionHeader(title: context.t.settingsSectionInvite),
+            _SettingsTile(
+              leading: const Icon(Icons.ios_share, color: AppColors.purple),
+              title: Text(context.t.settingsInviteFriends),
+              subtitle: Text(
+                context.t.settingsInviteFriendsSubtitle,
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () {
+                final cfg = ref.read(adminConfigProvider).valueOrNull ??
+                    const AdminConfig();
+                shareInviteLink(context, cfg);
+              },
+            ),
+            _SectionHeader(title: context.t.settingsSectionSupport),
+            _SettingsTile(
+              leading: const Icon(Icons.support_agent_outlined,
+                  color: AppColors.purple),
+              title: Text(context.t.contactUs),
+              subtitle: Text(
+                context.t.settingsContactUsSubtitle,
+                style: TextStyle(fontSize: 12, color: context.textSecondary),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasUnreadReply)
                     Container(
                       width: 9,
                       height: 9,
                       margin: const EdgeInsetsDirectional.only(end: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE04E5C),
+                        color: AppColors.purple,
                         shape: BoxShape.circle,
                         border: Border.all(color: context.cardBg, width: 1),
                       ),
@@ -333,37 +270,103 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   Icon(Icons.chevron_right, color: context.textSecondary),
                 ],
               ),
-              onTap: () => context.push('/admin'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ContactUsScreen()),
+              ),
             ),
-          ],
-          _SectionHeader(title: context.t.dangerZone),
-          _SettingsTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title:
-                Text(context.t.logout, style: const TextStyle(color: Colors.red)),
-            onTap: () async {
-              await ref.read(authServiceProvider).signOut();
-              ref.invalidate(adminConfigProvider);
-              ref.invalidate(adminPostsProvider);
-              ref.invalidate(adminEventsProvider);
-              ref.invalidate(blacklistProvider);
-              if (context.mounted) {
-                context.go('/login');
-              }
-            },
-          ),
-          _SettingsTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
-            title: Text(
-              context.t.deleteAccount,
-              style: const TextStyle(color: Colors.redAccent),
+            _SectionHeader(title: context.t.safety),
+            _SettingsTile(
+              leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
+              title: Text(context.t.blockedUsers),
+              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BlockedUsersScreen()),
+              ),
             ),
-            subtitle: Text(
-              context.t.profileDeleteAccountSubtitle,
+            // Approved event managers land here with event-posting rights
+            // but no other admin tooling. Full admins see the broader
+            // "Admin panel" entry below; this tile is for the limited
+            // org_admin role granted via Contact us.
+            if (isOrgAdmin && !isAdmin) ...[
+              _SectionHeader(title: context.t.settingsSectionOrganization),
+              _SettingsTile(
+                leading:
+                    const Icon(Icons.event_outlined, color: AppColors.purple),
+                title: Text(context.t.manageEvents,
+                    style: const TextStyle(
+                        color: AppColors.purple, fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  context.t.settingsManageEventsSubtitle,
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+                trailing:
+                    Icon(Icons.chevron_right, color: context.textSecondary),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
+                ),
+              ),
+            ],
+            if (isAdmin) ...[
+              _SectionHeader(title: context.t.admin),
+              _SettingsTile(
+                leading:
+                    const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
+                title: Text(
+                  context.t.profileAdminPanel,
+                  style: const TextStyle(
+                    color: Color(0xFF7E3BE8),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hasNewReports || hasUnreadContact)
+                      Container(
+                        width: 9,
+                        height: 9,
+                        margin: const EdgeInsetsDirectional.only(end: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE04E5C),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: context.cardBg, width: 1),
+                        ),
+                      ),
+                    Icon(Icons.chevron_right, color: context.textSecondary),
+                  ],
+                ),
+                onTap: () => context.push('/admin'),
+              ),
+            ],
+            _SectionHeader(title: context.t.dangerZone),
+            _SettingsTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: Text(context.t.logout,
+                  style: const TextStyle(color: Colors.red)),
+              onTap: () async {
+                await ref.read(authServiceProvider).signOut();
+                ref.invalidate(adminConfigProvider);
+                ref.invalidate(adminPostsProvider);
+                ref.invalidate(adminEventsProvider);
+                ref.invalidate(blacklistProvider);
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
             ),
-            onTap: () => _confirmDeleteAccount(context, ref),
-          ),
-          const SizedBox(height: 32),
+            _SettingsTile(
+              leading:
+                  const Icon(Icons.delete_forever, color: Colors.redAccent),
+              title: Text(
+                context.t.deleteAccount,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+              subtitle: Text(
+                context.t.profileDeleteAccountSubtitle,
+              ),
+              onTap: () => _confirmDeleteAccount(context, ref),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -461,62 +464,62 @@ class ProfileSettingsScreen extends ConsumerWidget {
               child: SizedBox(
                 height: MediaQuery.of(sheet).size.height * 0.6,
                 child: Column(
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                      sheet.t.settingsPreferredLanguage,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: context.textPrimary,
+                  children: [
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: context.borderColor,
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: entries.length,
-                    itemBuilder: (_, i) {
-                      final lang = entries[i];
-                      final selected = lang.code == current;
-                      return AppGlassCard(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        radius: 16,
-                        child: ListTile(
-                          title: Text(lang.label),
-                          subtitle: Text(
-                            lang.code.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecondary,
-                            ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          sheet.t.settingsPreferredLanguage,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: context.textPrimary,
                           ),
-                          trailing: selected
-                              ? const Icon(Icons.check,
-                                  color: AppColors.purple)
-                              : null,
-                          onTap: () => Navigator.pop(sheet, lang.code),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: entries.length,
+                        itemBuilder: (_, i) {
+                          final lang = entries[i];
+                          final selected = lang.code == current;
+                          return AppGlassCard(
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            radius: 16,
+                            child: ListTile(
+                              title: Text(lang.label),
+                              subtitle: Text(
+                                lang.code.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.textSecondary,
+                                ),
+                              ),
+                              trailing: selected
+                                  ? const Icon(Icons.check,
+                                      color: AppColors.purple)
+                                  : null,
+                              onTap: () => Navigator.pop(sheet, lang.code),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -528,18 +531,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
     if (selected != null) {
       await ref.read(preferredLanguageProvider.notifier).set(selected);
     }
-  }
-
-  void _showBlockedUsers(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const _BlockedUsersSheet(),
-    );
   }
 
   Future<void> _confirmDeleteAccount(
@@ -607,8 +598,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text(
-                    context.t.settingsDeleteFailed(e.message ?? e.code))),
+                content:
+                    Text(context.t.settingsDeleteFailed(e.message ?? e.code))),
           );
         }
         return;
@@ -877,8 +868,8 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
               child: TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
-                decoration: _settingsInputDecoration(
-                    context, label: context.t.settingsNewEmail),
+                decoration: _settingsInputDecoration(context,
+                    label: context.t.settingsNewEmail),
               ),
             ),
             const SizedBox(height: 12),
@@ -892,8 +883,8 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
                   context,
                   label: context.t.settingsCurrentPassword,
                   suffixIcon: IconButton(
-                    icon:
-                        Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(
+                        _obscure ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
@@ -935,148 +926,3 @@ class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
     );
   }
 }
-
-class _BlockedUsersSheet extends ConsumerWidget {
-  const _BlockedUsersSheet();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: AppPageBackground(
-        child: SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.65,
-            child: Column(
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.borderColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                context.t.settingsBlockedUsersTitle,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: context.textPrimary,
-                ),
-              ),
-            ),
-            // The full _BlockedUserTile lives in profile_screen.dart;
-            // we show a lightweight inline list here so the settings
-            // page can stand alone. Tapping unblock removes the user.
-            const Expanded(child: _BlockedUsersList()),
-          ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BlockedUsersList extends ConsumerWidget {
-  const _BlockedUsersList();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final blockedAsync = ref.watch(blockedUsersProvider);
-    return blockedAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            context.t.errorWithMessage(e),
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.textSecondary),
-          ),
-        ),
-      ),
-      data: (uids) {
-        if (uids.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                context.t.settingsBlockedUsersHint,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.textSecondary),
-              ),
-            ),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: uids.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (_, i) => _BlockedUserRow(uid: uids[i]),
-        );
-      },
-    );
-  }
-}
-
-class _BlockedUserRow extends ConsumerWidget {
-  final String uid;
-  const _BlockedUserRow({required this.uid});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final data = ref.watch(userByUidProvider(uid)).valueOrNull;
-    final username = (data?['username'] as String?) ?? uid;
-    final avatar = (data?['avatarUrl'] as String?) ?? '';
-
-    return ListTile(
-      leading: CircleAvatar(
-        radius: 20,
-        backgroundColor: context.inputFill,
-        backgroundImage:
-            avatar.isNotEmpty ? CachedNetworkImageProvider(avatar) : null,
-        child: avatar.isEmpty
-            ? Icon(Icons.person, color: context.textSecondary)
-            : null,
-      ),
-      title: Text(
-        username,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      trailing: SizedBox(
-        height: 32,
-        child: OutlinedButton(
-          onPressed: () async {
-            final me = ref.read(authServiceProvider).currentUser;
-            if (me == null) return;
-            await ref.read(blockServiceProvider).unblockUser(
-                  currentUid: me.uid,
-                  targetUid: uid,
-                );
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Colors.red, width: 1),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-          ),
-          child: Text(
-            context.t.unblock,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
