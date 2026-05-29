@@ -306,7 +306,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final uid = _currentUid;
       if (uid == null) return;
-      ref.read(presenceServiceProvider).setOnline(uid);
+      // Presence is owned by the app-lifecycle observer in main.dart, which
+      // now keeps a heartbeat running while the user is foregrounded. We no
+      // longer call setOnline() here — doing so would spin up a second,
+      // never-stopped heartbeat on a different PresenceService instance.
       unawaited(_markSeenNow());
     });
   }

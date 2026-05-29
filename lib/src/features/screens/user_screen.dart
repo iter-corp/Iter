@@ -455,7 +455,14 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           final following = followingAsync.valueOrNull?.length ??
               (user['followingCount'] as int?) ??
               0;
-          final posts = (user['postsCount'] as int?) ?? 0;
+          // Prefer the real post count (length of the streamed posts) over the
+          // denormalized `postsCount` counter, which can drift — and even go
+          // negative — when create/delete increments are dropped or run
+          // unbalanced. Fall back to the stored counter only until the list
+          // loads, and never display a negative.
+          final storedPostsCount = (user['postsCount'] as int?) ?? 0;
+          final posts = ref.watch(userPostsProvider(widget.uid)).valueOrNull?.length ??
+              (storedPostsCount < 0 ? 0 : storedPostsCount);
 
           final isBlocked = isBlockedAsync.value ?? false;
           final isBlockedBy = isBlockedByAsync.value ?? false;

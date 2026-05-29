@@ -43,9 +43,17 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   /// Legacy auto-mark hook kept disabled; category close handles read state.
   bool _legacyAutoMarkDisabled = true;
 
+  /// Captured eagerly in [initState] so the leave-path mark-read write does
+  /// not depend on `ref` still being valid. When the user backs out of the
+  /// page, `dispose()` runs after the element is unmounted and `ref.read`
+  /// there can be torn down before the async write lands — which is why
+  /// leaving via the back button used to skip marking the open tab read.
+  late final NotificationService _notificationService;
+
   @override
   void initState() {
     super.initState();
+    _notificationService = ref.read(notificationServiceProvider);
   }
 
   // ignore: unused_element
@@ -63,9 +71,12 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }
 
   @override
-  void dispose() {
+  void deactivate() {
+    // Runs when the page is removed from the navigation tree (back button)
+    // while the element is still mounted, so the mark-read write reliably
+    // lands. dispose() was too late — see [_notificationService].
     _markCategoryReadWhenClosed(_selectedCategory);
-    super.dispose();
+    super.deactivate();
   }
 
   bool _belongsToCategory(
@@ -104,8 +115,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     }
 
     _markedClosedCategories.add(category);
+    // Use the eagerly-captured service rather than ref.read so this still
+    // works from deactivate()/dispose() during back-navigation.
     unawaited(
-      ref.read(notificationServiceProvider).markNotificationsRead(uid, ids),
+      _notificationService.markNotificationsRead(uid, ids),
     );
   }
 
@@ -571,27 +584,46 @@ class _CategoryChip extends StatelessWidget {
 
 class _FollowStateButton extends StatelessWidget {
   final bool isFollowing;
+
+  /// True when a follow *request* to a private account is still pending
+  /// (the relationship doc exists with status == 'pending'). In this state
+  /// we are not yet following, but tapping "Follow Back" again would be
+  /// pointless — so we surface a neutral "Requested" pill instead.
+  final bool isPending;
   final VoidCallback? onTap;
 
   const _FollowStateButton({
     required this.isFollowing,
+    this.isPending = false,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Following / Requested both render as a muted, non-primary pill; only
+    // the actionable "Follow Back" uses the accent color.
+    final isNeutral = isFollowing || isPending;
+    final String label;
+    if (isFollowing) {
+      label = context.t.notifFollowing;
+    } else if (isPending) {
+      label = context.t.requested;
+    } else {
+      label = context.t.notifFollowBack;
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          color: isFollowing ? context.borderColor : const Color(0xFFB44FFF),
+          color: isNeutral ? context.borderColor : const Color(0xFFB44FFF),
         ),
         child: Text(
-          isFollowing ? context.t.notifFollowing : context.t.notifFollowBack,
+          label,
           style: TextStyle(
-            color: isFollowing ? context.textPrimary : Colors.white,
+            color: isNeutral ? context.textPrimary : Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -652,11 +684,34 @@ class _NotificationItem extends ConsumerWidget {
               final isFollowing =
                   isFollowingAsync.whenOrNull(data: (v) => v) ?? false;
 
+              // For a private actor, tapping "Follow Back" sends a follow
+              // *request* (status == 'pending') rather than an immediate
+              // follow. Surface that pending state so the pill reads
+              // "Requested" instead of staying on "Follow Back" forever.
+              final hasRequestedAsync =
+                  ref.watch(hasRequestedFollowProvider(notif.actorUid));
+              final hasRequested =
+                  hasRequestedAsync.whenOrNull(data: (v) => v) ?? false;
+
+              // The actor's privacy decides whether follow() creates a
+              // pending request or an active follow. Previously this was
+              // hardcoded to false, so following back a private account
+              // wrote an 'active' relationship the rules reject — the tap
+              // silently failed.
+              final actorIsPrivate = (actor?['isPrivate'] as bool?) ?? false;
+
               trailingWidget = _FollowStateButton(
                 isFollowing: isFollowing,
+                isPending: hasRequested,
                 onTap: () {
                   final followService = ref.read(followServiceProvider);
                   if (isFollowing) {
+                    followService.unfollow(
+                      currentUid: currentUser.uid,
+                      targetUid: notif.actorUid,
+                    );
+                  } else if (hasRequested) {
+                    // Cancel the pending request.
                     followService.unfollow(
                       currentUid: currentUser.uid,
                       targetUid: notif.actorUid,
@@ -665,7 +720,7 @@ class _NotificationItem extends ConsumerWidget {
                     followService.follow(
                       currentUid: currentUser.uid,
                       targetUid: notif.actorUid,
-                      isPrivate: false,
+                      isPrivate: actorIsPrivate,
                     );
                   }
                 },

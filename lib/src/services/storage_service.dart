@@ -17,8 +17,24 @@ class StorageException implements Exception {
 class StorageService {
   StorageService();
 
-  String get _supabaseUrl => dotenv.env['SUPABASE_URL']!;
-  String get _anonKey => dotenv.env['SUPABASE_ANON_KEY']!;
+  String get _supabaseUrl => _requireEnv('SUPABASE_URL');
+  String get _anonKey => _requireEnv('SUPABASE_ANON_KEY');
+
+  /// Reads a required env var, throwing a clear error if it's missing or empty.
+  ///
+  /// `dotenv.env[key]!` returns an *empty string* (not null) when the key is
+  /// absent, so a bare `!` doesn't protect against a `.env` that failed to
+  /// load — instead the empty URL later produces a cryptic "No host specified
+  /// in URI" error. This makes the real cause explicit.
+  String _requireEnv(String key) {
+    final value = dotenv.env[key];
+    if (value == null || value.isEmpty) {
+      throw StorageException(
+          '$key is not configured. The .env file may have failed to load — '
+          'try a clean rebuild (flutter clean).');
+    }
+    return value;
+  }
 
   Future<String> uploadAvatar(File file) {
     return _uploadViaEdge(bucket: 'avatars', file: file, kind: 'avatar');

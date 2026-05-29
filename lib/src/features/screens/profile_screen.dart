@@ -179,9 +179,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     following: followingAsync.valueOrNull?.length ??
                         (user['followingCount'] as int?) ??
                         0,
+                    // Prefer the real list length; the stored counter can drift
+                    // negative when create/delete increments run unbalanced, so
+                    // clamp the fallback at 0.
                     posts: postsAsync.valueOrNull?.length ??
-                        (user['postsCount'] as int?) ??
-                        0,
+                        (((user['postsCount'] as int?) ?? 0).clamp(0, 1 << 31)),
                     onFollowersTap: () => _showUserListSheet(
                       title: context.t.followers,
                       uids: followersAsync.value ?? const [],

@@ -646,9 +646,31 @@ class PostService {
     await postRef.delete();
 
     if (!isQa) {
-      await _db.collection('users').doc(uid).update({
-        'postsCount': FieldValue.increment(-1),
+      await _decrementPostsCount(uid);
+    }
+  }
+
+  /// Decrement a user's denormalized `postsCount`, flooring at 0.
+  ///
+  /// Using a transaction (instead of `FieldValue.increment(-1)`) lets us read
+  /// the current value and refuse to go negative — otherwise an unbalanced
+  /// delete (e.g. a delete whose matching create-increment was dropped) could
+  /// drive the displayed count to -1, -2, … even while posts still exist.
+  Future<void> _decrementPostsCount(String uid) async {
+    final userRef = _db.collection('users').doc(uid);
+    try {
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(userRef);
+        final current = (snap.data()?['postsCount'] as int?) ?? 0;
+        if (current <= 0) {
+          // Already at/below zero — clamp to 0 rather than going negative.
+          if (current < 0) tx.update(userRef, {'postsCount': 0});
+          return;
+        }
+        tx.update(userRef, {'postsCount': current - 1});
       });
+    } catch (_) {
+      // Best-effort: a failed counter update must not block the delete.
     }
   }
 
@@ -668,9 +690,7 @@ class PostService {
     await postRef.delete();
 
     if (authorUid != null && !isQa) {
-      await _db.collection('users').doc(authorUid).update({
-        'postsCount': FieldValue.increment(-1),
-      });
+      await _decrementPostsCount(authorUid);
     }
   }
 

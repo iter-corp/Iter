@@ -129,7 +129,12 @@ service cloud.firestore {
       allow update: if isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
         request.resource.data.resolved is bool;
-      allow read, delete: if isAdmin();
+      // Reporters may read their own report (the client's duplicate-report
+      // pre-check does a get() before creating). Admins may read all.
+      allow get: if isAdmin() ||
+        (signedIn() &&
+          (resource == null || resource.data.reporterUid == request.auth.uid));
+      allow list, delete: if isAdmin();
     }
 
     match /discussReports/{reportId} {
@@ -137,7 +142,10 @@ service cloud.firestore {
       allow update: if isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
         request.resource.data.resolved is bool;
-      allow read, delete: if isAdmin();
+      allow get: if isAdmin() ||
+        (signedIn() &&
+          (resource == null || resource.data.reporterUid == request.auth.uid));
+      allow list, delete: if isAdmin();
     }
 
     match /userReports/{reportId} {
@@ -145,7 +153,10 @@ service cloud.firestore {
       allow update: if isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
         request.resource.data.resolved is bool;
-      allow read, delete: if isAdmin();
+      allow get: if isAdmin() ||
+        (signedIn() &&
+          (resource == null || resource.data.reporterUid == request.auth.uid));
+      allow list, delete: if isAdmin();
     }
 
     // Blacklisted emails. Admins manage the full list; signed-in users may
