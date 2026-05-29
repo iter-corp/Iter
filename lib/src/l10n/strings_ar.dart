@@ -1548,6 +1548,8 @@ const Map<String, String> arStrings = {
 
   // ── STORY TEXT OVERLAY (added) ──
   'story_text_font_sample': 'أأ',
+  'story_text_color_tab_text': 'النص',
+  'story_text_color_tab_shape': 'الشكل',
 
   // ── SHARED VISIBLE-ONLY-TO-YOU ──
   'visible_only_to_you': 'مرئي لك فقط',

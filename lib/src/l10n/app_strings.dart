@@ -1858,6 +1858,8 @@ class AppStrings {
 
   // ── Story text overlay ──
   String get storyTextFontSample => _get('story_text_font_sample');
+  String get storyTextColorTabText => _get('story_text_color_tab_text');
+  String get storyTextColorTabShape => _get('story_text_color_tab_shape');
 
   // ── Shared visible-only-to-you ──
   String get visibleOnlyToYou => _get('visible_only_to_you');

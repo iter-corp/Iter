@@ -1571,6 +1571,8 @@ const Map<String, String> ckbStrings = {
 
   // ── STORY TEXT OVERLAY (added) ──
   'story_text_font_sample': 'ئا',
+  'story_text_color_tab_text': 'دەق',
+  'story_text_color_tab_shape': 'شێوە',
 
   // ── SHARED VISIBLE-ONLY-TO-YOU ──
   'visible_only_to_you': 'تەنها بۆ تۆ دەرکەوتووە',

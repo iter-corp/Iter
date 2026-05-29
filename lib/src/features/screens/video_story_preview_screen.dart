@@ -405,10 +405,14 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       _overlays[idx] = overlay.copyWith(
         text: result.text,
         color: result.color,
+        backgroundColor: result.backgroundColor,
         fontStyle: result.fontStyle,
         backgroundStyle: result.backgroundStyle,
         alignment: result.alignment,
         fontSize: result.fontSize,
+        // The composer's pinch edits the box scale — carry it back so the
+        // resized box persists after editing.
+        scale: result.scale,
       );
     });
   }
@@ -772,10 +776,17 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     }
     return GestureDetector(
       onTap: _toggleMute,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: c.value.aspectRatio,
-          child: VideoPlayer(c),
+      // Cover-fit (fill screen, crop overflow) so the preview matches what
+      // viewers see after publishing — no black bars on portrait video.
+      child: SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: c.value.size.width,
+            height: c.value.size.height,
+            child: VideoPlayer(c),
+          ),
         ),
       ),
     );

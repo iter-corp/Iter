@@ -167,6 +167,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (mounted) setState(() => _pendingCoverFile = File(picked.path));
   }
 
+  /// Append a unique version query param to a freshly uploaded image URL.
+  ///
+  /// The storage backend returns a deterministic path per user+kind, so
+  /// replacing an avatar/cover yields the SAME url string as before. Both
+  /// `CachedNetworkImage` and the CDN then keep serving the old bytes — the
+  /// user picks a new photo, saves, and nothing visibly changes. A `?v=`
+  /// stamp makes each saved url distinct so the new image actually loads.
+  String _withCacheBust(String url) {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final sep = url.contains('?') ? '&' : '?';
+    return '$url${sep}v=$stamp';
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     final username = _normalizeUsername(_usernameController.text);
@@ -221,8 +234,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (_pendingAvatarFile != null) {
         setState(() => _uploadingAvatar = true);
         try {
-          avatarUrlToSave =
-              await StorageService().uploadAvatar(_pendingAvatarFile!);
+          avatarUrlToSave = _withCacheBust(
+              await StorageService().uploadAvatar(_pendingAvatarFile!));
         } finally {
           if (mounted) setState(() => _uploadingAvatar = false);
         }
@@ -231,8 +244,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (_pendingCoverFile != null) {
         setState(() => _uploadingCover = true);
         try {
-          coverUrlToSave =
-              await StorageService().uploadCover(_pendingCoverFile!);
+          coverUrlToSave = _withCacheBust(
+              await StorageService().uploadCover(_pendingCoverFile!));
         } finally {
           if (mounted) setState(() => _uploadingCover = false);
         }

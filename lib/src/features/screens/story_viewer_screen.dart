@@ -476,6 +476,16 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     }
   }
 
+  /// Single close path for the viewer, guarded against the double-pop that
+  /// would otherwise dismiss the screen underneath. Used by the explicit
+  /// close button and the swipe-down gesture so the user can always leave —
+  /// including while a story's media is still loading.
+  void _close() {
+    if (_closing) return;
+    _closing = true;
+    if (mounted) Navigator.pop(context);
+  }
+
   void _nextGroup() {
     if (_groupIndex < _allGroups.length - 1) {
       setState(() {
@@ -499,6 +509,11 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         _groupIndex--;
         _index = 0;
       });
+      _startCurrent();
+    } else {
+      // Already on the very first story — tapping "previous" can't go back
+      // further, so restart the current story (standard story behavior)
+      // instead of leaving the progress bar frozen.
       _startCurrent();
     }
   }
@@ -666,15 +681,18 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         pausedNotifier: _longPressPaused,
         // Drive the story progress bar off the video's actual playback
         // clock. Stops the AnimationController and writes its value
-        // directly so the bar fills in lockstep with the visible
-        // frames — no drift, no race against an independent 5s timer.
+        // directly so the bar fills in lockstep with the visible frames.
         //
-        // No navToken check: the player widget is keyed per story
-        // (above) so the State (and its position timer) is recreated
-        // on every story change; updates can only ever come from the
-        // currently-mounted player.
+        // Gated on `tokenAtBuild == _navToken`: while the AnimatedSwitcher
+        // cross-fades to the next story, the OUTGOING video player is still
+        // mounted for ~280ms and its position timer keeps firing. Without
+        // this guard a stale player would (a) write into the new story's
+        // progress bar — freezing it — and (b) reach end-of-video and call
+        // _next() again, skipping the story after it. The token goes stale
+        // the moment we advance, so a non-current player's callbacks become
+        // no-ops.
         onPositionUpdate: (frac) {
-          if (!mounted) return;
+          if (!mounted || tokenAtBuild != _navToken) return;
           if (_progress.isAnimating) _progress.stop();
           _progress.value = frac;
         },
@@ -683,7 +701,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         // polled progress fraction, so it fires exactly once and the
         // video never replays into a black frame.
         onCompleted: () {
-          if (!mounted) return;
+          if (!mounted || tokenAtBuild != _navToken) return;
           _next();
         },
         // Re-key per story so a new VideoPlayerController is created
@@ -699,14 +717,18 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         borderStyle: (story.textBorderStyle ?? 'none'),
       );
     } else {
-      base = CachedNetworkImage(
-        imageUrl: story.imageUrl,
-        fit: BoxFit.contain,
-        placeholder: (_, __) => const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-        errorWidget: (_, __, ___) => const Center(
-          child: Icon(Icons.broken_image, color: Colors.white),
+      base = SizedBox.expand(
+        child: CachedNetworkImage(
+          imageUrl: story.imageUrl,
+          // Fill the screen (crop overflow) so portrait images have no space
+          // at the edges — same as video stories.
+          fit: BoxFit.cover,
+          placeholder: (_, __) => const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+          errorWidget: (_, __, ___) => const Center(
+            child: Icon(Icons.broken_image, color: Colors.white),
+          ),
         ),
       );
     }
@@ -882,7 +904,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           },
           onVerticalDragEnd: (details) {
             if ((details.primaryVelocity ?? 0) > 200) {
-              Navigator.pop(context);
+              _close();
             }
           },
           onHorizontalDragEnd: (details) {
@@ -1107,6 +1129,19 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                             ),
                           ),
                         ),
+                      // Always-available close button. Lives in the header
+                      // (above the media + any loading spinner), so the user
+                      // can leave the viewer even while a story is still
+                      // loading — same exit as the swipe-down gesture.
+                      const SizedBox(width: 4),
+                      IconButton(
+                        onPressed: _close,
+                        tooltip: context.t.close,
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -2708,10 +2743,19 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
         child: CircularProgressIndicator(color: Colors.white),
       );
     }
-    return Center(
-      child: AspectRatio(
-        aspectRatio: c.value.aspectRatio,
-        child: VideoPlayer(c),
+    // Fill the whole screen (cover), cropping any overflow, so a portrait
+    // video has no black bars at the edges — same as Instagram / TikTok
+    // stories. `FittedBox(cover)` scales the video's native-sized box up
+    // until it covers the viewport; `clipBehavior` trims the overflow.
+    return SizedBox.expand(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
+        child: SizedBox(
+          width: c.value.size.width,
+          height: c.value.size.height,
+          child: VideoPlayer(c),
+        ),
       ),
     );
   }

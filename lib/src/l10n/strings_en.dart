@@ -1588,6 +1588,8 @@ const Map<String, String> enStrings = {
 
   // ── STORY TEXT OVERLAY (added) ──
   'story_text_font_sample': 'Aa',
+  'story_text_color_tab_text': 'Text',
+  'story_text_color_tab_shape': 'Shape',
 
   // ── SHARED VISIBLE-ONLY-TO-YOU (sender-only profanity badge) ──
   'visible_only_to_you': 'Visible only to you',

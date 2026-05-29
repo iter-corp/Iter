@@ -12,6 +12,9 @@ import '../../l10n/app_strings.dart';
 
 enum StoryFontStyle { classic, bold, italic, mono }
 
+/// Which color the composer's palette is editing.
+enum _ColorTarget { text, shape }
+
 /// Visual treatment behind the text overlay.
 ///   • [none]        — no background, just text + drop shadow.
 ///   • [filled]      — solid rounded pill in the user's color.
@@ -28,6 +31,11 @@ class StoryTextOverlay {
   // change or a difference between compose canvas and viewer canvas.
   final Offset position;
   final Color color;
+  /// Color of the shape/background (filled pill, translucent card, brush
+  /// blob). Independent from [color] (the text color) so the user can style
+  /// text and shape separately. Defaults to black for back-compat with
+  /// overlays saved before this field existed.
+  final Color backgroundColor;
   final StoryFontStyle fontStyle;
   final StoryBackgroundStyle backgroundStyle;
   final TextAlign alignment;
@@ -40,6 +48,7 @@ class StoryTextOverlay {
     required this.text,
     required this.position,
     required this.color,
+    this.backgroundColor = Colors.black,
     required this.fontStyle,
     required this.backgroundStyle,
     required this.alignment,
@@ -53,6 +62,7 @@ class StoryTextOverlay {
     String? text,
     Offset? position,
     Color? color,
+    Color? backgroundColor,
     StoryFontStyle? fontStyle,
     StoryBackgroundStyle? backgroundStyle,
     TextAlign? alignment,
@@ -65,6 +75,7 @@ class StoryTextOverlay {
       text: text ?? this.text,
       position: position ?? this.position,
       color: color ?? this.color,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
       fontStyle: fontStyle ?? this.fontStyle,
       backgroundStyle: backgroundStyle ?? this.backgroundStyle,
       alignment: alignment ?? this.alignment,
@@ -81,6 +92,7 @@ class StoryTextOverlay {
         'x': position.dx,
         'y': position.dy,
         'color': color.toARGB32(),
+        'backgroundColor': backgroundColor.toARGB32(),
         'fontStyle': fontStyle.name,
         'backgroundStyle': backgroundStyle.name,
         'alignment': alignment.name,
@@ -123,6 +135,10 @@ class StoryTextOverlay {
         (j['y'] as num?)?.toDouble() ?? 0.5,
       ),
       color: Color((j['color'] as num?)?.toInt() ?? 0xFFFFFFFF),
+      // Back-compat: overlays saved before separate shape color default to
+      // black (the old hardcoded background).
+      backgroundColor:
+          Color((j['backgroundColor'] as num?)?.toInt() ?? 0xFF000000),
       fontStyle: parseFont(j['fontStyle'] as String?),
       backgroundStyle: parseBg(j['backgroundStyle'] as String?),
       alignment: parseAlign(j['alignment'] as String?),
@@ -131,6 +147,28 @@ class StoryTextOverlay {
       rotation: (j['rotation'] as num?)?.toDouble() ?? 0,
     );
   }
+}
+
+/// Pick a text direction from the content's first strong character so
+/// Kurdish / Arabic story text lays out right-to-left (correct caret
+/// position, word order and punctuation) regardless of the app's ambient
+/// locale. Falls back to LTR for Latin / neutral text.
+TextDirection storyTextDirection(String text) {
+  for (final rune in text.runes) {
+    // Arabic (0x0600–0x06FF), Arabic Supplement / Extended-A, and the
+    // Arabic Presentation Forms cover Kurdish (Sorani) and Arabic script.
+    if ((rune >= 0x0590 && rune <= 0x08FF) ||
+        (rune >= 0xFB1D && rune <= 0xFDFF) ||
+        (rune >= 0xFE70 && rune <= 0xFEFF)) {
+      return TextDirection.rtl;
+    }
+    // First strong Latin letter → LTR.
+    if ((rune >= 0x0041 && rune <= 0x005A) ||
+        (rune >= 0x0061 && rune <= 0x007A)) {
+      return TextDirection.ltr;
+    }
+  }
+  return TextDirection.ltr;
 }
 
 TextStyle textStyleForOverlay(StoryTextOverlay o) {
@@ -163,12 +201,12 @@ BoxDecoration? overlayBackgroundFor(StoryTextOverlay o) {
       return null;
     case StoryBackgroundStyle.filled:
       return BoxDecoration(
-        color: o.color,
+        color: o.backgroundColor,
         borderRadius: BorderRadius.circular(8),
       );
     case StoryBackgroundStyle.translucent:
       return BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
+        color: o.backgroundColor.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(8),
       );
     case StoryBackgroundStyle.brush:
@@ -181,34 +219,23 @@ BoxDecoration? overlayBackgroundFor(StoryTextOverlay o) {
 }
 
 BoxDecoration? overlaySelectionDecoration(StoryTextOverlay o, bool isActive) {
-  final base = overlayBackgroundFor(o);
-  if (!isActive) return base;
-  final halo = [
-    BoxShadow(
-      color: Colors.white.withValues(alpha: 0.85),
-      blurRadius: 0,
-      spreadRadius: 1,
-    ),
-  ];
-  if (base == null) {
-    return BoxDecoration(
-      borderRadius: BorderRadius.circular(8),
-      boxShadow: halo,
-    );
-  }
-  return base.copyWith(boxShadow: halo);
+  // No visible selection chrome. A freshly placed/edited overlay is always
+  // the active one, so any selection box (white halo or border) would show
+  // up immediately and read as a background the editor never displayed —
+  // exactly the "editing shows X, output shows Y" mismatch users hit.
+  // Selection still works functionally (drag / pinch / double-tap-to-edit);
+  // it just isn't painted. The overlay renders identically in the editor
+  // preview, the placed widget, and the final viewer.
+  return overlayBackgroundFor(o);
 }
 
-/// Text inside a "filled" background flips to a contrasting color so
-/// white-on-white (and black-on-black) never happens.
-Color overlayDisplayColor(StoryTextOverlay o) {
-  if (o.backgroundStyle != StoryBackgroundStyle.filled) return o.color;
-  final l = (o.color.r * 255 * 299 +
-          o.color.g * 255 * 587 +
-          o.color.b * 255 * 114) /
-      1000;
-  return l > 150 ? Colors.black : Colors.white;
-}
+/// Text color actually used when rendering an overlay.
+///
+/// The text color is now fully user-controlled (separate from the shape
+/// color), so we simply honor [o.color] for every background style. The
+/// editor preview, the placed widget and the viewer all use this same
+/// function, so what the user sees while picking is what gets published.
+Color overlayDisplayColor(StoryTextOverlay o) => o.color;
 
 // ─────────────────────────────────────────────
 // Placed overlay widget — pan / pinch / rotate / double-tap-to-edit.
@@ -306,6 +333,7 @@ class _StoryOverlayWidgetState extends State<StoryOverlayWidget> {
                   text: Text(
                     o.text,
                     textAlign: o.alignment,
+                    textDirection: storyTextDirection(o.text),
                     style: textStyle,
                   ),
                 ),
@@ -330,24 +358,11 @@ Widget _wrapWithBackground({
 }) {
   final maxWidth = canvasSize.width * 0.85;
   if (overlay.backgroundStyle == StoryBackgroundStyle.brush) {
-    final brush = ConstrainedBox(
+    // The brush blob itself is the visible treatment — no extra selection
+    // chrome, which previously read as a stray white box around it.
+    return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
-      child: BrushBackground(color: Colors.black, child: text),
-    );
-    if (!isActive) return brush;
-    // Halo wraps the brush so the active-selection ring still appears.
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.85),
-            blurRadius: 0,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: brush,
+      child: BrushBackground(color: overlay.backgroundColor, child: text),
     );
   }
   return Container(
@@ -402,6 +417,7 @@ class StoryOverlayStatic extends StatelessWidget {
                 text: Text(
                   o.text,
                   textAlign: o.alignment,
+                  textDirection: storyTextDirection(o.text),
                   style: textStyle,
                 ),
               ),
@@ -442,10 +458,26 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
 
   late final TextEditingController _controller;
   late Color _color;
+  late Color _backgroundColor;
   late StoryFontStyle _fontStyle;
   late StoryBackgroundStyle _backgroundStyle;
   late TextAlign _alignment;
   double _fontSize = 32;
+
+  // Which color the bottom palette is currently editing: the text or the
+  // shape/background. Lets the user style both, separately, from one strip.
+  _ColorTarget _colorTarget = _ColorTarget.text;
+
+  // Pinch resizes the whole overlay via [_scale] (a Transform on the box),
+  // NOT the font size. The placed/static widget applies the same
+  // `Transform.scale(scale)` with the same fixed `fontSize`, so the editor
+  // preview and the published overlay are pixel-identical — no reflow, no
+  // "looked one size while editing, another after publishing" mismatch.
+  double _scale = 1;
+  double? _scaleAtPinchStart;
+
+  static const double _minScale = 0.4;
+  static const double _maxScale = 5.0;
 
   @override
   void initState() {
@@ -453,17 +485,14 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
     final i = widget.initial;
     _controller = TextEditingController(text: i?.text ?? '');
     _color = i?.color ?? Colors.white;
+    _backgroundColor = i?.backgroundColor ?? Colors.black;
     _fontStyle = i?.fontStyle ?? StoryFontStyle.classic;
-    // Migrate any legacy overlays that were saved with `filled` (the old
-    // user-cycle included it, producing the unwanted white box behind
-    // text). Treat them as `none` so reopening the editor doesn't
-    // resurrect the box. New compositions also default to `none`.
-    final initialStyle = i?.backgroundStyle ?? StoryBackgroundStyle.none;
-    _backgroundStyle = initialStyle == StoryBackgroundStyle.filled
-        ? StoryBackgroundStyle.none
-        : initialStyle;
+    // `filled` is now a first-class style with its own color, so reopening an
+    // overlay that used it no longer needs migrating away.
+    _backgroundStyle = i?.backgroundStyle ?? StoryBackgroundStyle.none;
     _alignment = i?.alignment ?? TextAlign.center;
     _fontSize = i?.fontSize ?? 32;
+    _scale = i?.scale ?? 1;
   }
 
   @override
@@ -480,22 +509,38 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
     });
   }
 
+  // Font size is changed in steps via the A−/A+ control. Pinch separately
+  // controls the whole-box [_scale]; the two are independent so the user can
+  // pick a base text size AND scale the box.
+  static const double _minFontSize = 16;
+  static const double _maxFontSize = 72;
+  static const double _fontSizeStep = 4;
+
+  void _decreaseFontSize() {
+    setState(() {
+      _fontSize = (_fontSize - _fontSizeStep).clamp(_minFontSize, _maxFontSize);
+    });
+  }
+
+  void _increaseFontSize() {
+    setState(() {
+      _fontSize = (_fontSize + _fontSizeStep).clamp(_minFontSize, _maxFontSize);
+    });
+  }
+
   void _cycleBackground() {
     setState(() {
-      // `filled` is intentionally excluded from the user-facing cycle: it
-      // painted a solid rectangle in the text color behind the text,
-      // which (with a white text color) showed as a glaring white box
-      // and forced the text to flip black. Users found that confusing
-      // and asked for the box to be removed. The remaining styles —
-      // none / translucent / brush — give the same expressive range
-      // without ever drawing an opaque colored rectangle.
-      const values = [
-        StoryBackgroundStyle.none,
-        StoryBackgroundStyle.translucent,
-        StoryBackgroundStyle.brush,
-      ];
+      // Now that the shape has its own user-chosen color (independent of the
+      // text color), `filled` is back in the cycle — it draws a solid pill in
+      // the shape color. Full range: none / filled / translucent / brush.
+      const values = StoryBackgroundStyle.values;
       final i = values.indexOf(_backgroundStyle);
-      _backgroundStyle = values[(i == -1 ? 0 : i + 1) % values.length];
+      _backgroundStyle = values[(i + 1) % values.length];
+      // Jumping onto a style that paints a shape? Make sure the palette is
+      // editing the shape color so the next tap is intuitive.
+      if (_backgroundStyle == StoryBackgroundStyle.none) {
+        _colorTarget = _ColorTarget.text;
+      }
     });
   }
 
@@ -543,11 +588,15 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
         text: text,
         position: widget.initial?.position ?? const Offset(0.5, 0.5),
         color: _color,
+        backgroundColor: _backgroundColor,
         fontStyle: _fontStyle,
         backgroundStyle: _backgroundStyle,
         alignment: _alignment,
         fontSize: _fontSize,
-        scale: widget.initial?.scale ?? 1,
+        // Pinch in the composer adjusts the box scale (not font size), and
+        // the placed/static overlay applies this same scale, so what the
+        // user sized in the editor is exactly what publishes.
+        scale: _scale,
         rotation: widget.initial?.rotation ?? 0,
       ),
     );
@@ -560,15 +609,28 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
       text: _controller.text.isEmpty ? 'Aa' : _controller.text,
       position: const Offset(0.5, 0.5),
       color: _color,
+      backgroundColor: _backgroundColor,
       fontStyle: _fontStyle,
       backgroundStyle: _backgroundStyle,
       alignment: _alignment,
       fontSize: _fontSize,
     );
     final displayColor = overlayDisplayColor(preview);
+    // Whether the palette is allowed to edit the shape color: only when the
+    // current style actually paints a shape.
+    final canEditShape = _backgroundStyle != StoryBackgroundStyle.none;
+    final editingShape = canEditShape && _colorTarget == _ColorTarget.shape;
+    final selectedColor = editingShape ? _backgroundColor : _color;
 
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.65),
+      // Transparent so the real story media (the composer is pushed as a
+      // non-opaque route over the preview screen) shows through. The route's
+      // own barrierColor provides the dim. Previously this Scaffold added a
+      // second black@0.65 layer on top of the barrier — together ~85% black —
+      // which made the `translucent` box look near-solid-black while editing,
+      // even though on the bright video it renders as a light grey. Dropping
+      // the extra layer makes the editor preview match the committed result.
+      backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -594,6 +656,13 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                       fontStyle: _fontStyle,
                       onTap: _cycleFont,
                     ),
+                    const SizedBox(width: 8),
+                    // Text-size stepper — changes the font size, independent
+                    // of the pinch-to-resize box scale.
+                    _FontSizeStepper(
+                      onDecrease: _decreaseFontSize,
+                      onIncrease: _increaseFontSize,
+                    ),
                     const Spacer(),
                     _ComposerChip(
                       icon: Icons.check,
@@ -604,35 +673,30 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                 ),
               ),
               Expanded(
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 50,
-                      child: RotatedBox(
-                        quarterTurns: 3,
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            activeTrackColor: Colors.white,
-                            inactiveTrackColor:
-                                Colors.white.withValues(alpha: 0.35),
-                            thumbColor: Colors.white,
-                            trackHeight: 2,
-                            thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 8),
-                          ),
-                          child: Slider(
-                            min: 16,
-                            max: 72,
-                            value: _fontSize,
-                            onChanged: (v) =>
-                                setState(() => _fontSize = v),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: GestureDetector(
+                // Pinch anywhere on the editing canvas to resize the text —
+                // replaces the old vertical font-size slider. `onTap` here is
+                // a no-op that just absorbs taps in the empty area so they
+                // don't bubble up to the screen-level `_commit` handler; taps
+                // on the TextField itself still place the cursor.
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  onScaleStart: (_) => _scaleAtPinchStart = _scale,
+                  onScaleUpdate: (details) {
+                    final base = _scaleAtPinchStart ?? _scale;
+                    final next =
+                        (base * details.scale).clamp(_minScale, _maxScale);
+                    if (next != _scale) {
+                      setState(() => _scale = next);
+                    }
+                  },
+                  onScaleEnd: (_) => _scaleAtPinchStart = null,
+                  child: Center(
+                    // Same Transform.scale the placed/static overlay applies,
+                    // so the editor preview matches the published size exactly.
+                    child: Transform.scale(
+                      scale: _scale,
+                      child: GestureDetector(
                           onTap: () {},
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
@@ -642,15 +706,17 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                             child: _backgroundStyle ==
                                     StoryBackgroundStyle.brush
                                 ? BrushBackground(
-                                    color: Colors.black,
+                                    color: _backgroundColor,
                                     child: TextField(
                                       controller: _controller,
                                       autofocus: true,
                                       maxLines: null,
                                       textAlign: _alignment,
-                                      cursorColor: Colors.white,
+                                      textDirection:
+                                          storyTextDirection(_controller.text),
+                                      cursorColor: displayColor,
                                       style: textStyleForOverlay(preview)
-                                          .copyWith(color: Colors.white),
+                                          .copyWith(color: displayColor),
                                       // `filled: false` overrides the global
                                       // InputDecorationTheme which sets a
                                       // light-grey fill — that fill was
@@ -680,6 +746,8 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                                       autofocus: true,
                                       maxLines: null,
                                       textAlign: _alignment,
+                                      textDirection:
+                                          storyTextDirection(_controller.text),
                                       cursorColor: displayColor,
                                       style: textStyleForOverlay(preview)
                                           .copyWith(color: displayColor),
@@ -699,48 +767,203 @@ class _StoryTextComposerScreenState extends State<StoryTextComposerScreen> {
                         ),
                       ),
                     ),
-                  ],
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: GestureDetector(
                   onTap: () {},
-                  child: SizedBox(
-                    height: 36,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _palette.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(width: 10),
-                      itemBuilder: (_, i) {
-                        final c = _palette[i];
-                        final selected = c.toARGB32() == _color.toARGB32();
-                        return GestureDetector(
-                          onTap: () => setState(() => _color = c),
-                          child: Container(
-                            width: selected ? 32 : 28,
-                            height: selected ? 32 : 28,
-                            decoration: BoxDecoration(
-                              color: c,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: selected
-                                    ? Colors.white
-                                    : Colors.white24,
-                                width: selected ? 3 : 2,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Text / Shape toggle — picks which color the palette
+                      // below edits. The "Shape" tab only appears when the
+                      // current background style actually paints a shape.
+                      if (canEditShape)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _ColorTargetTab(
+                                label: context.t.storyTextColorTabText,
+                                selected: _colorTarget == _ColorTarget.text,
+                                swatch: _color,
+                                onTap: () => setState(
+                                    () => _colorTarget = _ColorTarget.text),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              _ColorTargetTab(
+                                label: context.t.storyTextColorTabShape,
+                                selected: _colorTarget == _ColorTarget.shape,
+                                swatch: _backgroundColor,
+                                onTap: () => setState(
+                                    () => _colorTarget = _ColorTarget.shape),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      SizedBox(
+                        height: 36,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _palette.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 10),
+                          itemBuilder: (_, i) {
+                            final c = _palette[i];
+                            final selected =
+                                c.toARGB32() == selectedColor.toARGB32();
+                            return GestureDetector(
+                              onTap: () => setState(() {
+                                if (editingShape) {
+                                  _backgroundColor = c;
+                                } else {
+                                  _color = c;
+                                }
+                              }),
+                              child: Container(
+                                width: selected ? 32 : 28,
+                                height: selected ? 32 : 28,
+                                decoration: BoxDecoration(
+                                  color: c,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.white24,
+                                    width: selected ? 3 : 2,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One tab of the Text / Shape color toggle. Shows a small swatch of the
+/// color it currently controls plus a label, and highlights when selected.
+class _ColorTargetTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color swatch;
+  final VoidCallback onTap;
+
+  const _ColorTargetTab({
+    required this.label,
+    required this.selected,
+    required this.swatch,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? Colors.white.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? Colors.white : Colors.white24,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: swatch,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white54, width: 1),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A−/A+ stepper for the text font size. Two tappable letters in a pill,
+/// sized small/large to hint their effect.
+class _FontSizeStepper extends StatelessWidget {
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  const _FontSizeStepper({
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: onDecrease,
+            behavior: HitTestBehavior.opaque,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('A',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 18,
+            color: Colors.white24,
+          ),
+          GestureDetector(
+            onTap: onIncrease,
+            behavior: HitTestBehavior.opaque,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('A',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
       ),
     );
   }
