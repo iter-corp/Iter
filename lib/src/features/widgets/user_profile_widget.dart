@@ -282,7 +282,8 @@ class UserNameBio extends StatelessWidget {
           if (handle.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              handle,
+              context.t.ltrHandle(handle),
+              textDirection: TextDirection.ltr,
               style: TextStyle(fontSize: 13, color: context.textSecondary),
             ),
           ],

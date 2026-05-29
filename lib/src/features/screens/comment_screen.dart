@@ -13,6 +13,7 @@ import '../../navigation/user_profile_nav.dart';
 import '../../services/comment_service.dart';
 import '../../services/translate_service.dart';
 import '../model/post_model.dart';
+import '../../utils/text_direction.dart';
 import '../widgets/app_page_background.dart';
 
 class _ReplyTarget {
@@ -756,6 +757,7 @@ class _CommentTile extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   RichText(
+                    textDirection: detectTextDirection(comment.text),
                     text: TextSpan(
                       style: TextStyle(
                         fontSize: 13,
@@ -767,7 +769,8 @@ class _CommentTile extends ConsumerWidget {
                         if (comment.replyToUsername != null &&
                             comment.replyToUsername!.isNotEmpty)
                           TextSpan(
-                            text: '@${comment.replyToUsername} ',
+                            text:
+                                '${context.t.ltrHandle(comment.replyToUsername!)} ',
                             style: const TextStyle(
                               color: Color(0xFF8A3FB8),
                               fontWeight: FontWeight.w600,

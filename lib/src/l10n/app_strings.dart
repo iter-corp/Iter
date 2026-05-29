@@ -556,9 +556,9 @@ class AppStrings {
   String get commentDeleteTitle => _get('comment_delete_title');
   String get commentDeleteBody => _get('comment_delete_body');
   String commentReplyingTo(Object username) =>
-      _fmt('comment_replying_to', {'username': username});
+      _fmtWithHandle('comment_replying_to', username);
   String commentReplyToHint(Object username) =>
-      _fmt('comment_reply_to_hint', {'username': username});
+      _fmtWithHandle('comment_reply_to_hint', username);
   String get commentAddCommentHint => _get('comment_add_comment_hint');
   String commentTranslateTo(Object language) =>
       _fmt('comment_translate_to', {'language': language});
@@ -1600,6 +1600,22 @@ class AppStrings {
     return '$open$text$pop';
   }
 
+  /// Formats an @handle as left-to-right text even inside Arabic or
+  /// Kurdish UI, so "@user" never renders visually as "user@".
+  String ltrHandle(Object usernameOrHandle) {
+    const lri = '\u2066';
+    const pop = '\u2069';
+    final value = '$usernameOrHandle'.trim();
+    if (value.isEmpty) return value;
+    final handle = value.startsWith('@') ? value : '@$value';
+    return '$lri$handle$pop';
+  }
+
+  String _fmtWithHandle(String key, Object username) {
+    final template = _get(key).replaceAll('@{username}', '{username}');
+    return template.replaceAll('{username}', ltrHandle(username));
+  }
+
   /// "just now" / "5m ago" / "3d ago" … for [time]. A null [time]
   /// is treated as the current moment ("just now").
   ///
@@ -1774,10 +1790,8 @@ class AppStrings {
   String get adminConversationDeleted => _get('admin_conversation_deleted');
   String get adminDeleteReportDiscussBody =>
       _get('admin_delete_report_discuss_body');
-  String get adminDeleteReportPostBody =>
-      _get('admin_delete_report_post_body');
-  String get adminDeleteReportUserBody =>
-      _get('admin_delete_report_user_body');
+  String get adminDeleteReportPostBody => _get('admin_delete_report_post_body');
+  String get adminDeleteReportUserBody => _get('admin_delete_report_user_body');
 
   // ── Admin settings ──
   String get adminSettingsSectionProfessions =>
@@ -1797,8 +1811,7 @@ class AppStrings {
       _get('admin_settings_section_academic_levels_desc');
   String get adminSettingsAddAcademicLevel =>
       _get('admin_settings_add_academic_level');
-  String get adminSettingsSectionGoals =>
-      _get('admin_settings_section_goals');
+  String get adminSettingsSectionGoals => _get('admin_settings_section_goals');
   String get adminSettingsSectionGoalsDesc =>
       _get('admin_settings_section_goals_desc');
   String get adminSettingsAddGoal => _get('admin_settings_add_goal');
@@ -1806,8 +1819,7 @@ class AppStrings {
       _get('admin_settings_section_profanity');
   String get adminSettingsSectionProfanityDesc =>
       _get('admin_settings_section_profanity_desc');
-  String get adminSettingsAddProfanity =>
-      _get('admin_settings_add_profanity');
+  String get adminSettingsAddProfanity => _get('admin_settings_add_profanity');
 
   // ── Admin events — funds picker ──
   String get adminEventsFundsPlaceholder =>
@@ -1837,8 +1849,7 @@ class AppStrings {
   String get reportReasonHate => _get('report_reason_hate');
   String get reportReasonViolence => _get('report_reason_violence');
   String get reportReasonNudity => _get('report_reason_nudity');
-  String get reportReasonMisinformation =>
-      _get('report_reason_misinformation');
+  String get reportReasonMisinformation => _get('report_reason_misinformation');
   String get reportReasonOther => _get('report_reason_other');
 
   // ── Map attribution ──

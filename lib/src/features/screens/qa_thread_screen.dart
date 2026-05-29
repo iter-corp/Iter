@@ -10,6 +10,7 @@ import '../../providers/comment_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../services/comment_service.dart';
+import '../../utils/text_direction.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
@@ -145,109 +146,110 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
             foregroundColor: context.textPrimary,
             backgroundColor: Colors.transparent,
             elevation: 0,
-            flexibleSpace:
-                const AppPageBackground(child: SizedBox.expand()),
+            flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
           ),
           body: AppPageBackground(
             child: SafeArea(
               child: Column(
-              children: [
-                Expanded(
-                  child: commentsAsync.when(
-                    loading: () => ListView(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                      children: [
-                        _QuestionCard(post: post),
-                        const SizedBox(height: 18),
-                        const Center(child: CircularProgressIndicator()),
-                      ],
-                    ),
-                    error: (e, _) => ListView(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                      children: [
-                        _QuestionCard(post: post),
-                        const SizedBox(height: 18),
-                        Text(
-                          context.t.qaCouldNotLoadAnswers(e),
-                          style: TextStyle(color: context.textSecondary),
-                        ),
-                      ],
-                    ),
-                    data: (comments) {
-                      final topAnswers =
-                          comments.where((c) => !c.isReply).toList();
-                      final pinUid = widget.highlightAuthorUid;
-                      final pinCommentId = widget.highlightCommentId;
-                      topAnswers.sort((a, b) {
-                        // Pin a specific answer when provided.
-                        if (pinCommentId != null) {
-                          final aPin = a.id == pinCommentId ? 0 : 1;
-                          final bPin = b.id == pinCommentId ? 0 : 1;
-                          if (aPin != bPin) return aPin.compareTo(bPin);
-                        }
-                        // Pin the highlighted user's answers to the top.
-                        if (pinUid != null) {
-                          final aPin = a.authorUid == pinUid ? 0 : 1;
-                          final bPin = b.authorUid == pinUid ? 0 : 1;
-                          if (aPin != bPin) return aPin.compareTo(bPin);
-                        }
-                        // Always order by creation time, newest first.
-                        // Likes / dislikes are editorial signals only —
-                        // they never reorder the list, so a single
-                        // dislike no longer drags an answer to the
-                        // bottom.
-                        return b.createdAt.compareTo(a.createdAt);
-                      });
-                      final repliesByParent = <String, List<Comment>>{};
-                      for (final c in comments) {
-                        if (c.parentCommentId == null) continue;
-                        repliesByParent
-                            .putIfAbsent(c.parentCommentId!, () => [])
-                            .add(c);
-                      }
-
-                      return ListView.separated(
+                children: [
+                  Expanded(
+                    child: commentsAsync.when(
+                      loading: () => ListView(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                        itemCount: 2 + topAnswers.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return _QuestionCard(post: post);
+                        children: [
+                          _QuestionCard(post: post),
+                          const SizedBox(height: 18),
+                          const Center(child: CircularProgressIndicator()),
+                        ],
+                      ),
+                      error: (e, _) => ListView(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+                        children: [
+                          _QuestionCard(post: post),
+                          const SizedBox(height: 18),
+                          Text(
+                            context.t.qaCouldNotLoadAnswers(e),
+                            style: TextStyle(color: context.textSecondary),
+                          ),
+                        ],
+                      ),
+                      data: (comments) {
+                        final topAnswers =
+                            comments.where((c) => !c.isReply).toList();
+                        final pinUid = widget.highlightAuthorUid;
+                        final pinCommentId = widget.highlightCommentId;
+                        topAnswers.sort((a, b) {
+                          // Pin a specific answer when provided.
+                          if (pinCommentId != null) {
+                            final aPin = a.id == pinCommentId ? 0 : 1;
+                            final bPin = b.id == pinCommentId ? 0 : 1;
+                            if (aPin != bPin) return aPin.compareTo(bPin);
                           }
-                          if (index == 1) {
-                            return _AnswersHeader(count: topAnswers.length);
+                          // Pin the highlighted user's answers to the top.
+                          if (pinUid != null) {
+                            final aPin = a.authorUid == pinUid ? 0 : 1;
+                            final bPin = b.authorUid == pinUid ? 0 : 1;
+                            if (aPin != bPin) return aPin.compareTo(bPin);
                           }
+                          // Always order by creation time, newest first.
+                          // Likes / dislikes are editorial signals only —
+                          // they never reorder the list, so a single
+                          // dislike no longer drags an answer to the
+                          // bottom.
+                          return b.createdAt.compareTo(a.createdAt);
+                        });
+                        final repliesByParent = <String, List<Comment>>{};
+                        for (final c in comments) {
+                          if (c.parentCommentId == null) continue;
+                          repliesByParent
+                              .putIfAbsent(c.parentCommentId!, () => [])
+                              .add(c);
+                        }
 
-                          final answer = topAnswers[index - 2];
-                          final replies =
-                              repliesByParent[answer.id] ?? const <Comment>[];
-                          final highlighted = (pinCommentId != null &&
-                                  answer.id == pinCommentId) ||
-                              (pinUid != null && answer.authorUid == pinUid);
-                          final expanded = _expandedAnswers.contains(answer.id);
-                          return _AnswerBlock(
-                            postId: post.id,
-                            answer: answer,
-                            replies: replies,
-                            expanded: expanded,
-                            highlighted: highlighted,
-                            onToggleExpanded: () => _toggleAnswer(answer.id),
-                            onReply: _startReply,
-                          );
-                        },
-                      );
-                    },
+                        return ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+                          itemCount: 2 + topAnswers.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              return _QuestionCard(post: post);
+                            }
+                            if (index == 1) {
+                              return _AnswersHeader(count: topAnswers.length);
+                            }
+
+                            final answer = topAnswers[index - 2];
+                            final replies =
+                                repliesByParent[answer.id] ?? const <Comment>[];
+                            final highlighted = (pinCommentId != null &&
+                                    answer.id == pinCommentId) ||
+                                (pinUid != null && answer.authorUid == pinUid);
+                            final expanded =
+                                _expandedAnswers.contains(answer.id);
+                            return _AnswerBlock(
+                              postId: post.id,
+                              answer: answer,
+                              replies: replies,
+                              expanded: expanded,
+                              highlighted: highlighted,
+                              onToggleExpanded: () => _toggleAnswer(answer.id),
+                              onReply: _startReply,
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-                _AnswerComposer(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  sending: _sending,
-                  replyTo: _replyTo?.username,
-                  onCancelReply: _cancelReply,
-                  onSubmit: _submitAnswer,
-                ),
-              ],
+                  _AnswerComposer(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    sending: _sending,
+                    replyTo: _replyTo?.username,
+                    onCancelReply: _cancelReply,
+                    onSubmit: _submitAnswer,
+                  ),
+                ],
               ),
             ),
           ),
@@ -280,8 +282,7 @@ class _QuestionCard extends ConsumerWidget {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    final title =
-        lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
+    final title = lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
     final body = lines.length > 1 ? lines.sublist(1).join('\n') : '';
     final isQuestion = post.discussKind == 'question' ||
         (post.discussKind == null && title.contains('?'));
@@ -401,8 +402,7 @@ class _QuestionCard extends ConsumerWidget {
                             const SizedBox(width: 8),
                             Text(
                               context.t.homeDeleteQuestionMenu,
-                              style:
-                                  const TextStyle(color: Color(0xFFEF476F)),
+                              style: const TextStyle(color: Color(0xFFEF476F)),
                             ),
                           ]),
                         ),
@@ -489,8 +489,7 @@ class _QuestionCard extends ConsumerWidget {
             child: Text(strings.cancel),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogCtx, controller.text.trim()),
+            onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
             child: Text(strings.save),
           ),
         ],
@@ -1262,8 +1261,7 @@ class _AnswerRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(authStateProvider).value?.uid;
-    final isAuthor =
-        currentUid != null && currentUid == comment.authorUid;
+    final isAuthor = currentUid != null && currentUid == comment.authorUid;
     final canManage = isAuthor && postId != null;
     return InkWell(
       onTap: onTap ?? () => openUserProfile(context, uid: comment.authorUid),
@@ -1331,12 +1329,13 @@ class _AnswerRow extends ConsumerWidget {
             ),
             const SizedBox(height: 6),
             RichText(
+              textDirection: detectTextDirection(comment.text),
               text: TextSpan(
                 children: [
                   if (comment.replyToUsername != null &&
                       comment.replyToUsername!.isNotEmpty)
                     TextSpan(
-                      text: '@${comment.replyToUsername} ',
+                      text: '${context.t.ltrHandle(comment.replyToUsername!)} ',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: context.textPrimary,
@@ -1401,83 +1400,82 @@ class _AnswerComposer extends StatelessWidget {
         radius: 22,
         surfaceAlpha: context.isDark ? 0.30 : 0.58,
         borderAlpha: context.isDark ? 0.18 : 0.52,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (replyTo != null) ...[
-              AppGlassCard(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                radius: 12,
-                surfaceAlpha: context.isDark ? 0.18 : 0.44,
-                borderAlpha: context.isDark ? 0.12 : 0.38,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        context.t.commentReplyingTo(replyTo!),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (replyTo != null) ...[
+                AppGlassCard(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  radius: 12,
+                  surfaceAlpha: context.isDark ? 0.18 : 0.44,
+                  borderAlpha: context.isDark ? 0.12 : 0.38,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          context.t.commentReplyingTo(replyTo!),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: context.textSecondary,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: onCancelReply,
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
                           color: context.textSecondary,
                         ),
                       ),
-                    ),
-                    InkWell(
-                      onTap: onCancelReply,
-                      child: Icon(
-                        Icons.close,
-                        size: 16,
-                        color: context.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    minLines: 1,
-                    maxLines: 5,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      filled: false,
-                      fillColor: Colors.transparent,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      hintText: replyTo == null
-                          ? context.t.qaWriteAnswerHint
-                          : context.t.qaWriteReplyHint,
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: sending ? null : onSubmit,
-                  child: sending
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(replyTo == null
-                          ? context.t.post
-                          : context.t.reply),
-                ),
               ],
-            ),
-          ],
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        hintText: replyTo == null
+                            ? context.t.qaWriteAnswerHint
+                            : context.t.qaWriteReplyHint,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: sending ? null : onSubmit,
+                    child: sending
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            replyTo == null ? context.t.post : context.t.reply),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
