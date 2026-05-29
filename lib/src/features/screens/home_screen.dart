@@ -599,7 +599,16 @@ class _HomeBodyState extends ConsumerState<HomeBody>
         },
         onDismissSearch: () {
           FocusScope.of(context).unfocus();
+          _searchCtrl.clear();
+          setState(() {
+            _searchQuery = '';
+            _qaAnswerMatches = <String>{};
+            _qaAnswerMatchesQuery = '';
+            _searchFocused = false;
+          });
         },
+        mode: _mode,
+        onModeChanged: _switchMode,
       ),
       if (_mode == _HomeMode.travel) ...[
         // The old inline location row was replaced by the search icon
@@ -1304,30 +1313,17 @@ class _HomeModeToggle extends ConsumerWidget {
         height: 44,
         child: Stack(
           children: [
-            // Centred: "Itr" title + the mode dropdown beside it.
+            // Centred: "Itr" title (mode dropdown moved to the search row)
             Align(
               alignment: Alignment.center,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    context.t.headerAppTitle,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: context.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _ModeDropdown(
-                    mode: mode,
-                    onChanged: onChanged,
-                    all: _all,
-                    iconFor: _iconFor,
-                    labelFor: (m) => _labelFor(context, m),
-                  ),
-                ],
+              child: Text(
+                context.t.headerAppTitle,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                  color: context.textPrimary,
+                ),
               ),
             ),
             // Trailing: notification bell (start side in RTL).
@@ -2163,6 +2159,8 @@ class _SearchPostRow extends StatelessWidget {
   /// Dismisses the keyboard / unfocuses the search field. Invoked when
   /// the user taps the blank space where the Post button used to be.
   final VoidCallback onDismissSearch;
+  final _HomeMode mode;
+  final ValueChanged<_HomeMode> onModeChanged;
 
   const _SearchPostRow({
     required this.hintText,
@@ -2175,6 +2173,8 @@ class _SearchPostRow extends StatelessWidget {
     this.focusNode,
     this.onChanged,
     this.onClear,
+    required this.mode,
+    required this.onModeChanged,
   });
 
   @override
@@ -2217,15 +2217,15 @@ class _SearchPostRow extends StatelessWidget {
                       Icon(Icons.close, size: 18, color: context.textSecondary),
                 ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide(color: borderColor),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide(color: borderColor),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: const BorderSide(color: Color(0xFF7E3BE8), width: 1.2),
           ),
         ),
@@ -2235,15 +2235,15 @@ class _SearchPostRow extends StatelessWidget {
       // the input for editing.
       searchSide = Material(
         color: fieldFill,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           onTap: onSearchTap,
           child: Container(
             height: 42,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: borderColor),
             ),
             child: Row(
@@ -2273,15 +2273,15 @@ class _SearchPostRow extends StatelessWidget {
       // Idle: a compact tappable search icon button.
       searchSide = Material(
         color: fieldFill,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           onTap: onSearchTap,
           child: Container(
             height: 42,
             width: 42,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: borderColor),
             ),
             child: Icon(Icons.search, color: context.textSecondary),
@@ -2289,6 +2289,33 @@ class _SearchPostRow extends StatelessWidget {
         ),
       );
     }
+
+    // Mode dropdown to render beside the search icon on the left.
+    final Widget modeToggle = _ModeDropdown(
+      mode: mode,
+      onChanged: onModeChanged,
+      all: const [_HomeMode.feed, _HomeMode.travel, _HomeMode.qa],
+      iconFor: (m) {
+        switch (m) {
+          case _HomeMode.feed:
+            return Icons.dynamic_feed_rounded;
+          case _HomeMode.travel:
+            return Icons.flight;
+          case _HomeMode.qa:
+            return Icons.forum_outlined;
+        }
+      },
+      labelFor: (m) {
+        switch (m) {
+          case _HomeMode.feed:
+            return context.t.homeFeed;
+          case _HomeMode.travel:
+            return context.t.homeTravelShort;
+          case _HomeMode.qa:
+            return context.t.homeDiscuss;
+        }
+      },
+    );
 
     // ── Post button (shared) ─────────────────────────────────────
     final Widget postButton = PrimaryActionButton(
@@ -2321,20 +2348,30 @@ class _SearchPostRow extends StatelessWidget {
     // ── Assemble the row ─────────────────────────────────────────
     final List<Widget> rowChildren;
     if (searching) {
-      // Input fills the row; blank tap-to-dismiss area on the side.
+      // Input fills the row; show a Cancel button to quit searching.
       rowChildren = [
         Expanded(child: searchSide),
-        const SizedBox(width: 10),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onDismissSearch,
-          child: const SizedBox(width: 84, height: 42),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 42,
+          width: 42,
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            onPressed: onDismissSearch,
+            icon: Icon(Icons.close, color: context.textSecondary),
+            tooltip: context.t.cancel,
+          ),
         ),
       ];
     } else if (hasResults) {
       // Query chip fills the row; ✕ reset then + Post on the side.
       rowChildren = [
-        Expanded(child: searchSide),
+        // Mode dropdown + query chip
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          modeToggle,
+          const SizedBox(width: 8),
+          Expanded(child: searchSide)
+        ]),
         const SizedBox(width: 8),
         resetButton,
         const SizedBox(width: 8),
@@ -2343,7 +2380,10 @@ class _SearchPostRow extends StatelessWidget {
     } else {
       // Idle: compact search icon, spacer, + Post.
       rowChildren = [
-        searchSide,
+        // Mode dropdown + search icon
+        Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [modeToggle, const SizedBox(width: 8), searchSide]),
         const Spacer(),
         postButton,
       ];

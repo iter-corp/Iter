@@ -65,6 +65,8 @@ class _AdminErrorReportsScreenState
             labelColor: AppColors.purple,
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
+            dividerColor: Colors.transparent,
+            dividerHeight: 0,
             tabs: [
               Tab(text: context.t.adminTabUnsolved(unsolved.length)),
               Tab(text: context.t.adminTabSolved(solved.length)),
@@ -73,24 +75,24 @@ class _AdminErrorReportsScreenState
         ),
         body: AppPageBackground(
           child: reportsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-          data: (_) => TabBarView(
-            children: [
-              _ReportsList(
-                reports: unsolved,
-                emptyTitle: all.isEmpty
-                    ? context.t.adminNoErrorReports
-                    : context.t.adminNoUnsolvedErrors,
-                emptySubtitle: context.t.adminCapturedErrorsHere,
-              ),
-              _ReportsList(
-                reports: solved,
-                emptyTitle: context.t.adminNothingSolvedYet,
-                emptySubtitle: context.t.adminSolvedReportsMoveHere,
-              ),
-            ],
-          ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+            data: (_) => TabBarView(
+              children: [
+                _ReportsList(
+                  reports: unsolved,
+                  emptyTitle: all.isEmpty
+                      ? context.t.adminNoErrorReports
+                      : context.t.adminNoUnsolvedErrors,
+                  emptySubtitle: context.t.adminCapturedErrorsHere,
+                ),
+                _ReportsList(
+                  reports: solved,
+                  emptyTitle: context.t.adminNothingSolvedYet,
+                  emptySubtitle: context.t.adminSolvedReportsMoveHere,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -395,165 +397,167 @@ class _ReportTile extends ConsumerWidget {
     return GestureDetector(
       onLongPress: onLongPress,
       child: AppGlassCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      radius: 16,
-      borderAlpha: report.resolved ? null : 0.65,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          leading: Icon(
-            report.resolved
-                ? Icons.check_circle_outline
-                : Icons.error_outline_rounded,
-            color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
-          ),
-          // Trailing chevron is replaced with a row: a copy button (so
-          // admins can grab the full report without expanding) plus the
-          // expansion arrow ExpansionTile draws by default isn't
-          // configurable. We use a custom `trailing` to host both.
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: context.t.copy,
-                icon: const Icon(Icons.copy_rounded, size: 18),
-                onPressed: () => _copyReportDetails(context, screen),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                    minWidth: 36, minHeight: 36),
-                visualDensity: VisualDensity.compact,
+        margin: const EdgeInsets.only(bottom: 10),
+        radius: 16,
+        borderAlpha: report.resolved ? null : 0.65,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            leading: Icon(
+              report.resolved
+                  ? Icons.check_circle_outline
+                  : Icons.error_outline_rounded,
+              color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
+            ),
+            // Trailing chevron is replaced with a row: a copy button (so
+            // admins can grab the full report without expanding) plus the
+            // expansion arrow ExpansionTile draws by default isn't
+            // configurable. We use a custom `trailing` to host both.
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: context.t.copy,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  onPressed: () => _copyReportDetails(context, screen),
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  visualDensity: VisualDensity.compact,
+                ),
+                Icon(Icons.expand_more, color: context.textSecondary),
+              ],
+            ),
+            title: Text(
+              report.message.split('\n').first,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: context.textPrimary,
+                decoration: report.resolved ? TextDecoration.lineThrough : null,
               ),
-              Icon(Icons.expand_more, color: context.textSecondary),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  _pill(context, Icons.layers_outlined, screen),
+                  _pill(context, Icons.schedule, _shortTime(report.createdAt)),
+                  _pill(context, Icons.devices_other,
+                      report.platform.isEmpty ? '?' : report.platform),
+                ],
+              ),
+            ),
+            children: [
+              // Full structured details.
+              _kv(context, context.t.adminWhen,
+                  _fullTime(context, report.createdAt)),
+              _kv(context, context.t.adminPageScreen, screen),
+              _kv(context, context.t.adminType, report.kind),
+              _kv(context, context.t.adminPlatform,
+                  report.platform.isEmpty ? '—' : report.platform),
+              _kv(context, context.t.adminAppVersionLabel,
+                  report.appVersion.isEmpty ? '—' : report.appVersion),
+              _kv(
+                  context,
+                  context.t.user,
+                  (report.uid ?? '').trim().isEmpty
+                      ? context.t.adminNotSignedIn
+                      : report.uid!.trim()),
+              if (report.context != null && report.context!.trim().isNotEmpty)
+                _kv(context, context.t.adminContext, report.context!.trim()),
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  context.t.adminErrorMessage,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(
+                report.message,
+                style: TextStyle(fontSize: 12.5, color: context.textPrimary),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  context.t.adminStackTrace,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: context.surfaceSoft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SelectableText(
+                  report.stack.isEmpty ? context.t.adminNoStack : report.stack,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(
+                        text: 'When: ${_fullTime(context, report.createdAt)}\n'
+                            'Screen: $screen\n'
+                            'Type: ${report.kind} · ${report.platform} · v${report.appVersion}\n'
+                            'User: ${report.uid ?? "not signed in"}\n\n'
+                            '${report.message}\n\n${report.stack}',
+                      ));
+                      AppFeedback.showInfo(
+                          context, context.t.adminCopiedToClipboard);
+                    },
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: Text(context.t.copy),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => ref
+                        .read(errorReportAdminProvider)
+                        .setResolved(report.id, !report.resolved),
+                    child: Text(report.resolved
+                        ? context.t.adminReopen
+                        : context.t.adminMarkResolved),
+                  ),
+                  IconButton(
+                    tooltip: context.t.delete,
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: Colors.red),
+                    onPressed: () =>
+                        ref.read(errorReportAdminProvider).delete(report.id),
+                  ),
+                ],
+              ),
             ],
           ),
-          title: Text(
-            report.message.split('\n').first,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: context.textPrimary,
-              decoration: report.resolved ? TextDecoration.lineThrough : null,
-            ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                _pill(context, Icons.layers_outlined, screen),
-                _pill(context, Icons.schedule, _shortTime(report.createdAt)),
-                _pill(context, Icons.devices_other,
-                    report.platform.isEmpty ? '?' : report.platform),
-              ],
-            ),
-          ),
-          children: [
-            // Full structured details.
-            _kv(context, context.t.adminWhen,
-                _fullTime(context, report.createdAt)),
-            _kv(context, context.t.adminPageScreen, screen),
-            _kv(context, context.t.adminType, report.kind),
-            _kv(context, context.t.adminPlatform,
-                report.platform.isEmpty ? '—' : report.platform),
-            _kv(context, context.t.adminAppVersionLabel,
-                report.appVersion.isEmpty ? '—' : report.appVersion),
-            _kv(
-                context,
-                context.t.user,
-                (report.uid ?? '').trim().isEmpty
-                    ? context.t.adminNotSignedIn
-                    : report.uid!.trim()),
-            if (report.context != null && report.context!.trim().isNotEmpty)
-              _kv(context, context.t.adminContext, report.context!.trim()),
-            const SizedBox(height: 10),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text(
-                context.t.adminErrorMessage,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: context.textSecondary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            SelectableText(
-              report.message,
-              style: TextStyle(fontSize: 12.5, color: context.textPrimary),
-            ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text(
-                context.t.adminStackTrace,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: context.textSecondary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: context.surfaceSoft,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: SelectableText(
-                report.stack.isEmpty ? context.t.adminNoStack : report.stack,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  height: 1.35,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(
-                      text: 'When: ${_fullTime(context, report.createdAt)}\n'
-                          'Screen: $screen\n'
-                          'Type: ${report.kind} · ${report.platform} · v${report.appVersion}\n'
-                          'User: ${report.uid ?? "not signed in"}\n\n'
-                          '${report.message}\n\n${report.stack}',
-                    ));
-                    AppFeedback.showInfo(context, context.t.adminCopiedToClipboard);
-                  },
-                  icon: const Icon(Icons.copy, size: 16),
-                  label: Text(context.t.copy),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => ref
-                      .read(errorReportAdminProvider)
-                      .setResolved(report.id, !report.resolved),
-                  child: Text(report.resolved
-                      ? context.t.adminReopen
-                      : context.t.adminMarkResolved),
-                ),
-                IconButton(
-                  tooltip: context.t.delete,
-                  icon: const Icon(Icons.delete_outline,
-                      size: 18, color: Colors.red),
-                  onPressed: () =>
-                      ref.read(errorReportAdminProvider).delete(report.id),
-                ),
-              ],
-            ),
-          ],
         ),
-      ),
       ),
     );
   }

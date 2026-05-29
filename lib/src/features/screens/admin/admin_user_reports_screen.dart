@@ -78,6 +78,8 @@ class AdminUserReportsScreen extends ConsumerWidget {
             labelColor: AppColors.purple,
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
+            dividerColor: Colors.transparent,
+            dividerHeight: 0,
             tabs: [
               Tab(text: context.t.adminTabOpen(unresolved.length)),
               Tab(text: context.t.adminTabResolved(resolved.length)),
@@ -86,24 +88,24 @@ class AdminUserReportsScreen extends ConsumerWidget {
         ),
         body: AppPageBackground(
           child: reportsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-          data: (_) => TabBarView(
-            children: [
-              _ReportsList(
-                reports: unresolved,
-                emptyTitle: all.isEmpty
-                    ? context.t.adminNoProfileReports
-                    : context.t.adminNoOpenReports,
-                emptySubtitle: context.t.adminFreshReportsHere,
-              ),
-              _ReportsList(
-                reports: resolved,
-                emptyTitle: context.t.adminNothingResolvedYet,
-                emptySubtitle: context.t.adminClosedReportsMoveHere,
-              ),
-            ],
-          ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+            data: (_) => TabBarView(
+              children: [
+                _ReportsList(
+                  reports: unresolved,
+                  emptyTitle: all.isEmpty
+                      ? context.t.adminNoProfileReports
+                      : context.t.adminNoOpenReports,
+                  emptySubtitle: context.t.adminFreshReportsHere,
+                ),
+                _ReportsList(
+                  reports: resolved,
+                  emptyTitle: context.t.adminNothingResolvedYet,
+                  emptySubtitle: context.t.adminClosedReportsMoveHere,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -159,8 +161,7 @@ class _ReportsListState extends ConsumerState<_ReportsList> {
     if (ids.isEmpty) return;
     final admin = ref.read(adminServiceProvider);
     try {
-      await Future.wait(
-          ids.map((id) => admin.deleteUserProfileReport(id)));
+      await Future.wait(ids.map((id) => admin.deleteUserProfileReport(id)));
       if (!mounted) return;
       AppFeedback.showSuccess(context, context.t.adminReportDeleted);
     } catch (e) {
@@ -319,201 +320,204 @@ class _ReportTile extends ConsumerWidget {
     return GestureDetector(
       onLongPress: onLongPress,
       child: AppGlassCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      radius: 16,
-      borderAlpha: report.resolved ? null : 0.65,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          leading: Icon(
-            report.resolved ? Icons.check_circle_outline : Icons.flag_outlined,
-            color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: context.t.copy,
-                icon: const Icon(Icons.copy_rounded, size: 18),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                    minWidth: 36, minHeight: 36),
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(
-                    text: 'When: ${_fullTime(report.createdAt)}\n'
-                        'Reason: ${report.reason}\n'
-                        'Reported user: ${report.targetUsername.isEmpty ? report.targetUid : "${report.targetUsername} (${report.targetUid})"}\n'
-                        'Reporter: ${report.reporterUsername.isEmpty ? report.reporterUid : "${report.reporterUsername} (${report.reporterUid})"}\n\n'
-                        'Details: ${(report.details ?? "").trim()}',
-                  ));
-                  AppFeedback.showInfo(
-                      context, context.t.adminCopiedToClipboard);
-                },
-              ),
-              Icon(Icons.expand_more, color: context.textSecondary),
-            ],
-          ),
-          title: Text(
-            report.targetUsername.isEmpty
-                ? report.targetUid
-                : report.targetUsername,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: context.textPrimary,
-              decoration: report.resolved ? TextDecoration.lineThrough : null,
+        margin: const EdgeInsets.only(bottom: 10),
+        radius: 16,
+        borderAlpha: report.resolved ? null : 0.65,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            leading: Icon(
+              report.resolved
+                  ? Icons.check_circle_outline
+                  : Icons.flag_outlined,
+              color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
             ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 4,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _pill(context, Icons.report_outlined, report.reason),
-                _pill(
-                    context,
-                    Icons.person_outline,
-                    report.reporterUsername.isEmpty
-                        ? report.reporterUid
-                        : report.reporterUsername),
-                _pill(context, Icons.schedule, _shortTime(report.createdAt)),
+                IconButton(
+                  tooltip: context.t.copy,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(
+                      text: 'When: ${_fullTime(report.createdAt)}\n'
+                          'Reason: ${report.reason}\n'
+                          'Reported user: ${report.targetUsername.isEmpty ? report.targetUid : "${report.targetUsername} (${report.targetUid})"}\n'
+                          'Reporter: ${report.reporterUsername.isEmpty ? report.reporterUid : "${report.reporterUsername} (${report.reporterUid})"}\n\n'
+                          'Details: ${(report.details ?? "").trim()}',
+                    ));
+                    AppFeedback.showInfo(
+                        context, context.t.adminCopiedToClipboard);
+                  },
+                ),
+                Icon(Icons.expand_more, color: context.textSecondary),
               ],
             ),
-          ),
-          children: [
-            _kv(
-              context,
-              context.t.adminReportedProfile,
+            title: Text(
               report.targetUsername.isEmpty
                   ? report.targetUid
-                  : '${report.targetUsername} (${report.targetUid})',
+                  : report.targetUsername,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: context.textPrimary,
+                decoration: report.resolved ? TextDecoration.lineThrough : null,
+              ),
             ),
-            _kv(
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  _pill(context, Icons.report_outlined, report.reason),
+                  _pill(
+                      context,
+                      Icons.person_outline,
+                      report.reporterUsername.isEmpty
+                          ? report.reporterUid
+                          : report.reporterUsername),
+                  _pill(context, Icons.schedule, _shortTime(report.createdAt)),
+                ],
+              ),
+            ),
+            children: [
+              _kv(
                 context,
-                context.t.adminReporter,
-                report.reporterUsername.isEmpty
-                    ? report.reporterUid
-                    : '${report.reporterUsername} (${report.reporterUid})'),
-            _kv(context, context.t.adminReason, report.reason),
-            _kv(context, context.t.adminWhen, _fullTime(report.createdAt)),
-            if ((report.details ?? '').trim().isNotEmpty)
-              _kv(context, context.t.adminDetails, report.details!.trim()),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                TextButton(
-                  onPressed: () => ref
-                      .read(adminServiceProvider)
-                      .setUserProfileReportResolved(
-                          report.id, !report.resolved),
-                  child: Text(report.resolved
-                      ? context.t.adminReopen
-                      : context.t.adminMarkResolved),
-                ),
-                TextButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => UserProfileScreen(uid: report.targetUid),
+                context.t.adminReportedProfile,
+                report.targetUsername.isEmpty
+                    ? report.targetUid
+                    : '${report.targetUsername} (${report.targetUid})',
+              ),
+              _kv(
+                  context,
+                  context.t.adminReporter,
+                  report.reporterUsername.isEmpty
+                      ? report.reporterUid
+                      : '${report.reporterUsername} (${report.reporterUid})'),
+              _kv(context, context.t.adminReason, report.reason),
+              _kv(context, context.t.adminWhen, _fullTime(report.createdAt)),
+              if ((report.details ?? '').trim().isNotEmpty)
+                _kv(context, context.t.adminDetails, report.details!.trim()),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: () => ref
+                        .read(adminServiceProvider)
+                        .setUserProfileReportResolved(
+                            report.id, !report.resolved),
+                    child: Text(report.resolved
+                        ? context.t.adminReopen
+                        : context.t.adminMarkResolved),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            UserProfileScreen(uid: report.targetUid),
+                      ),
                     ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: Text(context.t.adminViewProfile),
                   ),
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: Text(context.t.adminViewProfile),
-                ),
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red.withValues(alpha: 0.2),
-                    foregroundColor: Colors.red,
+                  FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red.withValues(alpha: 0.2),
+                      foregroundColor: Colors.red,
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(context.t.adminRemoveUserTitle),
+                          content: Text(context.t.adminRemoveUserBody),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: Text(context.t.cancel),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              onPressed: () async {
+                                Navigator.pop(ctx);
+                                await ref
+                                    .read(adminServiceProvider)
+                                    .deleteUser(report.targetUid);
+                                await ref
+                                    .read(adminServiceProvider)
+                                    .deleteUserProfileReport(report.id);
+                                if (!context.mounted) return;
+                                AppFeedback.showSuccess(
+                                    context, context.t.adminUserRemoved);
+                              },
+                              child: Text(context.t.adminRemoveUser),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Text(context.t.adminRemoveUser),
                   ),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(context.t.adminRemoveUserTitle),
-                        content: Text(context.t.adminRemoveUserBody),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: Text(context.t.cancel),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red,
+                  IconButton(
+                    tooltip: context.t.adminDeleteReport,
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: Colors.red),
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(context.t.adminDeleteReportTitle),
+                          content: Text(context.t.adminDeleteReportUserBody),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: Text(context.t.cancel),
                             ),
-                            onPressed: () async {
-                              Navigator.pop(ctx);
-                              await ref
-                                  .read(adminServiceProvider)
-                                  .deleteUser(report.targetUid);
-                              await ref
-                                  .read(adminServiceProvider)
-                                  .deleteUserProfileReport(report.id);
-                              if (!context.mounted) return;
-                              AppFeedback.showSuccess(
-                                  context, context.t.adminUserRemoved);
-                            },
-                            child: Text(context.t.adminRemoveUser),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: Text(context.t.adminRemoveUser),
-                ),
-                IconButton(
-                  tooltip: context.t.adminDeleteReport,
-                  icon: const Icon(Icons.delete_outline,
-                      size: 18, color: Colors.red),
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(context.t.adminDeleteReportTitle),
-                        content:
-                            Text(context.t.adminDeleteReportUserBody),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: Text(context.t.cancel),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red,
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text(context.t.delete),
                             ),
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: Text(context.t.delete),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed != true) return;
-                    try {
-                      await ref
-                          .read(adminServiceProvider)
-                          .deleteUserProfileReport(report.id);
-                      if (!context.mounted) return;
-                      AppFeedback.showSuccess(
-                          context, context.t.adminReportDeleted);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      AppFeedback.showError(
-                          context, context.t.failedWithError(e));
-                    }
-                  },
-                ),
-              ],
-            ),
-          ],
+                          ],
+                        ),
+                      );
+                      if (confirmed != true) return;
+                      try {
+                        await ref
+                            .read(adminServiceProvider)
+                            .deleteUserProfileReport(report.id);
+                        if (!context.mounted) return;
+                        AppFeedback.showSuccess(
+                            context, context.t.adminReportDeleted);
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        AppFeedback.showError(
+                            context, context.t.failedWithError(e));
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

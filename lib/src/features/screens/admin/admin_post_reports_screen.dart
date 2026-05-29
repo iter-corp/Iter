@@ -78,6 +78,8 @@ class AdminPostReportsScreen extends ConsumerWidget {
             labelColor: AppColors.purple,
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
+            dividerColor: Colors.transparent,
+            dividerHeight: 0,
             tabs: [
               Tab(text: context.t.adminTabOpen(unresolved.length)),
               Tab(text: context.t.adminTabResolved(resolved.length)),
@@ -86,24 +88,24 @@ class AdminPostReportsScreen extends ConsumerWidget {
         ),
         body: AppPageBackground(
           child: reportsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-          data: (_) => TabBarView(
-            children: [
-              _ReportsList(
-                reports: unresolved,
-                emptyTitle: all.isEmpty
-                    ? context.t.adminNoPostReports
-                    : context.t.adminNoOpenReports,
-                emptySubtitle: context.t.adminFreshReportsHere,
-              ),
-              _ReportsList(
-                reports: resolved,
-                emptyTitle: context.t.adminNothingResolvedYet,
-                emptySubtitle: context.t.adminClosedReportsMoveHere,
-              ),
-            ],
-          ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+            data: (_) => TabBarView(
+              children: [
+                _ReportsList(
+                  reports: unresolved,
+                  emptyTitle: all.isEmpty
+                      ? context.t.adminNoPostReports
+                      : context.t.adminNoOpenReports,
+                  emptySubtitle: context.t.adminFreshReportsHere,
+                ),
+                _ReportsList(
+                  reports: resolved,
+                  emptyTitle: context.t.adminNothingResolvedYet,
+                  emptySubtitle: context.t.adminClosedReportsMoveHere,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -327,203 +329,136 @@ class _ReportTile extends ConsumerWidget {
     return GestureDetector(
       onLongPress: onLongPress,
       child: AppGlassCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      radius: 16,
-      borderAlpha: report.resolved ? null : 0.65,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          leading: Icon(
-            report.resolved ? Icons.check_circle_outline : Icons.flag_outlined,
-            color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: context.t.copy,
-                icon: const Icon(Icons.copy_rounded, size: 18),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                    minWidth: 36, minHeight: 36),
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(
-                    text: 'When: ${_fullTime(report.createdAt)}\n'
-                        'Reason: ${report.reason}\n'
-                        'Reporter: ${report.reporterUsername.isEmpty ? report.reporterUid : "${report.reporterUsername} (${report.reporterUid})"}\n'
-                        'Post author: ${report.postAuthorUsername.isEmpty ? report.postAuthorUid : "${report.postAuthorUsername} (${report.postAuthorUid})"}\n'
-                        'Post id: ${report.postId}\n\n'
-                        'Caption: $caption\n\n'
-                        'Details: ${(report.details ?? "").trim()}',
-                  ));
-                  AppFeedback.showInfo(
-                      context, context.t.adminCopiedToClipboard);
-                },
-              ),
-              Icon(Icons.expand_more, color: context.textSecondary),
-            ],
-          ),
-          title: Text(
-            caption,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: context.textPrimary,
-              decoration: report.resolved ? TextDecoration.lineThrough : null,
+        margin: const EdgeInsets.only(bottom: 10),
+        radius: 16,
+        borderAlpha: report.resolved ? null : 0.65,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            leading: Icon(
+              report.resolved
+                  ? Icons.check_circle_outline
+                  : Icons.flag_outlined,
+              color: report.resolved ? Colors.green : const Color(0xFFE04E5C),
             ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 4,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _pill(context, Icons.report_outlined, report.reason),
-                _pill(
-                    context,
-                    Icons.person_outline,
-                    report.reporterUsername.isEmpty
-                        ? report.reporterUid
-                        : report.reporterUsername),
-                _pill(context, Icons.schedule, _shortTime(report.createdAt)),
+                IconButton(
+                  tooltip: context.t.copy,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(
+                      text: 'When: ${_fullTime(report.createdAt)}\n'
+                          'Reason: ${report.reason}\n'
+                          'Reporter: ${report.reporterUsername.isEmpty ? report.reporterUid : "${report.reporterUsername} (${report.reporterUid})"}\n'
+                          'Post author: ${report.postAuthorUsername.isEmpty ? report.postAuthorUid : "${report.postAuthorUsername} (${report.postAuthorUid})"}\n'
+                          'Post id: ${report.postId}\n\n'
+                          'Caption: $caption\n\n'
+                          'Details: ${(report.details ?? "").trim()}',
+                    ));
+                    AppFeedback.showInfo(
+                        context, context.t.adminCopiedToClipboard);
+                  },
+                ),
+                Icon(Icons.expand_more, color: context.textSecondary),
               ],
             ),
-          ),
-          children: [
-            _kv(context, context.t.adminReportedPost, caption),
-            _kv(
-                context,
-                context.t.adminPostAuthor,
-                report.postAuthorUsername.isEmpty
-                    ? report.postAuthorUid
-                    : '${report.postAuthorUsername} (${report.postAuthorUid})'),
-            _kv(
-                context,
-                context.t.adminReporter,
-                report.reporterUsername.isEmpty
-                    ? report.reporterUid
-                    : '${report.reporterUsername} (${report.reporterUid})'),
-            _kv(context, context.t.adminReason, report.reason),
-            _kv(context, context.t.adminWhen, _fullTime(report.createdAt)),
-            if ((report.details ?? '').trim().isNotEmpty)
-              _kv(context, context.t.adminDetails, report.details!.trim()),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                TextButton(
-                  onPressed: () => ref
-                      .read(adminServiceProvider)
-                      .setPostReportResolved(report.id, !report.resolved),
-                  child: Text(report.resolved
-                      ? context.t.adminReopen
-                      : context.t.adminMarkResolved),
-                ),
-                TextButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PostDetailScreen(postId: report.postId),
-                    ),
+            title: Text(
+              caption,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: context.textPrimary,
+                decoration: report.resolved ? TextDecoration.lineThrough : null,
+              ),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  _pill(context, Icons.report_outlined, report.reason),
+                  _pill(
+                      context,
+                      Icons.person_outline,
+                      report.reporterUsername.isEmpty
+                          ? report.reporterUid
+                          : report.reporterUsername),
+                  _pill(context, Icons.schedule, _shortTime(report.createdAt)),
+                ],
+              ),
+            ),
+            children: [
+              _kv(context, context.t.adminReportedPost, caption),
+              _kv(
+                  context,
+                  context.t.adminPostAuthor,
+                  report.postAuthorUsername.isEmpty
+                      ? report.postAuthorUid
+                      : '${report.postAuthorUsername} (${report.postAuthorUid})'),
+              _kv(
+                  context,
+                  context.t.adminReporter,
+                  report.reporterUsername.isEmpty
+                      ? report.reporterUid
+                      : '${report.reporterUsername} (${report.reporterUid})'),
+              _kv(context, context.t.adminReason, report.reason),
+              _kv(context, context.t.adminWhen, _fullTime(report.createdAt)),
+              if ((report.details ?? '').trim().isNotEmpty)
+                _kv(context, context.t.adminDetails, report.details!.trim()),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: () => ref
+                        .read(adminServiceProvider)
+                        .setPostReportResolved(report.id, !report.resolved),
+                    child: Text(report.resolved
+                        ? context.t.adminReopen
+                        : context.t.adminMarkResolved),
                   ),
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: Text(context.t.adminViewPost),
-                ),
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red.withValues(alpha: 0.2),
-                    foregroundColor: Colors.red,
-                  ),
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(
-                          report.resolved
-                              ? context.t.adminDeleteReportTitle
-                              : context.t.adminTakeDownPostTitle,
-                        ),
-                        content: Text(
-                          report.resolved
-                              ? context.t.adminDeleteReportBody
-                              : context.t.adminTakeDownPostBody,
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: Text(context.t.cancel),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red,
-                            ),
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: Text(
-                              report.resolved
-                                  ? context.t.adminDeleteReport
-                                  : context.t.adminTakeDownPost,
-                            ),
-                          ),
-                        ],
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PostDetailScreen(postId: report.postId),
                       ),
-                    );
-
-                    if (confirmed != true) return;
-
-                    try {
-                      if (report.resolved) {
-                        await ref
-                            .read(adminServiceProvider)
-                            .deletePostReport(report.id);
-                        if (!context.mounted) return;
-                        AppFeedback.showSuccess(
-                            context, context.t.adminReportDeleted);
-                        return;
-                      }
-
-                      await ref
-                          .read(adminServiceProvider)
-                          .deletePost(report.postId);
-                      await ref
-                          .read(adminServiceProvider)
-                          .setPostReportResolved(report.id, true);
-                      if (!context.mounted) return;
-                      AppFeedback.showSuccess(
-                        context,
-                        context.t.adminPostTakenDown,
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      AppFeedback.showError(
-                        context,
-                        context.t.adminActionFailed(e),
-                      );
-                    }
-                  },
-                  child: Text(
-                    report.resolved
-                        ? context.t.adminDeleteReport
-                        : context.t.adminTakeDownPost,
+                    ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: Text(context.t.adminViewPost),
                   ),
-                ),
-                if (!report.resolved)
-                  IconButton(
-                    tooltip: context.t.adminDeleteReport,
-                    icon: const Icon(Icons.delete_outline,
-                        size: 18, color: Colors.red),
+                  FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red.withValues(alpha: 0.2),
+                      foregroundColor: Colors.red,
+                    ),
                     onPressed: () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: Text(context.t.adminDeleteReportTitle),
-                          content:
-                              Text(context.t.adminDeleteReportPostBody),
+                          title: Text(
+                            report.resolved
+                                ? context.t.adminDeleteReportTitle
+                                : context.t.adminTakeDownPostTitle,
+                          ),
+                          content: Text(
+                            report.resolved
+                                ? context.t.adminDeleteReportBody
+                                : context.t.adminTakeDownPostBody,
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, false),
@@ -534,31 +469,100 @@ class _ReportTile extends ConsumerWidget {
                                 backgroundColor: Colors.red,
                               ),
                               onPressed: () => Navigator.pop(ctx, true),
-                              child: Text(context.t.delete),
+                              child: Text(
+                                report.resolved
+                                    ? context.t.adminDeleteReport
+                                    : context.t.adminTakeDownPost,
+                              ),
                             ),
                           ],
                         ),
                       );
+
                       if (confirmed != true) return;
+
                       try {
+                        if (report.resolved) {
+                          await ref
+                              .read(adminServiceProvider)
+                              .deletePostReport(report.id);
+                          if (!context.mounted) return;
+                          AppFeedback.showSuccess(
+                              context, context.t.adminReportDeleted);
+                          return;
+                        }
+
                         await ref
                             .read(adminServiceProvider)
-                            .deletePostReport(report.id);
+                            .deletePost(report.postId);
+                        await ref
+                            .read(adminServiceProvider)
+                            .setPostReportResolved(report.id, true);
                         if (!context.mounted) return;
                         AppFeedback.showSuccess(
-                            context, context.t.adminReportDeleted);
+                          context,
+                          context.t.adminPostTakenDown,
+                        );
                       } catch (e) {
                         if (!context.mounted) return;
                         AppFeedback.showError(
-                            context, context.t.failedWithError(e));
+                          context,
+                          context.t.adminActionFailed(e),
+                        );
                       }
                     },
+                    child: Text(
+                      report.resolved
+                          ? context.t.adminDeleteReport
+                          : context.t.adminTakeDownPost,
+                    ),
                   ),
-              ],
-            ),
-          ],
+                  if (!report.resolved)
+                    IconButton(
+                      tooltip: context.t.adminDeleteReport,
+                      icon: const Icon(Icons.delete_outline,
+                          size: 18, color: Colors.red),
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text(context.t.adminDeleteReportTitle),
+                            content: Text(context.t.adminDeleteReportPostBody),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: Text(context.t.cancel),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: Text(context.t.delete),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true) return;
+                        try {
+                          await ref
+                              .read(adminServiceProvider)
+                              .deletePostReport(report.id);
+                          if (!context.mounted) return;
+                          AppFeedback.showSuccess(
+                              context, context.t.adminReportDeleted);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          AppFeedback.showError(
+                              context, context.t.failedWithError(e));
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

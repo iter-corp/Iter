@@ -160,23 +160,31 @@ class _ReportsToolbarState extends State<ReportsToolbar> {
             AppGlassCard(
               radius: 16,
               padding: EdgeInsets.zero,
-              child: TextField(
-                controller: _searchCtrl,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: t.adminReportsSearchHint,
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchCtrl.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: t.clear,
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () => _searchCtrl.clear(),
-                        ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  inputDecorationTheme: const InputDecorationTheme(
+                    filled: false,
+                    fillColor: Colors.transparent,
+                  ),
+                ),
+                child: TextField(
+                  controller: _searchCtrl,
+                  textInputAction: TextInputAction.search,
+                  textAlignVertical: TextAlignVertical.center,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search),
+                    prefixIconConstraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
+                    hintText: t.adminReportsSearchHint,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
                 ),
               ),
             ),

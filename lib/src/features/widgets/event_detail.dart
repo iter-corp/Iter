@@ -333,6 +333,20 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (widget.description.trim().isNotEmpty) ...[
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
+                          onPressed: () => _translateDescription(
+                            context,
+                            target: preferredLang,
+                          ),
+                          icon: const Icon(Icons.translate, size: 18),
+                          label: Text(context.t.translate),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     Text(
                       widget.description,
                       style: TextStyle(
@@ -341,17 +355,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         height: 1.6,
                       ),
                     ),
-                    if (widget.description.trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: () => _translateDescription(
-                          context,
-                          target: preferredLang,
-                        ),
-                        icon: const Icon(Icons.translate, size: 18),
-                        label: Text(context.t.translate),
-                      ),
-                    ],
                   ],
                 ),
               ),
