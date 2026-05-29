@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/comment_providers.dart';
 import '../../navigation/user_profile_nav.dart';
@@ -576,14 +577,15 @@ class _CommentTile extends ConsumerWidget {
     this.highlighted = false,
   });
 
-  Future<void> _translateCommentToEnglish(BuildContext context) async {
+  Future<void> _translateComment(BuildContext context, WidgetRef ref) async {
     final raw = comment.text.trim();
     if (raw.isEmpty) return;
+    final target = ref.read(preferredLanguageProvider);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (sheet) => _CommentTranslateSheet(text: raw),
+      builder: (sheet) => _CommentTranslateSheet(text: raw, target: target),
     );
   }
 
@@ -862,7 +864,7 @@ class _CommentTile extends ConsumerWidget {
                         if (comment.text.trim().isNotEmpty) ...[
                           const SizedBox(width: 14),
                           GestureDetector(
-                            onTap: () => _translateCommentToEnglish(context),
+                            onTap: () => _translateComment(context, ref),
                             behavior: HitTestBehavior.opaque,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 2),
@@ -904,14 +906,18 @@ class _CommentTile extends ConsumerWidget {
 /// the next one loads so the sheet never appears empty mid-fetch.
 class _CommentTranslateSheet extends StatefulWidget {
   final String text;
-  const _CommentTranslateSheet({required this.text});
+  final String target;
+  const _CommentTranslateSheet({
+    required this.text,
+    required this.target,
+  });
 
   @override
   State<_CommentTranslateSheet> createState() => _CommentTranslateSheetState();
 }
 
 class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
-  String _target = 'en';
+  late String _target;
   String? _translated;
   String? _error;
   bool _loading = false;
@@ -919,6 +925,7 @@ class _CommentTranslateSheetState extends State<_CommentTranslateSheet> {
   @override
   void initState() {
     super.initState();
+    _target = widget.target;
     _translate();
   }
 

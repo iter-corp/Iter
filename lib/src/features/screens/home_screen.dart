@@ -12,9 +12,11 @@ import '../../providers/auth_providers.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/comment_providers.dart';
 import '../../providers/notification_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
 import '../../services/post_service.dart';
+import '../../services/translate_service.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import 'create_post_screen.dart';
@@ -456,9 +458,8 @@ class _HomeBodyState extends ConsumerState<HomeBody>
       }
       if (chosen == _kTravelCurrentOption) {
         _selectedPlace = _PlaceSuggestion(
-          name: _viewerCity.isEmpty
-              ? context.t.homeCurrentLocation
-              : _viewerCity,
+          name:
+              _viewerCity.isEmpty ? context.t.homeCurrentLocation : _viewerCity,
           city: '',
           lat: _viewerLat,
           lng: _viewerLng,
@@ -569,8 +570,7 @@ class _HomeBodyState extends ConsumerState<HomeBody>
       ),
       // Stories — directly under the tabs, identical on every tab.
       // Hidden while search is active.
-      if (showStories && !collapsed)
-        const StoriesList(),
+      if (showStories && !collapsed) const StoriesList(),
       // Search + Post row — one global search shared by every tab.
       _SearchPostRow(
         searching: _searchFocused,
@@ -707,8 +707,7 @@ class _HomeBodyState extends ConsumerState<HomeBody>
                 travelMode: isTravel,
                 travelPlace:
                     isTravel && placeLabel.isNotEmpty ? placeLabel : null,
-                travelDistance:
-                    isTravel ? (p.travelDistanceLabel ?? '') : null,
+                travelDistance: isTravel ? (p.travelDistanceLabel ?? '') : null,
                 viewerLocationOff: false,
               );
             },
@@ -821,119 +820,122 @@ class _HomeBodyState extends ConsumerState<HomeBody>
                         ],
                       ))
                   : postsAsync.when(
-                skipLoadingOnReload: true,
-                skipLoadingOnRefresh: true,
-                loading: () => ListView(
-                  controller: widget.scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 100),
-                  children: [
-                    ..._scrollTopContent(
-                      announcement: announcement,
-                      maintenance: maintenance,
-                      showStories: showStories,
-                    ),
-                    const SizedBox(height: 24),
-                    const Center(child: CircularProgressIndicator()),
-                  ],
-                ),
-                error: (e, _) => ListView(
-                  controller: widget.scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 100),
-                  children: [
-                    ..._scrollTopContent(
-                      announcement: announcement,
-                      maintenance: maintenance,
-                      showStories: showStories,
-                    ),
-                    const SizedBox(height: 24),
-                    Center(child: Text(context.t.homeErrorPrefix(e))),
-                  ],
-                ),
-                data: (posts) {
-                  // Search is handled by the separate all-tabs path
-                  // above, so here we just show the current tab's posts.
-                  final visiblePosts = posts;
-
-                  if (visiblePosts.isEmpty) {
-                    final emptyText = _mode == _HomeMode.qa
-                        ? context.t.homeNoDiscussThreads
-                        : context.t.homeNoPostsCreateFirst;
-                    return ListView(
-                      controller: widget.scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 100),
-                      children: [
-                        ..._scrollTopContent(
-                          announcement: announcement,
-                          maintenance: maintenance,
-                          showStories: showStories,
-                        ),
-                        const SizedBox(height: 24),
-                        Center(
-                          child: Text(emptyText),
-                        ),
-                      ],
-                    );
-                  }
-                  // Travel mode with no device location → a red/white
-                  // banner shown above the first card.
-                  final showTravelLocBanner = _mode == _HomeMode.travel &&
-                      (_viewerLat == null || _viewerLng == null);
-
-                  return CustomScrollView(
-                    controller: widget.scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Column(
-                          children: _scrollTopContent(
+                      skipLoadingOnReload: true,
+                      skipLoadingOnRefresh: true,
+                      loading: () => ListView(
+                        controller: widget.scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 100),
+                        children: [
+                          ..._scrollTopContent(
                             announcement: announcement,
                             maintenance: maintenance,
                             showStories: showStories,
                           ),
-                        ),
+                          const SizedBox(height: 24),
+                          const Center(child: CircularProgressIndicator()),
+                        ],
                       ),
-                      if (showTravelLocBanner)
-                        SliverToBoxAdapter(
-                          child: _TravelLocationOffBanner(
-                            onEnable: _enableLocationFromBanner,
+                      error: (e, _) => ListView(
+                        controller: widget.scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 100),
+                        children: [
+                          ..._scrollTopContent(
+                            announcement: announcement,
+                            maintenance: maintenance,
+                            showStories: showStories,
                           ),
-                        ),
-                      SliverPadding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 100),
-                        sliver: SliverList.builder(
-                          itemCount: visiblePosts.length,
-                          itemBuilder: (context, index) {
-                            final p = visiblePosts[index];
-                            if (_mode == _HomeMode.qa) {
-                              return _QaThreadCard(key: ValueKey(p.id), post: p);
-                            }
-                            final placeLabel = _travelPlaceLabel(p);
-                            final hasPlace = placeLabel.isNotEmpty;
-                            return PostCard(
-                              key: ValueKey(p.id),
-                              post: p,
-                              travelMode: _mode == _HomeMode.travel,
-                              travelPlace: _mode == _HomeMode.travel && hasPlace
-                                  ? placeLabel
-                                  : null,
-                              travelDistance: _mode == _HomeMode.travel
-                                  ? (p.travelDistanceLabel ?? '')
-                                  : null,
-                              // Location-off prompting now lives solely in
-                              // the red banner above the feed, so the
-                              // per-card prompt is disabled.
-                              viewerLocationOff: false,
-                            );
-                          },
-                        ),
+                          const SizedBox(height: 24),
+                          Center(child: Text(context.t.homeErrorPrefix(e))),
+                        ],
                       ),
-                    ],
-                  );
-                },
-              ),
+                      data: (posts) {
+                        // Search is handled by the separate all-tabs path
+                        // above, so here we just show the current tab's posts.
+                        final visiblePosts = posts;
+
+                        if (visiblePosts.isEmpty) {
+                          final emptyText = _mode == _HomeMode.qa
+                              ? context.t.homeNoDiscussThreads
+                              : context.t.homeNoPostsCreateFirst;
+                          return ListView(
+                            controller: widget.scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 100),
+                            children: [
+                              ..._scrollTopContent(
+                                announcement: announcement,
+                                maintenance: maintenance,
+                                showStories: showStories,
+                              ),
+                              const SizedBox(height: 24),
+                              Center(
+                                child: Text(emptyText),
+                              ),
+                            ],
+                          );
+                        }
+                        // Travel mode with no device location → a red/white
+                        // banner shown above the first card.
+                        final showTravelLocBanner = _mode == _HomeMode.travel &&
+                            (_viewerLat == null || _viewerLng == null);
+
+                        return CustomScrollView(
+                          controller: widget.scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: Column(
+                                children: _scrollTopContent(
+                                  announcement: announcement,
+                                  maintenance: maintenance,
+                                  showStories: showStories,
+                                ),
+                              ),
+                            ),
+                            if (showTravelLocBanner)
+                              SliverToBoxAdapter(
+                                child: _TravelLocationOffBanner(
+                                  onEnable: _enableLocationFromBanner,
+                                ),
+                              ),
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.only(top: 8, bottom: 100),
+                              sliver: SliverList.builder(
+                                itemCount: visiblePosts.length,
+                                itemBuilder: (context, index) {
+                                  final p = visiblePosts[index];
+                                  if (_mode == _HomeMode.qa) {
+                                    return _QaThreadCard(
+                                        key: ValueKey(p.id), post: p);
+                                  }
+                                  final placeLabel = _travelPlaceLabel(p);
+                                  final hasPlace = placeLabel.isNotEmpty;
+                                  return PostCard(
+                                    key: ValueKey(p.id),
+                                    post: p,
+                                    travelMode: _mode == _HomeMode.travel,
+                                    travelPlace:
+                                        _mode == _HomeMode.travel && hasPlace
+                                            ? placeLabel
+                                            : null,
+                                    travelDistance: _mode == _HomeMode.travel
+                                        ? (p.travelDistanceLabel ?? '')
+                                        : null,
+                                    // Location-off prompting now lives solely in
+                                    // the red banner above the feed, so the
+                                    // per-card prompt is disabled.
+                                    viewerLocationOff: false,
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
             ),
           ),
         ],
@@ -1425,8 +1427,7 @@ class _ModeDropdown extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
                 color: m == mode
                     ? AppColors.purple.withValues(alpha: 0.14)
@@ -1438,19 +1439,14 @@ class _ModeDropdown extends StatelessWidget {
                   Icon(
                     iconFor(m),
                     size: 20,
-                    color: m == mode
-                        ? AppColors.purple
-                        : context.textSecondary,
+                    color: m == mode ? AppColors.purple : context.textSecondary,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     labelFor(m),
                     style: TextStyle(
-                      fontWeight:
-                          m == mode ? FontWeight.w700 : FontWeight.w500,
-                      color: m == mode
-                          ? AppColors.purple
-                          : context.textPrimary,
+                      fontWeight: m == mode ? FontWeight.w700 : FontWeight.w500,
+                      color: m == mode ? AppColors.purple : context.textPrimary,
                     ),
                   ),
                   if (m == mode) ...[
@@ -1542,8 +1538,7 @@ class _TravelLocationOffBanner extends StatelessWidget {
               backgroundColor: Colors.white,
               foregroundColor: AppColors.red,
               visualDensity: VisualDensity.compact,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1589,8 +1584,7 @@ class _QaThreadCard extends ConsumerWidget {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    final title =
-        lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
+    final title = lines.isEmpty ? context.t.qaUntitledQuestion : lines.first;
     final body = lines.length > 1 ? lines.sublist(1).join(' ') : '';
     final preview = _twoSentencePreview(body);
     final timeLabel = context.t.timeAgo(post.createdAt);
@@ -1602,6 +1596,19 @@ class _QaThreadCard extends ConsumerWidget {
         context,
         MaterialPageRoute(
           builder: (_) => QaThreadScreen(post: post),
+        ),
+      );
+    }
+
+    Future<void> translatePost() async {
+      if (caption.isEmpty) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _DiscussTranslateSheet(
+          text: caption,
+          target: ref.read(preferredLanguageProvider),
         ),
       );
     }
@@ -1695,10 +1702,8 @@ class _QaThreadCard extends ConsumerWidget {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (dialogContext) => AlertDialog(
-                              title:
-                                  Text(context.t.homeDeleteQuestionTitle),
-                              content:
-                                  Text(context.t.homeDeleteQuestionBody),
+                              title: Text(context.t.homeDeleteQuestionTitle),
+                              content: Text(context.t.homeDeleteQuestionBody),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
@@ -1722,15 +1727,14 @@ class _QaThreadCard extends ConsumerWidget {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content: Text(
-                                      context.t.homeQuestionDeleted)),
+                                  content: Text(context.t.homeQuestionDeleted)),
                             );
                           } catch (e) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content: Text(
-                                      context.t.homeCouldNotDelete(e))),
+                                  content:
+                                      Text(context.t.homeCouldNotDelete(e))),
                             );
                           }
                         },
@@ -1754,8 +1758,7 @@ class _QaThreadCard extends ConsumerWidget {
                           if (canDelete)
                             PopupMenuItem<String>(
                               value: 'delete',
-                              child:
-                                  Text(context.t.homeDeleteQuestionMenu),
+                              child: Text(context.t.homeDeleteQuestionMenu),
                             ),
                         ],
                       ),
@@ -1802,6 +1805,12 @@ class _QaThreadCard extends ConsumerWidget {
                       label: context.t.homeDiscuss,
                       onTap: openThread,
                     ),
+                    if (caption.isNotEmpty)
+                      _QaMeta(
+                        icon: Icons.translate,
+                        label: context.t.translate,
+                        onTap: translatePost,
+                      ),
                     _QaMeta(
                       icon: isLiked ? Icons.favorite : Icons.favorite_border,
                       label: '',
@@ -1815,8 +1824,7 @@ class _QaThreadCard extends ConsumerWidget {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                                content: Text(
-                                    context.t.homeErrorPrefix(e))),
+                                content: Text(context.t.homeErrorPrefix(e))),
                           );
                         }
                       },
@@ -2021,81 +2029,81 @@ class _MiniPostPreview extends ConsumerWidget {
               // forces infinite height and the layout crashes.
               child: IntrinsicHeight(
                 child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Thumbnail (if the post has an image).
-                  if (hasImage)
-                    SizedBox(
-                      width: 70,
-                      child: CachedNetworkImage(
-                        imageUrl: src.imageUrls.first,
-                        cacheManager: MediaCache.images,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) =>
-                            Container(color: context.borderColor),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Thumbnail (if the post has an image).
+                    if (hasImage)
+                      SizedBox(
+                        width: 70,
+                        child: CachedNetworkImage(
+                          imageUrl: src.imageUrls.first,
+                          cacheManager: MediaCache.images,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              Container(color: context.borderColor),
+                        ),
                       ),
-                    ),
-                  // Author + caption.
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 9,
-                                backgroundColor: context.purpleSoft,
-                                backgroundImage: (src.authorAvatar != null &&
-                                        src.authorAvatar!.isNotEmpty)
-                                    ? CachedNetworkImageProvider(
-                                        src.authorAvatar!)
-                                    : null,
-                                child: (src.authorAvatar == null ||
-                                        src.authorAvatar!.isEmpty)
-                                    ? Icon(Icons.person,
-                                        size: 11,
-                                        color: context.textSecondary)
-                                    : null,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  src.authorUsername,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: context.textPrimary,
+                    // Author + caption.
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 9,
+                                  backgroundColor: context.purpleSoft,
+                                  backgroundImage: (src.authorAvatar != null &&
+                                          src.authorAvatar!.isNotEmpty)
+                                      ? CachedNetworkImageProvider(
+                                          src.authorAvatar!)
+                                      : null,
+                                  child: (src.authorAvatar == null ||
+                                          src.authorAvatar!.isEmpty)
+                                      ? Icon(Icons.person,
+                                          size: 11,
+                                          color: context.textSecondary)
+                                      : null,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    src.authorUsername,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimary,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Icon(Icons.chevron_right,
-                                  size: 16, color: context.textMuted),
-                            ],
-                          ),
-                          if (cap.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              cap,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.3,
-                                color: context.textSecondary,
-                              ),
+                                Icon(Icons.chevron_right,
+                                    size: 16, color: context.textMuted),
+                              ],
                             ),
+                            if (cap.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                cap,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.3,
+                                  color: context.textSecondary,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2205,8 +2213,8 @@ class _SearchPostRow extends StatelessWidget {
               ? null
               : IconButton(
                   onPressed: onClear,
-                  icon: Icon(Icons.close,
-                      size: 18, color: context.textSecondary),
+                  icon:
+                      Icon(Icons.close, size: 18, color: context.textSecondary),
                 ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -2218,8 +2226,7 @@ class _SearchPostRow extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: Color(0xFF7E3BE8), width: 1.2),
+            borderSide: const BorderSide(color: Color(0xFF7E3BE8), width: 1.2),
           ),
         ),
       );
@@ -2670,6 +2677,161 @@ class _DiscussKindButton extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscussTranslateSheet extends StatefulWidget {
+  final String text;
+  final String target;
+
+  const _DiscussTranslateSheet({
+    required this.text,
+    required this.target,
+  });
+
+  @override
+  State<_DiscussTranslateSheet> createState() => _DiscussTranslateSheetState();
+}
+
+class _DiscussTranslateSheetState extends State<_DiscussTranslateSheet> {
+  late String _target;
+  String? _translated;
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = widget.target;
+    _translate();
+  }
+
+  Future<void> _translate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: widget.text,
+        sourceLang: 'auto',
+        targetLang: _target,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = TranslateService.userFriendlyErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _selectLang(String code) {
+    if (code == _target) return;
+    setState(() => _target = code);
+    _translate();
+  }
+
+  String _labelOf(String code) => kTranslateLanguages
+      .firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?'))
+      .label;
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = <String>{};
+    final chipLangs = <TranslateLanguage>[];
+    for (final lang in kTranslateLanguages) {
+      if (seen.add(lang.code)) chipLangs.add(lang);
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  context.t.commentTranslateTo(_labelOf(_target)),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: chipLangs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  final lang = chipLangs[i];
+                  final selected = lang.code == _target;
+                  final label = lang.code == 'en' ? 'English' : lang.label;
+                  return GestureDetector(
+                    onTap: () => _selectLang(lang.code),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFB05ECC)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? Colors.white : null,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else
+              SelectableText(
+                _translated ?? '',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.t.close),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -3321,9 +3483,8 @@ class _TravelFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
-    final bg = disabled
-            ? context.inputFill.withValues(alpha: 0.5)
-            : context.inputFill;
+    final bg =
+        disabled ? context.inputFill.withValues(alpha: 0.5) : context.inputFill;
     final fg = selected
         ? Colors.white
         : (disabled ? context.textMuted : context.textPrimary);

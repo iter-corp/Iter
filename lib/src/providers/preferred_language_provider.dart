@@ -15,14 +15,18 @@ class PreferredLanguageNotifier extends StateNotifier<String> {
     _load();
   }
 
+  bool _changedLocally = false;
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_changedLocally) return;
     final code = prefs.getString(_kPrefsKey);
     if (code != null && code.isNotEmpty) state = code;
   }
 
   Future<void> set(String code) async {
     if (code.isEmpty || code == state) return;
+    _changedLocally = true;
     state = code;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kPrefsKey, code);

@@ -8,7 +8,9 @@ import '../../navigation/user_profile_nav.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/event_chat_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../services/event_chat_service.dart';
+import '../../services/translate_service.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
 import 'event_group_settings_screen.dart';
@@ -309,6 +311,21 @@ class _EventMessageBubble extends ConsumerWidget {
     final senderName = (senderLive?['username'] as String?) ??
         (isFromAdmin ? context.t.adminLabel : context.t.user);
     final senderAvatar = (senderLive?['avatarUrl'] as String?) ?? '';
+    final preferredLang = ref.watch(preferredLanguageProvider);
+
+    Future<void> translateMessage() async {
+      final text = msg.text.trim();
+      if (text.isEmpty) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _EventChatTranslateSheet(
+          text: text,
+          target: preferredLang,
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -339,8 +356,8 @@ class _EventMessageBubble extends ConsumerWidget {
               children: [
                 if (!isMe)
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                        bottom: 2, start: 4),
+                    padding:
+                        const EdgeInsetsDirectional.only(bottom: 2, start: 4),
                     child: Text(
                       isFromAdmin
                           ? context.t.senderAdmin(senderName)
@@ -417,6 +434,18 @@ class _EventMessageBubble extends ConsumerWidget {
                   parentPath: 'eventChats/$eventId/messages',
                   messageId: msg.id,
                 ),
+                if (msg.text.trim().isNotEmpty)
+                  TextButton.icon(
+                    onPressed: translateMessage,
+                    icon: const Icon(Icons.translate, size: 14),
+                    label: Text(context.t.translate),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
                 const SizedBox(height: 2),
                 Text(
                   _fmt(msg.createdAt),
@@ -426,6 +455,162 @@ class _EventMessageBubble extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EventChatTranslateSheet extends StatefulWidget {
+  final String text;
+  final String target;
+
+  const _EventChatTranslateSheet({
+    required this.text,
+    required this.target,
+  });
+
+  @override
+  State<_EventChatTranslateSheet> createState() =>
+      _EventChatTranslateSheetState();
+}
+
+class _EventChatTranslateSheetState extends State<_EventChatTranslateSheet> {
+  late String _target;
+  String? _translated;
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = widget.target;
+    _translate();
+  }
+
+  Future<void> _translate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: widget.text,
+        sourceLang: 'auto',
+        targetLang: _target,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = TranslateService.userFriendlyErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _selectLang(String code) {
+    if (code == _target) return;
+    setState(() => _target = code);
+    _translate();
+  }
+
+  String _labelOf(String code) => kTranslateLanguages
+      .firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?'))
+      .label;
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = <String>{};
+    final chipLangs = <TranslateLanguage>[];
+    for (final lang in kTranslateLanguages) {
+      if (seen.add(lang.code)) chipLangs.add(lang);
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  context.t.commentTranslateTo(_labelOf(_target)),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: chipLangs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  final lang = chipLangs[i];
+                  final selected = lang.code == _target;
+                  final label = lang.code == 'en' ? 'English' : lang.label;
+                  return GestureDetector(
+                    onTap: () => _selectLang(lang.code),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFB05ECC)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? Colors.white : null,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else
+              SelectableText(
+                _translated ?? '',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.t.close),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

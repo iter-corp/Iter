@@ -202,7 +202,11 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              onTap: () => _pickLanguage(context, ref, current: preferredLang),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const PreferredTranslationLanguageScreen(),
+                ),
+              ),
             ),
             _SettingsTile(
               leading:
@@ -438,101 +442,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
     return code.toUpperCase();
   }
 
-  Future<void> _pickLanguage(
-    BuildContext context,
-    WidgetRef ref, {
-    required String current,
-  }) async {
-    final seen = <String>{};
-    final entries = <TranslateLanguage>[];
-    for (final lang in kTranslateLanguages) {
-      if (seen.add(lang.code)) entries.add(lang);
-    }
-
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      isScrollControlled: true,
-      builder: (sheet) {
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: AppPageBackground(
-            child: SafeArea(
-              child: SizedBox(
-                height: MediaQuery.of(sheet).size.height * 0.6,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: context.borderColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          sheet.t.settingsPreferredLanguage,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: context.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: entries.length,
-                        itemBuilder: (_, i) {
-                          final lang = entries[i];
-                          final selected = lang.code == current;
-                          return AppGlassCard(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            radius: 16,
-                            child: ListTile(
-                              title: Text(lang.label),
-                              subtitle: Text(
-                                lang.code.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.textSecondary,
-                                ),
-                              ),
-                              trailing: selected
-                                  ? const Icon(Icons.check,
-                                      color: AppColors.purple)
-                                  : null,
-                              onTap: () => Navigator.pop(sheet, lang.code),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    if (selected != null) {
-      await ref.read(preferredLanguageProvider.notifier).set(selected);
-    }
-  }
-
   Future<void> _confirmDeleteAccount(
       BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
@@ -669,6 +578,152 @@ class ProfileSettingsScreen extends ConsumerWidget {
     } on FirebaseAuthException {
       return false;
     }
+  }
+}
+
+class PreferredTranslationLanguageScreen extends ConsumerStatefulWidget {
+  const PreferredTranslationLanguageScreen({super.key});
+
+  @override
+  ConsumerState<PreferredTranslationLanguageScreen> createState() =>
+      _PreferredTranslationLanguageScreenState();
+}
+
+class _PreferredTranslationLanguageScreenState
+    extends ConsumerState<PreferredTranslationLanguageScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<TranslateLanguage> _entries() {
+    final seen = <String>{};
+    final entries = <TranslateLanguage>[];
+    for (final lang in kTranslateLanguages) {
+      if (seen.add(lang.code)) entries.add(lang);
+    }
+    return entries;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ref.watch(preferredLanguageProvider);
+    final allEntries = _entries();
+    final q = _query.trim().toLowerCase();
+    final entries = q.isEmpty
+        ? allEntries
+        : allEntries
+            .where((lang) =>
+                lang.label.toLowerCase().contains(q) ||
+                lang.code.toLowerCase().contains(q))
+            .toList(growable: false);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: Text(context.t.settingsPreferredLanguage),
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+      ),
+      body: AppPageBackground(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: AppGlassCard(
+                radius: 16,
+                padding: EdgeInsets.zero,
+                surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                borderAlpha: context.isDark ? 0.14 : 0.50,
+                child: TextField(
+                  controller: _searchCtrl,
+                  textInputAction: TextInputAction.search,
+                  onChanged: (value) => setState(() => _query = value),
+                  decoration: InputDecoration(
+                    hintText: context.t.translateSearchLanguages,
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: entries.isEmpty
+                  ? Center(
+                      child: Text(
+                        context.t.translateNoLanguagesMatch,
+                        style: TextStyle(color: context.textSecondary),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        24 + MediaQuery.of(context).padding.bottom,
+                      ),
+                      itemCount: entries.length,
+                      itemBuilder: (_, i) {
+                        final lang = entries[i];
+                        final selected = lang.code == current;
+                        return AppGlassCard(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 0, vertical: 4),
+                          radius: 16,
+                          surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                          borderAlpha: context.isDark ? 0.14 : 0.50,
+                          child: ListTile(
+                            title: Text(lang.label),
+                            subtitle: Text(
+                              lang.code.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                            trailing: selected
+                                ? const Icon(Icons.check,
+                                    color: AppColors.purple)
+                                : null,
+                            onTap: () async {
+                              await ref
+                                  .read(preferredLanguageProvider.notifier)
+                                  .set(
+                                    lang.code,
+                                  );
+                              if (context.mounted) Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

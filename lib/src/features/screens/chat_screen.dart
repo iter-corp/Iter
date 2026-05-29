@@ -257,9 +257,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _loadAutoTranslatePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
+    final preferred = ref.read(preferredLanguageProvider);
     setState(() {
       _autoTranslate = prefs.getBool(_prefsAutoKey) ?? false;
-      _autoTranslateTarget = prefs.getString(_prefsLangKey) ?? 'en';
+      _autoTranslateTarget = prefs.getString(_prefsLangKey) ?? preferred;
     });
   }
 
@@ -294,6 +295,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _autoTranslateTarget = ref.read(preferredLanguageProvider);
     _messageFocusNode.addListener(() {
       if (!mounted) return;
       setState(() => _isInputFocused = _messageFocusNode.hasFocus);
@@ -364,8 +366,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (restrictMessaging && !isAdmin) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(context.t.messagingRestrictedGroup)),
+            SnackBar(content: Text(context.t.messagingRestrictedGroup)),
           );
         }
         return;
@@ -373,8 +374,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (adminOnly && !isAdmin) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(context.t.onlyAdminsCanMessage)),
+            SnackBar(content: Text(context.t.onlyAdminsCanMessage)),
           );
         }
         return;
@@ -436,8 +436,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(context.t.mediaSharingDisabledGroup)),
+              SnackBar(content: Text(context.t.mediaSharingDisabledGroup)),
             );
           }
           return false;
@@ -445,8 +444,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if ((restrictMessaging || adminOnly) && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(context.t.cannotSendMediaGroup)),
+              SnackBar(content: Text(context.t.cannotSendMediaGroup)),
             );
           }
           return false;
@@ -613,8 +611,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.showErrorOn(
-            messenger, context.t.couldNotShareLocation(e));
+        AppFeedback.showErrorOn(messenger, context.t.couldNotShareLocation(e));
       }
     }
   }
@@ -703,8 +700,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (videoSize > _kMaxAttachmentBytes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(context.t.videoTooLarge)),
+          SnackBar(content: Text(context.t.videoTooLarge)),
         );
       }
       return;
@@ -916,8 +912,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (!mediaShare) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(context.t.mediaSharingDisabledGroup)),
+              SnackBar(content: Text(context.t.mediaSharingDisabledGroup)),
             );
           }
           return;
@@ -926,8 +921,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if ((restrictMessaging || adminOnly) && !isAdmin) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(context.t.cannotSendVoiceGroup)),
+              SnackBar(content: Text(context.t.cannotSendVoiceGroup)),
             );
           }
           return;
@@ -1079,8 +1073,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         debugPrint('[chat-voice] too short, aborting');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(context.t.voiceMessageTooShort)),
+            SnackBar(content: Text(context.t.voiceMessageTooShort)),
           );
         }
         try {
@@ -1097,8 +1090,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         debugPrint('[chat-voice] upload returned EMPTY url');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(context.t.failedUploadVoiceEmpty)),
+            SnackBar(content: Text(context.t.failedUploadVoiceEmpty)),
           );
         }
         return;
@@ -1934,8 +1926,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         : [
                                             BoxShadow(
                                               color: Colors.black.withValues(
-                                                  alpha:
-                                                      context.isDark ? 0.18 : 0.05),
+                                                  alpha: context.isDark
+                                                      ? 0.18
+                                                      : 0.05),
                                               blurRadius: 10,
                                               offset: const Offset(0, 3),
                                             ),
@@ -2014,9 +2007,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     return ScaleTransition(
                                       scale: animation,
                                       child: RotationTransition(
-                                        turns: Tween<double>(
-                                                begin: 0.75, end: 1.0)
-                                            .animate(animation),
+                                        turns:
+                                            Tween<double>(begin: 0.75, end: 1.0)
+                                                .animate(animation),
                                         child: FadeTransition(
                                           opacity: animation,
                                           child: child,
@@ -2789,7 +2782,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
             children: [
               if (isGroup && !isMe)
                 Padding(
-                  padding: const EdgeInsetsDirectional.only(bottom: 2, start: 4),
+                  padding:
+                      const EdgeInsetsDirectional.only(bottom: 2, start: 4),
                   child: Text(
                     senderName,
                     style: TextStyle(
@@ -2848,10 +2842,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: (isMe
-                                          ? AppColors.purple
-                                          : Colors.black)
-                                      .withValues(
+                                  color:
+                                      (isMe ? AppColors.purple : Colors.black)
+                                          .withValues(
                                     alpha: widget.flashing
                                         ? 0.42
                                         : (isMe
@@ -2904,8 +2897,8 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     msg.fileUrl!.isNotEmpty) ...[
                                   _FileMessageBubble(
                                     url: msg.fileUrl!,
-                                    fileName:
-                                        msg.fileName ?? context.t.attachmentDefaultName,
+                                    fileName: msg.fileName ??
+                                        context.t.attachmentDefaultName,
                                     mimeType: msg.fileMimeType,
                                     sizeBytes: msg.fileSizeBytes,
                                     isMe: isMe,
@@ -3177,8 +3170,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                               style: const TextStyle(fontSize: 11),
                             )
                           : null,
-                      enabled:
-                          (msg.voiceTranscript ?? '').trim().isNotEmpty,
+                      enabled: (msg.voiceTranscript ?? '').trim().isNotEmpty,
                       onTap: () {
                         Navigator.pop(sheet);
                         _showVoiceTranscriptSheet(
@@ -3195,8 +3187,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                               sheetRef.watch(preferredLanguageProvider);
                           return _BubbleMenuAction(
                             icon: Icons.translate,
-                            label: context
-                                .t
+                            label: context.t
                                 .translateVoiceToLang(target.toUpperCase()),
                             onTap: () {
                               Navigator.pop(sheet);
@@ -3437,7 +3428,8 @@ class _BubbleMenuAction extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
               color: destructive
-                  ? AppColors.red.withValues(alpha: context.isDark ? 0.12 : 0.08)
+                  ? AppColors.red
+                      .withValues(alpha: context.isDark ? 0.12 : 0.08)
                   : context.inputFill
                       .withValues(alpha: context.isDark ? 0.7 : 0.85),
               borderRadius: BorderRadius.circular(18),
@@ -4212,9 +4204,12 @@ class _StoryReplyBanner extends ConsumerWidget {
       }
       final story = Story.fromDoc(doc);
       if (!context.mounted) return;
-      await openStoryViewer(context, [
-        [story]
-      ], 0);
+      await openStoryViewer(
+          context,
+          [
+            [story]
+          ],
+          0);
     } catch (_) {
       messenger.showSnackBar(
         SnackBar(content: Text(t.storyUnavailable)),
@@ -4255,9 +4250,8 @@ class _LocationMessageBubble extends StatelessWidget {
             lat: lat,
             lng: lng,
             height: 130,
-            label: (label ?? '').trim().isEmpty
-                ? context.t.sharedLocation
-                : label,
+            label:
+                (label ?? '').trim().isEmpty ? context.t.sharedLocation : label,
           ),
         ),
         const SizedBox(height: 6),

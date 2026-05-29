@@ -8,8 +8,10 @@ import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/comment_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../services/comment_service.dart';
+import '../../services/translate_service.dart';
 import '../../utils/text_direction.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
@@ -293,6 +295,19 @@ class _QuestionCard extends ConsumerWidget {
     final isAuthor = currentUid != null && currentUid == post.authorUid;
     final canReport = currentUid != null && currentUid != post.authorUid;
 
+    Future<void> translateQuestion() async {
+      if (caption.isEmpty) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _DiscussTranslateSheet(
+          text: caption,
+          target: ref.read(preferredLanguageProvider),
+        ),
+      );
+    }
+
     return AppGlassCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       radius: 20,
@@ -452,6 +467,14 @@ class _QuestionCard extends ConsumerWidget {
           if (hasSourcePost) ...[
             const SizedBox(height: 12),
             _EmbeddedPostCard(postId: post.sourcePostId!),
+          ],
+          if (caption.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: translateQuestion,
+              icon: const Icon(Icons.translate, size: 18),
+              label: Text(context.t.translate),
+            ),
           ],
           // Answer count text removed — the "Answers (N)" badge below
           // the question card already shows the live count and is the
@@ -1022,6 +1045,20 @@ class _AnswerReactionBar extends ConsumerWidget {
       }
     }
 
+    Future<void> translateAnswer() async {
+      final text = answer.text.trim();
+      if (text.isEmpty) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _DiscussTranslateSheet(
+          text: text,
+          target: ref.read(preferredLanguageProvider),
+        ),
+      );
+    }
+
     if (uid == null) {
       return Wrap(
         spacing: 8,
@@ -1044,6 +1081,7 @@ class _AnswerReactionBar extends ConsumerWidget {
             onTap: () {},
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
+          _TranslateReactionChip(onTap: translateAnswer, compact: compact),
         ],
       );
     }
@@ -1080,6 +1118,7 @@ class _AnswerReactionBar extends ConsumerWidget {
               onTap: () => setReaction('broken'),
             ),
             _ReplyReactionChip(onTap: onReply, compact: compact),
+            _TranslateReactionChip(onTap: translateAnswer, compact: compact),
           ],
         );
       },
@@ -1104,6 +1143,7 @@ class _AnswerReactionBar extends ConsumerWidget {
             onTap: () => setReaction('broken'),
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
+          _TranslateReactionChip(onTap: translateAnswer, compact: compact),
         ],
       ),
       error: (_, __) => Wrap(
@@ -1127,7 +1167,53 @@ class _AnswerReactionBar extends ConsumerWidget {
             onTap: () => setReaction('broken'),
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
+          _TranslateReactionChip(onTap: translateAnswer, compact: compact),
         ],
+      ),
+    );
+  }
+}
+
+class _TranslateReactionChip extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _TranslateReactionChip({required this.onTap, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 10,
+          vertical: compact ? 5 : 6,
+        ),
+        decoration: BoxDecoration(
+          color: context.inputFill,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.translate,
+              size: 13,
+              color: context.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              context.t.translate,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: context.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1367,6 +1453,161 @@ class _AnswerRow extends ConsumerWidget {
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscussTranslateSheet extends StatefulWidget {
+  final String text;
+  final String target;
+
+  const _DiscussTranslateSheet({
+    required this.text,
+    required this.target,
+  });
+
+  @override
+  State<_DiscussTranslateSheet> createState() => _DiscussTranslateSheetState();
+}
+
+class _DiscussTranslateSheetState extends State<_DiscussTranslateSheet> {
+  late String _target;
+  String? _translated;
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = widget.target;
+    _translate();
+  }
+
+  Future<void> _translate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: widget.text,
+        sourceLang: 'auto',
+        targetLang: _target,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = TranslateService.userFriendlyErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _selectLang(String code) {
+    if (code == _target) return;
+    setState(() => _target = code);
+    _translate();
+  }
+
+  String _labelOf(String code) => kTranslateLanguages
+      .firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?'))
+      .label;
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = <String>{};
+    final chipLangs = <TranslateLanguage>[];
+    for (final lang in kTranslateLanguages) {
+      if (seen.add(lang.code)) chipLangs.add(lang);
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  context.t.commentTranslateTo(_labelOf(_target)),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: chipLangs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  final lang = chipLangs[i];
+                  final selected = lang.code == _target;
+                  final label = lang.code == 'en' ? 'English' : lang.label;
+                  return GestureDetector(
+                    onTap: () => _selectLang(lang.code),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFB05ECC)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? Colors.white : null,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else
+              SelectableText(
+                _translated ?? '',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.t.close),
+              ),
+            ),
           ],
         ),
       ),

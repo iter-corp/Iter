@@ -114,15 +114,12 @@ const List<TranslateLanguage> kTranslateLanguages = [
 /// Client-side translation with provider routing.
 ///
 /// Provider priority:
-///  - Kurdish involved (source or target) → Microsoft Azure Translator only
-///  - All other languages → Gemini first, then Langbly / MyMemory / FreeAPITools
+///  - Kurdish involved (source or target) -> Azure key 1, Azure key 2, Gemini
+///  - All other languages -> Gemini, Azure key 1, Azure key 2
 ///
 /// Kurdish codes: ku, ckb (Sorani), kmr (Kurmanji) and any subtag variants.
 class TranslateService {
   const TranslateService();
-
-  // Round-robin index — shared across all instances for the app lifetime.
-  static int _providerIndex = 0;
 
   // ──────────────────────────────────────────────
   // On-device translation cache
@@ -350,20 +347,8 @@ class TranslateService {
         _isKurdish(effectiveSourceLang) || _isKurdish(targetLang);
     _tlog('kurdishInvolved=$kurdishInvolved providers=$allProviders');
 
-    // For Kurdish-related translations, keep deterministic order so Gemini
-    // is always attempted first (no rotation).
-    final orderedProviders = kurdishInvolved
-        ? allProviders
-        : () {
-            final startIndex = _providerIndex % allProviders.length;
-            return [
-              ...allProviders.sublist(startIndex),
-              ...allProviders.sublist(0, startIndex),
-            ];
-          }();
-
     Exception? lastError;
-    for (final provider in orderedProviders) {
+    for (final provider in allProviders) {
       _tlog('attempting provider=$provider');
       try {
         final result = await _callProvider(
@@ -375,7 +360,6 @@ class TranslateService {
         _tlog('SUCCESS via $provider, '
             'resultLen=${result.length} '
             'sample="${result.substring(0, result.length > 40 ? 40 : result.length)}"');
-        _providerIndex = (_providerIndex + 1) % allProviders.length;
         // Persist for next time. Fire-and-forget — caller already has the
         // result; cache write happens in the background.
         unawaited(_cacheStore(
@@ -410,48 +394,35 @@ class TranslateService {
     final involvesKurdish = kurdishTarget || kurdishSource;
 
     final geminiKey = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
-    final langblyKey = dotenv.maybeGet('LANGBLY_API_KEY') ?? '';
-    final freeapiKey = dotenv.maybeGet('FREEAPITOOLS_API_KEY') ?? '';
-
-    final azureKey = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
+    final azureProviders = _configuredAzureProviders();
 
     if (involvesKurdish) {
-      // Kurdish: Azure (Microsoft) is the primary engine, but Sorani/Kurmanji
-      // can fail on Azure due to region/quota/language-support issues. Fall
-      // back to MyMemory (supports ckb/kmr) and Gemini so users still get
-      // a translation while we diagnose Azure.
+      // Kurdish: Azure (Microsoft) is the primary engine for both source and
+      // target Kurdish. Gemini is the only fallback.
       final providers = <_Provider>[];
-      if (azureKey.isNotEmpty) {
-        providers.add(_Provider.azure);
-      }
-      providers.add(_Provider.mymemory);
+      providers.addAll(azureProviders);
       if (geminiKey.isNotEmpty) {
         providers.add(_Provider.gemini);
       }
       return providers;
     }
 
-    // Non-Kurdish: Gemini first, then other AI fallbacks. Azure is added
-    // last as a workhorse because it's reliable and has a generous free
-    // tier — it kicks in if Gemini's model has rotated, MyMemory hits
-    // its 403 daily quota, and so on. Without Azure here, comment/post
-    // translate would silently fail for non-Kurdish text once the free
-    // providers were exhausted.
+    // Non-Kurdish: Gemini first, then Azure fallback.
     final providers = <_Provider>[];
     if (geminiKey.isNotEmpty) {
       providers.add(_Provider.gemini);
     }
-    if (langblyKey.isNotEmpty) {
-      providers.add(_Provider.langbly);
-    }
-    providers.add(_Provider.mymemory);
-    if (freeapiKey.isNotEmpty) {
-      providers.add(_Provider.freeapitools);
-    }
-    if (azureKey.isNotEmpty) {
-      providers.add(_Provider.azure);
-    }
+    providers.addAll(azureProviders);
     return providers;
+  }
+
+  List<_Provider> _configuredAzureProviders() {
+    return [
+      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '').isNotEmpty)
+        _Provider.azurePrimary,
+      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '').isNotEmpty)
+        _Provider.azureSecondary,
+    ];
   }
 
   // ──────────────────────────────────────────────
@@ -465,20 +436,28 @@ class TranslateService {
     required String targetLang,
   }) async {
     switch (provider) {
-      case _Provider.azure:
+      case _Provider.azurePrimary:
         return _callAzure(
-            text: text, sourceLang: sourceLang, targetLang: targetLang);
+          keyEnvName: 'AZURE_TRANSLATOR_KEY',
+          regionEnvName: 'AZURE_TRANSLATOR_REGION',
+          endpointEnvName: 'AZURE_TRANSLATOR_ENDPOINT',
+          providerLabel: 'Azure primary',
+          text: text,
+          sourceLang: sourceLang,
+          targetLang: targetLang,
+        );
+      case _Provider.azureSecondary:
+        return _callAzure(
+          keyEnvName: 'AZURE_TRANSLATOR_KEY_2',
+          regionEnvName: 'AZURE_TRANSLATOR_REGION_2',
+          endpointEnvName: 'AZURE_TRANSLATOR_ENDPOINT_2',
+          providerLabel: 'Azure secondary',
+          text: text,
+          sourceLang: sourceLang,
+          targetLang: targetLang,
+        );
       case _Provider.gemini:
         return _callGemini(
-            text: text, sourceLang: sourceLang, targetLang: targetLang);
-      case _Provider.langbly:
-        return _callLangbly(
-            text: text, sourceLang: sourceLang, targetLang: targetLang);
-      case _Provider.mymemory:
-        return _callMyMemory(
-            text: text, sourceLang: sourceLang, targetLang: targetLang);
-      case _Provider.freeapitools:
-        return _callFreeAPITools(
             text: text, sourceLang: sourceLang, targetLang: targetLang);
     }
   }
@@ -487,26 +466,33 @@ class TranslateService {
   // Provider implementations
   // ──────────────────────────────────────────────
 
-  /// Microsoft Azure Translator. Used exclusively for Kurdish.
-  /// Maps kmr → ku (Kurmanji/Northern Kurdish) so Azure accepts the code.
+  /// Microsoft Azure Translator. Primary for Kurdish, fallback otherwise.
+  /// Maps ckb to ku for Azure; kmr falls through to Gemini because Azure
+  /// does not support Kurmanji.
   Future<String> _callAzure({
+    required String keyEnvName,
+    required String regionEnvName,
+    required String endpointEnvName,
+    required String providerLabel,
     required String text,
     required String sourceLang,
     required String targetLang,
   }) async {
-    final apiKey = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
+    final apiKey = dotenv.maybeGet(keyEnvName) ?? '';
     if (apiKey.isEmpty) {
-      throw Exception('Azure Translator key is missing');
+      throw Exception('$providerLabel Translator key is missing');
     }
-    final region =
-        dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ?? 'centralindia';
-    final endpoint = (dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
+    final region = dotenv.maybeGet(regionEnvName) ??
+        dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ??
+        'centralindia';
+    final endpoint = (dotenv.maybeGet(endpointEnvName) ??
+            dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
             'https://api.cognitive.microsofttranslator.com/')
         .replaceAll(RegExp(r'/$'), '');
 
     // Azure language-code mapping. Azure Translator uses `ku` for Central
     // Kurdish (Sorani). Kurmanji (Northern Kurdish, `kmr`) is NOT supported
-    // by Azure — the caller will fall back to MyMemory/Gemini for that.
+    // by Azure - the caller will fall back to Gemini for that.
     String mapLang(String code) {
       final l = code.toLowerCase();
       if (l == 'ckb' || l.startsWith('ckb-')) return 'ku';
@@ -531,9 +517,10 @@ class TranslateService {
     final uri =
         Uri.parse('$endpoint/translate').replace(queryParameters: query);
 
-    _tlog('Azure REQUEST: '
+    _tlog('$providerLabel REQUEST: '
         'endpoint=$endpoint region=$region '
         'from=${mappedSource ?? "(auto)"} to=$mappedTarget '
+        'keyEnv=$keyEnvName '
         'keyPrefix=${apiKey.substring(0, apiKey.length > 6 ? 6 : apiKey.length)}... '
         'uri=$uri');
 
@@ -553,28 +540,29 @@ class TranslateService {
         .timeout(const Duration(seconds: 20));
     stopwatch.stop();
 
-    _tlog('Azure RESPONSE: status=${response.statusCode} '
+    _tlog('$providerLabel RESPONSE: status=${response.statusCode} '
         'elapsed=${stopwatch.elapsedMilliseconds}ms '
         'bodyLen=${response.body.length} '
         'body=${response.body.length > 500 ? "${response.body.substring(0, 500)}..." : response.body}');
 
     if (response.statusCode == 429) {
-      throw Exception('Azure quota exceeded (429)');
+      throw Exception('$providerLabel quota exceeded (429)');
     }
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw Exception(
-          'Azure unauthorized (${response.statusCode}) — check key/region. Body: ${response.body}');
+          '$providerLabel unauthorized (${response.statusCode}) - check key/region. Body: ${response.body}');
     }
     if (response.statusCode != 200) {
-      throw Exception('Azure error ${response.statusCode}: ${response.body}');
+      throw Exception(
+          '$providerLabel error ${response.statusCode}: ${response.body}');
     }
 
     final decoded = jsonDecode(response.body) as List;
     final translated =
         (decoded.first['translations'] as List?)?.first?['text'] as String?;
     if (translated == null || translated.trim().isEmpty) {
-      _tlog('Azure returned empty translation. decoded=$decoded');
-      throw Exception('Azure returned empty translation');
+      _tlog('$providerLabel returned empty translation. decoded=$decoded');
+      throw Exception('$providerLabel returned empty translation');
     }
     return translated.trim();
   }
@@ -638,119 +626,6 @@ $text''';
     }
     return translated.trim();
   }
-
-  Future<String> _callLangbly({
-    required String text,
-    required String sourceLang,
-    required String targetLang,
-  }) async {
-    final apiKey = dotenv.maybeGet('LANGBLY_API_KEY') ?? '';
-    final response = await http
-        .post(
-          Uri.parse('https://api.langbly.com/language/translate/v2'),
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': apiKey,
-          },
-          body: jsonEncode({
-            'q': text,
-            'source': sourceLang,
-            'target': targetLang,
-          }),
-        )
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode == 429) {
-      throw Exception('Langbly quota exceeded (429)');
-    }
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw Exception('Langbly unauthorized (${response.statusCode})');
-    }
-    if (response.statusCode != 200) {
-      throw Exception('Langbly error ${response.statusCode}');
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final translated = (decoded['data']?['translations'] as List?)
-        ?.first?['translatedText'] as String?;
-    if (translated == null || translated.trim().isEmpty) {
-      throw Exception('Langbly returned empty translation');
-    }
-    return translated.trim();
-  }
-
-  /// MyMemory — free tier, no API key required.
-  /// 1 000 words/day anonymous; supports ckb (Sorani) and kmr (Kurmanji).
-  Future<String> _callMyMemory({
-    required String text,
-    required String sourceLang,
-    required String targetLang,
-  }) async {
-    // MyMemory uses "autodetect" for automatic source detection.
-    final src = sourceLang == 'auto' ? 'autodetect' : sourceLang;
-    final langPair = '$src|$targetLang';
-
-    final uri = Uri.parse(
-      'https://api.mymemory.translated.net/get',
-    ).replace(queryParameters: {'q': text, 'langpair': langPair});
-
-    final response = await http.get(uri).timeout(const Duration(seconds: 15));
-
-    if (response.statusCode != 200) {
-      throw Exception('MyMemory error ${response.statusCode}');
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final status = decoded['responseStatus'];
-    // MyMemory returns 200 for success (as a number or string).
-    if (status != 200 && status != '200') {
-      throw Exception('MyMemory API error: $status');
-    }
-
-    final translated = decoded['responseData']?['translatedText'] as String?;
-    if (translated == null || translated.trim().isEmpty) {
-      throw Exception('MyMemory returned empty translation');
-    }
-    return translated.trim();
-  }
-
-  Future<String> _callFreeAPITools({
-    required String text,
-    required String sourceLang,
-    required String targetLang,
-  }) async {
-    final apiKey = dotenv.maybeGet('FREEAPITOOLS_API_KEY') ?? '';
-    final response = await http
-        .post(
-          Uri.parse('https://freeapitools.dev/api/v1/translate'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'api_key': apiKey,
-            'text': text,
-            'source_language': sourceLang,
-            'target_language': targetLang,
-          }),
-        )
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode == 403) {
-      throw Exception('FreeAPITools forbidden (403)');
-    }
-    if (response.statusCode == 429) {
-      throw Exception('FreeAPITools quota exceeded (429)');
-    }
-    if (response.statusCode != 200) {
-      throw Exception('FreeAPITools error ${response.statusCode}');
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final translated = decoded['translated_text'] as String? ??
-        decoded['translation'] as String?;
-    if (translated == null || translated.trim().isEmpty) {
-      throw Exception('FreeAPITools returned empty translation');
-    }
-    return translated.trim();
-  }
 }
 
-enum _Provider { azure, gemini, langbly, mymemory, freeapitools }
+enum _Provider { azurePrimary, azureSecondary, gemini }

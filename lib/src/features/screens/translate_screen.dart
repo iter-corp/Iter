@@ -9,6 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/app_page_background.dart';
@@ -18,8 +19,9 @@ import 'saved_translations_screen.dart';
 
 // Languages: see [kTranslateLanguages] in translate_service.dart for the
 // canonical list shared with chat / comment / post translate pickers.
-TranslateLanguage _langByLabel(String label) => kTranslateLanguages
-    .firstWhere((l) => l.label == label, orElse: () => kTranslateLanguages.first);
+TranslateLanguage _langByLabel(String label) =>
+    kTranslateLanguages.firstWhere((l) => l.label == label,
+        orElse: () => kTranslateLanguages.first);
 
 class TranslateBody extends ConsumerStatefulWidget {
   const TranslateBody({super.key});
@@ -36,9 +38,20 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _sttInitialized = false;
   String _translatedText = '';
+  String _translatedSourceText = '';
+  String _translatedSourceLang = '';
+  String _translatedSourceLangLabel = '';
+  String _translatedTargetLang = '';
+  String _translatedTargetLangLabel = '';
   bool _hasTranslation = false;
   bool _isRecording = false;
   bool _isTranslating = false;
+  bool _updatingInputProgrammatically = false;
+  bool get _canBookmarkCurrentTranslation =>
+      _hasTranslation &&
+      _translatedText.isNotEmpty &&
+      _translatedSourceText.isNotEmpty &&
+      _inputController.text.trim() == _translatedSourceText;
 
   // ── TTS ──
   final FlutterTts _tts = FlutterTts();
@@ -50,6 +63,13 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
   @override
   void initState() {
     super.initState();
+    final preferred = ref.read(preferredLanguageProvider);
+    final preferredLang = kTranslateLanguages.firstWhere(
+      (lang) => lang.code == preferred,
+      orElse: () => _langByLabel(_targetLang),
+    );
+    _targetLang = preferredLang.label;
+    _inputController.addListener(_onInputChanged);
     _tts.setCompletionHandler(() {
       if (mounted) setState(() => _isSpeaking = false);
     });
@@ -63,10 +83,30 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
 
   @override
   void dispose() {
+    _inputController.removeListener(_onInputChanged);
     _tts.stop();
     _speech.stop();
     _inputController.dispose();
     super.dispose();
+  }
+
+  void _onInputChanged() {
+    if (_updatingInputProgrammatically) return;
+    if (_hasTranslation && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _setInputText(String text) {
+    _updatingInputProgrammatically = true;
+    try {
+      _inputController.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    } finally {
+      _updatingInputProgrammatically = false;
+    }
   }
 
   String _friendlySttError(AppStrings t, String code) {
@@ -149,8 +189,7 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(context.t.translateSttUnsupported(_sourceLang)),
+            content: Text(context.t.translateSttUnsupported(_sourceLang)),
           ),
         );
       }
@@ -169,10 +208,7 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       onResult: (result) {
         if (!mounted) return;
         setState(() {
-          _inputController.text = result.recognizedWords;
-          _inputController.selection = TextSelection.collapsed(
-            offset: _inputController.text.length,
-          );
+          _setInputText(result.recognizedWords);
         });
         if (result.finalResult && result.recognizedWords.trim().isNotEmpty) {
           _onTranslate();
@@ -183,13 +219,37 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
 
   void _swapLanguages() {
     setState(() {
+      final hadTranslation = _hasTranslation && _translatedText.isNotEmpty;
       final temp = _sourceLang;
       _sourceLang = _targetLang;
       _targetLang = temp;
       final inputText = _inputController.text;
-      _inputController.text = _translatedText;
+      _setInputText(_translatedText);
       _translatedText = inputText;
+      if (hadTranslation &&
+          inputText.trim().isNotEmpty &&
+          _inputController.text.trim().isNotEmpty) {
+        _translatedSourceText = _inputController.text.trim();
+        _translatedSourceLang = _langByLabel(_sourceLang).code;
+        _translatedSourceLangLabel = _sourceLang;
+        _translatedTargetLang = _langByLabel(_targetLang).code;
+        _translatedTargetLangLabel = _targetLang;
+        _hasTranslation = true;
+        _isBookmarked = false;
+      } else {
+        _clearTranslationSnapshot();
+      }
     });
+  }
+
+  void _clearTranslationSnapshot() {
+    _translatedSourceText = '';
+    _translatedSourceLang = '';
+    _translatedSourceLangLabel = '';
+    _translatedTargetLang = '';
+    _translatedTargetLangLabel = '';
+    _hasTranslation = false;
+    _isBookmarked = false;
   }
 
   Future<void> _onTranslate() async {
@@ -210,6 +270,11 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       setState(() {
         _hasTranslation = true;
         _translatedText = translated;
+        _translatedSourceText = input;
+        _translatedSourceLang = sourceCode;
+        _translatedSourceLangLabel = _sourceLang;
+        _translatedTargetLang = targetCode;
+        _translatedTargetLangLabel = _targetLang;
         _isBookmarked = false; // new result → not yet saved
       });
       // Stop any ongoing TTS from the previous result.
@@ -262,8 +327,13 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
       if (kTranslateLanguages.any((l) => l.label == result.targetLangLabel)) {
         _targetLang = result.targetLangLabel;
       }
-      _inputController.text = result.sourceText;
+      _setInputText(result.sourceText);
       _translatedText = result.translatedText;
+      _translatedSourceText = result.sourceText;
+      _translatedSourceLang = _langByLabel(_sourceLang).code;
+      _translatedSourceLangLabel = _sourceLang;
+      _translatedTargetLang = _langByLabel(_targetLang).code;
+      _translatedTargetLangLabel = _targetLang;
       _hasTranslation = true;
       _isBookmarked = true;
     });
@@ -272,7 +342,8 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
   // ── Bookmark: Save translation to Firestore ──
   Future<void> _toggleBookmark() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null || _translatedText.isEmpty) return;
+    if (uid == null || !_canBookmarkCurrentTranslation) return;
+    if (_translatedSourceText.isEmpty || _translatedTargetLang.isEmpty) return;
 
     final col = FirebaseFirestore.instance
         .collection('users')
@@ -282,8 +353,8 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
     if (_isBookmarked) {
       // Remove: find and delete the matching doc.
       final snap = await col
-          .where('sourceText', isEqualTo: _inputController.text.trim())
-          .where('targetLang', isEqualTo: _langByLabel(_targetLang).code)
+          .where('sourceText', isEqualTo: _translatedSourceText)
+          .where('targetLang', isEqualTo: _translatedTargetLang)
           .limit(1)
           .get();
       for (final doc in snap.docs) {
@@ -301,12 +372,12 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
     } else {
       // Save the translation.
       await col.add({
-        'sourceText': _inputController.text.trim(),
+        'sourceText': _translatedSourceText,
         'translatedText': _translatedText,
-        'sourceLang': _langByLabel(_sourceLang).code,
-        'sourceLangLabel': _sourceLang,
-        'targetLang': _langByLabel(_targetLang).code,
-        'targetLangLabel': _targetLang,
+        'sourceLang': _translatedSourceLang,
+        'sourceLangLabel': _translatedSourceLangLabel,
+        'targetLang': _translatedTargetLang,
+        'targetLangLabel': _translatedTargetLangLabel,
         'createdAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
@@ -395,7 +466,8 @@ class _TranslateBodyState extends ConsumerState<TranslateBody> {
                 _OutputBox(
                   translatedText: _hasTranslation ? _translatedText : '',
                   isRTL: _langByLabel(_targetLang).rtl,
-                  isBookmarked: _isBookmarked,
+                  isBookmarked: _canBookmarkCurrentTranslation && _isBookmarked,
+                  canBookmark: _canBookmarkCurrentTranslation,
                   onBookmark: _toggleBookmark,
                   onCopy: _copyToClipboard,
                 ),
@@ -454,7 +526,8 @@ class _LanguageSelectorRow extends StatelessWidget {
               width: 18,
               height: 18,
               fit: BoxFit.contain,
-              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+              colorFilter:
+                  const ColorFilter.mode(Colors.white, BlendMode.srcIn),
             ),
           ),
         ),
@@ -815,6 +888,7 @@ class _OutputBox extends StatelessWidget {
   final String translatedText;
   final bool isRTL;
   final bool isBookmarked;
+  final bool canBookmark;
   final VoidCallback onBookmark;
   final VoidCallback onCopy;
 
@@ -822,12 +896,17 @@ class _OutputBox extends StatelessWidget {
     required this.translatedText,
     required this.isRTL,
     this.isBookmarked = false,
+    this.canBookmark = false,
     required this.onBookmark,
     required this.onCopy,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bookmarkColor = canBookmark
+        ? context.textPrimary
+        : context.textMuted.withValues(alpha: 0.5);
+
     return AppGlassCard(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 110),
@@ -843,7 +922,7 @@ class _OutputBox extends StatelessWidget {
             children: [
               // 🔖 Bookmark — toggles filled/outline
               GestureDetector(
-                onTap: translatedText.isNotEmpty ? onBookmark : null,
+                onTap: canBookmark ? onBookmark : null,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
                   child: isBookmarked
@@ -859,7 +938,9 @@ class _OutputBox extends StatelessWidget {
                           width: 20,
                           height: 20,
                           colorFilter: ColorFilter.mode(
-                              context.textPrimary, BlendMode.srcIn),
+                            bookmarkColor,
+                            BlendMode.srcIn,
+                          ),
                         ),
                 ),
               ),

@@ -15,6 +15,7 @@ import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../providers/story_providers.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
@@ -937,7 +938,10 @@ class _PostCardState extends ConsumerState<PostCard>
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _PostTranslateSheet(text: stripped),
+      builder: (_) => _PostTranslateSheet(
+        text: stripped,
+        target: ref.read(preferredLanguageProvider),
+      ),
     );
   }
 
@@ -2804,14 +2808,18 @@ bool _isEmojiOnlyCaption(String s) => _stripEmoji(s).trim().isEmpty;
 /// repeats instant).
 class _PostTranslateSheet extends StatefulWidget {
   final String text;
-  const _PostTranslateSheet({required this.text});
+  final String target;
+  const _PostTranslateSheet({
+    required this.text,
+    required this.target,
+  });
 
   @override
   State<_PostTranslateSheet> createState() => _PostTranslateSheetState();
 }
 
 class _PostTranslateSheetState extends State<_PostTranslateSheet> {
-  String _target = 'en';
+  late String _target;
   String? _translated;
   String? _error;
   bool _loading = false;
@@ -2819,6 +2827,7 @@ class _PostTranslateSheetState extends State<_PostTranslateSheet> {
   @override
   void initState() {
     super.initState();
+    _target = widget.target;
     _translate();
   }
 

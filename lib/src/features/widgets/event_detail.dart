@@ -5,7 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/event_registration_providers.dart';
+import '../../providers/preferred_language_provider.dart';
 import '../../services/event_registration_service.dart';
+import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import 'event_registration_sheet.dart';
 
@@ -70,6 +72,23 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return MaterialLocalizations.of(context).formatMediumDate(date);
   }
 
+  Future<void> _translateDescription(
+    BuildContext context, {
+    required String target,
+  }) async {
+    final text = widget.description.trim();
+    if (text.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _EventTranslateSheet(
+        text: text,
+        target: target,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -102,6 +121,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final preferredLang = ref.watch(preferredLanguageProvider);
     final phone = widget.phone.trim();
     final email = widget.email.trim();
     final hasContact = phone.isNotEmpty || email.isNotEmpty;
@@ -310,13 +330,29 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               // 📌 SECTION: Description text
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  widget.description,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: context.textPrimary,
-                    height: 1.6,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.description,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: context.textPrimary,
+                        height: 1.6,
+                      ),
+                    ),
+                    if (widget.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () => _translateDescription(
+                          context,
+                          target: preferredLang,
+                        ),
+                        icon: const Icon(Icons.translate, size: 18),
+                        label: Text(context.t.translate),
+                      ),
+                    ],
+                  ],
                 ),
               ),
 
@@ -506,6 +542,161 @@ class _MetaChip extends StatelessWidget {
 }
 
 // 📌 SECTION: Registration Button (state-aware)
+class _EventTranslateSheet extends StatefulWidget {
+  final String text;
+  final String target;
+
+  const _EventTranslateSheet({
+    required this.text,
+    required this.target,
+  });
+
+  @override
+  State<_EventTranslateSheet> createState() => _EventTranslateSheetState();
+}
+
+class _EventTranslateSheetState extends State<_EventTranslateSheet> {
+  late String _target;
+  String? _translated;
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = widget.target;
+    _translate();
+  }
+
+  Future<void> _translate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await const TranslateService().translateText(
+        text: widget.text,
+        sourceLang: 'auto',
+        targetLang: _target,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translated = out;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = TranslateService.userFriendlyErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _selectLang(String code) {
+    if (code == _target) return;
+    setState(() => _target = code);
+    _translate();
+  }
+
+  String _labelOf(String code) => kTranslateLanguages
+      .firstWhere((l) => l.code == code,
+          orElse: () => const TranslateLanguage('?', '?'))
+      .label;
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = <String>{};
+    final chipLangs = <TranslateLanguage>[];
+    for (final lang in kTranslateLanguages) {
+      if (seen.add(lang.code)) chipLangs.add(lang);
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  context.t.commentTranslateTo(_labelOf(_target)),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: chipLangs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  final lang = chipLangs[i];
+                  final selected = lang.code == _target;
+                  final label = lang.code == 'en' ? 'English' : lang.label;
+                  return GestureDetector(
+                    onTap: () => _selectLang(lang.code),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFB05ECC)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? Colors.white : null,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else
+              SelectableText(
+                _translated ?? '',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.t.close),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RegistrationButton extends ConsumerWidget {
   final String eventId;
   final String eventTitle;
@@ -530,8 +721,7 @@ class _RegistrationButton extends ConsumerWidget {
             );
             if (!ok && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text(context.t.eventDetailCouldNotOpenLink)),
+                SnackBar(content: Text(context.t.eventDetailCouldNotOpenLink)),
               );
             }
           },
@@ -649,15 +839,13 @@ class _EventAuthorHeader extends ConsumerWidget {
     // Some user docs store the handle WITH a leading `@` (older signup
     // path), others store it without. Strip any leading `@` so we never
     // render the double-prefixed `@@mohammed`.
-    final handle = (rawHandle == null)
-        ? null
-        : rawHandle.replaceFirst(RegExp(r'^@+'), '');
+    final handle =
+        (rawHandle == null) ? null : rawHandle.replaceFirst(RegExp(r'^@+'), '');
 
     final primary =
         (username != null && username.isNotEmpty) ? username : fallbackTitle;
-    final secondary = (handle != null && handle.isNotEmpty)
-        ? '@$handle'
-        : fallbackSubtitle;
+    final secondary =
+        (handle != null && handle.isNotEmpty) ? '@$handle' : fallbackSubtitle;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -671,8 +859,7 @@ class _EventAuthorHeader extends ConsumerWidget {
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        _avatarPlaceholder(context),
+                    errorBuilder: (_, __, ___) => _avatarPlaceholder(context),
                   )
                 : _avatarPlaceholder(context),
           ),
