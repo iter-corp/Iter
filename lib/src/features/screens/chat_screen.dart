@@ -221,13 +221,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isRecording = false;
   DateTime? _recordStartedAt;
   bool _uploadingVoice = false;
-  // Live transcript captured by the on-device speech recognizer while
-  // the voice message is being recorded. Saved alongside the audio
-  // URL so the receiver can read or translate the message without
-  // waiting for a server-side transcription job.
-  final stt.SpeechToText _voiceStt = stt.SpeechToText();
-  bool _voiceSttInitialized = false;
-  String _voiceTranscript = '';
+  // NOTE: Voice-message transcription was removed for now — the on-device
+  // recognizer fought the recorder for the mic and produced empty transcripts.
+  // It will be reintroduced as a proper (likely server-side) job later.
 
   // Dictation (speech-to-text) state. Lets the user speak a message and
   // have it transcribed into the text field — they can edit before sending.
@@ -243,32 +239,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // dictation button to change.
   // String? _dictationLocaleId;  // TODO: Re-enable when _pickDictationLocale is uncommented
 
-  // Auto-translate incoming messages. Persisted per-chat in SharedPreferences
-  // so each chat can have its own preference. _autoTranslateTarget is the
-  // language code (e.g., 'en', 'ckb') the partner's messages get translated
-  // INTO. The settings sheet is opened from the translate icon in the header.
+  // Auto-translate incoming messages. The on/off toggle is persisted per-chat
+  // (each chat can independently enable it); the language it translates INTO is
+  // the GLOBAL [preferredLanguageProvider], shared with Settings → Translation
+  // language. The settings sheet is opened from the translate icon in the header.
   bool _autoTranslate = false;
-  String _autoTranslateTarget = 'en';
 
   String? get _currentUid => ref.read(authStateProvider).value?.uid;
 
   String get _prefsAutoKey => 'chat_autotranslate_${widget.chatId}';
-  String get _prefsLangKey => 'chat_autotranslate_lang_${widget.chatId}';
 
   Future<void> _loadAutoTranslatePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-    final preferred = ref.read(preferredLanguageProvider);
     setState(() {
       _autoTranslate = prefs.getBool(_prefsAutoKey) ?? false;
-      _autoTranslateTarget = prefs.getString(_prefsLangKey) ?? preferred;
     });
   }
 
   Future<void> _saveAutoTranslatePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefsAutoKey, _autoTranslate);
-    await prefs.setString(_prefsLangKey, _autoTranslateTarget);
   }
 
   Future<void> _markSeenNow() async {
@@ -296,7 +287,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _autoTranslateTarget = ref.read(preferredLanguageProvider);
     _messageFocusNode.addListener(() {
       if (!mounted) return;
       setState(() => _isInputFocused = _messageFocusNode.hasFocus);
@@ -947,58 +937,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       const RecordConfig(encoder: AudioEncoder.aacLc),
       path: path,
     );
-    // Best-effort live transcription. Both the recorder and the
-    // speech recognizer want the mic, so on platforms where the
-    // recognizer can't piggyback we just fall through with an empty
-    // transcript — the audio still uploads fine.
-    _voiceTranscript = '';
-    unawaited(_startVoiceTranscription());
     setState(() {
       _isRecording = true;
       _recordStartedAt = DateTime.now();
     });
-  }
-
-  Future<void> _startVoiceTranscription() async {
-    try {
-      if (!_voiceSttInitialized) {
-        _voiceSttInitialized = await _voiceStt.initialize(
-          onError: (e) =>
-              debugPrint('[chat-voice-stt] init error: ${e.errorMsg}'),
-        );
-      }
-      if (!_voiceSttInitialized) return;
-      // Match the user's preferred language so the recognizer picks
-      // the right model. Fallback locale = device default.
-      final lang = ref.read(preferredLanguageProvider);
-      final localeId = _localeIdForLang(lang);
-      await _voiceStt.listen(
-        localeId: localeId,
-        listenOptions: stt.SpeechListenOptions(
-          partialResults: true,
-          cancelOnError: false,
-          listenMode: stt.ListenMode.dictation,
-        ),
-        listenFor: const Duration(minutes: 5),
-        pauseFor: const Duration(seconds: 6),
-        onResult: (result) {
-          _voiceTranscript = result.recognizedWords;
-        },
-      );
-    } catch (e) {
-      debugPrint('[chat-voice-stt] start failed: $e');
-    }
-  }
-
-  /// Map a BCP-47 translate code to a speech-to-text locale id. The
-  /// translate list uses short codes ("en"); the recognizer needs the
-  /// full locale ("en_US"). Falls back to null (device default) for
-  /// codes we don't have a mapping for.
-  String? _localeIdForLang(String code) {
-    for (final l in kTranslateLanguages) {
-      if (l.code == code && l.stt != null) return l.stt;
-    }
-    return null;
   }
 
   Future<void> _stopAndSendVoiceRecording() async {
@@ -1015,12 +957,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
-    // Stop recording + the live transcript recognizer.
     final path = await _recorder.stop();
-    try {
-      if (_voiceStt.isListening) await _voiceStt.stop();
-    } catch (_) {}
-    final transcript = _voiceTranscript.trim();
     final startedAt = _recordStartedAt;
     setState(() {
       _isRecording = false;
@@ -1107,7 +1044,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             text: '',
             voiceUrl: url,
             voiceDurationMs: durationMs,
-            voiceTranscript: transcript.isEmpty ? null : transcript,
             replyToId: reply?.id,
             replyToText: reply == null ? null : _previewOf(reply),
             replyToSenderUid: reply?.senderUid,
@@ -1134,10 +1070,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _cancelRecording() async {
     if (!_isRecording) return;
     final path = await _recorder.stop();
-    try {
-      if (_voiceStt.isListening) await _voiceStt.stop();
-    } catch (_) {}
-    _voiceTranscript = '';
     setState(() {
       _isRecording = false;
       _recordStartedAt = null;
@@ -1223,7 +1155,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ));
                         }
                         return DropdownButtonFormField<String>(
-                          initialValue: _autoTranslateTarget,
+                          // Bound to the GLOBAL preferred language so it stays
+                          // in sync with Settings → Translation language.
+                          initialValue: ref.read(preferredLanguageProvider),
                           decoration: InputDecoration(
                             labelText: context.t.translateInto,
                             border: const OutlineInputBorder(),
@@ -1232,8 +1166,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           onChanged: (v) {
                             if (v == null) return;
                             setSheetState(() {});
-                            setState(() => _autoTranslateTarget = v);
-                            _saveAutoTranslatePrefs();
+                            // Update the single source of truth — this persists
+                            // globally and reflects in the Settings page too.
+                            ref
+                                .read(preferredLanguageProvider.notifier)
+                                .set(v);
                           },
                         );
                       },
@@ -1456,6 +1393,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The translate-into language is the GLOBAL preferred language (same one
+    // shown in Settings → Translation language). Changing it in either place
+    // updates the other. The per-chat [_autoTranslate] toggle stays local.
+    final autoTranslateTarget = ref.watch(preferredLanguageProvider);
     final chatDocAsync = ref.watch(chatDocProvider(widget.chatId));
     final chatDoc = chatDocAsync.value ?? const <String, dynamic>{};
     final isGroup = (chatDoc['kind'] as String?) == 'group';
@@ -1608,7 +1549,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   IconButton(
                     tooltip: _autoTranslate
-                        ? context.t.autoTranslateOnTooltip(_autoTranslateTarget)
+                        ? context.t.autoTranslateOnTooltip(autoTranslateTarget)
                         : context.t.translationSettingsTooltip,
                     onPressed: _openTranslationSettings,
                     icon: Icon(
@@ -1788,7 +1729,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           onReplyQuoteTap: _scrollToMessage,
                           flashing: _flashedMessageId == msg.id,
                           autoTranslate: _autoTranslate,
-                          autoTranslateTarget: _autoTranslateTarget,
+                          autoTranslateTarget: autoTranslateTarget,
                         ),
                       );
                     },
@@ -3160,49 +3101,6 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                         );
                       },
                     ),
-                  if (msg.voiceUrl != null && msg.voiceUrl!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _BubbleMenuAction(
-                      icon: Icons.subtitles_outlined,
-                      label: context.t.showTranscript,
-                      subtitle: (msg.voiceTranscript ?? '').trim().isEmpty
-                          ? Text(
-                              context.t.transcriptUnavailable,
-                              style: const TextStyle(fontSize: 11),
-                            )
-                          : null,
-                      enabled: (msg.voiceTranscript ?? '').trim().isNotEmpty,
-                      onTap: () {
-                        Navigator.pop(sheet);
-                        _showVoiceTranscriptSheet(
-                          context,
-                          transcript: msg.voiceTranscript ?? '',
-                        );
-                      },
-                    ),
-                    if ((msg.voiceTranscript ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Consumer(
-                        builder: (context, sheetRef, _) {
-                          final target =
-                              sheetRef.watch(preferredLanguageProvider);
-                          return _BubbleMenuAction(
-                            icon: Icons.translate,
-                            label: context.t
-                                .translateVoiceToLang(target.toUpperCase()),
-                            onTap: () {
-                              Navigator.pop(sheet);
-                              _showTranslationSheet(
-                                context,
-                                text: msg.voiceTranscript!,
-                                target: target,
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ],
                   const SizedBox(height: 8),
                   _BubbleMenuAction(
                     icon: Icons.delete_outline,
@@ -3343,53 +3241,6 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     );
   }
 
-  Future<void> _showVoiceTranscriptSheet(
-    BuildContext context, {
-    required String transcript,
-  }) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.subtitles_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    context.t.voiceTranscript,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SelectableText(
-                transcript,
-                style: const TextStyle(fontSize: 14, height: 1.4),
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(context.t.close),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Modern action row used by the message long-press sheet.
@@ -3399,7 +3250,6 @@ class _BubbleMenuAction extends StatelessWidget {
   final Widget? subtitle;
   final VoidCallback? onTap;
   final bool destructive;
-  final bool enabled;
 
   const _BubbleMenuAction({
     required this.icon,
@@ -3407,12 +3257,11 @@ class _BubbleMenuAction extends StatelessWidget {
     this.subtitle,
     this.onTap,
     this.destructive = false,
-    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final active = enabled && onTap != null;
+    final active = onTap != null;
     final accent = destructive ? AppColors.red : AppColors.purpleVivid;
     final textColor = destructive ? AppColors.red : context.textPrimary;
 

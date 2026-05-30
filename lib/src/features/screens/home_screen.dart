@@ -567,6 +567,15 @@ class _HomeBodyState extends ConsumerState<HomeBody>
       _HomeModeToggle(
         mode: _mode,
         onChanged: _switchMode,
+        onPost: () {
+          // In Discuss, "Post" opens the ask-a-question sheet;
+          // elsewhere it opens the create-post screen.
+          if (_mode == _HomeMode.qa) {
+            _showAskSheet(context);
+          } else {
+            _openCreatePost(context);
+          }
+        },
       ),
       // Stories — directly under the tabs, identical on every tab.
       // Hidden while search is active.
@@ -588,15 +597,6 @@ class _HomeBodyState extends ConsumerState<HomeBody>
           // appears with autofocus:true and grabs the keyboard.
           setState(() => _searchFocused = true);
         },
-        onPost: () {
-          // In Discuss, "Post" opens the ask-a-question sheet;
-          // elsewhere it opens the create-post screen.
-          if (_mode == _HomeMode.qa) {
-            _showAskSheet(context);
-          } else {
-            _openCreatePost(context);
-          }
-        },
         onDismissSearch: () {
           FocusScope.of(context).unfocus();
           _searchCtrl.clear();
@@ -606,6 +606,12 @@ class _HomeBodyState extends ConsumerState<HomeBody>
             _qaAnswerMatchesQuery = '';
             _searchFocused = false;
           });
+        },
+        onSubmit: () {
+          // Keyboard "search" action: close the keyboard but keep the query
+          // so the results state is shown (don't clear like onDismissSearch).
+          FocusScope.of(context).unfocus();
+          setState(() => _searchFocused = false);
         },
         mode: _mode,
         onModeChanged: _switchMode,
@@ -1273,10 +1279,12 @@ class _SearchHit {
 class _HomeModeToggle extends ConsumerWidget {
   final _HomeMode mode;
   final ValueChanged<_HomeMode> onChanged;
+  final VoidCallback onPost;
 
   const _HomeModeToggle({
     required this.mode,
     required this.onChanged,
+    required this.onPost,
   });
 
   static const _all = [_HomeMode.feed, _HomeMode.travel, _HomeMode.qa];
@@ -1324,6 +1332,16 @@ class _HomeModeToggle extends ConsumerWidget {
                   letterSpacing: 0.5,
                   color: context.textPrimary,
                 ),
+              ),
+            ),
+            // Leading: add-post button (opposite the notification bell).
+            // Keeps the original gradient "Post" pill style.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: PrimaryActionButton(
+                label: context.t.post,
+                icon: Icons.add,
+                onPressed: onPost,
               ),
             ),
             // Trailing: notification bell (start side in RTL).
@@ -2153,12 +2171,13 @@ class _SearchPostRow extends StatelessWidget {
   /// inline field; on Travel it opens the travel search page.
   final VoidCallback onSearchTap;
 
-  /// Opens the create-post screen.
-  final VoidCallback onPost;
-
   /// Dismisses the keyboard / unfocuses the search field. Invoked when
   /// the user taps the blank space where the Post button used to be.
   final VoidCallback onDismissSearch;
+
+  /// Submits the current query: closes the keyboard but KEEPS the query so
+  /// the results state is shown. Invoked by the keyboard's search action.
+  final VoidCallback onSubmit;
   final _HomeMode mode;
   final ValueChanged<_HomeMode> onModeChanged;
 
@@ -2167,8 +2186,8 @@ class _SearchPostRow extends StatelessWidget {
     required this.searching,
     required this.query,
     required this.onSearchTap,
-    required this.onPost,
     required this.onDismissSearch,
+    required this.onSubmit,
     this.controller,
     this.focusNode,
     this.onChanged,
@@ -2196,7 +2215,7 @@ class _SearchPostRow extends StatelessWidget {
         autofocus: true,
         onChanged: onChanged,
         textInputAction: TextInputAction.search,
-        onSubmitted: (_) => onDismissSearch(),
+        onSubmitted: (_) => onSubmit(),
         // Explicit text color so the typed query is legible in dark
         // mode too.
         style: TextStyle(color: context.textPrimary),
@@ -2213,8 +2232,11 @@ class _SearchPostRow extends StatelessWidget {
               ? null
               : IconButton(
                   onPressed: onClear,
-                  icon:
-                      Icon(Icons.close, size: 18, color: context.textSecondary),
+                  icon: Transform.rotate(
+                    angle: 0.5, // slight tilt (~23°) so the brush looks angled
+                    child: Icon(Icons.cleaning_services,
+                        size: 18, color: context.textSecondary),
+                  ),
                 ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(20),
@@ -2317,13 +2339,6 @@ class _SearchPostRow extends StatelessWidget {
       },
     );
 
-    // ── Post button (shared) ─────────────────────────────────────
-    final Widget postButton = PrimaryActionButton(
-      label: context.t.post,
-      icon: Icons.add,
-      onPressed: onPost,
-    );
-
     // ── Reset (✕) button — only in the results state ─────────────
     final Widget resetButton = SizedBox(
       height: 42,
@@ -2364,28 +2379,25 @@ class _SearchPostRow extends StatelessWidget {
         ),
       ];
     } else if (hasResults) {
-      // Query chip fills the row; ✕ reset then + Post on the side.
+      // Query chip fills the remaining space; ✕ reset on the side. Post is
+      // not shown here — it lives in the app bar now.
       rowChildren = [
-        // Mode dropdown + query chip
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          modeToggle,
-          const SizedBox(width: 8),
-          Expanded(child: searchSide)
-        ]),
+        modeToggle,
+        const SizedBox(width: 8),
+        // Expanded gives the query chip a bounded width so its inner
+        // Flexible/Expanded child can lay out (otherwise the flex child
+        // gets unbounded width and layout throws).
+        Expanded(child: searchSide),
         const SizedBox(width: 8),
         resetButton,
-        const SizedBox(width: 8),
-        postButton,
       ];
     } else {
-      // Idle: compact search icon, spacer, + Post.
+      // Idle: mode dropdown on the left, search button on the right (in the
+      // spot the + Post button used to occupy — Post now lives in the app bar).
       rowChildren = [
-        // Mode dropdown + search icon
-        Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [modeToggle, const SizedBox(width: 8), searchSide]),
+        modeToggle,
         const Spacer(),
-        postButton,
+        searchSide,
       ];
     }
 

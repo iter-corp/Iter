@@ -93,6 +93,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final inbox = inboxAsync.valueOrNull ?? const <ChatConversation>[];
     final unreadChats = inbox.where((c) => c.unreadCount > 0).length;
 
+    // Hide the floating bottom nav while the keyboard is open so it doesn't
+    // float above the keyboard / overlap the input the user is typing in.
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBody: true,
@@ -118,12 +122,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             ],
           ),
 
-          // 📌 SECTION: Floating Bottom Nav
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 16 + MediaQuery.of(context).padding.bottom,
-            child: ClipRRect(
+          // 📌 SECTION: Floating Bottom Nav (hidden while the keyboard is up)
+          if (!keyboardOpen)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 16 + MediaQuery.of(context).padding.bottom,
+              child: ClipRRect(
               borderRadius: BorderRadius.circular(40),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
