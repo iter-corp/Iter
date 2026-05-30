@@ -139,17 +139,14 @@ class StorageService {
       throw StorageException('File is empty: ${file.path}');
     }
 
-    var ext = _extensionOf(file.path);
+    final ext = _extensionOf(file.path);
     final contentType = _contentTypeOf(ext);
     debugPrint('[StorageService] ext=$ext contentType=$contentType');
-    // The Supabase edge function (issue-upload-url) rejects `m4a` with
-    // {"error":"bad ext"} even though the file is plain AAC audio inside an
-    // MP4 container. Re-label as `aac` for the upload-URL request — the
-    // bytes are still valid AAC so playback is unaffected.
-    if (kind == 'audio' && ext == 'm4a') {
-      ext = 'aac';
-      debugPrint('[StorageService] relabeled m4a -> aac for edge function');
-    }
+    // NOTE: do NOT relabel `m4a` -> `aac` here. The recorder writes an MP4/AAC
+    // container (`.m4a`); naming the stored object `.aac` makes iOS/Android
+    // audio players treat it as a raw ADTS AAC stream, which they can't decode
+    // from the MP4 bytes — playback is silent and reports "complete" instantly.
+    // The edge function already whitelists `m4a`, so the real extension works.
 
     final edgeUri = Uri.parse('$_supabaseUrl/functions/v1/issue-upload-url');
     debugPrint('[StorageService] POST $edgeUri');
@@ -256,8 +253,12 @@ class StorageService {
       case 'heic':
         return 'image/heic';
       case 'm4a':
+        // MP4/AAC container (what AudioRecorder writes). `audio/mp4` is the
+        // standard, widely-decodable type; `audio/m4a` is non-standard and
+        // some players reject it.
+        return 'audio/mp4';
       case 'aac':
-        return 'audio/m4a';
+        return 'audio/aac';
       case 'mp3':
         return 'audio/mpeg';
       case 'wav':

@@ -562,6 +562,7 @@ const Map<String, String> arStrings = {
       'الرسالة الصوتية قصيرة جداً (الحد الأدنى 300 مللي ثانية)',
   'failed_upload_voice_empty': 'فشل رفع الرسالة الصوتية - رابط فارغ',
   'voice_upload_failed': 'فشل رفع الصوت: {error}',
+  'voice_playback_failed': 'تعذّر تشغيل هذه الرسالة الصوتية. حاول مرة أخرى.',
   'translation_auto_description':
       'ترجمة رسائل الشخص الآخر تلقائياً إلى لغتك المفضلة. يمكنك دائماً النقر على أي رسالة لرؤية النص الأصلي.',
   'auto_translate_incoming': 'الترجمة التلقائية للرسائل الواردة',

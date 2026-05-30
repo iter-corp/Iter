@@ -572,6 +572,7 @@ const Map<String, String> ckbStrings = {
   'voice_message_too_short': 'نامەی دەنگی زۆر کورتە (لانی کەم 300ms)',
   'failed_upload_voice_empty': 'بارکردنی نامەی دەنگی شکستی هێنا - لینکی بەتاڵ',
   'voice_upload_failed': 'بارکردنی دەنگ شکستی هێنا: {error}',
+  'voice_playback_failed': 'نەتوانرا ئەم پەیامە دەنگییە لێبدرێت. تکایە دووبارە هەوڵبدەوە.',
   'translation_auto_description':
       'خۆکارانە نامەکانی کەسەکەی تر وەردەگێڕێتە سەر زمانە دڵخوازەکەت. هێشتا دەتوانیت پەنجە بنێیت بە هەر نامەیەکدا بۆ بینینی ڕەسەنەکەی.',
   'auto_translate_incoming': 'وەرگێڕانی خۆکاریی نامە هاتووەکان',

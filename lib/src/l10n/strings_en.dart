@@ -587,6 +587,7 @@ const Map<String, String> enStrings = {
   'voice_message_too_short': 'Voice message too short (min 300ms)',
   'failed_upload_voice_empty': 'Failed to upload voice message - empty URL',
   'voice_upload_failed': 'Voice upload failed: {error}',
+  'voice_playback_failed': "Couldn't play this voice message. Please try again.",
   'translation_auto_description':
       'Automatically translate the other person\'s messages into your preferred language. You can still tap any message to see the original.',
   'auto_translate_incoming': 'Auto-translate incoming messages',

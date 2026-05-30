@@ -691,6 +691,7 @@ class AppStrings {
   String get failedUploadVoiceEmpty => _get('failed_upload_voice_empty');
   String voiceUploadFailed(Object error) =>
       _fmt('voice_upload_failed', {'error': error});
+  String get voicePlaybackFailed => _get('voice_playback_failed');
   String get translationAutoDescription => _get('translation_auto_description');
   String get autoTranslateIncoming => _get('auto_translate_incoming');
   String get translateInto => _get('translate_into');

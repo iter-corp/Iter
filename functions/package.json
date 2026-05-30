@@ -11,7 +11,8 @@
     "deploy": "firebase deploy --only functions",
     "lint": "echo \"No lint configured\"",
     "seed:profanity": "node scripts/seed-profanity.js",
-    "backfill:message-visibility": "node scripts/backfill-message-visibility.js"
+    "backfill:message-visibility": "node scripts/backfill-message-visibility.js",
+    "migrate:voice-aac": "node scripts/migrate-voice-aac-to-m4a.js"
   },
   "dependencies": {
     "@google-cloud/translate": "^8.5.0",

@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Source;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -3688,16 +3689,43 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
   StreamSubscription<void>? _completeSub;
   StreamSubscription<Duration>? _durSub;
 
+  bool _loading = false;
+  // True once the clip has played to the end, so the next tap rewinds instead
+  // of instantly re-completing.
+  bool _completed = false;
+  // Downloaded bytes for legacy `.aac` voices, cached so re-taps don't refetch.
+  Uint8List? _legacyBytes;
+
   @override
   void initState() {
     super.initState();
     _duration = widget.durationMs == null
         ? null
         : Duration(milliseconds: widget.durationMs!);
+    // On iOS the default audio session can refuse to start playback for a
+    // remote URL (silent failure — play() throws and the bubble looks dead).
+    // The `playback` category routes received voice notes to the speaker and
+    // plays even with the ringer muted. NOTE: `defaultToSpeaker` is only valid
+    // with `playAndRecord` (it asserts otherwise), so it's deliberately omitted
+    // here — `playback` already uses the speaker for output.
+    unawaited(_player.setAudioContext(
+      AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const {},
+        ),
+        android: const AudioContextAndroid(
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ),
+    ));
     _posSub = _player.onPositionChanged.listen((p) {
       if (mounted) setState(() => _position = p);
     });
     _completeSub = _player.onPlayerComplete.listen((_) {
+      _completed = true;
       if (mounted) {
         setState(() {
           _playing = false;
@@ -3722,10 +3750,38 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
   Future<void> _toggle() async {
     if (_playing) {
       await _player.pause();
-      setState(() => _playing = false);
-    } else {
-      await _player.play(UrlSource(widget.url));
-      setState(() => _playing = true);
+      if (mounted) setState(() => _playing = false);
+      return;
+    }
+
+    if (_loading) return;
+    // Show feedback while the remote URL buffers and so a play() failure
+    // can't leave the bubble silently stuck on the play icon.
+    setState(() => _loading = true);
+    try {
+      final source = await _buildSource();
+      // If the player previously ran to completion it sits at the end of the
+      // clip; calling play() again would immediately re-complete with no audio
+      // (the "instantly jumps to the end, no sound" symptom). Re-set the source
+      // and rewind so every tap starts a clean playthrough.
+      if (_player.source == null || _completed) {
+        await _player.stop();
+        await _player.setSource(source);
+        await _player.seek(Duration.zero);
+        _completed = false;
+      }
+      await _player.resume();
+      if (mounted) setState(() => _playing = true);
+    } catch (e) {
+      debugPrint('[chat-voice] playback failed url=${widget.url} err=$e');
+      if (mounted) {
+        setState(() => _playing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.voicePlaybackFailed)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -3733,6 +3789,53 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     final m = d.inMinutes.toString();
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  /// Builds the playback source for this voice note.
+  ///
+  /// New messages are stored as `.m4a` and stream fine straight from the URL.
+  /// Old messages were stored with a `.aac` name over MP4/AAC-container bytes;
+  /// Android keys off the `.aac` URL extension and parses them as a raw ADTS
+  /// stream (it ignores the mime hint for remote sources), so they play silent.
+  /// For those we download the bytes once and hand them to the player as a
+  /// [BytesSource], which decodes by content instead of by extension.
+  Future<Source> _buildSource() async {
+    if (!_isLegacyAac(widget.url)) {
+      return UrlSource(widget.url, mimeType: _mimeForUrl(widget.url));
+    }
+    final cached = _legacyBytes;
+    if (cached != null) return BytesSource(cached, mimeType: 'audio/mp4');
+    final resp = await http.get(Uri.parse(widget.url));
+    if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+      throw Exception('legacy voice fetch failed: ${resp.statusCode}');
+    }
+    _legacyBytes = resp.bodyBytes;
+    return BytesSource(resp.bodyBytes, mimeType: 'audio/mp4');
+  }
+
+  /// A voice object whose URL ends in `.aac` — these predate the storage fix
+  /// and actually hold MP4/AAC-container bytes that need the bytes fallback.
+  bool _isLegacyAac(String url) {
+    final lower = url.toLowerCase();
+    final q = lower.indexOf('?');
+    final path = q == -1 ? lower : lower.substring(0, q);
+    return path.endsWith('.aac');
+  }
+
+  /// Explicit mime hint so the native player decodes the container correctly
+  /// instead of guessing from the URL extension (older messages were stored
+  /// with a misleading `.aac` name over MP4/AAC bytes, which decoded silently).
+  String? _mimeForUrl(String url) {
+    final lower = url.toLowerCase();
+    final q = lower.indexOf('?');
+    final path = q == -1 ? lower : lower.substring(0, q);
+    if (path.endsWith('.m4a') || path.endsWith('.aac') || path.endsWith('.mp4')) {
+      return 'audio/mp4';
+    }
+    if (path.endsWith('.mp3')) return 'audio/mpeg';
+    if (path.endsWith('.wav')) return 'audio/wav';
+    if (path.endsWith('.ogg')) return 'audio/ogg';
+    return null;
   }
 
   Future<void> _seekTo(double progress) async {
