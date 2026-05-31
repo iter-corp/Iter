@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/admin_providers.dart';
-import '../../providers/comment_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -134,6 +133,12 @@ class _HomeBodyState extends ConsumerState<HomeBody>
     unawaited(_loadSavedMode());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureViewerLocation();
+      // Clear any stale "view in discuss" filter left over from a previous
+      // mount so the Discuss tab never opens pre-filtered to one post. The
+      // provider is app-scoped (survives this widget), so reset it on mount.
+      if (mounted && ref.read(discussFilterPostIdProvider) != null) {
+        ref.read(discussFilterPostIdProvider.notifier).state = null;
+      }
     });
     _searchFocus.addListener(_onSearchFocusChange);
   }
@@ -499,6 +504,12 @@ class _HomeBodyState extends ConsumerState<HomeBody>
 
   Future<void> _switchMode(_HomeMode mode) async {
     if (_mode == mode) return;
+    // Leaving (or re-entering) a tab manually clears any active "view in
+    // discuss" post filter — otherwise the Discuss feed stays stuck showing
+    // only one post's threads after the user navigates away and back.
+    if (ref.read(discussFilterPostIdProvider) != null) {
+      ref.read(discussFilterPostIdProvider.notifier).state = null;
+    }
     setState(() => _mode = mode);
     unawaited(_saveMode(mode));
 
@@ -616,6 +627,23 @@ class _HomeBodyState extends ConsumerState<HomeBody>
         mode: _mode,
         onModeChanged: _switchMode,
       ),
+      // Discuss "view in discuss" filter banner — shown only on the QA tab
+      // when a post filter is active. Lets the user see WHICH post is being
+      // filtered and tap X to clear back to all discussions.
+      if (_mode == _HomeMode.qa && !collapsed)
+        Consumer(
+          builder: (context, ref, _) {
+            final filterId = ref.watch(discussFilterPostIdProvider);
+            if (filterId == null || filterId.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return _DiscussFilterBanner(
+              postId: filterId,
+              onClear: () =>
+                  ref.read(discussFilterPostIdProvider.notifier).state = null,
+            );
+          },
+        ),
       if (_mode == _HomeMode.travel) ...[
         // The old inline location row was replaced by the search icon
         // in _SearchPostRow (which opens the travel search page).
@@ -1298,30 +1326,6 @@ class _HomeModeToggle extends ConsumerWidget {
     required this.onPost,
   });
 
-  static const _all = [_HomeMode.feed, _HomeMode.travel, _HomeMode.qa];
-
-  IconData _iconFor(_HomeMode m) {
-    switch (m) {
-      case _HomeMode.feed:
-        return Icons.dynamic_feed_rounded;
-      case _HomeMode.travel:
-        return Icons.flight;
-      case _HomeMode.qa:
-        return Icons.forum_outlined;
-    }
-  }
-
-  String _labelFor(BuildContext context, _HomeMode m) {
-    switch (m) {
-      case _HomeMode.feed:
-        return context.t.homeFeed;
-      case _HomeMode.travel:
-        return context.t.homeTravelShort;
-      case _HomeMode.qa:
-        return context.t.homeDiscuss;
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadCountProvider);
@@ -2002,6 +2006,115 @@ class _QaThreadCard extends ConsumerWidget {
 /// Mini preview of the post a Discuss item was created from — shown
 /// inside the Discuss home list card. Author line + image + caption
 /// in a compact bordered card; tapping it opens the full post.
+/// Banner shown atop the Discuss tab when a "view in discuss" post filter is
+/// active. Shows a thumbnail + caption of the filtered post and an X to clear
+/// the filter back to all discussions.
+class _DiscussFilterBanner extends ConsumerWidget {
+  final String postId;
+  final VoidCallback onClear;
+
+  const _DiscussFilterBanner({required this.postId, required this.onClear});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postAsync = ref.watch(singlePostProvider(postId));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.purpleSoft,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFF7E3BE8).withValues(alpha: 0.30),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          children: [
+            // Thumbnail.
+            postAsync.when(
+              loading: () => Container(
+                width: 56,
+                height: 56,
+                color: context.surfaceSoft,
+                child: const Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+              error: (_, __) => const SizedBox(width: 56, height: 56),
+              data: (src) {
+                final hasImage = src != null && src.imageUrls.isNotEmpty;
+                if (!hasImage) {
+                  return Container(
+                    width: 56,
+                    height: 56,
+                    color: context.surfaceSoft,
+                    child: Icon(Icons.forum_outlined,
+                        size: 22, color: context.textSecondary),
+                  );
+                }
+                return SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: CachedNetworkImage(
+                    imageUrl: src.imageUrls.first,
+                    cacheManager: MediaCache.images,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) =>
+                        Container(color: context.borderColor),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 10),
+            // Label + caption.
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.t.homeDiscussionsAboutPost,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF7E3BE8),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    postAsync.valueOrNull?.caption.trim().isNotEmpty == true
+                        ? postAsync.value!.caption.trim()
+                        : context.t.homeDiscuss,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Clear (X) button.
+            IconButton(
+              tooltip: context.t.clear,
+              icon: Icon(Icons.close_rounded,
+                  size: 20, color: context.textSecondary),
+              onPressed: onClear,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MiniPostPreview extends ConsumerWidget {
   final String postId;
 

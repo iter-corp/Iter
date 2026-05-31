@@ -421,6 +421,7 @@ const Map<String, String> enStrings = {
   'home_travel_short': 'Travel',
   'home_travel_mode': 'Travel Mode',
   'home_discuss': 'Discuss',
+  'home_discussions_about_post': 'Discussions about this post',
   'home_error_prefix': 'Error: {error}',
   'home_no_discuss_threads': 'No Discuss threads yet. Ask the first question!',
   'home_no_matching_questions': 'No matching questions found.',

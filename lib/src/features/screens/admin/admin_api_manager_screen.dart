@@ -248,7 +248,7 @@ class AdminApiManagerScreen extends ConsumerWidget {
           child: TabBarView(
             children: [
               _KeysTab(onAddTap: () => _showAddSheet(context, ref)),
-              _LogTab(ref: ref),
+              const _LogTab(),
             ],
           ),
         ),
@@ -686,8 +686,7 @@ class _ApiKeyTile extends ConsumerWidget {
 // ─── API Log tab ─────────────────────────────────────────────────────────────
 
 class _LogTab extends ConsumerWidget {
-  final WidgetRef ref;
-  const _LogTab({required this.ref});
+  const _LogTab();
 
   @override
   Widget build(BuildContext context, WidgetRef r) {

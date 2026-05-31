@@ -64,14 +64,6 @@ final commentsProvider =
 
 /// Live count of public comments / answers on a post. Drives the answer
 /// count badge in the QA thread and the count chip on the home Discuss
-/// card so the number is always in sync with what's actually visible —
-/// never the stale `post.commentsCount` cached on the doc.
-final commentsCountProvider = StreamProvider.family<int, String>((ref, postId) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return const Stream.empty();
-  final service = ref.watch(commentServiceProvider);
-  return _retryStream(() => service.streamCommentsCount(postId));
-});
 
 typedef UserAnswerReactionArgs = ({
   String postId,

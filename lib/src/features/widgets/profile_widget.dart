@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
@@ -493,69 +492,6 @@ class ProfileEmpty extends StatelessWidget {
               );
             }),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// BOTTOM NAV
-class ProfileBottomNav extends StatelessWidget {
-  final int selectedNav;
-  final Function(int) onTap;
-  final List<String> icons;
-
-  const ProfileBottomNav({
-    super.key,
-    required this.selectedNav,
-    required this.onTap,
-    required this.icons,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: 20,
-      right: 20,
-      bottom: 16,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.75),
-          borderRadius: BorderRadius.circular(40),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 12,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(icons.length, (index) {
-            final bool isSelected = selectedNav == index;
-            return GestureDetector(
-              onTap: () => onTap(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.white : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: SvgPicture.asset(
-                  icons[index],
-                  width: 24,
-                  height: 24,
-                  colorFilter: ColorFilter.mode(
-                    isSelected ? Colors.black : Colors.white,
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-            );
-          }),
         ),
       ),
     );

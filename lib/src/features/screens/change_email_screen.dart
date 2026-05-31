@@ -118,7 +118,6 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(

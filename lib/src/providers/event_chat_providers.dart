@@ -20,11 +20,6 @@ final eventChatMessagesProvider =
   return ref.watch(eventChatServiceProvider).streamMessages(eventId);
 });
 
-/// Admin uid for the event chat (determines whether compose is shown).
-final eventChatAdminProvider =
-    StreamProvider.family<String?, String>((ref, eventId) {
-  return ref.watch(eventChatServiceProvider).streamAdminUid(eventId);
-});
 
 /// Live list of members of an event chat.
 final eventChatMembersProvider =

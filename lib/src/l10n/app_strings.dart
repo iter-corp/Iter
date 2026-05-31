@@ -482,6 +482,8 @@ class AppStrings {
   String get homeModeDiscussSubtitle => _get('home_mode_discuss_subtitle');
   String get homeTravelMode => _get('home_travel_mode');
   String get homeDiscuss => _get('home_discuss');
+  String get homeDiscussionsAboutPost =>
+      _get('home_discussions_about_post');
   String homeErrorPrefix(Object error) =>
       _fmt('home_error_prefix', {'error': error});
   String get homeNoDiscussThreads => _get('home_no_discuss_threads');

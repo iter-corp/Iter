@@ -1518,7 +1518,6 @@ class _AnswerRow extends ConsumerWidget {
   final Comment comment;
   final bool compact;
   final Widget? trailingAction;
-  final VoidCallback? onTap;
   // Post id is needed to wire edit/delete back through CommentService
   // when the current user is the author of [comment]. Optional so the
   // existing call sites (reply rows that don't need the menu) keep
@@ -1529,7 +1528,6 @@ class _AnswerRow extends ConsumerWidget {
     required this.comment,
     this.compact = false,
     this.trailingAction,
-    this.onTap,
     this.postId,
   });
 
@@ -1539,7 +1537,7 @@ class _AnswerRow extends ConsumerWidget {
     final isAuthor = currentUid != null && currentUid == comment.authorUid;
     final canManage = isAuthor && postId != null;
     return InkWell(
-      onTap: onTap ?? () => openUserProfile(context, uid: comment.authorUid),
+      onTap: () => openUserProfile(context, uid: comment.authorUid),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),

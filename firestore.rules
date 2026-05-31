@@ -9,13 +9,6 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    function canSeeContent(uid) {
-      let user = get(/databases/$(database)/documents/users/$(uid)).data;
-      return !user.isPrivate || isSelf(uid) || 
-             (exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)) && 
-              get(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)).data.status == 'active');
-    }
-
     function isAdmin() {
       return signedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&

@@ -5,7 +5,13 @@
       "Bash(git branch *)",
       "Bash(git merge *)",
       "Bash(flutter doctor *)",
-      "Bash(firebase projects:list)"
+      "Bash(firebase projects:list)",
+      "Bash(cd /d D:\\\\COIL-project)",
+      "Bash(dir /b)",
+      "Bash(git ls-files *)",
+      "Bash(python -c \"import pypdf; print\\('pypdf ok'\\)\")",
+      "Bash(python -c \"import fitz; print\\('fitz ok'\\)\")",
+      "Bash(python -c \"import pdfplumber; print\\('pdfplumber ok'\\)\")"
     ]
   }
 }

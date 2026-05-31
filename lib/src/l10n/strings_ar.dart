@@ -397,6 +397,7 @@ const Map<String, String> arStrings = {
   'home_travel_short': 'السفر',
   'home_travel_mode': 'وضع السفر',
   'home_discuss': 'نقاش',
+  'home_discussions_about_post': 'مناقشات حول هذا المنشور',
   'home_error_prefix': 'خطأ: {error}',
   'home_no_discuss_threads': 'لا توجد نقاشات بعد. اطرح السؤال الأول!',
   'home_no_matching_questions': 'لم يتم العثور على أسئلة مطابقة.',

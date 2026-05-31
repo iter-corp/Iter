@@ -11,6 +11,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/block_providers.dart';
+import '../../providers/comment_providers.dart';
 import '../../providers/contact_request_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../providers/post_providers.dart';
@@ -967,12 +968,29 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              '$time • ${context.t.homeAnswersCount(p.commentsCount < 0 ? 0 : p.commentsCount)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textSecondary,
-                              ),
+                            // Live answer count straight from the comments
+                            // subcollection — the cached `commentsCount` on the
+                            // post doc drifts (stale/0 on legacy threads), so we
+                            // count for real, mirroring the QA thread header.
+                            StreamBuilder<int>(
+                              stream: ref
+                                  .read(commentServiceProvider)
+                                  .streamCommentsCount(p.id),
+                              initialData:
+                                  p.commentsCount < 0 ? 0 : p.commentsCount,
+                              builder: (context, snap) {
+                                final count = snap.data ??
+                                    (p.commentsCount < 0
+                                        ? 0
+                                        : p.commentsCount);
+                                return Text(
+                                  '$time • ${context.t.homeAnswersCount(count)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.textSecondary,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),

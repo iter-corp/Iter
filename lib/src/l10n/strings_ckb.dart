@@ -403,6 +403,7 @@ const Map<String, String> ckbStrings = {
   'home_travel_short': 'گەشت',
   'home_travel_mode': 'دۆخی گەشت',
   'home_discuss': 'گفتوگۆ',
+  'home_discussions_about_post': 'گفتوگۆکان دەربارەی ئەم پۆستە',
   'home_error_prefix': 'هەڵە: {error}',
   'home_no_discuss_threads': 'هیچ گفتوگۆیەک نییە هێشتا. یەکەم پرسیار بکە!',
   'home_no_matching_questions': 'هیچ پرسیارێکی گونجاو نەدۆزرایەوە.',
