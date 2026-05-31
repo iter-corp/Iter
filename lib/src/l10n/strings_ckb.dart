@@ -1231,6 +1231,62 @@ const Map<String, String> ckbStrings = {
   'admin_event_countries_desc':
       'ئەو وڵاتانەی بەڕێوەبەران بۆنەکانیانی پێوە دەبەستنەوە، و بەکارهێنەرانیش ئاگادارکردنەوەکانیان پێ دەپاڵێون.',
   'admin_add_country': 'زیادکردنی وڵات',
+
+  // ── QA HELPFUL ANSWER ──
+  'qa_mark_helpful': 'بەکارهاتوو نیشانە بکە',
+  'qa_unmark_helpful': 'نیشانە لابکە',
+  'qa_author_found_helpful': 'نووسەری پرسیار ئەمەی بەسوودی دیت',
+
+  // ── ADMIN API MANAGER ──
+  'admin_api_manager': 'بەڕێوەبردنی API',
+  'admin_api_manager_providers': 'کلیلەکانی API',
+  'admin_api_manager_add_key': 'زیادکردنی کلیلی API',
+  'admin_api_manager_empty': 'هیچ کلیلێکی API ڕێکنەخراو نییە',
+  'admin_api_manager_empty_subtitle': 'کلیلەکانی API زیاد بکە بۆ چالاककردنی تایبەتمەندییەکانی هوشمەندی دەستکرد.',
+  'admin_api_manager_disabled': 'جیاکراوەتەوە',
+  'admin_api_manager_active': 'چالاک',
+  'admin_api_manager_delete_title': 'سڕینەوەی کلیلی API؟',
+  'admin_api_manager_delete_body': 'ئەمە کلیلی API بە دایمی دەسڕێتەوە.',
+  'admin_api_manager_disable_key': 'جیاکردنەوەی کلیل',
+  'admin_api_manager_enable_key': 'چالاककردنی کلیل',
+  'admin_api_manager_select_provider': 'دابینکەر هەڵبژێرە',
+  'admin_api_manager_api_key': 'کلیلی API',
+  'admin_api_manager_key_hint': 'کلیلی API خۆت لێرە بچسپێنە',
+  'admin_api_manager_key_required': 'کلیلی API پێویستە',
+
+  // ── EVENT MANAGER REVOCATION / DELETE EVENTS ──
+  'admin_revoke_delete_events_title': 'سڕینەوەی هەموو ئایینەکانی ئەم بەکارهێنەرە؟',
+  'admin_revoke_delete_events_body': 'ئایا دەتەوێت هەموو ئایینەکانی دروستکراوی ئەم بەکارهێنەرە بسڕیتەوە؟',
+  'admin_revoke_delete_events_confirm_title': 'دڵنیایت؟',
+  'admin_revoke_delete_events_confirm_body': 'ئەمە هەموو ئایینەکان بە دایمی دەسڕێتەوە. ناتوانرێت گەڕانەوە.',
+  'admin_revoke_delete_events_yes': 'سڕینەوەی ئایینەکان',
+  'admin_revoke_keep_events': 'ئایینەکان بەجێبهێڵە',
+
+  // ── EVENT SHARE ──
+  'event_share': 'هاوبەشکردنی ئایین',
+  'event_share_send_to_friend': 'ناردن بۆ هاوڕێ',
+  'event_share_to_story': 'هاوبەشکردن لە چیرۆکەکەمدا',
+  'event_shared_to_story': 'ئایین لە چیرۆکەکەتدا هاوبەشکرا',
+  'event_share_story_failed': 'نەتوانرا بە چیرۆک هاوبەش بکرێت: {error}',
+  'event_share_sent': 'ئایین ناردرا بۆ {name}',
+
+  // ── COMMENT REPORTING ──
+  'comment_report': 'ڕاپۆرتی کۆمێنت',
+  'comment_report_sent': 'ڕاپۆرت نێردرا بۆ بەڕێوەبەران',
+  'comment_report_failed': 'نەتوانرا ڕاپۆرت بکرێت: {error}',
+  'comment_report_pick_reason': 'بۆچی ئەم کۆمێنتەت ڕاپۆرت دەکەیت؟',
+
+  // ── ADMIN COMMENT REPORTS ──
+  'admin_comment_reports': 'ڕاپۆرتەکانی کۆمێنت',
+  'admin_comment_reports_subtitle': 'پێداچوونەوە بە ڕاپۆرتەکانی کۆمێنت و وەڵامەکان',
+  'admin_no_comment_reports': 'هیچ ڕاپۆرتێکی کۆمێنت نییە',
+  'admin_reported_comment': 'کۆمێنتی ڕاپۆرتکراو',
+  'admin_comment_author': 'نووسەری کۆمێنت',
+  'admin_take_down_comment_title': 'سڕینەوەی کۆمێنت؟',
+  'admin_take_down_comment_body': 'ئەمە کۆمێنتی ڕاپۆرتکراو دەسڕێتەوە و ڕاپۆرتەکە داخستن دەبێت.',
+  'admin_take_down_comment': 'سڕینەوەی کۆمێنت',
+  'admin_comment_taken_down': 'کۆمێنت سڕایەوە و ڕاپۆرت داخرا',
+
   'profile_no_users_yet': 'هیچ بەکارهێنەرێک نییە هێشتا',
   'profile_no_profile_data': 'هیچ زانیارییەکی پڕۆفایل نییە',
   'profile_only_followers_can_see': 'تەنها فۆڵۆوەرز دەتوانن پۆستەکانت ببینن',

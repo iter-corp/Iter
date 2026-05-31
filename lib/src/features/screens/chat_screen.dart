@@ -38,6 +38,7 @@ import '../../services/translate_service.dart';
 import '../../utils/app_feedback.dart';
 import '../../utils/maps_links.dart';
 import '../model/post_model.dart';
+import '../widgets/event_share.dart';
 import '../widgets/location_map.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
@@ -2859,6 +2860,10 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
                                     postId: msg.sharedPostId!,
                                     isMe: isMe,
                                   )
+                                else if (msg.sharedEventId != null &&
+                                    msg.sharedEventId!.isNotEmpty)
+                                  SharedEventMessage(
+                                      eventId: msg.sharedEventId!)
                                 else if (msg.hasLocation) ...[
                                   _LocationMessageBubble(
                                     lat: msg.locationLat!,

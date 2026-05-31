@@ -13,6 +13,7 @@ import 'admin_discuss_posts_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_posts_screen.dart';
 import 'admin_reports_screen.dart';
+import 'admin_api_manager_screen.dart';
 import 'admin_settings_screen.dart';
 import 'admin_users_screen.dart';
 
@@ -138,6 +139,18 @@ class AdminDashboardScreen extends ConsumerWidget {
               MaterialPageRoute(
                 builder: (_) => const AdminBlacklistScreen(),
               ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AdminTile(
+            icon: Icons.vpn_key_outlined,
+            title: context.t.adminApiManager,
+            subtitle: context.t.adminApiManagerEmptySubtitle,
+            color: const Color(0xFF10A37F),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AdminApiManagerScreen()),
             ),
           ),
           const SizedBox(height: 10),

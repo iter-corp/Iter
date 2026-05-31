@@ -9,18 +9,21 @@ const _kPostReportsSeenAtMs = 'admin_post_reports_seen_at_ms';
 const _kDiscussReportsSeenAtMs = 'admin_discuss_reports_seen_at_ms';
 const _kProfileReportsSeenAtMs = 'admin_profile_reports_seen_at_ms';
 const _kErrorReportsSeenAtMs = 'admin_error_reports_seen_at_ms';
+const _kCommentReportsSeenAtMs = 'admin_comment_reports_seen_at_ms';
 
 class AdminReportSeenState {
   final DateTime? postReportsSeenAt;
   final DateTime? discussReportsSeenAt;
   final DateTime? profileReportsSeenAt;
   final DateTime? errorReportsSeenAt;
+  final DateTime? commentReportsSeenAt;
 
   const AdminReportSeenState({
     this.postReportsSeenAt,
     this.discussReportsSeenAt,
     this.profileReportsSeenAt,
     this.errorReportsSeenAt,
+    this.commentReportsSeenAt,
   });
 
   AdminReportSeenState copyWith({
@@ -28,10 +31,12 @@ class AdminReportSeenState {
     DateTime? discussReportsSeenAt,
     DateTime? profileReportsSeenAt,
     DateTime? errorReportsSeenAt,
+    DateTime? commentReportsSeenAt,
     bool clearPost = false,
     bool clearDiscuss = false,
     bool clearProfile = false,
     bool clearError = false,
+    bool clearComment = false,
   }) {
     return AdminReportSeenState(
       postReportsSeenAt:
@@ -44,6 +49,9 @@ class AdminReportSeenState {
           : (profileReportsSeenAt ?? this.profileReportsSeenAt),
       errorReportsSeenAt:
           clearError ? null : (errorReportsSeenAt ?? this.errorReportsSeenAt),
+      commentReportsSeenAt: clearComment
+          ? null
+          : (commentReportsSeenAt ?? this.commentReportsSeenAt),
     );
   }
 }
@@ -60,6 +68,7 @@ class AdminReportSeenNotifier extends StateNotifier<AdminReportSeenState> {
       discussReportsSeenAt: _fromMs(prefs.getInt(_kDiscussReportsSeenAtMs)),
       profileReportsSeenAt: _fromMs(prefs.getInt(_kProfileReportsSeenAtMs)),
       errorReportsSeenAt: _fromMs(prefs.getInt(_kErrorReportsSeenAtMs)),
+      commentReportsSeenAt: _fromMs(prefs.getInt(_kCommentReportsSeenAtMs)),
     );
   }
 
@@ -97,6 +106,13 @@ class AdminReportSeenNotifier extends StateNotifier<AdminReportSeenState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_kErrorReportsSeenAtMs, now.millisecondsSinceEpoch);
   }
+
+  Future<void> markCommentReportsSeen() async {
+    final now = _now();
+    state = state.copyWith(commentReportsSeenAt: now);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kCommentReportsSeenAtMs, now.millisecondsSinceEpoch);
+  }
 }
 
 final adminReportSeenProvider =
@@ -125,6 +141,16 @@ DateTime? _latestUnresolvedProfileReportAt(List<UserProfileReport> reports) {
 }
 
 DateTime? _latestUnresolvedErrorReportAt(List<ErrorReport> reports) {
+  DateTime? latest;
+  for (final r in reports) {
+    if (r.resolved) continue;
+    final at = r.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    if (latest == null || at.isAfter(latest)) latest = at;
+  }
+  return latest;
+}
+
+DateTime? _latestUnresolvedCommentReportAt(List<CommentReport> reports) {
   DateTime? latest;
   for (final r in reports) {
     if (r.resolved) continue;
@@ -186,9 +212,23 @@ final hasNewErrorReportsProvider = Provider<bool>((ref) {
   return latest.isAfter(seenAt);
 });
 
+final hasNewCommentReportsProvider = Provider<bool>((ref) {
+  final seenAt = ref.watch(
+    adminReportSeenProvider.select((s) => s.commentReportsSeenAt),
+  );
+  final latest = ref.watch(commentReportsProvider).maybeWhen(
+        data: _latestUnresolvedCommentReportAt,
+        orElse: () => null,
+      );
+  if (latest == null) return false;
+  if (seenAt == null) return true;
+  return latest.isAfter(seenAt);
+});
+
 final hasAnyNewReportsProvider = Provider<bool>((ref) {
   return ref.watch(hasNewPostReportsProvider) ||
       ref.watch(hasNewDiscussReportsProvider) ||
       ref.watch(hasNewProfileReportsProvider) ||
+      ref.watch(hasNewCommentReportsProvider) ||
       ref.watch(hasNewErrorReportsProvider);
 });

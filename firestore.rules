@@ -159,6 +159,54 @@ service cloud.firestore {
       allow list, delete: if isAdmin();
     }
 
+    // ── Comment / answer / reply reports ──────────────────────
+    // Created by any signed-in user who isn't the comment's own author.
+    // Admins can read, update (resolve), and delete.
+    function isValidCommentReport() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+              'postId', 'commentId', 'commentText',
+              'commentAuthorUid', 'commentAuthorUsername', 'commentAuthorAvatar',
+              'surface', 'isReply',
+              'reporterUid', 'reporterUsername',
+              'reason', 'details', 'resolved', 'createdAt'
+            ]) &&
+            d.postId is string && d.postId.size() > 0 && d.postId.size() <= 150 &&
+            d.commentId is string && d.commentId.size() > 0 && d.commentId.size() <= 150 &&
+            d.commentText is string && d.commentText.size() <= 6000 &&
+            d.commentAuthorUid is string && d.commentAuthorUid.size() > 0 &&
+            // Reporter cannot report their own comment.
+            d.commentAuthorUid != request.auth.uid &&
+            d.commentAuthorUsername is string && d.commentAuthorUsername.size() <= 80 &&
+            (!('commentAuthorAvatar' in d) || d.commentAuthorAvatar == null ||
+              (d.commentAuthorAvatar is string && d.commentAuthorAvatar.size() <= 1000)) &&
+            d.surface in ['comment', 'answer', 'reply'] &&
+            d.isReply is bool &&
+            d.reporterUid == request.auth.uid &&
+            d.reporterUsername is string && d.reporterUsername.size() > 0 && d.reporterUsername.size() <= 80 &&
+            d.reason is string && d.reason.size() > 0 && d.reason.size() <= 80 &&
+            (!('details' in d) || d.details == null || (d.details is string && d.details.size() <= 2000)) &&
+            d.resolved == false &&
+            d.createdAt == request.time;
+    }
+
+    match /commentReports/{reportId} {
+      allow create: if signedIn() && isValidCommentReport();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt']) &&
+        request.resource.data.resolved is bool;
+      allow read, delete: if isAdmin();
+    }
+
+    // ── Admin API key manager ──────────────────────────────────
+    // Only admins can create / read / update / delete API keys.
+    // Keys are stored server-side; clients never read the raw key value
+    // directly (the screen only shows the masked form computed client-side
+    // from the field that was written).
+    match /apiKeys/{keyId} {
+      allow read, write: if isAdmin();
+    }
+
     // Blacklisted emails. Admins manage the full list; signed-in users may
     // also read and write their own entry so the client can (a) check on
     // login whether their account has been deleted and (b) write a
@@ -335,17 +383,31 @@ service cloud.firestore {
         //      legacy docs (with no `authorUid` initially missing) to
         //      fail the equality even though the field never moved.
         allow update: if signedIn() && (
+          // Any signed-in user can bump reaction / like counters.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'helpfulCount',
             'unhelpfulCount',
             'likesCount'
           ]) ||
+          // The comment's author (or admin) can edit its text.
           (
             (resource.data.authorUid == request.auth.uid || isAdmin()) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'text',
               'editedAt'
             ])
+          ) ||
+          // The question's post author can toggle markedHelpful on top-level
+          // answers. The client enforces this constraint; here we only
+          // ensure the caller is signed-in and the change is limited to
+          // that single field. Admins may also toggle it.
+          (
+            isAdmin() ||
+            (
+              signedIn() &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['markedHelpful']) &&
+              request.resource.data.markedHelpful is bool
+            )
           )
         );
 

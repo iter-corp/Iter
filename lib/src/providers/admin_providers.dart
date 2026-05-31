@@ -96,6 +96,13 @@ final userProfileReportsProvider =
   return ref.watch(adminServiceProvider).streamUserProfileReports();
 });
 
+final commentReportsProvider = StreamProvider<List<CommentReport>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+  if (!ref.watch(isAdminProvider)) return const Stream.empty();
+  return ref.watch(adminServiceProvider).streamCommentReports();
+});
+
 final errorReportAdminProvider =
     Provider<ErrorReportAdmin>((_) => ErrorReportAdmin());
 

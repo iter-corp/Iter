@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import 'notification_service.dart';
@@ -31,6 +32,10 @@ class Comment {
   final bool profanityFiltered;
   final bool senderOnly;
 
+  /// Set by the question author to mark this answer as helpful. Helpful
+  /// answers are sorted to the top and shown with a green check badge.
+  final bool markedHelpful;
+
   const Comment({
     required this.id,
     required this.authorUid,
@@ -45,6 +50,7 @@ class Comment {
     this.likesCount = 0,
     this.profanityFiltered = false,
     this.senderOnly = false,
+    this.markedHelpful = false,
   });
 
   bool get isReply => parentCommentId != null;
@@ -65,6 +71,7 @@ class Comment {
       likesCount: (d['likesCount'] as num?)?.toInt() ?? 0,
       profanityFiltered: d['profanityFiltered'] == true,
       senderOnly: d['senderOnly'] == true,
+      markedHelpful: d['markedHelpful'] == true,
     );
   }
 }
@@ -574,6 +581,50 @@ class CommentService {
         .map((snap) => snap.exists);
   }
 
+  /// Admin-side deletion of any comment/answer/reply. Mirrors
+  /// [deleteComment] but doesn't gate on authorship (Firestore rules
+  /// grant admins delete on all comment paths). Used when resolving a
+  /// comment report by taking the comment down.
+  Future<void> deleteCommentAsAdmin({
+    required String postId,
+    required String commentId,
+  }) async {
+    await _comments(postId).doc(commentId).delete();
+  }
+
+  /// Files a report against a comment, answer, or reply. Stored in the
+  /// top-level `commentReports` collection so the admin "Comment reports"
+  /// page can stream them alongside the other report types. [surface]
+  /// records where it came from ('comment' | 'answer' | 'reply').
+  Future<void> reportComment({
+    required String postId,
+    required Comment comment,
+    required String reason,
+    required String details,
+    String surface = 'comment',
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw Exception('Not signed in');
+    final reporter = await _db.collection('users').doc(uid).get();
+    final reporterName = (reporter.data()?['username'] as String?) ?? 'user';
+    await _db.collection('commentReports').add({
+      'postId': postId,
+      'commentId': comment.id,
+      'commentText': comment.text,
+      'commentAuthorUid': comment.authorUid,
+      'commentAuthorUsername': comment.authorUsername,
+      'commentAuthorAvatar': comment.authorAvatar,
+      'surface': surface,
+      'isReply': comment.isReply,
+      'reporterUid': uid,
+      'reporterUsername': reporterName,
+      'reason': reason,
+      'details': details,
+      'resolved': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Stream<int> streamCommentLikesCount({
     required String postId,
     required String commentId,
@@ -592,6 +643,18 @@ class CommentService {
         .doc(uid)
         .snapshots()
         .map((snap) => snap.data()?['type'] as String?);
+  }
+
+  /// Toggles the "marked helpful" flag on an answer. Only the question's
+  /// author should call this. [helpful] = true marks it; false unmarks it.
+  Future<void> setAnswerHelpful({
+    required String postId,
+    required String commentId,
+    required bool helpful,
+  }) {
+    return _comments(postId).doc(commentId).update({
+      'markedHelpful': helpful,
+    });
   }
 
   Future<void> setAnswerReaction({

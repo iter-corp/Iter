@@ -22,6 +22,15 @@ class Story {
   /// it opens the original post. Null for normal photo stories.
   final String? sharedPostId;
 
+  /// When this story was created by sharing an event, holds that event's
+  /// id. The viewer renders a "View event" pill; tapping opens the event
+  /// detail. Null for normal/photo/shared-post stories.
+  final String? sharedEventId;
+
+  /// Cached title of the shared event — stored at story creation time so
+  /// the viewer can display it without a Firestore fetch.
+  final String? sharedEventTitle;
+
   /// Optional video for video stories. When set, the viewer plays the
   /// video instead of rendering [imageUrl]. [imageUrl] may still hold a
   /// thumbnail used in the inbox previews.
@@ -73,6 +82,8 @@ class Story {
     this.likesCount = 0,
     this.commentsCount = 0,
     this.sharedPostId,
+    this.sharedEventId,
+    this.sharedEventTitle,
     this.videoUrl,
     this.videoTrimStartMs,
     this.videoTrimEndMs,
@@ -96,6 +107,8 @@ class Story {
       likesCount: (d['likesCount'] as int?) ?? 0,
       commentsCount: (d['commentsCount'] as int?) ?? 0,
       sharedPostId: (d['sharedPostId'] as String?)?.trim(),
+      sharedEventId: (d['sharedEventId'] as String?)?.trim(),
+      sharedEventTitle: (d['sharedEventTitle'] as String?)?.trim(),
       videoUrl: (d['videoUrl'] as String?)?.trim(),
       videoTrimStartMs: (d['videoTrimStartMs'] as num?)?.toInt(),
       videoTrimEndMs: (d['videoTrimEndMs'] as num?)?.toInt(),
@@ -151,6 +164,8 @@ class StoryService {
   Future<String> createStory({
     required String imageUrl,
     String? sharedPostId,
+    String? sharedEventId,
+    String? sharedEventTitle,
     String? videoUrl,
     int? videoTrimStartMs,
     int? videoTrimEndMs,
@@ -175,6 +190,10 @@ class StoryService {
       'imageUrl': imageUrl,
       if (sharedPostId != null && sharedPostId.isNotEmpty)
         'sharedPostId': sharedPostId,
+      if (sharedEventId != null && sharedEventId.isNotEmpty)
+        'sharedEventId': sharedEventId,
+      if (sharedEventTitle != null && sharedEventTitle.isNotEmpty)
+        'sharedEventTitle': sharedEventTitle,
       if (videoUrl != null && videoUrl.isNotEmpty) 'videoUrl': videoUrl,
       if (videoTrimStartMs != null && videoTrimStartMs > 0)
         'videoTrimStartMs': videoTrimStartMs,

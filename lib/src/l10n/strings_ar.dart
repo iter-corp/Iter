@@ -1217,6 +1217,61 @@ const Map<String, String> arStrings = {
       'البلدان التي يضع المسؤولون علامة للفعاليات بها، ويقوم المستخدمون بتصفية الإشعارات بناءً عليها.',
   'admin_add_country': 'إضافة بلد',
 
+  // ── QA HELPFUL ANSWER ──
+  'qa_mark_helpful': 'وضع علامة مفيدة',
+  'qa_unmark_helpful': 'إلغاء العلامة',
+  'qa_author_found_helpful': 'وجد صاحب السؤال هذا مفيداً',
+
+  // ── ADMIN API MANAGER ──
+  'admin_api_manager': 'مدير الواجهات البرمجية',
+  'admin_api_manager_providers': 'مفاتيح API',
+  'admin_api_manager_add_key': 'إضافة مفتاح API',
+  'admin_api_manager_empty': 'لا توجد مفاتيح API مُهيَّأة',
+  'admin_api_manager_empty_subtitle': 'أضف مفاتيح API لتفعيل ميزات الذكاء الاصطناعي.',
+  'admin_api_manager_disabled': 'معطَّل',
+  'admin_api_manager_active': 'نشط',
+  'admin_api_manager_delete_title': 'حذف مفتاح API؟',
+  'admin_api_manager_delete_body': 'سيؤدي هذا إلى حذف مفتاح API نهائياً.',
+  'admin_api_manager_disable_key': 'تعطيل المفتاح',
+  'admin_api_manager_enable_key': 'تفعيل المفتاح',
+  'admin_api_manager_select_provider': 'اختر المزوِّد',
+  'admin_api_manager_api_key': 'مفتاح API',
+  'admin_api_manager_key_hint': 'الصق مفتاح API هنا',
+  'admin_api_manager_key_required': 'مفتاح API مطلوب',
+
+  // ── EVENT MANAGER REVOCATION / DELETE EVENTS ──
+  'admin_revoke_delete_events_title': 'حذف جميع فعاليات هذا المستخدم؟',
+  'admin_revoke_delete_events_body': 'هل تريد حذف جميع الفعاليات التي أنشأها هذا المستخدم أيضاً؟',
+  'admin_revoke_delete_events_confirm_title': 'هل أنت متأكد؟',
+  'admin_revoke_delete_events_confirm_body': 'سيؤدي هذا إلى حذف جميع الفعاليات نهائياً. لا يمكن التراجع.',
+  'admin_revoke_delete_events_yes': 'حذف الفعاليات',
+  'admin_revoke_keep_events': 'الاحتفاظ بالفعاليات',
+
+  // ── EVENT SHARE ──
+  'event_share': 'مشاركة الفعالية',
+  'event_share_send_to_friend': 'إرسال إلى صديق',
+  'event_share_to_story': 'مشاركة في قصتي',
+  'event_shared_to_story': 'تمت مشاركة الفعالية في قصتك',
+  'event_share_story_failed': 'تعذّر المشاركة في القصة: {error}',
+  'event_share_sent': 'تم إرسال الفعالية إلى {name}',
+
+  // ── COMMENT REPORTING ──
+  'comment_report': 'الإبلاغ عن التعليق',
+  'comment_report_sent': 'تم إرسال البلاغ إلى المشرفين',
+  'comment_report_failed': 'تعذّر الإبلاغ: {error}',
+  'comment_report_pick_reason': 'لماذا تُبلِّغ عن هذا التعليق؟',
+
+  // ── ADMIN COMMENT REPORTS ──
+  'admin_comment_reports': 'بلاغات التعليقات',
+  'admin_comment_reports_subtitle': 'مراجعة البلاغات المتعلقة بالتعليقات والأجوبة',
+  'admin_no_comment_reports': 'لا توجد بلاغات تعليقات',
+  'admin_reported_comment': 'التعليق المُبلَّغ عنه',
+  'admin_comment_author': 'كاتب التعليق',
+  'admin_take_down_comment_title': 'حذف التعليق؟',
+  'admin_take_down_comment_body': 'سيؤدي هذا إلى حذف التعليق المُبلَّغ عنه وإغلاق البلاغ.',
+  'admin_take_down_comment': 'حذف التعليق',
+  'admin_comment_taken_down': 'تم حذف التعليق وإغلاق البلاغ',
+
   // ── PROFILE SCREENS (added) ──
   'profile_no_users_yet': 'لا يوجد مستخدمون بعد',
   'profile_no_profile_data': 'لا توجد بيانات ملف شخصي',

@@ -378,6 +378,14 @@ class _UserTile extends ConsumerWidget {
         );
         if (ok == true) {
           await admin.setRole(uid, isRevoking ? 'user' : 'org_admin');
+          // After revoking, offer to also delete every event the
+          // (now demoted) user created. Two confirmations: the first
+          // asks whether to delete, the second confirms the
+          // irreversible action — declining the second returns to the
+          // first so the admin can reconsider without re-revoking.
+          if (isRevoking && context.mounted) {
+            await _promptDeleteUserEvents(context, ref, uid);
+          }
         }
       } else if (action == 'suspend') {
         await admin.suspendUser(uid, !suspended);
@@ -419,6 +427,73 @@ class _UserTile extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.t.failedWithError(e))));
       }
+    }
+  }
+
+  /// Two-step prompt offered right after revoking a user's event-manager
+  /// role: "delete all their events?" → "are you sure?". Declining the
+  /// second step loops back to the first so the admin can change their
+  /// mind. Does nothing (silently) when the user has no events.
+  Future<void> _promptDeleteUserEvents(
+      BuildContext context, WidgetRef ref, String uid) async {
+    final admin = ref.read(adminServiceProvider);
+    final count = await admin.countEventsCreatedBy(uid);
+    if (count == 0 || !context.mounted) return;
+
+    while (true) {
+      final wantsDelete = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(ctx.t.adminRevokeDeleteEventsTitle),
+          content: Text(ctx.t.adminRevokeDeleteEventsBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ctx.t.adminRevokeKeepEvents),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                ctx.t.adminRevokeDeleteEventsYes,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (wantsDelete != true || !context.mounted) return;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(ctx.t.adminRevokeDeleteEventsConfirmTitle),
+          content: Text(ctx.t.adminRevokeDeleteEventsConfirmBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ctx.t.cancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(ctx.t.adminRevokeDeleteEventsYes),
+            ),
+          ],
+        ),
+      );
+
+      // Confirmed → delete and stop. Declined → loop back to the first
+      // prompt so the admin can choose "keep events" instead.
+      if (confirmed == true) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.adminDeletingAllUserData)),
+          );
+        }
+        await admin.deleteEventsCreatedBy(uid);
+        return;
+      }
+      if (!context.mounted) return;
     }
   }
 }

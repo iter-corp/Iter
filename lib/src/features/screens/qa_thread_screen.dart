@@ -16,6 +16,7 @@ import '../../utils/text_direction.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/comment_report_sheet.dart';
 import 'post_detail_screen.dart';
 
 class QaThreadScreen extends ConsumerStatefulWidget {
@@ -181,6 +182,10 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                         final pinUid = widget.highlightAuthorUid;
                         final pinCommentId = widget.highlightCommentId;
                         topAnswers.sort((a, b) {
+                          // Author-marked helpful answers always float first.
+                          final aHelp = a.markedHelpful ? 0 : 1;
+                          final bHelp = b.markedHelpful ? 0 : 1;
+                          if (aHelp != bHelp) return aHelp.compareTo(bHelp);
                           // Pin a specific answer when provided.
                           if (pinCommentId != null) {
                             final aPin = a.id == pinCommentId ? 0 : 1;
@@ -194,10 +199,6 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                             if (aPin != bPin) return aPin.compareTo(bPin);
                           }
                           // Always order by creation time, newest first.
-                          // Likes / dislikes are editorial signals only —
-                          // they never reorder the list, so a single
-                          // dislike no longer drags an answer to the
-                          // bottom.
                           return b.createdAt.compareTo(a.createdAt);
                         });
                         final repliesByParent = <String, List<Comment>>{};
@@ -231,6 +232,7 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                                 _expandedAnswers.contains(answer.id);
                             return _AnswerBlock(
                               postId: post.id,
+                              postAuthorUid: post.authorUid,
                               answer: answer,
                               replies: replies,
                               expanded: expanded,
@@ -866,6 +868,7 @@ class _AnswersHeader extends StatelessWidget {
 
 class _AnswerBlock extends ConsumerWidget {
   final String postId;
+  final String postAuthorUid;
   final Comment answer;
   final List<Comment> replies;
   final void Function(Comment target) onReply;
@@ -875,6 +878,7 @@ class _AnswerBlock extends ConsumerWidget {
 
   const _AnswerBlock({
     required this.postId,
+    required this.postAuthorUid,
     required this.answer,
     required this.replies,
     required this.onReply,
@@ -885,18 +889,51 @@ class _AnswerBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isHelpful = answer.markedHelpful;
     return AppGlassCard(
       radius: 20,
-      emphasize: highlighted,
-      surfaceAlpha: highlighted
-          ? (context.isDark ? 0.32 : 0.58)
-          : (context.isDark ? 0.24 : 0.52),
-      borderAlpha: highlighted
-          ? (context.isDark ? 0.26 : 0.58)
-          : (context.isDark ? 0.16 : 0.50),
+      emphasize: highlighted || isHelpful,
+      surfaceAlpha: isHelpful
+          ? (context.isDark ? 0.28 : 0.54)
+          : highlighted
+              ? (context.isDark ? 0.32 : 0.58)
+              : (context.isDark ? 0.24 : 0.52),
+      borderAlpha: isHelpful
+          ? 0.70
+          : highlighted
+              ? (context.isDark ? 0.26 : 0.58)
+              : (context.isDark ? 0.16 : 0.50),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Green "Author found this helpful" banner
+          if (isHelpful)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withValues(alpha: 0.12),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle_rounded,
+                      size: 15, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Author found this helpful',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF16A34A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
             child: Column(
@@ -909,6 +946,7 @@ class _AnswerBlock extends ConsumerWidget {
                 const SizedBox(height: 6),
                 _AnswerReactionBar(
                   postId: postId,
+                  postAuthorUid: postAuthorUid,
                   answer: answer,
                   onReply: () => onReply(answer),
                   enabled: !answer.senderOnly,
@@ -979,6 +1017,7 @@ class _AnswerBlock extends ConsumerWidget {
                               const SizedBox(height: 4),
                               _AnswerReactionBar(
                                 postId: postId,
+                                postAuthorUid: postAuthorUid,
                                 answer: r,
                                 onReply: () => onReply(r),
                                 compact: true,
@@ -999,6 +1038,7 @@ class _AnswerBlock extends ConsumerWidget {
 
 class _AnswerReactionBar extends ConsumerWidget {
   final String postId;
+  final String postAuthorUid;
   final Comment answer;
   final VoidCallback onReply;
   final bool compact;
@@ -1006,6 +1046,7 @@ class _AnswerReactionBar extends ConsumerWidget {
 
   const _AnswerReactionBar({
     required this.postId,
+    required this.postAuthorUid,
     required this.answer,
     required this.onReply,
     this.compact = false,
@@ -1027,6 +1068,26 @@ class _AnswerReactionBar extends ConsumerWidget {
 
     final uid = ref.watch(authStateProvider.select((a) => a.value?.uid));
     final service = ref.read(commentServiceProvider);
+
+    // "Mark helpful" chip — only for top-level answers (not replies),
+    // only shown to the question author, only when not sender-only.
+    final isPostAuthor = uid != null && uid == postAuthorUid;
+    final canMarkHelpful = isPostAuthor && !answer.isReply;
+
+    Future<void> toggleHelpful() async {
+      try {
+        await service.setAnswerHelpful(
+          postId: postId,
+          commentId: answer.id,
+          helpful: !answer.markedHelpful,
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.errorWithMessage(e.toString()))),
+        );
+      }
+    }
 
     Future<void> setReaction(String type) async {
       if (uid == null) return;
@@ -1059,6 +1120,22 @@ class _AnswerReactionBar extends ConsumerWidget {
       );
     }
 
+    // Report chip shown only to signed-in users who aren't the author —
+    // tapping runs the shared report flow against this answer/reply.
+    Widget? reportChip() {
+      if (uid == null || uid == answer.authorUid) return null;
+      return _ReportReactionChip(
+        compact: compact,
+        onTap: () => reportCommentFlow(
+          context,
+          ref,
+          postId: postId,
+          comment: answer,
+          surface: answer.isReply ? 'reply' : 'answer',
+        ),
+      );
+    }
+
     if (uid == null) {
       return Wrap(
         spacing: 8,
@@ -1082,6 +1159,7 @@ class _AnswerReactionBar extends ConsumerWidget {
           ),
           _ReplyReactionChip(onTap: onReply, compact: compact),
           _TranslateReactionChip(onTap: translateAnswer, compact: compact),
+          if (reportChip() != null) reportChip()!,
         ],
       );
     }
@@ -1119,6 +1197,13 @@ class _AnswerReactionBar extends ConsumerWidget {
             ),
             _ReplyReactionChip(onTap: onReply, compact: compact),
             _TranslateReactionChip(onTap: translateAnswer, compact: compact),
+            if (canMarkHelpful)
+              _HelpfulChip(
+                marked: answer.markedHelpful,
+                compact: compact,
+                onTap: toggleHelpful,
+              ),
+            if (reportChip() != null) reportChip()!,
           ],
         );
       },
@@ -1169,6 +1254,110 @@ class _AnswerReactionBar extends ConsumerWidget {
           _ReplyReactionChip(onTap: onReply, compact: compact),
           _TranslateReactionChip(onTap: translateAnswer, compact: compact),
         ],
+      ),
+    );
+  }
+}
+
+class _HelpfulChip extends StatelessWidget {
+  final bool marked;
+  final bool compact;
+  final VoidCallback onTap;
+
+  const _HelpfulChip({
+    required this.marked,
+    required this.onTap,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF16A34A);
+    final fg = marked ? green : context.textSecondary;
+    final bg = marked
+        ? green.withValues(alpha: 0.12)
+        : context.inputFill;
+    final border = marked
+        ? green.withValues(alpha: 0.35)
+        : context.borderColor;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 10,
+          vertical: compact ? 5 : 6,
+        ),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              marked
+                  ? Icons.check_circle_rounded
+                  : Icons.check_circle_outline_rounded,
+              size: compact ? 13 : 14,
+              color: fg,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              marked
+                  ? 'Unmark'
+                  : 'Mark helpful',
+              style: TextStyle(
+                fontSize: compact ? 11 : 12,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportReactionChip extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _ReportReactionChip({required this.onTap, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 10,
+          vertical: compact ? 5 : 6,
+        ),
+        decoration: BoxDecoration(
+          color: context.inputFill,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.flag_outlined, size: 13, color: Colors.red),
+            const SizedBox(width: 6),
+            Text(
+              context.t.report,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

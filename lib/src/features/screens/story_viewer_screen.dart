@@ -19,6 +19,7 @@ import '../../services/own_story_seen_service.dart';
 import '../../services/story_service.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
+import '../widgets/event_share.dart';
 import '../widgets/story_text_overlay.dart';
 import 'post_detail_screen.dart';
 import 'text_story_composer_screen.dart';
@@ -733,7 +734,10 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       );
     }
 
-    if (story.overlays.isEmpty) return base;
+    final hasEvent =
+        story.sharedEventId != null && story.sharedEventId!.isNotEmpty;
+
+    if (story.overlays.isEmpty && !hasEvent) return base;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -746,6 +750,18 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
               StoryOverlayStatic(
                 overlay: overlay,
                 canvasSize: canvas,
+              ),
+            if (hasEvent)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 96,
+                child: Center(
+                  child: _ViewEventChip(
+                    eventId: story.sharedEventId!,
+                    title: story.sharedEventTitle,
+                  ),
+                ),
               ),
           ],
         );
@@ -1795,6 +1811,67 @@ class _StorySignInBanner extends StatelessWidget {
 /// Renders a "shared post" story: the original feed/travel post shown
 /// as a card centered on a brand-gradient background. Tapping the card
 /// opens the full post in [PostDetailScreen].
+/// Tappable "View event" pill overlaid on a shared-event story. Opens the
+/// event detail via [openEventById].
+class _ViewEventChip extends StatelessWidget {
+  final String eventId;
+  final String? title;
+
+  const _ViewEventChip({required this.eventId, this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => openEventById(context, eventId),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 280),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.event_outlined, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title != null && title!.isNotEmpty)
+                    Text(
+                      title!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  Text(
+                    context.t.eventsViewEvent,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right, color: Colors.white70, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SharedPostStoryView extends ConsumerStatefulWidget {
   final String postId;
 

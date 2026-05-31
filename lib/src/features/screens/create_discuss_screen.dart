@@ -39,156 +39,169 @@ class _CreateDiscussScreenState extends ConsumerState<CreateDiscussScreen> {
     return AppPageBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: Text(t.homeDiscussionLabel),
           backgroundColor: Colors.transparent,
           foregroundColor: context.textPrimary,
           elevation: 0,
         ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12, top: 8),
-            child: Center(
-              child: AppGlassCard(
-                radius: 30,
-                surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                borderAlpha: context.isDark ? 0.14 : 0.50,
-                padding: const EdgeInsets.all(4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // Scrollable form content
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                   children: [
-                    _bottomTab(context, t.post, 0, false),
-                    _bottomTab(context, t.homeDiscussionLabel, 2, true),
-                    _bottomTab(context, t.story, 1, false),
+                    // Kind toggle — sliding-pill style matching MessageTabBar
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        const pad = 4.0;
+                        final pillWidth = (constraints.maxWidth - pad * 2) / 2;
+                        return Container(
+                          height: 48,
+                          padding: const EdgeInsets.all(pad),
+                          decoration: BoxDecoration(
+                            color: context.cardBg,
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(color: context.borderColor),
+                          ),
+                          child: Stack(
+                            children: [
+                              AnimatedAlign(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                                alignment: isDiscussion
+                                    ? AlignmentDirectional.centerEnd
+                                    : AlignmentDirectional.centerStart,
+                                child: Container(
+                                  width: pillWidth,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.purple,
+                                        AppColors.purpleVivid
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.purple
+                                            .withValues(alpha: 0.35),
+                                        blurRadius: 14,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _kindTab(
+                                      context,
+                                      Icons.help_outline,
+                                      t.homeQuestionLabel,
+                                      !isDiscussion,
+                                      () => setState(() => _kind = 'question'),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _kindTab(
+                                      context,
+                                      Icons.forum_outlined,
+                                      t.homeDiscussionLabel,
+                                      isDiscussion,
+                                      () =>
+                                          setState(() => _kind = 'discussion'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _questionCtrl,
+                      minLines: 2,
+                      maxLines: 4,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: TextStyle(color: context.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: isDiscussion
+                            ? t.homeWhatsYourDiscussion
+                            : t.homeWhatsYourQuestion,
+                        filled: true,
+                        fillColor: context.inputFill,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _detailsCtrl,
+                      minLines: 3,
+                      maxLines: 8,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: TextStyle(color: context.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: t.homeAddMoreContext,
+                        filled: true,
+                        fillColor: context.inputFill,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    PrimaryActionButton(
+                      label: isDiscussion
+                          ? t.homePostDiscussion
+                          : t.homePostQuestion,
+                      onPressed: _submitting ? null : _submit,
+                      loading: _submitting,
+                      size: PrimaryActionSize.large,
+                      fullWidth: true,
+                    ),
                   ],
                 ),
               ),
-            ),
-          ),
-        ),
-        body: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
-              // Kind toggle — same sliding-pill style as MessageTabBar
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  const pad = 4.0;
-                  final pillWidth = (constraints.maxWidth - pad * 2) / 2;
-                  return Container(
-                    height: 48,
-                    padding: const EdgeInsets.all(pad),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: context.borderColor),
-                    ),
-                    child: Stack(
+
+              // Bottom pill tab switcher — inside body, same as CreatePostScreen
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20, top: 8),
+                child: Center(
+                  child: AppGlassCard(
+                    radius: 30,
+                    surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                    borderAlpha: context.isDark ? 0.14 : 0.50,
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        AnimatedAlign(
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOutCubic,
-                          alignment: isDiscussion
-                              ? AlignmentDirectional.centerEnd
-                              : AlignmentDirectional.centerStart,
-                          child: Container(
-                            width: pillWidth,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.purple, AppColors.purpleVivid],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.purple.withValues(alpha: 0.35),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _kindTab(
-                                context,
-                                Icons.help_outline,
-                                t.homeQuestionLabel,
-                                !isDiscussion,
-                                () => setState(() => _kind = 'question'),
-                              ),
-                            ),
-                            Expanded(
-                              child: _kindTab(
-                                context,
-                                Icons.forum_outlined,
-                                t.homeDiscussionLabel,
-                                isDiscussion,
-                                () => setState(() => _kind = 'discussion'),
-                              ),
-                            ),
-                          ],
-                        ),
+                        _bottomTab2(context, t.post, 0, false),
+                        _bottomTab2(context, t.homeDiscussionLabel, 2, true),
+                        _bottomTab2(context, t.story, 1, false),
                       ],
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _questionCtrl,
-                minLines: 2,
-                maxLines: 4,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                style: TextStyle(color: context.textPrimary),
-                decoration: InputDecoration(
-                  hintText: isDiscussion
-                      ? t.homeWhatsYourDiscussion
-                      : t.homeWhatsYourQuestion,
-                  filled: true,
-                  fillColor: context.inputFill,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _detailsCtrl,
-                minLines: 3,
-                maxLines: 8,
-                textCapitalization: TextCapitalization.sentences,
-                style: TextStyle(color: context.textPrimary),
-                decoration: InputDecoration(
-                  hintText: t.homeAddMoreContext,
-                  filled: true,
-                  fillColor: context.inputFill,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              PrimaryActionButton(
-                label: isDiscussion ? t.homePostDiscussion : t.homePostQuestion,
-                onPressed: _submitting ? null : _submit,
-                loading: _submitting,
-                size: PrimaryActionSize.large,
-                fullWidth: true,
               ),
             ],
           ),
@@ -207,7 +220,8 @@ class _CreateDiscussScreenState extends ConsumerState<CreateDiscussScreen> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 17,
+            Icon(icon,
+                size: 17,
                 color: isActive ? Colors.white : context.textSecondary),
             const SizedBox(width: 6),
             Flexible(
@@ -228,7 +242,7 @@ class _CreateDiscussScreenState extends ConsumerState<CreateDiscussScreen> {
     );
   }
 
-  Widget _bottomTab(
+  Widget _bottomTab2(
       BuildContext context, String text, int index, bool isActive) {
     return GestureDetector(
       onTap: () {

@@ -5,6 +5,7 @@ import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_report_notifications_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../widgets/app_page_background.dart';
+import 'admin_comment_reports_screen.dart';
 import 'admin_discuss_reports_screen.dart';
 import 'admin_error_reports_screen.dart';
 import 'admin_post_reports_screen.dart';
@@ -18,6 +19,7 @@ class AdminReportsScreen extends ConsumerWidget {
     final hasNewPostReports = ref.watch(hasNewPostReportsProvider);
     final hasNewDiscussReports = ref.watch(hasNewDiscussReportsProvider);
     final hasNewProfileReports = ref.watch(hasNewProfileReportsProvider);
+    final hasNewCommentReports = ref.watch(hasNewCommentReportsProvider);
     final hasNewErrorReports = ref.watch(hasNewErrorReportsProvider);
 
     return Scaffold(
@@ -86,6 +88,24 @@ class AdminReportsScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(
                     builder: (_) => const AdminUserReportsScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _ReportsTile(
+            icon: Icons.mode_comment_outlined,
+            title: context.t.adminCommentReports,
+            subtitle: context.t.adminCommentReportsSubtitle,
+            color: const Color(0xFF9C6ADE),
+            showNotificationDot: hasNewCommentReports,
+            onTap: () {
+              ref
+                  .read(adminReportSeenProvider.notifier)
+                  .markCommentReportsSeen();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminCommentReportsScreen()),
               );
             },
           ),

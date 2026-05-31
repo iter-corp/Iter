@@ -678,6 +678,66 @@ class UserProfileReport {
   }
 }
 
+class CommentReport {
+  final String id;
+  final String postId;
+  final String commentId;
+  final String commentText;
+  final String commentAuthorUid;
+  final String commentAuthorUsername;
+  final String? commentAuthorAvatar;
+  final String surface; // 'comment' | 'answer' | 'reply'
+  final bool isReply;
+  final String reporterUid;
+  final String reporterUsername;
+  final String reason;
+  final String? details;
+  final bool resolved;
+  final DateTime? createdAt;
+  final DateTime? resolvedAt;
+
+  const CommentReport({
+    required this.id,
+    required this.postId,
+    required this.commentId,
+    required this.commentText,
+    required this.commentAuthorUid,
+    required this.commentAuthorUsername,
+    required this.commentAuthorAvatar,
+    required this.surface,
+    required this.isReply,
+    required this.reporterUid,
+    required this.reporterUsername,
+    required this.reason,
+    required this.details,
+    required this.resolved,
+    required this.createdAt,
+    required this.resolvedAt,
+  });
+
+  factory CommentReport.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? {};
+    return CommentReport(
+      id: doc.id,
+      postId: (d['postId'] as String?) ?? '',
+      commentId: (d['commentId'] as String?) ?? '',
+      commentText: (d['commentText'] as String?) ?? '',
+      commentAuthorUid: (d['commentAuthorUid'] as String?) ?? '',
+      commentAuthorUsername: (d['commentAuthorUsername'] as String?) ?? '',
+      commentAuthorAvatar: d['commentAuthorAvatar'] as String?,
+      surface: (d['surface'] as String?) ?? 'comment',
+      isReply: (d['isReply'] as bool?) ?? false,
+      reporterUid: (d['reporterUid'] as String?) ?? '',
+      reporterUsername: (d['reporterUsername'] as String?) ?? '',
+      reason: (d['reason'] as String?) ?? '',
+      details: d['details'] as String?,
+      resolved: (d['resolved'] as bool?) ?? false,
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      resolvedAt: (d['resolvedAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
 class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
@@ -1278,6 +1338,25 @@ class AdminService {
   Future<void> deleteUserProfileReport(String id) =>
       _db.collection('userReports').doc(id).delete();
 
+  // -------- Comment reports --------
+  Stream<List<CommentReport>> streamCommentReports({int limit = 200}) {
+    return _db
+        .collection('commentReports')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((s) => s.docs.map(CommentReport.fromDoc).toList());
+  }
+
+  Future<void> setCommentReportResolved(String id, bool resolved) =>
+      _db.collection('commentReports').doc(id).update({
+        'resolved': resolved,
+        'resolvedAt': resolved ? FieldValue.serverTimestamp() : null,
+      });
+
+  Future<void> deleteCommentReport(String id) =>
+      _db.collection('commentReports').doc(id).delete();
+
   // -------- Events --------
   Stream<List<AdminEvent>> streamEvents() {
     return _db
@@ -1475,6 +1554,38 @@ class AdminService {
     final batch = _db.batch();
     batch.delete(_db.collection('events').doc(id));
     await batch.commit();
+  }
+
+  /// How many events the given user has created. Used by the admin
+  /// "revoke event manager" flow to decide whether to offer the
+  /// "also delete their events" prompt.
+  Future<int> countEventsCreatedBy(String uid) async {
+    final snap = await _db
+        .collection('events')
+        .where('createdByUid', isEqualTo: uid)
+        .get();
+    return snap.docs.length;
+  }
+
+  /// Deletes every event created by [uid], reusing [deleteEvent] so each
+  /// event's notifications and chat artifacts are swept too. Best-effort
+  /// per event: one failing delete doesn't abort the sweep. Returns the
+  /// number of events deleted.
+  Future<int> deleteEventsCreatedBy(String uid) async {
+    final snap = await _db
+        .collection('events')
+        .where('createdByUid', isEqualTo: uid)
+        .get();
+    var deleted = 0;
+    for (final doc in snap.docs) {
+      try {
+        await deleteEvent(doc.id);
+        deleted++;
+      } catch (e) {
+        debugPrint('deleteEventsCreatedBy: failed for ${doc.id}: $e');
+      }
+    }
+    return deleted;
   }
 
   Future<void> _deleteEventChatArtifacts(String eventId) async {

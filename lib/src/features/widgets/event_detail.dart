@@ -6,10 +6,12 @@ import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/event_registration_providers.dart';
 import '../../providers/preferred_language_provider.dart';
+import '../../services/admin_service.dart';
 import '../../services/event_registration_service.dart';
 import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import 'event_registration_sheet.dart';
+import 'event_share.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
   final String eventId;
@@ -101,6 +103,28 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     super.dispose();
   }
 
+  /// Reconstructs an [AdminEvent] from the widget's fields so the share
+  /// sheet has a single object to work with. `country`/`createdAt`/`funds`
+  /// aren't needed by the share flow (it only uses id/title/location/
+  /// imageUrls), so the unavailable ones are left empty/null.
+  AdminEvent _asAdminEvent() => AdminEvent(
+        id: widget.eventId,
+        title: widget.title,
+        subtitle: widget.subtitle,
+        location: widget.location,
+        description: widget.description,
+        link: widget.link,
+        phone: widget.phone,
+        email: widget.email,
+        imageUrls: widget.imageUrls,
+        createdAt: null,
+        deadlineAt: widget.deadlineAt,
+        eventType: widget.eventType,
+        country: '',
+        funds: widget.funds,
+        createdByUid: widget.createdByUid,
+      );
+
   void _prev() {
     if (_currentImage > 0) {
       _pageController.previousPage(
@@ -132,17 +156,33 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 📌 SECTION: Back Arrow
+              // 📌 SECTION: Back Arrow + Share
               Padding(
                 padding: const EdgeInsetsDirectional.only(
-                    start: 14, top: 10, bottom: 6),
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Icon(
-                    Icons.arrow_back,
-                    size: 22,
-                    color: context.textPrimary,
-                  ),
+                    start: 14, end: 14, top: 10, bottom: 6),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 22,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => showEventShareSheet(
+                        context,
+                        event: _asAdminEvent(),
+                      ),
+                      child: Icon(
+                        Icons.ios_share,
+                        size: 22,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 6),

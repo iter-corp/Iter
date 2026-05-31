@@ -1248,6 +1248,66 @@ const Map<String, String> enStrings = {
       'Countries admins tag events with, and users filter notifications by.',
   'admin_add_country': 'Add a country',
 
+  // ── QA HELPFUL ANSWER ──
+  'qa_mark_helpful': 'Mark helpful',
+  'qa_unmark_helpful': 'Unmark',
+  'qa_author_found_helpful': 'Author found this helpful',
+
+  // ── ADMIN API MANAGER ──
+  'admin_api_manager': 'API Manager',
+  'admin_api_manager_providers': 'API KEYS',
+  'admin_api_manager_add_key': 'Add API key',
+  'admin_api_manager_empty': 'No API keys configured',
+  'admin_api_manager_empty_subtitle':
+      'Add API keys for AI providers to enable AI features.',
+  'admin_api_manager_disabled': 'Disabled',
+  'admin_api_manager_active': 'Active',
+  'admin_api_manager_delete_title': 'Delete API key?',
+  'admin_api_manager_delete_body':
+      'This will permanently remove this API key. AI features using it will stop working.',
+  'admin_api_manager_disable_key': 'Disable key',
+  'admin_api_manager_enable_key': 'Enable key',
+  'admin_api_manager_select_provider': 'Select provider',
+  'admin_api_manager_api_key': 'API Key',
+  'admin_api_manager_key_hint': 'Paste your API key here',
+  'admin_api_manager_key_required': 'API key is required',
+
+  // ── EVENT MANAGER REVOCATION / DELETE EVENTS ──
+  'admin_revoke_delete_events_title': 'Delete all events by this user?',
+  'admin_revoke_delete_events_body':
+      'This user has events posted under their account. Do you want to delete all their events as well?',
+  'admin_revoke_delete_events_confirm_title': 'Are you sure?',
+  'admin_revoke_delete_events_confirm_body':
+      'This will permanently delete all events created by this user. This cannot be undone.',
+  'admin_revoke_delete_events_yes': 'Delete events',
+  'admin_revoke_keep_events': 'Keep events',
+
+  // ── EVENT SHARE ──
+  'event_share': 'Share event',
+  'event_share_send_to_friend': 'Send to a friend',
+  'event_share_to_story': 'Share to my story',
+  'event_shared_to_story': 'Event shared to your story',
+  'event_share_story_failed': 'Could not share to story: {error}',
+  'event_share_sent': 'Event sent to {name}',
+
+  // ── COMMENT REPORTING ──
+  'comment_report': 'Report comment',
+  'comment_report_sent': 'Report sent to admins',
+  'comment_report_failed': 'Could not report comment: {error}',
+  'comment_report_pick_reason': 'Why are you reporting this comment?',
+
+  // ── ADMIN COMMENT REPORTS ──
+  'admin_comment_reports': 'Comment reports',
+  'admin_comment_reports_subtitle': 'Review reports on comments and answers',
+  'admin_no_comment_reports': 'No comment reports',
+  'admin_reported_comment': 'Reported comment',
+  'admin_comment_author': 'Comment author',
+  'admin_take_down_comment_title': 'Delete comment?',
+  'admin_take_down_comment_body':
+      'This will delete the reported comment and mark this report as resolved.',
+  'admin_take_down_comment': 'Delete comment',
+  'admin_comment_taken_down': 'Comment deleted and report resolved',
+
   // ── PROFILE SCREENS (added) ──
   'profile_no_users_yet': 'No users yet',
   'profile_no_profile_data': 'No profile data',

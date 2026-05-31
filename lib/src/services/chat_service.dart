@@ -21,6 +21,7 @@ class ChatMessage {
   final String? fileMimeType;
   final int? fileSizeBytes;
   final String? sharedPostId;
+  final String? sharedEventId;
   final String? voiceUrl;
   final int? voiceDurationMs;
 
@@ -67,6 +68,7 @@ class ChatMessage {
     this.fileMimeType,
     this.fileSizeBytes,
     this.sharedPostId,
+    this.sharedEventId,
     this.voiceUrl,
     this.voiceDurationMs,
     this.voiceTranscript,
@@ -134,6 +136,7 @@ class ChatMessage {
       fileMimeType: d['fileMimeType'] as String?,
       fileSizeBytes: (d['fileSizeBytes'] as num?)?.toInt(),
       sharedPostId: d['sharedPostId'] as String?,
+      sharedEventId: d['sharedEventId'] as String?,
       voiceUrl: d['voiceUrl'] as String?,
       voiceDurationMs: (d['voiceDurationMs'] as num?)?.toInt(),
       voiceTranscript: pickOptStr('vt', 'voiceTranscript'),
@@ -170,6 +173,7 @@ class ChatMessage {
         if (fileMimeType != null) 'fileMimeType': fileMimeType,
         if (fileSizeBytes != null) 'fileSizeBytes': fileSizeBytes,
         if (sharedPostId != null) 'sharedPostId': sharedPostId,
+        if (sharedEventId != null) 'sharedEventId': sharedEventId,
         if (voiceUrl != null) 'voiceUrl': voiceUrl,
         if (voiceDurationMs != null) 'voiceDurationMs': voiceDurationMs,
         if (voiceTranscript != null) 'voiceTranscript': voiceTranscript,
@@ -202,6 +206,7 @@ class ChatMessage {
         fileMimeType: m['fileMimeType'] as String?,
         fileSizeBytes: (m['fileSizeBytes'] as num?)?.toInt(),
         sharedPostId: m['sharedPostId'] as String?,
+        sharedEventId: m['sharedEventId'] as String?,
         voiceUrl: m['voiceUrl'] as String?,
         voiceDurationMs: (m['voiceDurationMs'] as num?)?.toInt(),
         voiceTranscript: m['voiceTranscript'] as String?,
@@ -424,6 +429,9 @@ class ChatService {
     if ((data['sharedPostId'] as String?)?.trim().isNotEmpty == true) {
       return 'Shared a post';
     }
+    if ((data['sharedEventId'] as String?)?.trim().isNotEmpty == true) {
+      return 'Shared an event';
+    }
     if ((data['voiceUrl'] as String?)?.trim().isNotEmpty == true) {
       return 'Voice message';
     }
@@ -598,6 +606,7 @@ class ChatService {
     String? fileMimeType,
     int? fileSizeBytes,
     String? sharedPostId,
+    String? sharedEventId,
     String? voiceUrl,
     int? voiceDurationMs,
     String? voiceTranscript,
@@ -618,6 +627,7 @@ class ChatService {
     final normalizedFileUrl = fileUrl?.trim();
     final normalizedFileName = fileName?.trim();
     final normalizedSharedPostId = sharedPostId?.trim();
+    final normalizedSharedEventId = sharedEventId?.trim();
     final normalizedVoiceUrl = voiceUrl?.trim();
     final normalizedVoiceTranscript = voiceTranscript?.trim();
     final normalizedStoryId = storyId?.trim();
@@ -631,6 +641,8 @@ class ChatService {
     final hasFile = normalizedFileUrl != null && normalizedFileUrl.isNotEmpty;
     final hasSharedPost =
         normalizedSharedPostId != null && normalizedSharedPostId.isNotEmpty;
+    final hasSharedEvent =
+        normalizedSharedEventId != null && normalizedSharedEventId.isNotEmpty;
     final hasVoice =
         normalizedVoiceUrl != null && normalizedVoiceUrl.isNotEmpty;
     final hasStoryRef =
@@ -646,6 +658,7 @@ class ChatService {
         !hasVideo &&
         !hasFile &&
         !hasSharedPost &&
+        !hasSharedEvent &&
         !hasVoice &&
         !hasStoryRef &&
         !hasSticker &&
@@ -695,7 +708,9 @@ class ChatService {
                 ? 'Sent a sticker'
                 : hasSharedPost
                     ? 'Shared a post'
-                    : hasVoice
+                    : hasSharedEvent
+                        ? 'Shared an event'
+                        : hasVoice
                         ? 'Voice message'
                         : hasVideo
                             ? 'Sent a video'
@@ -742,6 +757,7 @@ class ChatService {
         'fileMimeType': fileMimeType,
       if (hasFile && fileSizeBytes != null) 'fileSizeBytes': fileSizeBytes,
       if (hasSharedPost) 'sharedPostId': normalizedSharedPostId,
+      if (hasSharedEvent) 'sharedEventId': normalizedSharedEventId,
       if (hasVoice) 'voiceUrl': normalizedVoiceUrl,
       if (hasVoice && voiceDurationMs != null)
         'voiceDurationMs': voiceDurationMs,

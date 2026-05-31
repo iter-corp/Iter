@@ -1449,6 +1449,75 @@ class AppStrings {
   String get adminEventCountriesDesc => _get('admin_event_countries_desc');
   String get adminAddCountry => _get('admin_add_country');
 
+  // ── QA HELPFUL ANSWER ──
+  String get qaMarkHelpful => _get('qa_mark_helpful');
+  String get qaUnmarkHelpful => _get('qa_unmark_helpful');
+  String get qaAuthorFoundHelpful => _get('qa_author_found_helpful');
+
+  // ── ADMIN API MANAGER ──
+  String get adminApiManager => _get('admin_api_manager');
+  String get adminApiManagerProviders => _get('admin_api_manager_providers');
+  String get adminApiManagerAddKey => _get('admin_api_manager_add_key');
+  String get adminApiManagerEmpty => _get('admin_api_manager_empty');
+  String get adminApiManagerEmptySubtitle =>
+      _get('admin_api_manager_empty_subtitle');
+  String get adminApiManagerDisabled => _get('admin_api_manager_disabled');
+  String get adminApiManagerActive => _get('admin_api_manager_active');
+  String get adminApiManagerDeleteTitle =>
+      _get('admin_api_manager_delete_title');
+  String get adminApiManagerDeleteBody => _get('admin_api_manager_delete_body');
+  String get adminApiManagerDisableKey => _get('admin_api_manager_disable_key');
+  String get adminApiManagerEnableKey => _get('admin_api_manager_enable_key');
+  String get adminApiManagerSelectProvider =>
+      _get('admin_api_manager_select_provider');
+  String get adminApiManagerApiKey => _get('admin_api_manager_api_key');
+  String get adminApiManagerKeyHint => _get('admin_api_manager_key_hint');
+  String get adminApiManagerKeyRequired =>
+      _get('admin_api_manager_key_required');
+
+  // ── EVENT MANAGER REVOCATION / DELETE EVENTS ──
+  String get adminRevokeDeleteEventsTitle =>
+      _get('admin_revoke_delete_events_title');
+  String get adminRevokeDeleteEventsBody =>
+      _get('admin_revoke_delete_events_body');
+  String get adminRevokeDeleteEventsConfirmTitle =>
+      _get('admin_revoke_delete_events_confirm_title');
+  String get adminRevokeDeleteEventsConfirmBody =>
+      _get('admin_revoke_delete_events_confirm_body');
+  String get adminRevokeDeleteEventsYes =>
+      _get('admin_revoke_delete_events_yes');
+  String get adminRevokeKeepEvents => _get('admin_revoke_keep_events');
+
+  // ── EVENT SHARE ──
+  String get eventShare => _get('event_share');
+  String get eventShareSendToFriend => _get('event_share_send_to_friend');
+  String get eventShareToStory => _get('event_share_to_story');
+  String get eventSharedToStory => _get('event_shared_to_story');
+  String eventShareStoryFailed(Object error) =>
+      _fmt('event_share_story_failed', {'error': error});
+  String eventShareSent(Object name) =>
+      _fmt('event_share_sent', {'name': name});
+
+  // ── COMMENT REPORTING ──
+  String get commentReport => _get('comment_report');
+  String get commentReportSent => _get('comment_report_sent');
+  String commentReportFailed(Object error) =>
+      _fmt('comment_report_failed', {'error': error});
+  String get commentReportPickReason => _get('comment_report_pick_reason');
+
+  // ── ADMIN COMMENT REPORTS ──
+  String get adminCommentReports => _get('admin_comment_reports');
+  String get adminCommentReportsSubtitle =>
+      _get('admin_comment_reports_subtitle');
+  String get adminNoCommentReports => _get('admin_no_comment_reports');
+  String get adminReportedComment => _get('admin_reported_comment');
+  String get adminCommentAuthor => _get('admin_comment_author');
+  String get adminTakeDownCommentTitle =>
+      _get('admin_take_down_comment_title');
+  String get adminTakeDownCommentBody => _get('admin_take_down_comment_body');
+  String get adminTakeDownComment => _get('admin_take_down_comment');
+  String get adminCommentTakenDown => _get('admin_comment_taken_down');
+
   // ── PROFILE SCREENS (added) ──
   String get profileNoUsersYet => _get('profile_no_users_yet');
   String get profileNoProfileData => _get('profile_no_profile_data');
