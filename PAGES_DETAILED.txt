@@ -1,0 +1,144 @@
+Main Screen (bottom tabs)
+- Tabs: Home, Events, Translate, Messages, Profile
+- bottom nav with unread badge and scroll-to-top on re-tap
+- PageView navigation and per-tab background
+
+Home (HomeBody)
+- Modes: Feed, Travel, Discuss (QA)
+- Shared: Stories strip, global search, post composer / ask sheet, notification bell
+- Feed mode: post feed, pull-to-refresh, post cards (like, comment, repost, translate, save, share), open PostDetail, open comments, open author profile
+- Travel mode: location-aware feed, travel quick filters, place picker, travel location-off banner, distance labels
+- Discuss (QA) mode: question threads, ask-a-question sheet, answers list, reply/like/dislike answers, pin/highlight answers
+
+Notification Screen
+- Three categories/tabs: Activity, Follow, Event
+- Activity: likes, comments, replies, reposts, story interactions, messages
+- Follow: follow, follow_request, follow_accept (with follow-back actions and pending request handling)
+- Event: event invites/approvals/new events/role updates
+- Features: unread counts per category, horizontal category chips, grouped by date (Today/Yesterday/Earlier), mark read/unread, delete, item actions sheet
+
+Messages / Inbox (MessageScreen)
+- Lists: 1:1 chats, contact requests
+- Search chats, new group creation, open chat
+- Merge and sort inbox rows by last time
+
+Chat Screen (1:1)
+- Send/receive text messages
+- Attachments: image, video, file, location
+- Audio recording & playback
+- Pending uploads, upload status, retry failed sends
+- Message reactions, reply/quote, stickers, polls, open media viewer, download/open files
+- Message translation UI hooks
+
+Chat Media Viewer (ChatMediaScreen)
+- Tabs for Images / Videos / Files
+- Grid/list of shared media in a chat, open media items, empty states
+
+Create Post (CreatePostScreen)
+- Compose post caption
+- Attach multiple images and videos (camera or gallery)
+- Video size limit and validation
+- Add place name / city (geocode typed place or use current location)
+- Privacy (public / followers-only), post upload and progress
+
+Post Detail (PostDetailScreen)
+- Display single post, stream live updates
+- Open comments sheet (CommentScreen), highlight specific comment
+
+Comment Screen
+- View comments (draggable sheet), threaded replies (one-level nesting), expand/collapse replies
+- Reply to comment, submit comment, show post context optionally
+- Highlight comment and scroll-to behavior, report/delete options
+
+QA Thread (QaThreadScreen)
+- Show question (post) and list of answers
+- Post/submit answers, reply to answers, pin highlight author/answer, sort newest-first, expand/collapse answers
+
+Stories: Add / Camera / Composer / Preview / Viewer
+- AddToStoryScreen: pick from albums, system gallery fallback, open preview
+- CameraStoryScreen: camera capture, flip camera, flash modes, capture photo/video, upload and preview
+- TextStoryComposerScreen: text-only story composer
+- StoryPreview / VideoStoryPreview: preview, edit, post
+- StoryViewerScreen: full-screen story playback, progress bar, pause on long-press, like/comment/share, reply, mark seen
+
+Profile (ProfileScreen)
+- Profile header: avatar, cover, name, handle, bio
+- Stats: followers, following, posts count
+- Buttons: settings, follow/unfollow, message, edit profile
+- Tabs: user posts (grid/list), QA threads, saved items? (as implemented)
+- Modal: show followers/following lists
+
+Edit Profile (EditProfileScreen)
+- Change avatar / cover (gallery), upload to storage
+- Edit name, username (validation), bio, gender (fixed list)
+- Personalization fields: profession, field, academic level, goals
+
+Profile Settings (ProfileSettingsScreen)
+- Account: change email, change password (if email/password user)
+- Privacy: private account toggle, profile visitors
+- Notifications: event notification settings
+- Language & app translation preferences
+- Links to: blocked users, contact us, saved translations, event notification settings, admin screens if admin
+
+Profile Visitors (ProfileVisitorsScreen)
+- List of recent visitors to profile, count badge, empty state
+
+Blocked Users (BlockedUsersScreen)
+- List blocked accounts, unblock actions
+
+Language Screen
+- Select app UI language, shows native names and directions
+
+Change Password (ChangePasswordScreen)
+- Current password / new password flow, validation, error display
+
+User Screen (user_screen.dart)
+- View another user's profile (avatar, bio, stats)
+- Follow/unfollow, message, view posts, view mutuals
+
+Image Viewer (ImageViewerScreen)
+- Fullscreen image view, zoom, share, open in external app, save
+
+Video Story Preview (VideoStoryPreviewScreen)
+- Preview captured video stories, trim/check playback before posting
+
+Event Body / Events (EventBody + EventDetail)
+- Tabs: Partners, Events
+- Event listing: list + map layout, filters (city, type, academic level, nearby), search
+- Event detail widget: title, subtitle, description, date/time, location map, join/RSVP, share, admin actions
+- Quick-start sheet for first-time users, event relevance scoring, partner filtering
+
+
+Event Notifications Settings
+- Per-event notification preferences, toggles
+
+Admin Area (admin/*)
+- Admin dashboard, manage users, posts, events
+- Reports: post reports, discuss reports, user reports, error reports
+- Contact requests and admin settings, blacklist management, admin tools
+
+Auth / Onboarding
+- SplashScreen, AppIntro, Onboarding flow
+- Login (email/Google/Apple), Signup, OTP screen, Forgot password
+- Auth error flows and validation
+
+Contact Us (ContactUsScreen)
+- Send feedback or support requests, show contact/help info
+
+Requests / Follow Requests (RequestScreen)
+- View incoming follow/contact requests, accept/reject actions
+
+Translate / Saved Translations
+- TranslateBody: text input, speech-to-text input, text-to-speech (TTS), swap languages, bookmark/save translation
+- SavedTranslationsScreen: list saved translations, restore to translate screen, delete swipe-to-dismiss
+
+Translate Helpers
+- Inline translation for posts/comments where integration exists (providers/services)
+
+Misc / Utilities
+- Image/video pickers and gallery access (AddToStory, CreatePost, Camera)
+- Permissions handling (location, camera, microphone, storage)
+- Background location handling for Travel mode
+- Local persistence: shared_preferences, sqflite usage hooks
+- Developer/diagnostics screens and logs
+

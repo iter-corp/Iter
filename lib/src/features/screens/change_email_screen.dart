@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/app_page_background.dart';
-import '../widgets/primary_action_button.dart';
 
 /// Full-page "Change email" flow (previously a popup dialog).
 ///
@@ -28,6 +27,8 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+
+  bool get _busy => _loading;
 
   @override
   void dispose() {
@@ -59,8 +60,8 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       _error = null;
     });
     try {
-      final cred = EmailAuthProvider.credential(
-          email: user.email!, password: password);
+      final cred =
+          EmailAuthProvider.credential(email: user.email!, password: password);
       await user.reauthenticateWithCredential(cred);
       try {
         await user.verifyBeforeUpdateEmail(newEmail);
@@ -101,6 +102,20 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
     }
   }
 
+  InputDecoration _fieldDecoration({required String label, Widget? suffix}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: context.textSecondary),
+      filled: false,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      enabledBorder: InputBorder.none,
+      border: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      suffixIcon: suffix,
+      suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
@@ -112,58 +127,92 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
         foregroundColor: context.textPrimary,
         elevation: 0,
         flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : _save,
+            child: _loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    context.t.save,
+                    style: const TextStyle(color: AppColors.purple),
+                  ),
+          ),
+        ],
       ),
       body: AppPageBackground(
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+            padding: EdgeInsets.fromLTRB(
+                20, 20, 20, 24 + MediaQuery.of(context).padding.bottom),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_error != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEEEE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                TextField(
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: context.t.settingsNewEmail,
-                    border: const OutlineInputBorder(),
+                AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration:
+                        _fieldDecoration(label: context.t.settingsNewEmail),
                   ),
                 ),
                 const SizedBox(height: 14),
-                TextField(
-                  controller: _passCtrl,
-                  obscureText: _obscure,
-                  decoration: InputDecoration(
-                    labelText: context.t.settingsCurrentPassword,
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscure
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () => setState(() => _obscure = !_obscure),
+                AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                    controller: _passCtrl,
+                    obscureText: _obscure,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: _fieldDecoration(
+                      label: context.t.settingsCurrentPassword,
+                      suffix: IconButton(
+                        icon: Icon(
+                            _obscure ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
                     ),
                   ),
                 ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ],
                 const SizedBox(height: 24),
-                PrimaryActionButton(
-                  label: context.t.save,
-                  onPressed: _loading ? null : _save,
-                  loading: _loading,
-                  size: PrimaryActionSize.large,
-                  fullWidth: true,
+                SizedBox(
+                  height: 48,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.purple,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _busy ? null : _save,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            context.t.save,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                  ),
                 ),
               ],
             ),

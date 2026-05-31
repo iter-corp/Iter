@@ -16,6 +16,7 @@ import '../../services/translate_service.dart';
 import '../model/post_model.dart';
 import '../../utils/text_direction.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/comment_report_sheet.dart';
 
 class _ReplyTarget {
   final String parentCommentId;
@@ -878,6 +879,32 @@ class _CommentTile extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          // Three-dot report button next to Translate. Hide for
+                          // the comment author or when not signed in because
+                          // Firestore rules disallow reporting your own comment.
+                          if (currentUid != null &&
+                              currentUid != comment.authorUid) ...[
+                            const SizedBox(width: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: IconButton(
+                                onPressed: () => reportCommentFlow(
+                                  context,
+                                  ref,
+                                  postId: post.id,
+                                  comment: comment,
+                                ),
+                                icon: Icon(
+                                  Icons.more_horiz,
+                                  size: 18,
+                                  color: context.textSecondary,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
+                              ),
+                            ),
+                          ],
                         ],
                       ],
                     ),

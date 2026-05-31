@@ -1,0 +1,34 @@
+Email/password authentication
+Google Sign-In
+Sign in with Apple
+Firebase Authentication
+Cloud Firestore database
+Realtime Database
+Cloud Functions integration
+Cloud Storage file uploads
+Push notifications (Firebase Messaging)
+User profile management
+Location tracking
+Geocoding (address lookup)
+Camera capture (photos & video)
+Image picker (gallery)
+Video recording
+Video trimming
+Video playback
+Audio playback
+Text-to-speech
+Speech-to-text
+Realtime voice/video calls (Agora)
+Chat messaging
+End-to-end encrypted chat
+File sharing and open/save
+Photo management and gallery
+In-app reports
+Local persistence (sqflite)
+Shared preferences (settings)
+Deep linking support
+Multi-platform builds (Android, iOS, Web, macOS, Windows, Linux)
+Supabase integration and serverless functions
+Permissions handling
+Background processing support
+Developer tools and diagnostics

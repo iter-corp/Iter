@@ -1,0 +1,67 @@
+Authentication (Sign In / Sign Up)
+- Email/password authentication
+- Google Sign-In
+- Sign in with Apple
+- Firebase Authentication
+
+Home / Dashboard
+- User profile management
+- Push notifications (Firebase Messaging)
+- Deep linking support
+- In-app reports (summary widgets)
+
+Chat / Messaging
+- Chat messaging
+- End-to-end encrypted chat
+- File sharing and open/save
+- Push notifications for messages
+- Cloud Firestore database
+- Realtime Database
+- Cloud Functions integration
+
+Voice & Video Calls
+- Realtime voice/video calls (Agora)
+- Call signaling via Cloud Functions/Realtime DB
+
+Media / Gallery
+- Camera capture (photos & video)
+- Image picker (gallery)
+- Video recording
+- Video trimming
+- Video playback
+- Audio playback
+- Photo management and gallery
+- Cloud Storage file uploads
+
+Profile & Settings
+- User profile management (edit, avatar upload)
+- Shared preferences (settings)
+- Permissions handling
+- Sign out / account management
+
+Location / Maps
+- Location tracking
+- Geocoding (address lookup)
+- Permissions handling for location
+- Background processing support for location updates
+
+Offline & Local Data
+- Local persistence (sqflite)
+- Shared preferences (local settings)
+- Sync with Cloud Firestore / Realtime Database
+
+Notifications
+- Push notifications (Firebase Messaging)
+- Permission prompts and handling
+
+Integrations & Backend
+- Cloud Functions integration
+- Cloud Firestore database
+- Realtime Database
+- Supabase integration and serverless functions
+- Firebase Authentication
+- Cloud Storage file uploads
+
+Developer / Diagnostics
+- Developer tools and diagnostics
+- Logs and debug screens
