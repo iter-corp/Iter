@@ -734,6 +734,17 @@ class _HomeBodyState extends ConsumerState<HomeBody>
 
   @override
   Widget build(BuildContext context) {
+    // "View in discuss" (from a post menu anywhere in the app) sets the
+    // discuss filter then pops to root. Switch the home shell to the Discuss
+    // tab when that happens — otherwise the filter is applied but the user
+    // stays on whatever tab they were on and sees nothing change.
+    ref.listen<String?>(discussFilterPostIdProvider, (prev, next) {
+      if (next != null && _mode != _HomeMode.qa && mounted) {
+        setState(() => _mode = _HomeMode.qa);
+        _saveMode(_HomeMode.qa);
+      }
+    });
+
     final profile = ref.watch(currentUserDocProvider).valueOrNull;
     if ((_viewerLat == null || _viewerLng == null) &&
         !_resolvingLocation &&

@@ -2206,6 +2206,10 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
 /// If the post already has a Discuss thread it just opens it. For a
 /// new topic it first asks the user to type their question about the
 /// post, then creates the topic (question + linked post) and opens it.
+/// Starts a NEW discussion about [post] and opens its thread. Every user can
+/// create their own discussion of the same post — we always ask for the
+/// question and always create a fresh topic (no reuse/dedupe). To browse the
+/// discussions others already made about this post, see [viewPostDiscussions].
 Future<void> discussPost(
   BuildContext context,
   WidgetRef ref,
@@ -2220,19 +2224,11 @@ Future<void> discussPost(
   final createdMsg = strings.postCardDiscussCreated;
 
   try {
-    // If a Discuss topic already exists, just open it.
-    var topicId = post.discussTopicId ??
-        await postService.findDiscussTopicForPost(post.id);
-
-    if (topicId == null) {
-      // New topic — ask the user to type their question first.
-      if (!context.mounted) return;
-      final question = await _askDiscussQuestion(context);
-      if (question == null || question.trim().isEmpty) return;
-      topicId =
-          await postService.createQaPostFromPost(post, question: question);
-      messenger.showSnackBar(SnackBar(content: Text(createdMsg)));
-    }
+    final question = await _askDiscussQuestion(context);
+    if (question == null || question.trim().isEmpty) return;
+    final topicId =
+        await postService.createQaPostFromPost(post, question: question);
+    messenger.showSnackBar(SnackBar(content: Text(createdMsg)));
 
     final qaPost = await postService.getPostById(topicId);
     if (qaPost == null) return;
@@ -2245,6 +2241,19 @@ Future<void> discussPost(
       SnackBar(content: Text(strings.postCardDiscussFailed(e))),
     );
   }
+}
+
+/// Opens the Discuss tab filtered to all discussions about [post]. Sets the
+/// shared [discussFilterPostIdProvider] so the Discuss feed shows only this
+/// post's threads (with a thumbnail header + X to clear back to all), then
+/// pops to the root where the home Discuss tab lives.
+void viewPostDiscussions(
+  BuildContext context,
+  WidgetRef ref,
+  Post post,
+) {
+  ref.read(discussFilterPostIdProvider.notifier).state = post.id;
+  Navigator.of(context).popUntil((r) => r.isFirst);
 }
 
 /// Bottom sheet asking the user to type a question about a post they
@@ -2350,6 +2359,8 @@ class _OwnerMenu extends StatelessWidget {
             await _toggleVisibility(context);
           } else if (action == 'discuss') {
             await discussPost(context, ref, post);
+          } else if (action == 'view_discuss') {
+            viewPostDiscussions(context, ref, post);
           } else if (action == 'delete') {
             await _delete(context);
           }
@@ -2374,14 +2385,22 @@ class _OwnerMenu extends StatelessWidget {
                   : context.t.postCardMakeFollowersOnly),
             ]),
           ),
+          // Always available: start your OWN discussion of this post.
           PopupMenuItem(
             value: 'discuss',
             child: Row(children: [
               const Icon(Icons.forum_outlined, size: 18),
               const SizedBox(width: 8),
-              Text(post.discussTopicId != null
-                  ? context.t.postCardViewInDiscuss
-                  : context.t.postCardDiscussThisPost),
+              Text(context.t.postCardDiscussThisPost),
+            ]),
+          ),
+          // Browse every discussion others made about this post.
+          PopupMenuItem(
+            value: 'view_discuss',
+            child: Row(children: [
+              const Icon(Icons.visibility_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(context.t.postCardViewInDiscuss),
             ]),
           ),
           PopupMenuItem(
@@ -2513,17 +2532,27 @@ class _ViewerMenu extends StatelessWidget {
             await _report(context);
           } else if (action == 'discuss') {
             await discussPost(context, ref, post);
+          } else if (action == 'view_discuss') {
+            viewPostDiscussions(context, ref, post);
           }
         },
         itemBuilder: (_) => [
+          // Always available: start your OWN discussion of this post.
           PopupMenuItem(
             value: 'discuss',
             child: Row(children: [
               const Icon(Icons.forum_outlined, size: 18),
               const SizedBox(width: 8),
-              Text(post.discussTopicId != null
-                  ? context.t.postCardViewInDiscuss
-                  : context.t.postCardDiscussThisPost),
+              Text(context.t.postCardDiscussThisPost),
+            ]),
+          ),
+          // Browse every discussion others made about this post.
+          PopupMenuItem(
+            value: 'view_discuss',
+            child: Row(children: [
+              const Icon(Icons.visibility_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(context.t.postCardViewInDiscuss),
             ]),
           ),
           PopupMenuItem(

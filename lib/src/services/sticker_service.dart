@@ -186,6 +186,58 @@ class StickerService {
         .delete();
   }
 
+  /// Permanently deletes EVERY custom sticker the user owns — the Firestore
+  /// pack docs under `users/{uid}/stickerPacks` AND the underlying `.webp`
+  /// files in Firebase Storage under `users/{uid}/stickers/`. Used by account
+  /// self-delete so no sticker data or media is left behind.
+  ///
+  /// Best-effort per item: a failure on one file/pack is skipped rather than
+  /// aborting the whole account deletion.
+  Future<void> deleteAllStickers(String uid) async {
+    // 1. Firestore: each pack stores its sticker file URLs in `stickerUrls`.
+    //    Delete each referenced Storage object, then the pack doc itself.
+    final packs = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('stickerPacks')
+        .get();
+    for (final pack in packs.docs) {
+      final urls =
+          List<String>.from(pack.data()['stickerUrls'] as List? ?? const []);
+      for (final url in urls) {
+        try {
+          await _storage.refFromURL(url).delete();
+        } catch (_) {
+          // File already gone or URL unparsable — skip.
+        }
+      }
+      await pack.reference.delete();
+    }
+
+    // 2. Storage sweep: catch any stray files under the user's sticker folder
+    //    that weren't referenced by a pack doc (e.g. an upload that failed to
+    //    update Firestore). Firebase has no folder-delete, so list + recurse.
+    await _deleteStorageFolder(_storage.ref('users/$uid/stickers'));
+  }
+
+  /// Recursively deletes all items under [ref] in Firebase Storage. A missing
+  /// folder simply yields an empty listing.
+  Future<void> _deleteStorageFolder(Reference ref) async {
+    try {
+      final result = await ref.listAll();
+      for (final item in result.items) {
+        try {
+          await item.delete();
+        } catch (_) {}
+      }
+      for (final prefix in result.prefixes) {
+        await _deleteStorageFolder(prefix);
+      }
+    } catch (_) {
+      // Folder doesn't exist (user never made a sticker) — nothing to do.
+    }
+  }
+
   /// Stream all custom packs for a user.
   Stream<List<CustomStickerPack>> streamCustomPacks(String uid) {
     return _db

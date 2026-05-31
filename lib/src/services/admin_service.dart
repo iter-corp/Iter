@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import 'notification_service.dart';
 import 'post_service.dart';
+import 'sticker_service.dart';
+import 'storage_service.dart';
 
 class AdminConfig {
   final bool storiesEnabled;
@@ -851,37 +853,145 @@ class AdminService {
       }
     }
 
+    // ── 1. The user's own posts (and every nested subcollection) ──────────
     final posts =
         await _db.collection('posts').where('authorUid', isEqualTo: uid).get();
     for (final post in posts.docs) {
+      await _deleteSubcollection(post.reference, 'likes');
+      await _deleteSubcollection(post.reference, 'reposts');
+      // Comments under the post can themselves have likes / reactions —
+      // sweep those before deleting each comment, then the comment.
+      final comments = await post.reference.collection('comments').get();
+      for (final c in comments.docs) {
+        await _deleteSubcollection(c.reference, 'likes');
+        await _deleteSubcollection(c.reference, 'reactions');
+        await c.reference.delete();
+      }
       await post.reference.delete();
     }
 
+    // ── 2. The user's own stories (and nested subcollections) ─────────────
     final stories = await _db
         .collection('stories')
         .where('authorUid', isEqualTo: uid)
         .get();
     for (final story in stories.docs) {
+      await _deleteSubcollection(story.reference, 'viewers');
+      await _deleteSubcollection(story.reference, 'likes');
+      final sComments = await story.reference.collection('comments').get();
+      for (final c in sComments.docs) {
+        await _deleteSubcollection(c.reference, 'likes');
+        await c.reference.delete();
+      }
       await story.reference.delete();
     }
 
-    // Remove this user from other people's follow lists before we delete
-    // the user's own follow collections. This prevents the deleted account
-    // from remaining in others' follower/following lists.
+    // ── 3. The user's traces on OTHER people's content ────────────────────
+    // Comments, likes, reposts and reactions the user left anywhere. The
+    // collection-group reads are scoped by the loosened rules to the caller's
+    // own docs only (authorUid / doc-id == uid), so this never touches
+    // anyone else's data. Best-effort per group: a missing composite index
+    // or a permission edge shouldn't abort the whole self-delete.
+    await _deleteOwnCommentsEverywhere(uid);
+    await _deleteOwnTraceByDocId('likes', uid);
+    await _deleteOwnTraceByDocId('reposts', uid);
+    await _deleteOwnTraceByDocId('reactions', uid);
+
+    // ── 4. Direct-message chats — delete the WHOLE conversation for both ───
+    // sides (messages + reactions + polls + the chat doc itself).
+    final chats = await _db
+        .collection('chats')
+        .where('participants', arrayContains: uid)
+        .get();
+    for (final chat in chats.docs) {
+      // Messages (each may have a reactions subcollection).
+      final messages = await chat.reference.collection('messages').get();
+      for (final m in messages.docs) {
+        await _deleteSubcollection(m.reference, 'reactions');
+        await m.reference.delete();
+      }
+      // Polls (each may have a votes subcollection).
+      final polls = await chat.reference.collection('polls').get();
+      for (final p in polls.docs) {
+        await _deleteSubcollection(p.reference, 'votes');
+        await p.reference.delete();
+      }
+      // Finally the chat container — must come AFTER the messages above,
+      // because the message-delete rule reads the (still-existing) chat doc
+      // to verify participation.
+      await chat.reference.delete();
+    }
+
+    // ── 5. Event registrations the user submitted ─────────────────────────
+    final regs = await _db
+        .collection('eventRegistrations')
+        .where('userUid', isEqualTo: uid)
+        .get();
+    for (final r in regs.docs) {
+      await r.reference.delete();
+    }
+
+    // ── 6. Event-group-chat memberships (leave every group) ───────────────
+    // Find membership docs via the collection group, then delete each one
+    // (rules allow a user to delete their own member doc).
+    try {
+      final memberships = await _db
+          .collectionGroup('members')
+          .where('uid', isEqualTo: uid)
+          .get();
+      for (final m in memberships.docs) {
+        await m.reference.delete();
+      }
+    } catch (_) {
+      // Best-effort — missing index or no memberships.
+    }
+
+    // ── 7. "Who viewed my profile" traces the user left on OTHER profiles ─
+    try {
+      final visits = await _db
+          .collectionGroup('visitors')
+          .where('uid', isEqualTo: uid)
+          .get();
+      for (final v in visits.docs) {
+        await v.reference.delete();
+      }
+    } catch (_) {
+      // The visitor doc id is the visitor's uid, so even without the `uid`
+      // field this is bounded; ignore if the query/index isn't available.
+    }
+
+    // ── 8. Remove the user from other people's follow lists ───────────────
     await _deleteFollowTraces(uid, userRef);
 
-    // Comments by this user are intentionally preserved; the comment tile
-    // displays "deleted user" once the author doc is gone.
-
+    // ── 9. The user's own subcollections ──────────────────────────────────
     await _deleteSubcollection(userRef, 'followers');
     await _deleteSubcollection(userRef, 'following');
     await _deleteSubcollection(userRef, 'reposts');
     await _deleteSubcollection(userRef, 'saved');
     await _deleteSubcollection(userRef, 'savedTranslations');
+    await _deleteSubcollection(userRef, 'visitors');
 
     await _deleteSubcollection(
         _db.collection('notifications').doc(uid), 'items');
 
+    // ── 10. Custom stickers (Firestore packs + Firebase Storage .webp) ────
+    try {
+      await StickerService().deleteAllStickers(uid);
+    } catch (e) {
+      debugPrint('selfDelete: sticker deletion failed (continuing): $e');
+    }
+
+    // ── 11. The user's uploaded media in Supabase Storage ─────────────────
+    // Runs BEFORE the Auth-email rename below so the Firebase ID token the
+    // edge function verifies is still valid. Best-effort: a Storage failure
+    // must not block freeing the account's email / Auth record.
+    try {
+      await StorageService().deleteAllMyMedia();
+    } catch (e) {
+      debugPrint('selfDelete: media deletion failed (continuing): $e');
+    }
+
+    // ── 12. Finally, the user document itself ─────────────────────────────
     await userRef.delete();
 
     // Free the email in Firebase Auth by renaming the account to a junk
@@ -944,6 +1054,49 @@ class AdminService {
     final snap = await parent.collection(subcollection).get();
     for (final doc in snap.docs) {
       await doc.reference.delete();
+    }
+  }
+
+  /// Self-delete helper: deletes every comment authored by [uid] anywhere in
+  /// the database (post comments, story comments, nested replies). Uses a
+  /// `collectionGroup('comments')` query filtered to the caller's own
+  /// `authorUid`, which the loosened rules permit. Each comment may have its
+  /// own `likes` / `reactions` subcollections; those are swept first.
+  /// Best-effort: a missing composite index or permission edge logs and
+  /// returns rather than aborting the whole account deletion.
+  Future<void> _deleteOwnCommentsEverywhere(String uid) async {
+    try {
+      final snap = await _db
+          .collectionGroup('comments')
+          .where('authorUid', isEqualTo: uid)
+          .get();
+      for (final c in snap.docs) {
+        await _deleteSubcollection(c.reference, 'likes');
+        await _deleteSubcollection(c.reference, 'reactions');
+        await c.reference.delete();
+      }
+    } catch (e) {
+      debugPrint('selfDelete: could not sweep own comments: $e');
+    }
+  }
+
+  /// Self-delete helper: deletes every doc in any `[group]` subcollection
+  /// whose document id equals [uid]. For `likes`, `reposts`, and `reactions`
+  /// the doc id IS the acting user's uid, so a `collectionGroup` read scoped
+  /// by the loosened rules returns only the caller's own traces. We can't
+  /// filter a collection group by document id directly, so we read the group
+  /// (rules already restrict the result to `isSelf`) and delete each hit.
+  /// Best-effort per group.
+  Future<void> _deleteOwnTraceByDocId(String group, String uid) async {
+    try {
+      final snap = await _db.collectionGroup(group).get();
+      for (final doc in snap.docs) {
+        if (doc.id == uid) {
+          await doc.reference.delete();
+        }
+      }
+    } catch (e) {
+      debugPrint('selfDelete: could not sweep own $group: $e');
     }
   }
 

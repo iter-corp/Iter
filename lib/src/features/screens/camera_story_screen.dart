@@ -10,6 +10,7 @@ import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
 import '../widgets/feature_disabled_view.dart';
 import 'add_to_story_screen.dart';
+import 'create_discuss_screen.dart';
 import 'create_post_screen.dart';
 import 'story_preview_screen.dart';
 import 'text_story_composer_screen.dart';
@@ -307,6 +308,14 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
           MaterialPageRoute(builder: (_) => const CreatePostScreen()),
         );
         break;
+      case 2:
+        // Discuss — pushReplacement so the Post/Discuss/Story bar stays
+        // consistent across the three create modes.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const CreateDiscussScreen()),
+        );
+        break;
       default:
         setState(() => _bottomTab = index);
     }
@@ -430,13 +439,24 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
                     ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildTab(context.t.post, 0),
-                          const SizedBox(width: 24),
-                          _buildTab(context.t.story, 1),
-                        ],
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildTab(context.t.post, 0),
+                              const SizedBox(width: 4),
+                              _buildTab(context.t.homeDiscussionLabel, 2),
+                              const SizedBox(width: 4),
+                              _buildTab(context.t.story, 1),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -547,12 +567,25 @@ class _CameraStoryScreenState extends ConsumerState<CameraStoryScreen>
     final bool isActive = _bottomTab == index;
     return GestureDetector(
       onTap: () => _onTabSelected(index),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isActive ? Colors.white : Colors.white54,
-          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          fontSize: 15,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        decoration: BoxDecoration(
+          // Active tab uses the same purple gradient as the "Post" button.
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFFD044E8), Color(0xFF7E3BE8)],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.white54,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontSize: 15,
+          ),
         ),
       ),
     );

@@ -311,6 +311,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final language = ref.watch(localeProvider);
     final minVersion =
         ref.watch(adminConfigProvider).valueOrNull?.minAppVersion ?? '';
+    final isAdmin = ref.watch(isAdminProvider);
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
@@ -352,6 +353,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
             child: _VersionGate(
               minVersion: minVersion,
+              isAdmin: isAdmin,
               child: child ?? const SizedBox.shrink(),
             ),
           ),
@@ -371,8 +373,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
 class _VersionGate extends StatefulWidget {
   final String minVersion;
+  final bool isAdmin;
   final Widget child;
-  const _VersionGate({required this.minVersion, required this.child});
+  const _VersionGate({required this.minVersion, required this.isAdmin, required this.child});
 
   @override
   State<_VersionGate> createState() => _VersionGateState();
@@ -411,7 +414,8 @@ class _VersionGateState extends State<_VersionGate> {
   Widget build(BuildContext context) {
     final minVersion = widget.minVersion;
     final current = _currentVersion;
-    final requiresUpdate = current != null &&
+    final requiresUpdate = !widget.isAdmin &&
+        current != null &&
         minVersion.isNotEmpty &&
         _compareVersions(current, minVersion) < 0;
 

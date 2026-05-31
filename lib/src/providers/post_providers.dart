@@ -69,12 +69,19 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
   );
 });
 
+/// When non-null, the Discuss tab is filtered to only show discussions whose
+/// `sourcePostId` matches this id — i.e. all the discussions made about one
+/// specific post. Set by "view in discuss" on a post; cleared (back to the
+/// full discuss feed) by the X on the filter header. Null = show everything.
+final discussFilterPostIdProvider = StateProvider<String?>((_) => null);
+
 final qaFeedProvider = StreamProvider<List<Post>>((ref) {
   final currentUid = ref.watch(
     authStateProvider.select((a) => a.value?.uid),
   );
   if (currentUid == null) return const Stream.empty();
 
+  final filterPostId = ref.watch(discussFilterPostIdProvider);
   final followService = ref.watch(followServiceProvider);
   final blockedStream =
       ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
@@ -89,6 +96,8 @@ final qaFeedProvider = StreamProvider<List<Post>>((ref) {
       return posts
           .where((p) => !blockedSet.contains(p.authorUid))
           .where((p) => !p.isPrivate || allowed.contains(p.authorUid))
+          // When a post filter is active, keep only discussions about it.
+          .where((p) => filterPostId == null || p.sourcePostId == filterPostId)
           .toList();
     },
   );

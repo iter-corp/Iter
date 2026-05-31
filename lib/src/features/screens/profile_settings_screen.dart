@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,9 +16,9 @@ import '../../services/translate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/share_app.dart';
 import '../widgets/app_page_background.dart';
+import 'account_center_screen.dart';
 import 'admin/admin_events_screen.dart';
 import 'blocked_users_screen.dart';
-import 'change_password_screen.dart';
 import 'contact_us_screen.dart';
 import 'event_notifications_settings_screen.dart';
 import 'profile_visitors_screen.dart';
@@ -40,8 +39,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final hasNewReports = ref.watch(hasAnyNewReportsProvider);
     final hasUnreadContact = ref.watch(hasUnreadContactRequestsProvider);
     final hasUnreadReply = ref.watch(hasUnreadAdminReplyProvider);
-    final userDoc = ref.watch(currentUserDocProvider).valueOrNull;
-    final isPrivate = (userDoc?['isPrivate'] as bool?) ?? false;
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
     final preferredLang = ref.watch(preferredLanguageProvider);
     final uiLanguage = ref.watch(localeProvider);
@@ -68,48 +65,17 @@ class ProfileSettingsScreen extends ConsumerWidget {
           ),
           children: [
             _SectionHeader(title: context.t.account),
+            // Email, password, private-account and delete-account all live
+            // behind one Account Center page now, instead of being scattered
+            // across this list.
             _SettingsTile(
-              leading:
-                  const Icon(Icons.email_outlined, color: AppColors.purple),
-              title: Text(context.t.changeEmail),
+              leading: const Icon(Icons.manage_accounts_outlined,
+                  color: AppColors.purple),
+              title: Text(context.t.accountCenter),
               trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => _changeEmail(context),
-            ),
-            // Only users who actually have a password to change see this row.
-            // Pure-Google (or pure-Apple) accounts manage their password
-            // through the provider, not in this app — exposing a "Set
-            // password" entry here was confusing and the resulting screen
-            // had no "current password" to verify against.
-            if (_isEmailPasswordUser())
-              _SettingsTile(
-                leading: const Icon(Icons.lock_reset, color: AppColors.purple),
-                title: Text(context.t.changePassword),
-                trailing:
-                    Icon(Icons.chevron_right, color: context.textSecondary),
-                onTap: () => _changePassword(context),
-              ),
-            _SettingsTile(
-              leading: Icon(
-                isPrivate ? Icons.lock_outline : Icons.lock_open,
-                color: AppColors.purple,
-              ),
-              title: Text(context.t.privateAccount),
-              subtitle: Text(
-                isPrivate
-                    ? context.t.profileOnlyFollowersCanSee
-                    : context.t.profileAnyoneCanSee,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Switch.adaptive(
-                value: isPrivate,
-                activeTrackColor: AppColors.purple,
-                onChanged: (val) async {
-                  final uid = ref.read(authServiceProvider).currentUser?.uid;
-                  if (uid == null) return;
-                  await ref
-                      .read(userServiceProvider)
-                      .updateUser(uid, {'isPrivate': val});
-                },
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const AccountCenterScreen()),
               ),
             ),
             _SettingsTile(
@@ -348,6 +314,26 @@ class ProfileSettingsScreen extends ConsumerWidget {
               title: Text(context.t.logout,
                   style: const TextStyle(color: Colors.red)),
               onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(ctx.t.logout),
+                    content: Text(ctx.t.logoutConfirmBody),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(ctx.t.cancel),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                            foregroundColor: Colors.red),
+                        child: Text(ctx.t.logout),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !context.mounted) return;
                 await ref.read(authServiceProvider).signOut();
                 ref.invalidate(adminConfigProvider);
                 ref.invalidate(adminPostsProvider);
@@ -358,79 +344,12 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 }
               },
             ),
-            _SettingsTile(
-              leading:
-                  const Icon(Icons.delete_forever, color: Colors.redAccent),
-              title: Text(
-                context.t.deleteAccount,
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-              subtitle: Text(
-                context.t.profileDeleteAccountSubtitle,
-              ),
-              onTap: () => _confirmDeleteAccount(context, ref),
-            ),
+            // Delete account moved into Account Center (ACCOUNT section above).
             const SizedBox(height: 32),
           ],
         ),
       ),
     );
-  }
-
-  /// Returns true if the current user signed up with email+password.
-  bool _isEmailPasswordUser() {
-    final user = FirebaseAuth.instance.currentUser;
-    return user?.providerData.any((p) => p.providerId == 'password') ?? false;
-  }
-
-  Future<void> _changeEmail(BuildContext context) async {
-    if (!_isEmailPasswordUser()) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(ctx.t.settingsCannotChangeEmailTitle),
-          content: Text(
-            ctx.t.settingsCannotChangeEmailBody,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(ctx.t.ok),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    final verificationSent = await showDialog<bool>(
-      context: context,
-      builder: (_) => const _ChangeEmailDialog(),
-    );
-    if (verificationSent == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.t.settingsVerificationEmailSent,
-          ),
-        ),
-      );
-    }
-  }
-
-  /// Opens the full-page change-password screen. Only reachable when the
-  /// settings row is shown, which is gated on the user actually having a
-  /// password credential to change — so the social-user "set password"
-  /// branch that used to live here is no longer needed.
-  Future<void> _changePassword(BuildContext context) async {
-    final passwordUpdated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-    );
-    if (passwordUpdated == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.t.settingsPasswordUpdated)),
-      );
-    }
   }
 
   String _languageLabel(String code) {
@@ -440,144 +359,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
       if (lang.code == code) return lang.label;
     }
     return code.toUpperCase();
-  }
-
-  Future<void> _confirmDeleteAccount(
-      BuildContext context, WidgetRef ref) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(context.t.profileDeleteAccountTitle),
-        content: Text(
-          context.t.profileDeleteAccountBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.t.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              context.t.profileDeleteEverything,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.t.profileDeletingAccount)),
-    );
-
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) return;
-    final uid = authUser.uid;
-
-    try {
-      await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
-    } on FirebaseAuthException catch (e) {
-      // The Auth-email-rename step inside selfDeleteCurrentUser is the
-      // most common failure point — it requires a recent login. Try to
-      // re-auth and retry once if the user is a password account.
-      if (e.code == 'requires-recent-login') {
-        if (!context.mounted) return;
-        final reAuthed = await _reauthBeforeDelete(context, authUser);
-        if (!reAuthed) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(context.t.settingsSecurityRelogin)),
-            );
-          }
-          return;
-        }
-        try {
-          await ref.read(adminServiceProvider).selfDeleteCurrentUser(uid);
-        } catch (e2) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(context.t.settingsDeleteFailed(e2))),
-            );
-          }
-          return;
-        }
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content:
-                    Text(context.t.settingsDeleteFailed(e.message ?? e.code))),
-          );
-        }
-        return;
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t.settingsDeleteFailed(e))),
-        );
-      }
-      return;
-    }
-
-    // Sign out locally so the cached credential doesn't linger.
-    try {
-      await FirebaseAuth.instance.signOut();
-    } catch (_) {}
-
-    if (context.mounted) {
-      context.go('/login');
-    }
-  }
-
-  /// Prompts a password user for their current password and re-authenticates
-  /// so a subsequent privileged operation (email rename, delete) can proceed.
-  /// Returns true on success, false if the user cancelled or re-auth failed.
-  /// For non-password accounts (Google / Apple) returns false immediately —
-  /// they need a different re-auth flow we don't trigger from here.
-  Future<bool> _reauthBeforeDelete(BuildContext context, User user) async {
-    final isPasswordUser =
-        user.providerData.any((p) => p.providerId == 'password');
-    if (!isPasswordUser || user.email == null) return false;
-
-    final passCtrl = TextEditingController();
-    final password = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.t.settingsCurrentPassword),
-        content: TextField(
-          controller: passCtrl,
-          obscureText: true,
-          autofocus: true,
-          decoration: InputDecoration(hintText: ctx.t.settingsCurrentPassword),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(ctx.t.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, passCtrl.text),
-            child: Text(ctx.t.ok),
-          ),
-        ],
-      ),
-    );
-    passCtrl.dispose();
-    if (password == null || password.isEmpty) return false;
-
-    try {
-      final cred = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
-      );
-      await user.reauthenticateWithCredential(cred);
-      return true;
-    } on FirebaseAuthException {
-      return false;
-    }
   }
 }
 
@@ -779,203 +560,6 @@ class _SectionHeader extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: context.textSecondary,
           letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-InputDecoration _settingsInputDecoration(
-  BuildContext context, {
-  required String label,
-  Widget? suffixIcon,
-}) {
-  return InputDecoration(
-    labelText: label,
-    labelStyle: TextStyle(color: context.textSecondary),
-    filled: false,
-    fillColor: Colors.transparent,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-    enabledBorder: InputBorder.none,
-    border: InputBorder.none,
-    focusedBorder: InputBorder.none,
-    suffixIcon: suffixIcon,
-    suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-  );
-}
-
-class _ChangeEmailDialog extends StatefulWidget {
-  const _ChangeEmailDialog();
-
-  @override
-  State<_ChangeEmailDialog> createState() => _ChangeEmailDialogState();
-}
-
-class _ChangeEmailDialogState extends State<_ChangeEmailDialog> {
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-
-  bool _obscure = true;
-  bool _loading = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final newEmail = _emailCtrl.text.trim();
-    final password = _passCtrl.text;
-    if (newEmail.isEmpty || password.isEmpty) {
-      setState(() => _error = context.t.settingsAllFieldsRequired);
-      return;
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.email == null) {
-      setState(() => _error = context.t.settingsNoEmailAccount);
-      return;
-    }
-
-    if (newEmail.toLowerCase() == user.email!.toLowerCase()) {
-      setState(
-        () => _error = context.t.settingsEmailMustDiffer,
-      );
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final cred = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
-      );
-      await user.reauthenticateWithCredential(cred);
-
-      try {
-        await user.verifyBeforeUpdateEmail(newEmail);
-      } on FirebaseAuthException catch (e) {
-        // Fallback for projects where verify-before-update is not enabled.
-        if (e.code == 'operation-not-allowed' || e.code == 'internal-error') {
-          await user.updateEmail(newEmail);
-          await user.sendEmailVerification();
-        } else {
-          rethrow;
-        }
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = switch (e.code) {
-          'wrong-password' ||
-          'invalid-credential' =>
-            context.t.settingsIncorrectPassword,
-          'requires-recent-login' => context.t.settingsSecurityReloginShort,
-          'email-already-in-use' => context.t.settingsEmailAlreadyInUse,
-          'invalid-email' => context.t.settingsEmailInvalid,
-          'too-many-requests' => context.t.settingsTooManyRequests,
-          'network-request-failed' => context.t.settingsNetworkError,
-          'operation-not-allowed' => context.t.settingsEmailChangeNotEnabled,
-          _ => e.message ?? context.t.settingsSomethingWentWrong,
-        };
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = context.t.settingsSomethingWentWrongRetry;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      child: AppGlassCard(
-        radius: 20,
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.t.changeEmail,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            AppGlassCard(
-              radius: 16,
-              padding: EdgeInsets.zero,
-              child: TextField(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: _settingsInputDecoration(context,
-                    label: context.t.settingsNewEmail),
-              ),
-            ),
-            const SizedBox(height: 12),
-            AppGlassCard(
-              radius: 16,
-              padding: EdgeInsets.zero,
-              child: TextField(
-                controller: _passCtrl,
-                obscureText: _obscure,
-                decoration: _settingsInputDecoration(
-                  context,
-                  label: context.t.settingsCurrentPassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        _obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: const TextStyle(color: Colors.red, fontSize: 13),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed:
-                      _loading ? null : () => Navigator.of(context).pop(false),
-                  child: Text(context.t.cancel),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: _loading ? null : _save,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(context.t.save,
-                          style: const TextStyle(color: AppColors.purple)),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

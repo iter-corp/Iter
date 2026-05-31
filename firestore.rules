@@ -233,12 +233,17 @@ service cloud.firestore {
       }
     }
 
-    // Collection-group access for admin cleanup (deleteUser cascade).
+    // Collection-group access for admin cleanup (deleteUser cascade) and for
+    // a user's own self-delete sweep. A user may read (to locate) their OWN
+    // cross-user traces so account self-deletion can leave nothing behind,
+    // even on the Spark/free plan (no Cloud Functions). The actual delete of
+    // each trace is still governed by its per-collection delete rule, which
+    // already permits the owner (isSelf / authorUid == auth.uid).
     match /{path=**}/followers/{followerUid} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isSelf(followerUid);
     }
     match /{path=**}/following/{followingUid} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isSelf(followingUid);
     }
     match /{path=**}/comments/{commentId} {
       // Per-post comment access goes through /posts/{postId}/comments below
@@ -249,15 +254,23 @@ service cloud.firestore {
       // We allow that for any signed-in user reading their OWN comments
       // (resource.data.authorUid == request.auth.uid), plus a blanket admin
       // read for moderation tools. Other users' comments remain reachable
-      // only via the per-post path.
+      // only via the per-post path. Self-delete reuses this to find and
+      // delete the user's own comments wherever they live.
       allow read: if isAdmin() ||
         (signedIn() && resource.data.authorUid == request.auth.uid);
     }
+    // collectionGroup reads for a user's OWN likes / reposts / reactions so
+    // the self-delete sweep can find and remove them from anywhere. For these
+    // the document id IS the acting user's uid, so isSelf(...) scopes the read
+    // strictly to the caller's own trace — never anyone else's.
     match /{path=**}/likes/{likeUid} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isSelf(likeUid);
     }
     match /{path=**}/reposts/{repostUid} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isSelf(repostUid);
+    }
+    match /{path=**}/reactions/{reactionUid} {
+      allow read: if isAdmin() || isSelf(reactionUid);
     }
 
     match /follows/{targetUid}/followers/{followerUid} {
@@ -464,8 +477,12 @@ service cloud.firestore {
       allow create: if signedIn() &&
         request.resource.data.userUid == request.auth.uid &&
         request.resource.data.status == 'pending';
-      // Only admins can approve/reject. Users may not edit a submitted request.
-      allow update, delete: if isAdmin();
+      // Only admins can approve/reject; users may not EDIT a submitted
+      // request. A user MAY delete their own registration — needed so
+      // account self-delete removes the user's event sign-ups completely.
+      allow update: if isAdmin();
+      allow delete: if isAdmin() ||
+        (signedIn() && resource.data.userUid == request.auth.uid);
     }
 
     // ── Collection-group rule for members ────────────────────
@@ -578,7 +595,12 @@ service cloud.firestore {
         request.auth.uid in resource.data.participants ||
         request.auth.uid in request.resource.data.participants
       );
-      allow delete: if isAdmin();
+      // Admins, or any participant, may delete the chat doc. Participant
+      // delete is needed so account self-delete removes the whole
+      // conversation for BOTH sides. The client deletes all messages first,
+      // then the chat doc.
+      allow delete: if isAdmin() ||
+        (signedIn() && request.auth.uid in resource.data.participants);
 
       match /messages/{messageId} {
         allow read: if isChatParticipant(chatId) || isAdmin();
@@ -612,7 +634,10 @@ service cloud.firestore {
             request.resource.data.deletedByUid == request.auth.uid
           )
         );
-        allow delete: if isAdmin();
+        // Admins, or any participant, may hard-delete a message. Participant
+        // delete is needed for account self-delete to wipe the conversation
+        // for both sides.
+        allow delete: if isAdmin() || isChatParticipant(chatId);
 
         match /reactions/{reactorUid} {
           allow read: if isChatParticipant(chatId);
@@ -627,8 +652,9 @@ service cloud.firestore {
           && request.resource.data.createdByUid == request.auth.uid;
         allow update: if isChatParticipant(chatId)
           && resource.data.createdByUid == request.auth.uid;
-        allow delete: if isChatParticipant(chatId)
-          && resource.data.createdByUid == request.auth.uid;
+        // The poll creator may delete it; any participant may also delete it
+        // so account self-delete can fully clear a conversation's polls.
+        allow delete: if isChatParticipant(chatId);
 
         match /votes/{voterUid} {
           allow read: if isChatParticipant(chatId);

@@ -94,6 +94,7 @@ class AppStrings {
   // ──────────────────────────────────────────────────────────────
   String get login => _get('login');
   String get logout => _get('logout');
+  String get logoutConfirmBody => _get('logout_confirm_body');
   String get signup => _get('signup');
   String get signIn => _get('sign_in');
   String get signUp => _get('sign_up');
@@ -266,6 +267,7 @@ class AppStrings {
   // ──────────────────────────────────────────────────────────────
   String get settings => _get('settings');
   String get account => _get('account');
+  String get accountCenter => _get('account_center');
   String get appearance => _get('appearance');
   String get languageLabel => _get('language');
   String get appLanguage => _get('app_language');

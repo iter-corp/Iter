@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../services/admin_service.dart';
 import '../services/error_report_service.dart';
@@ -33,17 +34,44 @@ final adminUsersProvider =
   return ref.watch(adminServiceProvider).streamUsers(query: query);
 });
 
+/// Keeps a post only if it's public, OR it's private but has at least one
+/// report filed against it. Admins should not be able to browse every user's
+/// private content — only private posts that were reported for moderation.
+List<Map<String, dynamic>> _hideUnreportedPrivate(
+  List<Map<String, dynamic>> posts,
+  List<PostReport> reports,
+) {
+  final reportedIds = reports.map((r) => r.postId).toSet();
+  return posts.where((p) {
+    final isPrivate = (p['isPrivate'] as bool?) ?? false;
+    if (!isPrivate) return true;
+    return reportedIds.contains(p['id'] as String?);
+  }).toList();
+}
+
 final adminPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
-  return ref.watch(adminServiceProvider).streamRegularPosts();
+  final posts = ref.watch(adminServiceProvider).streamRegularPosts();
+  final reports = ref.watch(adminServiceProvider).streamPostReports();
+  return Rx.combineLatest2(
+    posts,
+    reports.onErrorReturn(const <PostReport>[]),
+    _hideUnreportedPrivate,
+  );
 });
 
 final adminDiscussPostsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
-  return ref.watch(adminServiceProvider).streamDiscussPosts();
+  final posts = ref.watch(adminServiceProvider).streamDiscussPosts();
+  final reports = ref.watch(adminServiceProvider).streamDiscussReports();
+  return Rx.combineLatest2(
+    posts,
+    reports.onErrorReturn(const <PostReport>[]),
+    _hideUnreportedPrivate,
+  );
 });
 
 final postReportsProvider = StreamProvider<List<PostReport>>((ref) {

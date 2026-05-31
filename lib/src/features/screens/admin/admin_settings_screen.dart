@@ -18,7 +18,6 @@ class AdminSettingsScreen extends ConsumerStatefulWidget {
 class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   final _announcementCtrl = TextEditingController();
   final _minVersionCtrl = TextEditingController();
-  final _contactEmailCtrl = TextEditingController();
   final _iosUrlCtrl = TextEditingController();
   final _androidUrlCtrl = TextEditingController();
   final _newTypeCtrl = TextEditingController();
@@ -53,7 +52,6 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     _cfg = cfg;
     _announcementCtrl.text = cfg.announcement;
     _minVersionCtrl.text = cfg.minAppVersion;
-    _contactEmailCtrl.text = cfg.contactEmail;
     _iosUrlCtrl.text = cfg.iosAppStoreUrl;
     _androidUrlCtrl.text = cfg.androidPlayStoreUrl;
     _hydrated = true;
@@ -63,7 +61,6 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   void dispose() {
     _announcementCtrl.dispose();
     _minVersionCtrl.dispose();
-    _contactEmailCtrl.dispose();
     _iosUrlCtrl.dispose();
     _androidUrlCtrl.dispose();
     _newTypeCtrl.dispose();
@@ -226,7 +223,6 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       final next = _cfg.copyWith(
         announcement: _announcementCtrl.text.trim(),
         minAppVersion: _minVersionCtrl.text.trim(),
-        contactEmail: _contactEmailCtrl.text.trim(),
         iosAppStoreUrl: _iosUrlCtrl.text.trim(),
         androidPlayStoreUrl: _androidUrlCtrl.text.trim(),
         // _cfg already carries the edited list fields.
@@ -236,6 +232,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.t.adminSaved)),
         );
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
@@ -324,13 +321,6 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               _textInputCard(
                 controller: _minVersionCtrl,
                 hintText: context.t.adminMinVersionHint,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSectionContactEmail),
-              _textInputCard(
-                controller: _contactEmailCtrl,
-                hintText: context.t.adminContactEmailHint,
-                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
               _section(context.t.adminSectionAppStoreLinks),

@@ -106,6 +106,50 @@ class StorageService {
         bucket: 'posts', file: file, kind: 'chat-file', subPath: chatId);
   }
 
+  /// Permanently deletes EVERY media file the signed-in user has uploaded
+  /// (avatars, covers, post images/videos, story media, chat images/videos/
+  /// files/voices) from Supabase Storage. Used by account self-delete so no
+  /// media is left behind. Best-effort: throws [StorageException] on failure
+  /// so the caller can decide whether to surface it, but the deletion of the
+  /// user's Firestore data should proceed regardless.
+  ///
+  /// Calls the `delete-user-media` edge function, which verifies the Firebase
+  /// ID token server-side and removes only `<uid>/...` paths — a user can
+  /// never delete another user's files.
+  Future<void> deleteAllMyMedia() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StorageException('Not signed in');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) {
+      throw StorageException('Could not get Firebase ID token');
+    }
+
+    final edgeUri = Uri.parse('$_supabaseUrl/functions/v1/delete-user-media');
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            edgeUri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_anonKey',
+              'apikey': _anonKey,
+              'X-Firebase-Token': idToken,
+            },
+          )
+          .timeout(const Duration(seconds: 60));
+    } on TimeoutException {
+      throw StorageException('Media deletion timed out.');
+    }
+
+    if (res.statusCode != 200) {
+      throw StorageException(
+          'delete-user-media failed: ${res.statusCode} ${res.body}');
+    }
+    debugPrint('[StorageService] deleteAllMyMedia OK: ${res.body}');
+  }
+
   Future<String> _uploadViaEdge({
     required String bucket,
     required File file,

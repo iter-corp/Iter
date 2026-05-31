@@ -19,6 +19,7 @@ import '../../utils/app_feedback.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/location_map.dart';
 import 'camera_story_screen.dart';
+import 'create_discuss_screen.dart';
 
 class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
@@ -673,6 +674,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _bottomTab(context.t.post, 0, true),
+                        _bottomTab(context.t.homeDiscussionLabel, 2, false),
                         _bottomTab(context.t.story, 1, false),
                       ],
                     ),
@@ -695,19 +697,32 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             context,
             MaterialPageRoute(builder: (_) => const CameraStoryScreen()),
           );
+        } else if (index == 2) {
+          // Discuss: replace (not stack) so the back button returns to the
+          // feed rather than to this create-post screen.
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CreateDiscussScreen()),
+          );
         }
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? context.cardBg : Colors.transparent,
+          // Active tab uses the same purple gradient as the "Post" button.
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFFD044E8), Color(0xFF7E3BE8)],
+                )
+              : null,
+          color: isActive ? null : Colors.transparent,
           borderRadius: BorderRadius.circular(25),
         ),
         child: Text(
           text,
           style: TextStyle(
-            color: isActive ? context.textPrimary : context.textSecondary,
+            color: isActive ? Colors.white : context.textSecondary,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),

@@ -520,40 +520,28 @@ class _ReportTile extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(
-                        text: 'When: ${_fullTime(context, report.createdAt)}\n'
-                            'Screen: $screen\n'
-                            'Type: ${report.kind} · ${report.platform} · v${report.appVersion}\n'
-                            'User: ${report.uid ?? "not signed in"}\n\n'
-                            '${report.message}\n\n${report.stack}',
-                      ));
-                      AppFeedback.showInfo(
-                          context, context.t.adminCopiedToClipboard);
-                    },
-                    icon: const Icon(Icons.copy, size: 16),
-                    label: Text(context.t.copy),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => ref
-                        .read(errorReportAdminProvider)
-                        .setResolved(report.id, !report.resolved),
-                    child: Text(report.resolved
-                        ? context.t.adminReopen
-                        : context.t.adminMarkResolved),
-                  ),
-                  IconButton(
-                    tooltip: context.t.delete,
-                    icon: const Icon(Icons.delete_outline,
-                        size: 18, color: Colors.red),
-                    onPressed: () =>
-                        ref.read(errorReportAdminProvider).delete(report.id),
-                  ),
-                ],
+              // Per-report resolve / delete actions were removed: admins
+              // manage reports via the toolbar (multi-select → delete) and the
+              // "Clear all solved" menu, so the redundant inline buttons here
+              // only duplicated those. A Copy action is kept since it has no
+              // toolbar equivalent.
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(
+                      text: 'When: ${_fullTime(context, report.createdAt)}\n'
+                          'Screen: $screen\n'
+                          'Type: ${report.kind} · ${report.platform} · v${report.appVersion}\n'
+                          'User: ${report.uid ?? "not signed in"}\n\n'
+                          '${report.message}\n\n${report.stack}',
+                    ));
+                    AppFeedback.showInfo(
+                        context, context.t.adminCopiedToClipboard);
+                  },
+                  icon: const Icon(Icons.copy, size: 16),
+                  label: Text(context.t.copy),
+                ),
               ),
             ],
           ),

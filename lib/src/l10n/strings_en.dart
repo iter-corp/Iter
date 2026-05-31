@@ -55,6 +55,7 @@ const Map<String, String> enStrings = {
   // ── Auth ──────────────────────────────────────────────────────
   'login': 'Log in',
   'logout': 'Log out',
+  'logout_confirm_body': 'Are you sure you want to log out?',
   'signup': 'Sign up',
   'sign_in': 'Sign in',
   'sign_up': 'Sign up',
@@ -208,6 +209,7 @@ const Map<String, String> enStrings = {
   // ── Settings ──────────────────────────────────────────────────
   'settings': 'Settings',
   'account': 'Account',
+  'account_center': 'Account Center',
   'appearance': 'Appearance',
   'language': 'Language',
   'app_language': 'App language',

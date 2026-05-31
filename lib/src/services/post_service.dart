@@ -281,10 +281,10 @@ class PostService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
 
-    // Reuse an existing Discuss topic for this post if one exists.
-    final existing = await findDiscussTopicForPost(source.id);
-    if (existing != null) return existing;
-
+    // Every user can start their OWN discussion about a post — no reuse or
+    // dedupe, so a single post can have many independent discuss threads.
+    // (Previously this returned the first existing topic and stamped
+    // `discussTopicId` on the source, capping each post at one discussion.)
     final userDoc = await _db.collection('users').doc(user.uid).get();
     final username = userDoc.data()?['username'] as String? ?? 'user';
     final avatar = userDoc.data()?['avatarUrl'] as String?;
@@ -306,13 +306,6 @@ class PostService {
       'sourcePostId': source.id,
       'createdAt': FieldValue.serverTimestamp(),
     });
-
-    // Tag the original post so its menu can switch to "View in Discuss".
-    try {
-      await _posts.doc(source.id).update({'discussTopicId': ref.id});
-    } catch (_) {
-      // Non-fatal: the lookup-by-sourcePostId path still works.
-    }
 
     return ref.id;
   }
@@ -356,16 +349,6 @@ class PostService {
     return results.whereType<String>().toSet();
   }
 
-  /// Returns the QA topic id created from [postId], or null if none.
-  Future<String?> findDiscussTopicForPost(String postId) async {
-    final snap = await _posts
-        .where('postType', isEqualTo: 'qa')
-        .where('sourcePostId', isEqualTo: postId)
-        .limit(1)
-        .get();
-    if (snap.docs.isEmpty) return null;
-    return snap.docs.first.id;
-  }
 
   /// Q&A feed is isolated from normal posts by requiring postType == 'qa'.
   /// We sort client-side to avoid composite-index requirements.

@@ -51,6 +51,7 @@ const Map<String, String> ckbStrings = {
   // ── Auth ──────────────────────────────────────────────────────
   'login': 'چوونە ژوورەوە',
   'logout': 'چوونەدەرەوە',
+  'logout_confirm_body': 'دڵنیایت دەتەوێت چوونەدەرەوە بکەیت؟',
   'signup': 'خۆتۆمارکردن',
   'sign_in': 'چوونەژوورەوە',
   'sign_up': 'خۆتۆمارکردن',
@@ -204,6 +205,7 @@ const Map<String, String> ckbStrings = {
   // ── Settings ──────────────────────────────────────────────────
   'settings': 'ڕێکخستنەکان',
   'account': 'هەژمار',
+  'account_center': 'ناوەندی هەژمار',
   'appearance': 'ڕووکار',
   'language': 'زمان',
   'app_language': 'زمانی ئەپ',

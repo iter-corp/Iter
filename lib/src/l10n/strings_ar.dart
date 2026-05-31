@@ -51,6 +51,7 @@ const Map<String, String> arStrings = {
   // ── Auth ──────────────────────────────────────────────────────
   'login': 'تسجيل الدخول',
   'logout': 'تسجيل الخروج',
+  'logout_confirm_body': 'هل أنت متأكد أنك تريد تسجيل الخروج؟',
   'signup': 'إنشاء حساب',
   'sign_in': 'تسجيل الدخول',
   'sign_up': 'إنشاء حساب',
@@ -204,6 +205,7 @@ const Map<String, String> arStrings = {
   // ── Settings ──────────────────────────────────────────────────
   'settings': 'الإعدادات',
   'account': 'الحساب',
+  'account_center': 'مركز الحساب',
   'appearance': 'المظهر',
   'language': 'اللغة',
   'app_language': 'لغة التطبيق',

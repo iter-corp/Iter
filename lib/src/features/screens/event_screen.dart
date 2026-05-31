@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
@@ -1347,9 +1346,7 @@ class _EventsView extends ConsumerWidget {
                               parent: BouncingScrollPhysics(),
                             ),
                             slivers: [
-                              const SliverToBoxAdapter(
-                                  child: _BecomeAdminBanner()),
-                              SliverPadding(
+                                              SliverPadding(
                                 padding:
                                     const EdgeInsets.fromLTRB(20, 8, 20, 120),
                                 sliver: SliverGrid(
@@ -1578,146 +1575,6 @@ class _LayoutToggle extends StatelessWidget {
   }
 }
 
-class _BecomeAdminBanner extends ConsumerWidget {
-  const _BecomeAdminBanner();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cfg = ref.watch(adminConfigProvider).valueOrNull;
-    final email = cfg?.contactEmail ?? '';
-    if (email.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => _showContactSheet(context, email),
-          child: AppGlassCard(
-            padding: const EdgeInsets.all(14),
-            radius: 16,
-            surfaceAlpha: context.isDark ? 0.22 : 0.50,
-            borderAlpha: context.isDark ? 0.16 : 0.48,
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.workspace_premium_outlined,
-                  color: _kBrandPurple,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        context.t.eventsWantHostEvent,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        context.t.eventsTapContactAdmin,
-                        style: TextStyle(
-                            fontSize: 12, color: context.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: Color(0xFFB1B1B6),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showContactSheet(BuildContext context, String email) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                context.t.eventsBecomeEventAdmin,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                context.t.eventsBecomeAdminBody,
-                style: TextStyle(color: context.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: context.inputFill,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.mail_outline, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SelectableText(
-                        email,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: email));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text(context.t.eventsEmailCopied)),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.copy, size: 16),
-                      label: Text(context.t.copy),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _EventCard extends StatefulWidget {
   final AdminEvent event;
