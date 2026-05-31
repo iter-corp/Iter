@@ -152,47 +152,42 @@ Future<void> _seedApiKeysFromEnv() async {
     final db = FirebaseFirestore.instance;
     final col = db.collection('apiKeys');
 
-    Future<void> seed({
-      required String provider,
-      required String key,
-      String? label,
-    }) async {
-      if (key.isEmpty) return;
-      // Use a deterministic doc ID so re-runs never create duplicates.
-      final docId = '${provider}_env';
+    // priority: gemini=0 (first for non-Kurdish), azure=1 (first for Kurdish
+    // but second overall since the translation service handles Kurdish routing).
+    final seeds = [
+      if ((dotenv.maybeGet('GEMINI_API_KEY') ?? '').isNotEmpty)
+        {'id': 'gemini_env', 'provider': 'gemini',
+         'key': dotenv.maybeGet('GEMINI_API_KEY')!, 'priority': 0},
+      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '').isNotEmpty)
+        {'id': 'azure_env', 'provider': 'azure',
+         'key': dotenv.maybeGet('AZURE_TRANSLATOR_KEY')!, 'priority': 1},
+      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '').isNotEmpty)
+        {'id': 'azure_env_2', 'provider': 'azure',
+         'key': dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2')!, 'priority': 2},
+    ];
+
+    for (final s in seeds) {
+      final docId = s['id'] as String;
       final doc = col.doc(docId);
       final snap = await doc.get();
-      if (snap.exists) return; // already seeded
-      await doc.set({
-        'provider': provider,
-        'key': key,
-        'active': true,
-        'statusMessage': null,
-        'lastChecked': null,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      debugPrint('[boot] seeded apiKeys/$docId ($provider)');
-    }
-
-    final gemini = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
-    final azure1 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
-    final azure2 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '';
-
-    await seed(provider: 'gemini', key: gemini);
-    await seed(provider: 'azure', key: azure1);
-    if (azure2.isNotEmpty) {
-      await db.collection('apiKeys').doc('azure_env_2').get().then((s) async {
-        if (s.exists) return;
-        await db.collection('apiKeys').doc('azure_env_2').set({
-          'provider': 'azure',
-          'key': azure2,
+      final data = snap.data();
+      if (!snap.exists) {
+        // Create fresh.
+        await doc.set({
+          'provider': s['provider'],
+          'key': s['key'],
           'active': true,
           'statusMessage': null,
           'lastChecked': null,
+          'priority': s['priority'],
           'createdAt': FieldValue.serverTimestamp(),
         });
-        debugPrint('[boot] seeded apiKeys/azure_env_2');
-      });
+        debugPrint('[boot] seeded apiKeys/$docId');
+      } else if (data != null && !data.containsKey('priority')) {
+        // Existing doc from before priority was added — patch it.
+        await doc.update({'priority': s['priority']});
+        debugPrint('[boot] patched priority on apiKeys/$docId');
+      }
     }
   } catch (e) {
     debugPrint('[boot] _seedApiKeysFromEnv failed (non-fatal): $e');

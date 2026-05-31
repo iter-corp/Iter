@@ -147,13 +147,16 @@ class _ApiKeyService {
   final _col = FirebaseFirestore.instance.collection('apiKeys');
   final _logCol = FirebaseFirestore.instance.collection('apiLogs');
 
-  // Keys stream — ordered by priority asc, then createdAt asc.
+  // Keys stream — sorted client-side by priority then createdAt to avoid
+  // needing a Firestore composite index.
   Stream<List<ApiKeyEntry>> streamKeys() {
     return _col
-        .orderBy('priority')
-        .orderBy('createdAt')
         .snapshots()
-        .map((s) => s.docs.map(ApiKeyEntry.fromDoc).toList());
+        .map((s) {
+          final list = s.docs.map(ApiKeyEntry.fromDoc).toList();
+          list.sort((a, b) => a.priority.compareTo(b.priority));
+          return list;
+        });
   }
 
   // Error log stream — newest first, last 200.
@@ -233,26 +236,18 @@ class AdminApiManagerScreen extends ConsumerWidget {
             ],
           ),
           actions: [
-            // Add key button — only visible on the keys tab.
-            Builder(builder: (ctx) {
-              return IconButton(
-                tooltip: context.t.add,
-                icon: const Icon(Icons.add_rounded),
-                onPressed: () {
-                  final tab = DefaultTabController.of(ctx).index;
-                  if (tab == 0) {
-                    _showAddSheet(context, ref);
-                  }
-                },
-              );
-            }),
+            IconButton(
+              tooltip: context.t.add,
+              icon: const Icon(Icons.add_rounded),
+              onPressed: () => _showAddSheet(context, ref),
+            ),
             const SizedBox(width: 4),
           ],
         ),
         body: AppPageBackground(
           child: TabBarView(
             children: [
-              _KeysTab(ref: ref),
+              _KeysTab(onAddTap: () => _showAddSheet(context, ref)),
               _LogTab(ref: ref),
             ],
           ),
@@ -282,8 +277,8 @@ class AdminApiManagerScreen extends ConsumerWidget {
 // ─── Keys tab ────────────────────────────────────────────────────────────────
 
 class _KeysTab extends ConsumerWidget {
-  final WidgetRef ref;
-  const _KeysTab({required this.ref});
+  final VoidCallback onAddTap;
+  const _KeysTab({required this.onAddTap});
 
   @override
   Widget build(BuildContext context, WidgetRef r) {
@@ -361,9 +356,7 @@ class _KeysTab extends ConsumerWidget {
                 textAlign: TextAlign.center),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () {
-                // Can't call _showAddSheet from here directly — handled by parent.
-              },
+              onPressed: onAddTap,
               icon: const Icon(Icons.add),
               label: Text(context.t.adminApiManagerAddKey),
               style: FilledButton.styleFrom(
