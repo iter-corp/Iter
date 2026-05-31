@@ -207,6 +207,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ── API usage log ───────────────────────────────────────────
+    // Written by any signed-in user (every translation attempt).
+    // Admins can read and delete; regular users may only create.
+    match /apiLogs/{logId} {
+      allow create: if signedIn();
+      allow read, delete: if isAdmin();
+      allow update: if false;
+    }
+
     // Blacklisted emails. Admins manage the full list; signed-in users may
     // also read and write their own entry so the client can (a) check on
     // login whether their account has been deleted and (b) write a

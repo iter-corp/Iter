@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,143 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Tag prefix used by every debug print emitted by [TranslateService].
 /// Search the device log with: `flutter logs | grep [translate]`
 const String _kTranslateLogTag = '[translate]';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Key Store — reads active keys from Firestore `apiKeys` collection and
+// falls back to .env values when Firestore has nothing configured.
+//
+// The store keeps a live subscription so key changes (add / disable / delete)
+// in the admin panel take effect in the running app within seconds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ApiKeyStore {
+  _ApiKeyStore._();
+  static final _ApiKeyStore instance = _ApiKeyStore._();
+
+  // All active key docs in global priority order (sorted by `priority` asc).
+  // Each map: { 'id', 'key', 'provider', 'priority', 'statusMessage' }
+  final List<Map<String, dynamic>> _allKeys = [];
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  bool _initialized = false;
+
+  final _db = FirebaseFirestore.instance;
+
+  /// Start listening to Firestore. Safe to call multiple times.
+  void init() {
+    if (_initialized) return;
+    _initialized = true;
+    _sub = _db
+        .collection('apiKeys')
+        .where('active', isEqualTo: true)
+        .orderBy('priority')
+        .snapshots()
+        .listen(
+      (snap) {
+        _allKeys
+          ..clear()
+          ..addAll(snap.docs.map((doc) {
+            final d = doc.data();
+            return {
+              'id': doc.id,
+              'key': (d['key'] as String? ?? '').trim(),
+              'provider': (d['provider'] as String? ?? '').toLowerCase(),
+              'priority': (d['priority'] as num?)?.toInt() ?? 999,
+              'statusMessage': (d['statusMessage'] as String?) ?? '',
+            };
+          }));
+        _tlog('ApiKeyStore updated: ${_allKeys.length} active keys '
+            '${_allKeys.map((k) => "${k["provider"]}#${k["priority"]}").join(", ")}');
+      },
+      onError: (e) => _tlog('ApiKeyStore stream error: $e'),
+    );
+  }
+
+  void dispose() {
+    _sub?.cancel();
+    _sub = null;
+    _initialized = false;
+    _allKeys.clear();
+  }
+
+  /// Returns all active key entries for [provider] in priority order,
+  /// falling back to .env values if Firestore has nothing for that provider.
+  List<Map<String, dynamic>> docsFor(String provider) {
+    final p = provider.toLowerCase();
+    final fromFirestore =
+        _allKeys.where((d) => d['provider'] == p).toList();
+    if (fromFirestore.isNotEmpty) return fromFirestore;
+
+    // .env fallback — keeps working before admin populates Firestore.
+    final envKeys = <String>[];
+    switch (p) {
+      case 'gemini':
+        final k = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
+        if (k.isNotEmpty) envKeys.add(k);
+      case 'azure':
+        final k1 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
+        final k2 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '';
+        if (k1.isNotEmpty) envKeys.add(k1);
+        if (k2.isNotEmpty) envKeys.add(k2);
+    }
+    return envKeys
+        .map((k) => {'id': '', 'key': k, 'provider': p, 'priority': 999,
+                      'statusMessage': ''})
+        .toList();
+  }
+
+  /// Convenience: just the key strings.
+  List<String> keysFor(String provider) =>
+      docsFor(provider).map((d) => d['key'] as String).toList();
+
+  /// The full ordered list across ALL providers — used by _buildProviderList
+  /// to respect the admin-set cross-provider ordering (e.g. Azure key ranked
+  /// #1 even though Gemini is a different provider).
+  List<Map<String, dynamic>> get allKeysSorted => _allKeys;
+
+  // ── Status helpers ──────────────────────────────────────────────────────
+
+  void markKeyFailed(String docId, String error) {
+    if (docId.isEmpty) return;
+    _db.collection('apiKeys').doc(docId).update({
+      'statusMessage': error.length > 300 ? error.substring(0, 300) : error,
+      'lastChecked': FieldValue.serverTimestamp(),
+    }).catchError((_) {});
+  }
+
+  void markKeyOk(String docId, String currentStatus) {
+    if (docId.isEmpty || currentStatus.isEmpty) return;
+    _db.collection('apiKeys').doc(docId).update({
+      'statusMessage': null,
+      'lastChecked': FieldValue.serverTimestamp(),
+    }).catchError((_) {});
+  }
+
+  // ── API log ─────────────────────────────────────────────────────────────
+
+  void writeLog({
+    required String provider,
+    required String keyId,
+    required bool success,
+    required bool wasFallback,
+    String? error,
+    String? nextProvider,
+  }) {
+    _db.collection('apiLogs').add({
+      'provider': provider,
+      'keyId': keyId,
+      'success': success,
+      'wasFallback': wasFallback,
+      if (error != null)
+        'error': error.length > 300 ? error.substring(0, 300) : error,
+      if (nextProvider != null) 'nextProvider': nextProvider,
+      'createdAt': FieldValue.serverTimestamp(),
+    }).ignore();
+  }
+}
+
+/// Call this once from main.dart (after Firebase.initializeApp) so the key
+/// store starts listening before the first translation is requested.
+void initApiKeyStore() => _ApiKeyStore.instance.init();
 
 void _tlog(String msg) {
   if (kDebugMode) debugPrint('$_kTranslateLogTag $msg');
@@ -347,9 +485,23 @@ class TranslateService {
         _isKurdish(effectiveSourceLang) || _isKurdish(targetLang);
     _tlog('kurdishInvolved=$kurdishInvolved providers=$allProviders');
 
+    final store = _ApiKeyStore.instance;
     Exception? lastError;
-    for (final provider in allProviders) {
+    for (var i = 0; i < allProviders.length; i++) {
+      final provider = allProviders[i];
       _tlog('attempting provider=$provider');
+      final providerName = provider == _Provider.gemini ? 'gemini' : 'azure';
+      final docs = store.docsFor(providerName);
+      // azurePrimary → docs[0], azureSecondary → docs[1] (if present).
+      final docIndex = provider == _Provider.azureSecondary ? 1 : 0;
+      final usedDoc = docs.length > docIndex ? docs[docIndex] : null;
+      final usedDocId = usedDoc?['id'] as String? ?? '';
+      final currentStatus = usedDoc?['statusMessage'] as String? ?? '';
+      final wasFallback = i > 0;
+      // The next provider name (for the log entry), if there is one.
+      final nextProviderName = i + 1 < allProviders.length
+          ? (allProviders[i + 1] == _Provider.gemini ? 'gemini' : 'azure')
+          : null;
       try {
         final result = await _callProvider(
           provider: provider,
@@ -360,8 +512,17 @@ class TranslateService {
         _tlog('SUCCESS via $provider, '
             'resultLen=${result.length} '
             'sample="${result.substring(0, result.length > 40 ? 40 : result.length)}"');
-        // Persist for next time. Fire-and-forget — caller already has the
-        // result; cache write happens in the background.
+        // Clear any previous failure status for this key.
+        store.markKeyOk(usedDocId, currentStatus);
+        // Write success log (only log fallback successes to reduce noise).
+        if (wasFallback) {
+          store.writeLog(
+            provider: providerName,
+            keyId: usedDocId,
+            success: true,
+            wasFallback: true,
+          );
+        }
         unawaited(_cacheStore(
           sourceLang: effectiveSourceLang,
           targetLang: targetLang,
@@ -371,6 +532,15 @@ class TranslateService {
         return result;
       } on Exception catch (e) {
         _tlog('FAIL via $provider: $e');
+        store.markKeyFailed(usedDocId, e.toString());
+        store.writeLog(
+          provider: providerName,
+          keyId: usedDocId,
+          success: false,
+          wasFallback: wasFallback,
+          error: e.toString(),
+          nextProvider: nextProviderName,
+        );
         lastError = e;
         // Fall through to next provider.
       }
@@ -389,39 +559,31 @@ class TranslateService {
     required String targetLang,
   }) {
     final kurdishTarget = _isKurdish(targetLang);
-    // For explicit Kurdish source (not auto-detect), treat as Kurdish too.
     final kurdishSource = sourceLang != 'auto' && _isKurdish(sourceLang);
     final involvesKurdish = kurdishTarget || kurdishSource;
 
-    final geminiKey = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
-    final azureProviders = _configuredAzureProviders();
+    final store = _ApiKeyStore.instance;
+    final hasGemini = store.keysFor('gemini').isNotEmpty;
+    final azureKeys = store.keysFor('azure');
+
+    // Build one _Provider per Azure key (index-based so we can try each key).
+    final azureProviders = List.generate(
+      azureKeys.length,
+      (i) => i == 0 ? _Provider.azurePrimary : _Provider.azureSecondary,
+    );
 
     if (involvesKurdish) {
-      // Kurdish: Azure (Microsoft) is the primary engine for both source and
-      // target Kurdish. Gemini is the only fallback.
-      final providers = <_Provider>[];
-      providers.addAll(azureProviders);
-      if (geminiKey.isNotEmpty) {
-        providers.add(_Provider.gemini);
-      }
-      return providers;
+      // Kurdish: Azure first (best Kurdish support), Gemini as fallback.
+      return [
+        ...azureProviders,
+        if (hasGemini) _Provider.gemini,
+      ];
     }
 
-    // Non-Kurdish: Gemini first, then Azure fallback.
-    final providers = <_Provider>[];
-    if (geminiKey.isNotEmpty) {
-      providers.add(_Provider.gemini);
-    }
-    providers.addAll(azureProviders);
-    return providers;
-  }
-
-  List<_Provider> _configuredAzureProviders() {
+    // Non-Kurdish: Gemini first, Azure as fallback.
     return [
-      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '').isNotEmpty)
-        _Provider.azurePrimary,
-      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '').isNotEmpty)
-        _Provider.azureSecondary,
+      if (hasGemini) _Provider.gemini,
+      ...azureProviders,
     ];
   }
 
@@ -435,30 +597,50 @@ class TranslateService {
     required String sourceLang,
     required String targetLang,
   }) async {
+    final store = _ApiKeyStore.instance;
     switch (provider) {
       case _Provider.azurePrimary:
+        final keys = store.keysFor('azure');
+        final key = keys.isNotEmpty ? keys.first : '';
         return _callAzure(
-          keyEnvName: 'AZURE_TRANSLATOR_KEY',
-          regionEnvName: 'AZURE_TRANSLATOR_REGION',
-          endpointEnvName: 'AZURE_TRANSLATOR_ENDPOINT',
+          apiKey: key,
+          // Region / endpoint: still read from .env as optional overrides;
+          // if not set, the defaults below apply.
+          region: dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ?? 'centralindia',
+          endpoint: (dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
+                  'https://api.cognitive.microsofttranslator.com/')
+              .replaceAll(RegExp(r'/$'), ''),
           providerLabel: 'Azure primary',
           text: text,
           sourceLang: sourceLang,
           targetLang: targetLang,
         );
       case _Provider.azureSecondary:
+        final keys = store.keysFor('azure');
+        final key = keys.length > 1 ? keys[1] : '';
         return _callAzure(
-          keyEnvName: 'AZURE_TRANSLATOR_KEY_2',
-          regionEnvName: 'AZURE_TRANSLATOR_REGION_2',
-          endpointEnvName: 'AZURE_TRANSLATOR_ENDPOINT_2',
+          apiKey: key,
+          region: dotenv.maybeGet('AZURE_TRANSLATOR_REGION_2') ??
+              dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ??
+              'centralindia',
+          endpoint: (dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT_2') ??
+                  dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
+                  'https://api.cognitive.microsofttranslator.com/')
+              .replaceAll(RegExp(r'/$'), ''),
           providerLabel: 'Azure secondary',
           text: text,
           sourceLang: sourceLang,
           targetLang: targetLang,
         );
       case _Provider.gemini:
+        final keys = store.keysFor('gemini');
+        final key = keys.isNotEmpty ? keys.first : '';
         return _callGemini(
-            text: text, sourceLang: sourceLang, targetLang: targetLang);
+          apiKey: key,
+          text: text,
+          sourceLang: sourceLang,
+          targetLang: targetLang,
+        );
     }
   }
 
@@ -470,25 +652,17 @@ class TranslateService {
   /// Maps ckb to ku for Azure; kmr falls through to Gemini because Azure
   /// does not support Kurmanji.
   Future<String> _callAzure({
-    required String keyEnvName,
-    required String regionEnvName,
-    required String endpointEnvName,
+    required String apiKey,
+    required String region,
+    required String endpoint,
     required String providerLabel,
     required String text,
     required String sourceLang,
     required String targetLang,
   }) async {
-    final apiKey = dotenv.maybeGet(keyEnvName) ?? '';
     if (apiKey.isEmpty) {
       throw Exception('$providerLabel Translator key is missing');
     }
-    final region = dotenv.maybeGet(regionEnvName) ??
-        dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ??
-        'centralindia';
-    final endpoint = (dotenv.maybeGet(endpointEnvName) ??
-            dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
-            'https://api.cognitive.microsofttranslator.com/')
-        .replaceAll(RegExp(r'/$'), '');
 
     // Azure language-code mapping. Azure Translator uses `ku` for Central
     // Kurdish (Sorani). Kurmanji (Northern Kurdish, `kmr`) is NOT supported
@@ -520,7 +694,6 @@ class TranslateService {
     _tlog('$providerLabel REQUEST: '
         'endpoint=$endpoint region=$region '
         'from=${mappedSource ?? "(auto)"} to=$mappedTarget '
-        'keyEnv=$keyEnvName '
         'keyPrefix=${apiKey.substring(0, apiKey.length > 6 ? 6 : apiKey.length)}... '
         'uri=$uri');
 
@@ -568,11 +741,11 @@ class TranslateService {
   }
 
   Future<String> _callGemini({
+    required String apiKey,
     required String text,
     required String sourceLang,
     required String targetLang,
   }) async {
-    final apiKey = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
     if (apiKey.isEmpty) {
       throw Exception('Gemini API key is missing');
     }

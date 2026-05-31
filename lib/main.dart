@@ -24,6 +24,7 @@ import 'src/providers/theme_provider.dart';
 import 'src/router/app_router.dart';
 import 'src/services/admin_service.dart';
 import 'src/services/error_report_service.dart';
+import 'src/services/translate_service.dart';
 import 'src/services/fcm_service.dart';
 import 'src/services/message_cache.dart';
 import 'src/services/presence_service.dart';
@@ -116,6 +117,15 @@ Future<void> main() async {
       }
     }
 
+    // Start the API key store — listens to Firestore `apiKeys` collection so
+    // TranslateService picks up keys added/disabled in the admin panel live.
+    initApiKeyStore();
+
+    // One-time migration: seed existing .env keys into Firestore `apiKeys`
+    // so the admin panel isn't empty on first launch. Safe to run every boot
+    // — the function checks for existing docs before writing.
+    unawaited(_seedApiKeysFromEnv());
+
     // Sanity-check that auth stream produces a first event.
     FirebaseAuth.instance.authStateChanges().first.timeout(
       const Duration(seconds: 5),
@@ -132,6 +142,61 @@ Future<void> main() async {
       child: const MyApp(),
     ));
   });
+}
+
+/// Seeds the existing .env API keys into Firestore `apiKeys` so the admin
+/// API manager isn't empty on first launch. Only writes docs that don't
+/// exist yet — completely safe to call on every boot.
+Future<void> _seedApiKeysFromEnv() async {
+  try {
+    final db = FirebaseFirestore.instance;
+    final col = db.collection('apiKeys');
+
+    Future<void> seed({
+      required String provider,
+      required String key,
+      String? label,
+    }) async {
+      if (key.isEmpty) return;
+      // Use a deterministic doc ID so re-runs never create duplicates.
+      final docId = '${provider}_env';
+      final doc = col.doc(docId);
+      final snap = await doc.get();
+      if (snap.exists) return; // already seeded
+      await doc.set({
+        'provider': provider,
+        'key': key,
+        'active': true,
+        'statusMessage': null,
+        'lastChecked': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint('[boot] seeded apiKeys/$docId ($provider)');
+    }
+
+    final gemini = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
+    final azure1 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
+    final azure2 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '';
+
+    await seed(provider: 'gemini', key: gemini);
+    await seed(provider: 'azure', key: azure1);
+    if (azure2.isNotEmpty) {
+      await db.collection('apiKeys').doc('azure_env_2').get().then((s) async {
+        if (s.exists) return;
+        await db.collection('apiKeys').doc('azure_env_2').set({
+          'provider': 'azure',
+          'key': azure2,
+          'active': true,
+          'statusMessage': null,
+          'lastChecked': null,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        debugPrint('[boot] seeded apiKeys/azure_env_2');
+      });
+    }
+  } catch (e) {
+    debugPrint('[boot] _seedApiKeysFromEnv failed (non-fatal): $e');
+  }
 }
 
 Future<void> _configureSystemUi({Brightness? appBrightness}) async {
