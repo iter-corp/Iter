@@ -1311,6 +1311,11 @@ const Map<String, String> arStrings = {
   'profile_create_first_post': 'أنشئ منشورك الأول',
   'profile_share_your_content': 'شارك محتواك',
   'profile_create': 'إنشاء',
+  'follow_list_search_hint': 'بحث',
+  'follow_list_no_matches': 'لا توجد نتائج',
+  'follow_list_remove_follower': 'إزالة',
+  'follow_list_remove_follower_confirm': 'إزالة {name} من متابعيك؟',
+  'follow_list_unfollow_confirm': 'إلغاء متابعة {name}؟',
   'profile_visitors_count': '{count} زوار',
   'profile_no_visits_yet': 'لا توجد زيارات للملف الشخصي بعد',
   'profile_no_visits_subtitle':

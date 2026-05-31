@@ -18,6 +18,7 @@ import '../../services/post_service.dart';
 import '../../services/translate_service.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
+import 'create_discuss_screen.dart';
 import 'create_post_screen.dart';
 import 'notification_screen.dart';
 import 'post_detail_screen.dart';
@@ -579,10 +580,11 @@ class _HomeBodyState extends ConsumerState<HomeBody>
         mode: _mode,
         onChanged: _switchMode,
         onPost: () {
-          // In Discuss, "Post" opens the ask-a-question sheet;
-          // elsewhere it opens the create-post screen.
+          // In Discuss, "Post" opens the full-screen create-discuss screen
+          // (same interface family as create-post); elsewhere it opens the
+          // create-post screen.
           if (_mode == _HomeMode.qa) {
-            _showAskSheet(context);
+            _openCreateDiscuss(context);
           } else {
             _openCreatePost(context);
           }
@@ -997,18 +999,12 @@ class _HomeBodyState extends ConsumerState<HomeBody>
     );
   }
 
-  void _showAskSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AskQuestionSheet(
-        onPosted: () {
-          ref.invalidate(qaFeedProvider);
-        },
-      ),
+  Future<void> _openCreateDiscuss(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CreateDiscussScreen()),
     );
+    ref.invalidate(qaFeedProvider);
   }
 
   Future<void> _openCreatePost(BuildContext context) async {
@@ -2574,283 +2570,6 @@ class _QaMeta extends StatelessWidget {
                   ),
                 ),
               ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-// 📌 SECTION: Ask Question Sheet
-// ─────────────────────────────────────────────
-
-class _AskQuestionSheet extends ConsumerStatefulWidget {
-  final VoidCallback onPosted;
-
-  const _AskQuestionSheet({required this.onPosted});
-
-  @override
-  ConsumerState<_AskQuestionSheet> createState() => _AskQuestionSheetState();
-}
-
-class _AskQuestionSheetState extends ConsumerState<_AskQuestionSheet> {
-  final _questionCtrl = TextEditingController();
-  final _detailsCtrl = TextEditingController();
-  String _discussKind = 'question';
-  bool _submitting = false;
-
-  @override
-  void dispose() {
-    _questionCtrl.dispose();
-    _detailsCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final question = _questionCtrl.text.trim();
-    final details = _detailsCtrl.text.trim();
-    if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t.homeWriteQuestionFirst)));
-      return;
-    }
-    setState(() => _submitting = true);
-    try {
-      await ref.read(postServiceProvider).createQaPost(
-            question: question,
-            details: details,
-            discussKind: _discussKind,
-          );
-      if (!mounted) return;
-      Navigator.pop(context);
-      widget.onPosted();
-    } catch (e) {
-      if (e is DiscussPostBlockedException) {
-        if (!mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text(context.t.homeQuestionBlockedTitle),
-            content: Text(context.t.homeQuestionBlockedBody),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: Text(context.t.ok),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(context.t.homeErrorPrefix(e))));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final bottomInset =
-        mq.viewInsets.bottom > 0 ? mq.viewInsets.bottom : mq.padding.bottom;
-    return GestureDetector(
-      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-      behavior: HitTestBehavior.translucent,
-      child: Container(
-        // Let the sheet grow to fill remaining space so SingleChildScrollView
-        // has a bounded height and keyboard insets can be absorbed cleanly.
-        margin: EdgeInsets.only(top: mq.size.height * 0.25),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 16,
-            bottom: bottomInset + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: context.purpleSoft,
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: const Icon(
-                      Icons.help_outline_rounded,
-                      size: 20,
-                      color: Color(0xFF7E3BE8),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    context.t.homeAskCommunity,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: context.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  _DiscussKindButton(
-                    icon: Icons.help_outline_rounded,
-                    label: context.t.homeQuestionLabel,
-                    selected: _discussKind == 'question',
-                    onTap: () => setState(() => _discussKind = 'question'),
-                  ),
-                  const SizedBox(width: 8),
-                  _DiscussKindButton(
-                    icon: Icons.forum_outlined,
-                    label: context.t.homeDiscussionLabel,
-                    selected: _discussKind == 'discussion',
-                    onTap: () => setState(() => _discussKind = 'discussion'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Question field
-              TextField(
-                controller: _questionCtrl,
-                autofocus: true,
-                maxLines: 2,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: context.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: _discussKind == 'discussion'
-                      ? context.t.homeWhatsYourDiscussion
-                      : context.t.homeWhatsYourQuestion,
-                  hintStyle: TextStyle(
-                      color: context.textSecondary,
-                      fontWeight: FontWeight.w400),
-                  filled: true,
-                  fillColor: context.inputFill,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Optional details field
-              TextField(
-                controller: _detailsCtrl,
-                maxLines: 4,
-                minLines: 2,
-                textCapitalization: TextCapitalization.sentences,
-                style: TextStyle(fontSize: 14, color: context.textPrimary),
-                decoration: InputDecoration(
-                  hintText: context.t.homeAddMoreContext,
-                  hintStyle: TextStyle(color: context.textSecondary),
-                  filled: true,
-                  fillColor: context.inputFill,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              PrimaryActionButton(
-                label: _discussKind == 'discussion'
-                    ? context.t.homePostDiscussion
-                    : context.t.homePostQuestion,
-                onPressed: _submitting ? null : _submit,
-                loading: _submitting,
-                size: PrimaryActionSize.large,
-                fullWidth: true,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DiscussKindButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DiscussKindButton({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? const Color(0xFF7E3BE8) : context.textSecondary;
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? context.purpleSoft : context.inputFill,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected
-                  ? const Color(0xFF7E3BE8).withValues(alpha: 0.35)
-                  : context.borderColor,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
             ],
           ),
         ),

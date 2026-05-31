@@ -1331,6 +1331,11 @@ const Map<String, String> ckbStrings = {
   'profile_create_first_post': 'یەکەم پۆستت دروست بکە',
   'profile_share_your_content': 'ناوەڕۆکەکەت هاوبەش بکە',
   'profile_create': 'دروستکردن',
+  'follow_list_search_hint': 'گەڕان',
+  'follow_list_no_matches': 'هیچ ئەنجامێک نییە',
+  'follow_list_remove_follower': 'لابردن',
+  'follow_list_remove_follower_confirm': '{name} لە شوێنکەوتووانت لاببرێت؟',
+  'follow_list_unfollow_confirm': 'شوێنکەوتنی {name} هەڵبوەشێنرێتەوە؟',
   'profile_visitors_count': '{count} سەردانکەر',
   'profile_no_visits_yet': 'هیچ سەردانێکی پڕۆفایل نییە هێشتا',
   'profile_no_visits_subtitle':

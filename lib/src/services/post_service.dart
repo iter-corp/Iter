@@ -277,6 +277,7 @@ class PostService {
   Future<String> createQaPostFromPost(
     Post source, {
     required String question,
+    String details = '',
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not signed in');
@@ -289,8 +290,17 @@ class PostService {
     final username = userDoc.data()?['username'] as String? ?? 'user';
     final avatar = userDoc.data()?['avatarUrl'] as String?;
 
-    final caption =
+    final trimmedQuestion =
         question.trim().isEmpty ? 'Discussion about a post' : question.trim();
+    // Mirror createQaPost: question + optional body stored as one caption.
+    final caption = details.trim().isEmpty
+        ? trimmedQuestion
+        : '$trimmedQuestion\n${details.trim()}';
+
+    final matches = await _profanityFilter.findMatches(caption);
+    if (matches.isNotEmpty) {
+      throw DiscussPostBlockedException(matches);
+    }
 
     final ref = await _posts.add({
       'authorUid': user.uid,

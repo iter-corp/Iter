@@ -2257,17 +2257,31 @@ class _EmptyState extends StatelessWidget {
 // flips between list and map.
 final Map<String, LatLng?> _eventGeocodeCache = {};
 
-class _EventsMapView extends StatefulWidget {
+class _EventsMapView extends ConsumerStatefulWidget {
   final List<AdminEvent> events;
   const _EventsMapView({required this.events});
 
   @override
-  State<_EventsMapView> createState() => _EventsMapViewState();
+  ConsumerState<_EventsMapView> createState() => _EventsMapViewState();
 }
 
-class _EventsMapViewState extends State<_EventsMapView> {
+class _EventsMapViewState extends ConsumerState<_EventsMapView> {
   final Map<String, LatLng> _resolved = {};
   bool _resolving = false;
+
+  /// The viewer's home location from their account doc (`location: {lat,lng}`),
+  /// used to open the map on their own country instead of zoomed onto a pin.
+  /// Null when the account has no saved location.
+  LatLng? _homeLocation() {
+    final profile = ref.read(currentUserDocProvider).valueOrNull;
+    final loc = profile?['location'];
+    if (loc is Map) {
+      final lat = (loc['lat'] as num?)?.toDouble();
+      final lng = (loc['lng'] as num?)?.toDouble();
+      if (lat != null && lng != null) return LatLng(lat, lng);
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -2319,6 +2333,11 @@ class _EventsMapViewState extends State<_EventsMapView> {
   }
 
   LatLng _initialCenter() {
+    // Default to the viewer's own country (their saved account location) so
+    // the map opens on familiar ground rather than zoomed tight on a pin.
+    final home = _homeLocation();
+    if (home != null) return home;
+
     if (_resolved.isEmpty) {
       // Fallback: roughly centered on Europe / Africa so the empty world
       // doesn't open zoomed on the wrong hemisphere.
@@ -2359,7 +2378,13 @@ class _EventsMapViewState extends State<_EventsMapView> {
         FlutterMap(
           options: MapOptions(
             initialCenter: _initialCenter(),
-            initialZoom: markers.length > 1 ? 4 : 11,
+            // Open on the viewer's country by default (~5.5 = country level)
+            // so they aren't dropped tight on a pin and forced to zoom out.
+            // Without a saved home location, fall back to the events overview
+            // (wide for many, regional for one).
+            initialZoom: _homeLocation() != null
+                ? 5.5
+                : (markers.length > 1 ? 4 : 9),
             minZoom: 2,
             maxZoom: 18,
           ),

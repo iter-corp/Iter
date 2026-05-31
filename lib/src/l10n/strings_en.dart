@@ -1349,6 +1349,12 @@ const Map<String, String> enStrings = {
   'profile_create_first_post': 'Create your first post',
   'profile_share_your_content': 'Share your content',
   'profile_create': 'Create',
+  'follow_list_search_hint': 'Search',
+  'follow_list_no_matches': 'No matches',
+  'follow_list_remove_follower': 'Remove',
+  'follow_list_remove_follower_confirm':
+      'Remove {name} from your followers?',
+  'follow_list_unfollow_confirm': 'Unfollow {name}?',
   'profile_visitors_count': '{count} visitors',
   'profile_no_visits_yet': 'No profile visits yet',
   'profile_no_visits_subtitle':

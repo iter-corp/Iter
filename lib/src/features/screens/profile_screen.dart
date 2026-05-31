@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../l10n/app_strings.dart';
-import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/admin_report_notifications_provider.dart';
 import '../../providers/auth_providers.dart';
@@ -23,6 +22,7 @@ import '../widgets/app_page_background.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
 import 'blocked_users_screen.dart';
+import 'follow_list_screen.dart';
 import 'profile_settings_screen.dart';
 import 'qa_thread_screen.dart';
 
@@ -36,92 +36,11 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   int selectedTab = 0;
 
-  void _showUserListSheet({required String title, required List<String> uids}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) {
-        return SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.65,
-            child: Column(
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: uids.isEmpty
-                      ? Center(
-                          child: Text(
-                            context.t.profileNoUsersYet,
-                            style: TextStyle(color: context.textSecondary),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: uids.length,
-                          separatorBuilder: (_, __) => const SizedBox.shrink(),
-                          itemBuilder: (context, index) {
-                            final uid = uids[index];
-                            final userAsync = ref
-                                .watch(
-                                  userServiceProvider,
-                                )
-                                .streamUser(uid);
-
-                            return StreamBuilder<Map<String, dynamic>?>(
-                              stream: userAsync,
-                              builder: (context, snapshot) {
-                                final data = snapshot.data;
-                                final avatarUrl = data?['avatarUrl'] as String?;
-                                return ListTile(
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    openUserProfile(context, uid: uid);
-                                  },
-                                  leading: CircleAvatar(
-                                    backgroundColor: context.inputFill,
-                                    backgroundImage: avatarUrl != null
-                                        ? NetworkImage(avatarUrl)
-                                        : null,
-                                    child: avatarUrl == null
-                                        ? const Icon(Icons.person, size: 18)
-                                        : null,
-                                  ),
-                                  title: Text(
-                                    (data?['username'] as String?) ?? uid,
-                                  ),
-                                  subtitle: Text(
-                                    (data?['handle'] as String?) ?? '',
-                                    style:
-                                        TextStyle(color: context.textSecondary),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  void _openFollowList(String uid, int initialTab) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowListScreen(uid: uid, initialTab: initialTab),
+      ),
     );
   }
 
@@ -185,14 +104,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     // clamp the fallback at 0.
                     posts: postsAsync.valueOrNull?.length ??
                         (((user['postsCount'] as int?) ?? 0).clamp(0, 1 << 31)),
-                    onFollowersTap: () => _showUserListSheet(
-                      title: context.t.followers,
-                      uids: followersAsync.value ?? const [],
-                    ),
-                    onFollowingTap: () => _showUserListSheet(
-                      title: context.t.following,
-                      uids: followingAsync.value ?? const [],
-                    ),
+                    onFollowersTap: currentUid == null
+                        ? null
+                        : () => _openFollowList(currentUid, 0),
+                    onFollowingTap: currentUid == null
+                        ? null
+                        : () => _openFollowList(currentUid, 1),
                   ),
                   ProfileButtons(
                     onSettings: () => _showSettings(context),

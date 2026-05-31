@@ -1558,6 +1558,13 @@ class AppStrings {
   String get profileCreateFirstPost => _get('profile_create_first_post');
   String get profileShareYourContent => _get('profile_share_your_content');
   String get profileCreate => _get('profile_create');
+  String get followListSearchHint => _get('follow_list_search_hint');
+  String get followListNoMatches => _get('follow_list_no_matches');
+  String get followListRemoveFollower => _get('follow_list_remove_follower');
+  String followListRemoveFollowerConfirm(Object name) =>
+      _fmt('follow_list_remove_follower_confirm', {'name': name});
+  String followListUnfollowConfirm(Object name) =>
+      _fmt('follow_list_unfollow_confirm', {'name': name});
   String profileVisitorsCount(Object count) =>
       _fmt('profile_visitors_count', {'count': count});
   String get profileNoVisitsYet => _get('profile_no_visits_yet');

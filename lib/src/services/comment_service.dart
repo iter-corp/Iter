@@ -148,6 +148,11 @@ class CommentService {
     List<Comment> publicComments = const [];
     List<Comment> privateComments = const [];
     List<Comment> lastEmitted = const [];
+    // Whether we've pushed at least one value. The de-dupe below would
+    // otherwise swallow the very first emission for an empty thread (merged
+    // == lastEmitted == []), leaving the StreamProvider stuck in `loading`
+    // forever so the QA screen shows a spinner for questions with no answers.
+    bool hasEmitted = false;
 
     void emitMerged() {
       final merged = [...publicComments, ...privateComments]..sort((a, b) {
@@ -163,7 +168,8 @@ class CommentService {
 
           return a.id.compareTo(b.id);
         });
-      if (_sameComments(lastEmitted, merged)) return;
+      if (hasEmitted && _sameComments(lastEmitted, merged)) return;
+      hasEmitted = true;
       lastEmitted = merged;
       if (!controller.isClosed) controller.add(merged);
     }

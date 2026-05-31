@@ -23,8 +23,8 @@ import '../../utils/app_feedback.dart';
 import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
+import '../screens/create_discuss_screen.dart';
 import '../screens/image_viewer_screen.dart';
-import '../screens/qa_thread_screen.dart';
 import '../../navigation/user_profile_nav.dart';
 import 'location_map.dart';
 
@@ -2215,32 +2215,13 @@ Future<void> discussPost(
   WidgetRef ref,
   Post post,
 ) async {
-  final postService = ref.read(postServiceProvider);
-  final messenger = ScaffoldMessenger.of(context);
-  final navigator = Navigator.of(context);
-  // Capture the string table now so no BuildContext is used after an
-  // await (the catch block needs it for the error message).
-  final strings = context.t;
-  final createdMsg = strings.postCardDiscussCreated;
-
-  try {
-    final question = await _askDiscussQuestion(context);
-    if (question == null || question.trim().isEmpty) return;
-    final topicId =
-        await postService.createQaPostFromPost(post, question: question);
-    messenger.showSnackBar(SnackBar(content: Text(createdMsg)));
-
-    final qaPost = await postService.getPostById(topicId);
-    if (qaPost == null) return;
-
-    navigator.push(
-      MaterialPageRoute(builder: (_) => QaThreadScreen(post: qaPost)),
-    );
-  } catch (e) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(strings.postCardDiscussFailed(e))),
-    );
-  }
+  // Open the same full-screen create-discuss interface used by the Discuss
+  // tab, pre-linked to this post. The screen handles creating the thread
+  // (question + optional details) and navigating to it on submit, so this
+  // is just a push.
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => CreateDiscussScreen(sourcePost: post)),
+  );
 }
 
 /// Opens the Discuss tab filtered to all discussions about [post]. Sets the
@@ -2254,86 +2235,6 @@ void viewPostDiscussions(
 ) {
   ref.read(discussFilterPostIdProvider.notifier).state = post.id;
   Navigator.of(context).popUntil((r) => r.isFirst);
-}
-
-/// Bottom sheet asking the user to type a question about a post they
-/// are turning into a Discuss topic. Returns the question, or null if
-/// the user dismissed without posting.
-Future<String?> _askDiscussQuestion(BuildContext context) {
-  final controller = TextEditingController();
-  return showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: context.cardBg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (sheetCtx) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
-          16 + MediaQuery.of(sheetCtx).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              sheetCtx.t.discussAskTitle,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLines: 3,
-              minLines: 1,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                hintText: sheetCtx.t.discussAskHint,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () =>
-                    Navigator.pop(sheetCtx, controller.text.trim()),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.purple,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(sheetCtx.t.discussAskAction),
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
 }
 
 class _OwnerMenu extends StatelessWidget {

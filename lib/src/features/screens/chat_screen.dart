@@ -1141,38 +1141,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     const SizedBox(height: 8),
                     Builder(
                       builder: (context) {
-                        // De-duplicate by language code so the dropdown's
-                        // "exactly one item per value" assertion holds.
-                        // kTranslateLanguages lists English twice (USA / UK)
-                        // for dictation locale variety; the translate
-                        // target only cares about the BCP-47 code.
-                        final seen = <String>{};
-                        final items = <DropdownMenuItem<String>>[];
-                        for (final lang in kTranslateLanguages) {
-                          if (!seen.add(lang.code)) continue;
-                          items.add(DropdownMenuItem(
-                            value: lang.code,
-                            child: Text(lang.label),
-                          ));
-                        }
-                        return DropdownButtonFormField<String>(
-                          // Bound to the GLOBAL preferred language so it stays
-                          // in sync with Settings → Translation language.
-                          initialValue: ref.read(preferredLanguageProvider),
+                        // Bound to the GLOBAL preferred language so it stays in
+                        // sync with Settings → Translation language. Resolve
+                        // the code back to a label for display; kTranslate-
+                        // Languages lists English twice (USA / UK) so take the
+                        // first match for the code.
+                        final currentCode =
+                            ref.read(preferredLanguageProvider);
+                        final currentLabel = kTranslateLanguages
+                            .firstWhere((l) => l.code == currentCode,
+                                orElse: () => kTranslateLanguages.first)
+                            .label;
+                        return InputDecorator(
                           decoration: InputDecoration(
                             labelText: context.t.translateInto,
                             border: const OutlineInputBorder(),
                           ),
-                          items: items,
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setSheetState(() {});
-                            // Update the single source of truth — this persists
-                            // globally and reflects in the Settings page too.
-                            ref
-                                .read(preferredLanguageProvider.notifier)
-                                .set(v);
-                          },
+                          child: InkWell(
+                            // A tappable field that opens a searchable,
+                            // dismissible picker. Replaces the old full-screen
+                            // dropdown menu that had no search and could only
+                            // be dismissed by picking something.
+                            onTap: () async {
+                              final code =
+                                  await _pickTranslateLanguage(currentCode);
+                              if (code == null) return;
+                              setSheetState(() {});
+                              // Update the single source of truth — this
+                              // persists globally and reflects in Settings too.
+                              ref
+                                  .read(preferredLanguageProvider.notifier)
+                                  .set(code);
+                            },
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    currentLabel,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const Icon(Icons.keyboard_arrow_down_rounded),
+                              ],
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -1184,6 +1196,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           },
         );
       },
+    );
+  }
+
+  /// Opens a searchable, dismissible bottom sheet of translate target
+  /// languages and returns the selected BCP-47 code (or null if dismissed
+  /// without picking). De-duplicates by code so English (USA/UK) shows once.
+  Future<String?> _pickTranslateLanguage(String currentCode) {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _TranslateLanguagePickerSheet(currentCode: currentCode),
     );
   }
 
@@ -4970,6 +4994,111 @@ class _PendingAttachmentBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Searchable, dismissible language picker for the chat translate-into target.
+/// Pops with the selected BCP-47 code, or null if the user dismisses it
+/// (swipe down / tap the scrim) without choosing — so the sheet can always
+/// be closed without making a selection. De-duplicates by code (English is
+/// listed twice in [kTranslateLanguages] for dictation locales).
+class _TranslateLanguagePickerSheet extends StatefulWidget {
+  final String currentCode;
+  const _TranslateLanguagePickerSheet({required this.currentCode});
+
+  @override
+  State<_TranslateLanguagePickerSheet> createState() =>
+      _TranslateLanguagePickerSheetState();
+}
+
+class _TranslateLanguagePickerSheetState
+    extends State<_TranslateLanguagePickerSheet> {
+  String _query = '';
+
+  static final List<TranslateLanguage> _uniqueLanguages = () {
+    final seen = <String>{};
+    return [
+      for (final lang in kTranslateLanguages)
+        if (seen.add(lang.code)) lang,
+    ];
+  }();
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? _uniqueLanguages
+        : _uniqueLanguages
+            .where((l) =>
+                l.label.toLowerCase().contains(q) ||
+                l.code.toLowerCase().contains(q))
+            .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    prefixIcon:
+                        Icon(Icons.search, color: context.textSecondary),
+                    hintText: context.t.translateSearchLanguages,
+                    filled: true,
+                    fillColor: context.inputFill,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          context.t.translateNoLanguagesMatch,
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final lang = filtered[i];
+                          final isCurrent = lang.code == widget.currentCode;
+                          return ListTile(
+                            title: Text(lang.label),
+                            subtitle: Text(
+                              lang.code,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                            trailing: isCurrent
+                                ? const Icon(Icons.check,
+                                    color: Color(0xFFB05ECC))
+                                : null,
+                            onTap: () => Navigator.pop(context, lang.code),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
