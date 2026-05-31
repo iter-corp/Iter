@@ -88,6 +88,10 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
     super.dispose();
   }
 
+  // Note: avoid calling `ref.listen` here — it must be used inside
+  // the build method of a ConsumerWidget/ConsumerState. We attach a
+  // listener inside `build` where `ref.watch` is available.
+
   Future<void> _submitAnswer() async {
     final text = _controller.text.trim();
     final user = ref.read(authStateProvider).value;
@@ -122,6 +126,28 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the comments provider for this postId and attach a listener
+    // here at the top-level of build so Riverpod allows `ref.listen`.
+    final commentsAsync = ref.watch(commentsProvider(widget.post.id));
+    ref.listen<AsyncValue<List<Comment>>>(
+      commentsProvider(widget.post.id),
+      (previous, next) {
+        if (next.isLoading) {
+          debugPrint('[QaThread] commentsProvider: loading');
+        } else if (next.hasError) {
+          debugPrint('[QaThread] commentsProvider error: ${next.error}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not load answers: ${next.error}')),
+            );
+          }
+        } else if (next.hasValue) {
+          debugPrint(
+              '[QaThread] commentsProvider: got ${next.value?.length ?? 0} comments');
+        }
+      },
+    );
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('posts')
@@ -137,8 +163,6 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
             .firstWhere((line) => line.isNotEmpty, orElse: () => '');
         final isQuestionThread = post.discussKind == 'question' ||
             (post.discussKind == null && firstLine.contains('?'));
-
-        final commentsAsync = ref.watch(commentsProvider(post.id));
 
         return Scaffold(
           backgroundColor: Colors.transparent,
@@ -942,6 +966,28 @@ class _AnswerBlock extends ConsumerWidget {
                 _AnswerRow(
                   comment: answer,
                   postId: postId,
+                  trailingAction: Consumer(
+                    builder: (ctx, ref, _) {
+                      final uid = ref.watch(authStateProvider).value?.uid;
+                      if (uid == null || uid == answer.authorUid)
+                        return const SizedBox.shrink();
+                      return IconButton(
+                        onPressed: () => reportCommentFlow(
+                          ctx,
+                          ref,
+                          postId: postId,
+                          comment: answer,
+                          surface: answer.isReply ? 'reply' : 'answer',
+                        ),
+                        icon: Icon(Icons.more_horiz,
+                            size: 20, color: ctx.textSecondary),
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
+                        tooltip: ctx.t.report,
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 6),
                 _AnswerReactionBar(
@@ -1012,7 +1058,29 @@ class _AnswerBlock extends ConsumerWidget {
                                 comment: r,
                                 compact: true,
                                 postId: postId,
-                                trailingAction: null,
+                                trailingAction: Consumer(
+                                  builder: (ctx, ref, _) {
+                                    final uid =
+                                        ref.watch(authStateProvider).value?.uid;
+                                    if (uid == null || uid == r.authorUid)
+                                      return const SizedBox.shrink();
+                                    return IconButton(
+                                      onPressed: () => reportCommentFlow(
+                                        ctx,
+                                        ref,
+                                        postId: postId,
+                                        comment: r,
+                                        surface: r.isReply ? 'reply' : 'answer',
+                                      ),
+                                      icon: Icon(Icons.more_horiz,
+                                          size: 18, color: ctx.textSecondary),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                          minWidth: 28, minHeight: 28),
+                                      tooltip: ctx.t.report,
+                                    );
+                                  },
+                                ),
                               ),
                               const SizedBox(height: 4),
                               _AnswerReactionBar(
@@ -1138,8 +1206,8 @@ class _AnswerReactionBar extends ConsumerWidget {
 
     if (uid == null) {
       return Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 6,
+        runSpacing: 4,
         children: [
           _ReactionChip(
             icon: Icons.favorite_border,
@@ -1203,13 +1271,13 @@ class _AnswerReactionBar extends ConsumerWidget {
                 compact: compact,
                 onTap: toggleHelpful,
               ),
-            if (reportChip() != null) reportChip()!,
+            // Report button moved to the top row next to the author name.
           ],
         );
       },
       loading: () => Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 6,
+        runSpacing: 4,
         children: [
           _ReactionChip(
             icon: Icons.favorite_border,
@@ -1232,8 +1300,8 @@ class _AnswerReactionBar extends ConsumerWidget {
         ],
       ),
       error: (_, __) => Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 6,
+        runSpacing: 4,
         children: [
           _ReactionChip(
             icon: Icons.favorite_border,
@@ -1274,12 +1342,8 @@ class _HelpfulChip extends StatelessWidget {
   Widget build(BuildContext context) {
     const green = Color(0xFF16A34A);
     final fg = marked ? green : context.textSecondary;
-    final bg = marked
-        ? green.withValues(alpha: 0.12)
-        : context.inputFill;
-    final border = marked
-        ? green.withValues(alpha: 0.35)
-        : context.borderColor;
+    final bg = marked ? green.withValues(alpha: 0.12) : context.inputFill;
+    final border = marked ? green.withValues(alpha: 0.35) : context.borderColor;
 
     return InkWell(
       onTap: onTap,
@@ -1306,9 +1370,7 @@ class _HelpfulChip extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             Text(
-              marked
-                  ? 'Unmark'
-                  : 'Mark helpful',
+              marked ? 'Unmark' : 'Mark helpful',
               style: TextStyle(
                 fontSize: compact ? 11 : 12,
                 fontWeight: FontWeight.w700,
@@ -1330,35 +1392,17 @@ class _ReportReactionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Ink(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 8 : 10,
-          vertical: compact ? 5 : 6,
-        ),
-        decoration: BoxDecoration(
-          color: context.inputFill,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.flag_outlined, size: 13, color: Colors.red),
-            const SizedBox(width: 6),
-            Text(
-              context.t.report,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.red,
-              ),
-            ),
-          ],
-        ),
+    // Render as a compact three-dot icon button for answers and replies.
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(
+        Icons.more_horiz,
+        size: compact ? 18 : 20,
+        color: context.textSecondary,
       ),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      tooltip: context.t.report,
     );
   }
 }

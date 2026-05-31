@@ -173,10 +173,14 @@ class CommentService {
           .orderBy('createdAt', descending: false)
           .snapshots()
           .listen((snap) {
+        debugPrint(
+            '[CommentService] public comments snapshot: ${snap.docs.length} docs for post $postId');
         unawaited(_backfillMissingLikesCount(postId, snap.docs));
         publicComments = snap.docs.map(Comment.fromDoc).toList();
         emitMerged();
       }, onError: (Object e, StackTrace st) {
+        debugPrint(
+            '[CommentService] public comments error for post $postId: $e');
         if (!controller.isClosed) controller.addError(e, st);
       });
 
@@ -184,9 +188,13 @@ class CommentService {
           .orderBy('createdAt', descending: false)
           .snapshots()
           .listen((snap) {
+        debugPrint(
+            '[CommentService] private comments snapshot: ${snap.docs.length} docs for post $postId viewer $viewerUid');
         privateComments = snap.docs.map(Comment.fromDoc).toList();
         emitMerged();
       }, onError: (Object e, StackTrace st) {
+        debugPrint(
+            '[CommentService] private comments error for post $postId viewer $viewerUid: $e');
         if (!controller.isClosed) controller.addError(e, st);
       });
     };
