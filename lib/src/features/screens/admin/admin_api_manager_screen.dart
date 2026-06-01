@@ -836,12 +836,16 @@ class _LogTile extends StatelessWidget {
                     children: [
                       Icon(icon, size: 13, color: color),
                       const SizedBox(width: 4),
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: context.textPrimary,
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: context.textPrimary,
+                          ),
                         ),
                       ),
                       if (entry.wasFallback) ...[
@@ -864,7 +868,7 @@ class _LogTile extends StatelessWidget {
                           ),
                         ),
                       ],
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       Text(
                         timeStr,
                         style: TextStyle(

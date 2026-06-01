@@ -10,6 +10,7 @@ import '../../../services/admin_service.dart';
 import '../../../services/city_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/responsive.dart';
+import '../../widgets/app_page_background.dart';
 import '../../widgets/personalization_fields.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -168,6 +169,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         if (_goals.isNotEmpty) 'goals': _goals,
       };
       await userService.updateUser(uid, data);
+      // One-way sync: fold the event types these goals imply into the user's
+      // event-notification filter (changing goals updates notifications, but
+      // not vice-versa).
+      if (_goals.isNotEmpty) {
+        await userService.syncEventNotifTypesFromGoals(uid, _goals);
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -180,9 +187,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final cfg = ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
     final pad = context.scaleW(16, 24);
     return Scaffold(
-      appBar: AppBar(title: Text(context.t.onboardingSetupProfile)),
-      body: SafeArea(
-        child: SingleChildScrollView(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(context.t.onboardingSetupProfile),
+      ),
+      body: AppPageBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(pad, pad, pad, pad + context.bottomSafeInset),
           child: Form(
             key: _formKey,
@@ -328,6 +341,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
               ],
             ),
+          ),
           ),
         ),
       ),

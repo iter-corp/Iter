@@ -96,6 +96,61 @@ int _eventRelevanceScore(AdminEvent e, Map<String, dynamic>? userDoc) {
   return score;
 }
 
+/// Heuristic relevance of a candidate [other] user to the signed-in [me] for
+/// the Connect list. Higher = more relevant. Mirrors [_eventRelevanceScore]:
+/// shared field / goals / academic level, same city, and GPS proximity all
+/// raise the score so the most relevant people surface first when browsing.
+int _partnerRelevanceScore(
+  Map<String, dynamic> other,
+  Map<String, dynamic> me,
+) {
+  var score = 0;
+
+  String s(Map<String, dynamic> m, String k) =>
+      (m[k] as String? ?? '').trim().toLowerCase();
+  List<String> goalsOf(Map<String, dynamic> m) =>
+      ((m['goals'] as List?)?.cast<String>() ?? const [])
+          .map((g) => g.toLowerCase())
+          .toList();
+
+  // Same academic field is the strongest single signal.
+  final myField = s(me, 'field');
+  if (myField.isNotEmpty && s(other, 'field') == myField) score += 3;
+
+  // Same academic level (e.g. both "Masters").
+  final myLevel = s(me, 'academicLevel');
+  if (myLevel.isNotEmpty && s(other, 'academicLevel') == myLevel) score += 1;
+
+  // Same profession (Student/Researcher/…).
+  final myProfession = s(me, 'profession');
+  if (myProfession.isNotEmpty && s(other, 'profession') == myProfession) {
+    score += 1;
+  }
+
+  // Overlapping goals (Internships, Conferences, …) — +2 per shared goal.
+  final myGoals = goalsOf(me).toSet();
+  if (myGoals.isNotEmpty) {
+    for (final g in goalsOf(other)) {
+      if (myGoals.contains(g)) score += 2;
+    }
+  }
+
+  // Same city, then GPS proximity as a softer fallback.
+  final myCity = s(me, 'city');
+  if (myCity.isNotEmpty && s(other, 'city') == myCity) {
+    score += 2;
+  } else {
+    final myLoc = me['location'];
+    final otherLoc = other['location'];
+    if (myLoc is Map && otherLoc is Map) {
+      final km = _distanceKm(myLoc, otherLoc);
+      if (km != null && km <= 100) score += 1;
+    }
+  }
+
+  return score;
+}
+
 final _partnersStreamProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   return FirebaseFirestore.instance
@@ -682,6 +737,20 @@ class _PartnersView extends ConsumerWidget {
               (u['academicLevel'] as String? ?? '').toLowerCase().trim() ==
               pick)
           .toList();
+    }
+
+    // Personalized ordering: when the user is just browsing (no search query
+    // and no active filter) order the list by how well each person matches the
+    // viewer's own profile, so the most relevant people surface first. As soon
+    // as the viewer searches or applies a filter we leave ordering untouched —
+    // search must be able to find ANYONE, unranked by personalization.
+    if (q.isEmpty && !_hasActiveFilter && currentUser != null) {
+      final scored = {
+        for (final u in result)
+          u['__id'] as String: _partnerRelevanceScore(u, currentUser),
+      };
+      result = [...result]..sort(
+          (a, b) => (scored[b['__id']] ?? 0).compareTo(scored[a['__id']] ?? 0));
     }
 
     return result;
@@ -2417,22 +2486,46 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
       });
     }
 
-    final markers = <Marker>[];
+    // Group events by their resolved coordinate. Events in the same city are
+    // geocoded to the SAME point (shared geocode cache) or share an admin pin,
+    // so without spreading they stack exactly on top of each other and only the
+    // topmost is visible. We fan co-located events out into a small ring around
+    // the shared point so each event gets its own visible pin in a different
+    // spot of the city.
+    final byPoint = <String, List<AdminEvent>>{};
     for (final e in widget.events) {
       final p = _resolved[e.id];
       if (p == null) continue;
-      markers.add(
-        Marker(
-          point: p,
-          width: 44,
-          height: 44,
-          alignment: Alignment.topCenter,
-          child: GestureDetector(
-            onTap: () => _showEventSheet(context, e, p),
-            child: const _EventMapPin(),
-          ),
-        ),
-      );
+      // Round to ~11m so points that are effectively identical group together.
+      final key = '${p.latitude.toStringAsFixed(4)},'
+          '${p.longitude.toStringAsFixed(4)}';
+      (byPoint[key] ??= <AdminEvent>[]).add(e);
+    }
+
+    final markers = <Marker>[];
+    for (final group in byPoint.values) {
+      // Single event at this point: place it exactly where it resolved.
+      if (group.length == 1) {
+        final e = group.first;
+        final p = _resolved[e.id]!;
+        markers.add(_buildEventMarker(e, p));
+        continue;
+      }
+      // Multiple events share this point: spread them around a small ring so
+      // they appear in different places of the same city. The ring radius
+      // grows slightly with the count so larger clusters don't overlap.
+      final base = _resolved[group.first.id]!;
+      final radiusDeg = 0.006 + group.length * 0.0008; // ~0.7km + per event
+      for (var i = 0; i < group.length; i++) {
+        final angle = (2 * math.pi / group.length) * i;
+        final latScale = math.cos(base.latitude * math.pi / 180).abs();
+        final spread = LatLng(
+          base.latitude + radiusDeg * math.sin(angle),
+          base.longitude +
+              (latScale == 0 ? 0 : radiusDeg * math.cos(angle) / latScale),
+        );
+        markers.add(_buildEventMarker(group[i], spread));
+      }
     }
 
     final unresolved = widget.events.length - markers.length;
@@ -2502,6 +2595,21 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Builds a tappable event pin at [point]. [point] may be the event's exact
+  /// resolved location, or a spread position when several events share a spot.
+  Marker _buildEventMarker(AdminEvent e, LatLng point) {
+    return Marker(
+      point: point,
+      width: 44,
+      height: 44,
+      alignment: Alignment.topCenter,
+      child: GestureDetector(
+        onTap: () => _showEventSheet(context, e, point),
+        child: const _EventMapPin(),
+      ),
     );
   }
 

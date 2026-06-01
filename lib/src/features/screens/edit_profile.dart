@@ -269,6 +269,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         if (coverUrlToSave != null) 'coverUrl': coverUrlToSave,
       });
 
+      // One-way sync: fold the event types these goals imply into the user's
+      // event-notification filter. Additive and one-directional — editing goals
+      // updates notification prefs, but editing notification prefs never edits
+      // goals.
+      await ref
+          .read(userServiceProvider)
+          .syncEventNotifTypesFromGoals(uid, _goals);
+
       // Keep FirebaseAuth profile displayName aligned for legacy fallbacks.
       await ref
           .read(authServiceProvider)

@@ -64,6 +64,32 @@ class EventNotifPrefs {
       );
 }
 
+/// Maps a personalization goal (from `kProfileGoalOptions`, e.g. "Internships")
+/// to the matching event-type tags (from `kEventTypes`, e.g. "Internship").
+///
+/// Used to keep a user's event-notification type filter in sync with the goals
+/// they pick at onboarding / profile edit. Goals with no clear event-type
+/// counterpart ("Networking", "Local events") map to nothing, so they simply
+/// don't add a type filter.
+const Map<String, List<String>> kGoalToEventTypes = {
+  'Internships': ['Internship'],
+  'Scholarships': ['Scholarship'],
+  'Conferences': ['Conference'],
+  'Research': ['Research'],
+  'Networking': [],
+  'Local events': [],
+};
+
+/// Translates a list of profile [goals] into the de-duplicated set of event
+/// types they imply. Order follows `kEventTypes` so the result is stable.
+List<String> eventTypesForGoals(List<String> goals) {
+  final out = <String>{};
+  for (final g in goals) {
+    out.addAll(kGoalToEventTypes[g] ?? const []);
+  }
+  return out.toList();
+}
+
 class UserService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -89,6 +115,41 @@ class UserService {
   Future<void> setEventNotifPrefs(String uid, EventNotifPrefs prefs) =>
       _doc(uid)
           .set({'eventNotifPrefs': prefs.toMap()}, SetOptions(merge: true));
+
+  /// One-way sync: when the user changes their personalization [goals], fold
+  /// the event types those goals imply into their event-notification type
+  /// filter. This is intentionally additive and one-directional — changing
+  /// goals updates notification prefs, but changing notification prefs never
+  /// touches goals.
+  ///
+  /// Behaviour:
+  /// * Goal-derived types are merged into any existing `types` (we never drop
+  ///   a type the user added manually).
+  /// * If notifications are off, we leave `mode` off — picking a goal should
+  ///   not silently re-enable alerts the user turned off.
+  /// * If the goals imply no event types ("Networking", "Local events" only),
+  ///   nothing is written.
+  Future<void> syncEventNotifTypesFromGoals(
+    String uid,
+    List<String> goals,
+  ) async {
+    final goalTypes = eventTypesForGoals(goals);
+    if (goalTypes.isEmpty) return;
+
+    final snap = await _doc(uid).get();
+    final current = EventNotifPrefs.fromMap(
+        snap.data()?['eventNotifPrefs'] as Map<String, dynamic>?);
+
+    // Merge goal-derived types into the existing filter, preserving order
+    // (existing types first, then any newly implied ones).
+    final merged = <String>[
+      ...current.types,
+      ...goalTypes.where((t) => !current.types.contains(t)),
+    ];
+    if (merged.length == current.types.length) return; // nothing new
+
+    await setEventNotifPrefs(uid, current.copyWith(types: merged));
+  }
 
   Future<void> reportUserProfile({
     required String targetUid,
