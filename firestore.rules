@@ -778,9 +778,18 @@ service cloud.firestore {
           isAdmin() ||
           get(/databases/$(database)/documents/contactRequests/$(requestId)).data.userUid == request.auth.uid
         );
+        // A user's FIRST message is written in the same transaction that
+        // creates the parent thread doc, so a get() on the parent here sees
+        // the not-yet-committed state and returns null — which previously
+        // failed the rule with permission-denied. We therefore only require
+        // ownership when the parent already exists; when it doesn't, the
+        // sender writing their own uid is sufficient (the parent's own
+        // create rule already pins userUid == auth.uid, so the thread can
+        // only ever belong to this same user).
         allow create: if signedIn() &&
           request.resource.data.senderUid == request.auth.uid && (
             isAdmin() ||
+            !exists(/databases/$(database)/documents/contactRequests/$(requestId)) ||
             get(/databases/$(database)/documents/contactRequests/$(requestId)).data.userUid == request.auth.uid
           );
         allow update, delete: if false;

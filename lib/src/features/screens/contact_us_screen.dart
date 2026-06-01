@@ -362,14 +362,12 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
   final _scrollController = ScrollController();
   bool _sending = false;
   bool _markedRead = false;
-  late bool _orgApproved;
   late String _requestId;
   late ContactRequestType _requestType;
 
   @override
   void initState() {
     super.initState();
-    _orgApproved = widget.request.status == ContactRequestStatus.promoted;
     _requestId = widget.request.id;
     _requestType = widget.request.type;
   }
@@ -428,25 +426,6 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     }
   }
 
-  Future<void> _changeType(ContactRequestType type) async {
-    if (_requestType == type) return;
-    final previousType = _requestType;
-    setState(() => _requestType = type);
-    if (_requestId.isEmpty) return;
-    try {
-      await ref.read(contactRequestServiceProvider).setType(
-            requestId: _requestId,
-            type: type,
-          );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _requestType = previousType);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.t.contactCouldNotUpdateType(e))),
-      );
-    }
-  }
-
   Future<void> _handleAdminUserAction({
     required BuildContext context,
     required String uid,
@@ -490,9 +469,6 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                     requestId: _requestId,
                     userUid: uid,
                   );
-              if (mounted) {
-                setState(() => _orgApproved = false);
-              }
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -505,9 +481,6 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
                     requestId: _requestId,
                     userUid: uid,
                   );
-              if (mounted) {
-                setState(() => _orgApproved = true);
-              }
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -583,9 +556,6 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
             <ContactRequestMessage>[],
           )
         : ref.watch(contactRequestMessagesProvider(_requestId));
-    final canEditType = !isAdmin &&
-        !_orgApproved &&
-        widget.request.status != ContactRequestStatus.revoked;
     final requesterLive = isAdmin && widget.request.userUid.isNotEmpty
         ? ref.watch(userByUidProvider(widget.request.userUid)).valueOrNull
         : null;
@@ -719,14 +689,9 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
         child: SafeArea(
           child: Column(
           children: [
-            if (canEditType)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                child: _ThreadTypeBar(
-                  value: _requestType,
-                  onChanged: _changeType,
-                ),
-              ),
+            // The Message / Event (organization) type selector was removed —
+            // users now have a single plain "Message" thread, so there's no
+            // type bar to show.
             Expanded(
               child: msgsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -906,65 +871,6 @@ class _Bubble extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ThreadTypeBar extends StatelessWidget {
-  final ContactRequestType value;
-  final ValueChanged<ContactRequestType> onChanged;
-
-  const _ThreadTypeBar({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget chip(ContactRequestType type, String label, IconData icon) {
-      final selected = value == type;
-      return Expanded(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => onChanged(type),
-          child: AppGlassCard(
-            radius: 14,
-            emphasize: selected,
-            surfaceAlpha: context.isDark ? 0.42 : 0.36,
-            borderAlpha: selected ? 0.65 : (context.isDark ? 0.14 : 0.50),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: selected ? AppColors.purple : context.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? AppColors.purple : context.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        chip(ContactRequestType.message, context.t.contactTypeMessage,
-            Icons.chat_outlined),
-        const SizedBox(width: 10),
-        chip(
-          ContactRequestType.organization,
-          context.t.contactTypeOrg,
-          Icons.apartment_outlined,
-        ),
-      ],
     );
   }
 }

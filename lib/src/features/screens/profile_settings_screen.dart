@@ -214,36 +214,41 @@ class ProfileSettingsScreen extends ConsumerWidget {
                 shareInviteLink(context, cfg);
               },
             ),
-            _SectionHeader(title: context.t.settingsSectionSupport),
-            _SettingsTile(
-              leading: const Icon(Icons.support_agent_outlined,
-                  color: AppColors.purple),
-              title: Text(context.t.contactUs),
-              subtitle: Text(
-                context.t.settingsContactUsSubtitle,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (hasUnreadReply)
-                    Container(
-                      width: 9,
-                      height: 9,
-                      margin: const EdgeInsetsDirectional.only(end: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.purple,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: context.cardBg, width: 1),
+            // Contact us is the channel for regular users to reach the admin
+            // team. Admins are the recipients of those messages, so the whole
+            // support section is hidden from them.
+            if (!isAdmin) ...[
+              _SectionHeader(title: context.t.settingsSectionSupport),
+              _SettingsTile(
+                leading: const Icon(Icons.support_agent_outlined,
+                    color: AppColors.purple),
+                title: Text(context.t.contactUs),
+                subtitle: Text(
+                  context.t.settingsContactUsSubtitle,
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hasUnreadReply)
+                      Container(
+                        width: 9,
+                        height: 9,
+                        margin: const EdgeInsetsDirectional.only(end: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.purple,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: context.cardBg, width: 1),
+                        ),
                       ),
-                    ),
-                  Icon(Icons.chevron_right, color: context.textSecondary),
-                ],
+                    Icon(Icons.chevron_right, color: context.textSecondary),
+                  ],
+                ),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ContactUsScreen()),
+                ),
               ),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ContactUsScreen()),
-              ),
-            ),
+            ],
             _SectionHeader(title: context.t.safety),
             _SettingsTile(
               leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
