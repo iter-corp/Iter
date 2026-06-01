@@ -2269,11 +2269,25 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
   final Map<String, LatLng> _resolved = {};
   bool _resolving = false;
 
-  /// The viewer's home location from their account doc (`location: {lat,lng}`),
-  /// used to open the map on their own country instead of zoomed onto a pin.
-  /// Null when the account has no saved location.
-  LatLng? _homeLocation() {
-    final profile = ref.read(currentUserDocProvider).valueOrNull;
+  final MapController _mapController = MapController();
+
+  /// Whether we've already centered the map on the viewer's home location.
+  /// The account profile loads asynchronously, so it may not be ready when the
+  /// map first builds — once it arrives we recenter exactly once.
+  bool _centeredOnHome = false;
+
+  /// Centroid of the viewer's country, resolved from their saved `city` string
+  /// (e.g. "Tbilisi, Georgia") when no precise GPS `location` exists. Lets the
+  /// map still open on their country even if they denied GPS at signup.
+  LatLng? _countryCentroid;
+  bool _resolvingCentroid = false;
+  String? _centroidSourceCity;
+
+  /// Reads the viewer's precise home location from their account doc
+  /// (`location: {lat,lng}`). Pass the already-loaded [profile] map so callers
+  /// use the value watched in `build` (not a possibly-empty `ref.read`).
+  /// Null when the account has no saved GPS location.
+  LatLng? _homeLocationFrom(Map<String, dynamic>? profile) {
     final loc = profile?['location'];
     if (loc is Map) {
       final lat = (loc['lat'] as num?)?.toDouble();
@@ -2283,10 +2297,41 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
     return null;
   }
 
+  LatLng? _homeLocation() =>
+      _homeLocationFrom(ref.read(currentUserDocProvider).valueOrNull);
+
+  /// Where to center on the viewer: their precise GPS point if saved, else
+  /// their country's centroid (resolved offline from the `city` string).
+  LatLng? _viewerCenterFrom(Map<String, dynamic>? profile) =>
+      _homeLocationFrom(profile) ?? _countryCentroid;
+
+  /// Kicks off the offline country-centroid lookup from the saved `city`
+  /// string when there's no GPS point. Runs once per distinct city value.
+  void _ensureCountryCentroid(Map<String, dynamic>? profile) {
+    if (_homeLocationFrom(profile) != null) return; // GPS point wins.
+    final city = (profile?['city'] as String?)?.trim() ?? '';
+    if (city.isEmpty || city == _centroidSourceCity || _resolvingCentroid) {
+      return;
+    }
+    _resolvingCentroid = true;
+    _centroidSourceCity = city;
+    countryCentroidFromLocationString(city).then((centroid) {
+      _resolvingCentroid = false;
+      if (!mounted || centroid == null) return;
+      setState(() => _countryCentroid = LatLng(centroid.lat, centroid.lng));
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _resolveAll();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
   }
 
   @override
@@ -2353,6 +2398,25 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch (not read) the profile so the map rebuilds when the account doc —
+    // including the saved country location — finishes loading.
+    final profile = ref.watch(currentUserDocProvider).valueOrNull;
+    // If there's no GPS point, resolve the country centroid from the `city`
+    // string so we can still open on the viewer's country.
+    _ensureCountryCentroid(profile);
+    final home = _viewerCenterFrom(profile);
+
+    // Once a home center arrives (it may not be ready on first build — GPS or
+    // the resolved country centroid land later), recenter on the viewer's
+    // country exactly once. Deferred to after the frame so the controller is
+    // attached before we move it.
+    if (home != null && !_centeredOnHome) {
+      _centeredOnHome = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _mapController.move(home, 5.5);
+      });
+    }
+
     final markers = <Marker>[];
     for (final e in widget.events) {
       final p = _resolved[e.id];
@@ -2376,13 +2440,14 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
     return Stack(
       children: [
         FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
-            initialCenter: _initialCenter(),
+            initialCenter: home ?? _initialCenter(),
             // Open on the viewer's country by default (~5.5 = country level)
             // so they aren't dropped tight on a pin and forced to zoom out.
             // Without a saved home location, fall back to the events overview
             // (wide for many, regional for one).
-            initialZoom: _homeLocation() != null
+            initialZoom: home != null
                 ? 5.5
                 : (markers.length > 1 ? 4 : 9),
             minZoom: 2,
@@ -2390,7 +2455,14 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              // CARTO Voyager — a free, cleaner-looking basemap (softer colours,
+              // clearer labels) than raw OSM. {r} pulls @2x retina tiles so the
+              // map stays crisp on high-DPI phones. Free for reasonable use;
+              // only requires keeping OSM + CARTO attribution below.
+              urlTemplate:
+                  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
+              retinaMode: RetinaMode.isHighDensity(context),
               userAgentPackageName: 'com.coil.app',
             ),
             MarkerLayer(markers: markers),

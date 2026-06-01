@@ -1654,7 +1654,7 @@ const Map<String, String> enStrings = {
 
   // ── MAP ATTRIBUTION (added) ──
   'map_attribution_short': '© OpenStreetMap',
-  'map_attribution_long': 'OpenStreetMap contributors',
+  'map_attribution_long': '© OpenStreetMap contributors © CARTO',
 
   // ── STORY TEXT OVERLAY (added) ──
   'story_text_font_sample': 'Aa',

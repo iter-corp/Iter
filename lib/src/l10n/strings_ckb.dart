@@ -1632,7 +1632,7 @@ const Map<String, String> ckbStrings = {
 
   // ── MAP ATTRIBUTION (added) ──
   'map_attribution_short': '© OpenStreetMap',
-  'map_attribution_long': 'بەشدارانی OpenStreetMap',
+  'map_attribution_long': '© بەشدارانی OpenStreetMap © CARTO',
 
   // ── STORY TEXT OVERLAY (added) ──
   'story_text_font_sample': 'ئا',

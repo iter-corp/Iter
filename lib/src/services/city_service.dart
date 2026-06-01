@@ -125,6 +125,42 @@ class WorldCitiesNotifier extends AsyncNotifier<List<CityOption>> {
   }
 }
 
+/// A country's name and centroid coordinates, from the offline
+/// `country_state_city` dataset. Used to center a map on "their country"
+/// when only a city/country *string* is known and no GPS point exists.
+class CountryCentroid {
+  final String name;
+  final double lat;
+  final double lng;
+  const CountryCentroid(
+      {required this.name, required this.lat, required this.lng});
+}
+
+/// Resolves a stored location string like "Tbilisi, Georgia" (or just
+/// "Georgia") to its country's centroid, so the map can open on the whole
+/// country. The country is taken from the segment after the last comma,
+/// matched case-insensitively against the offline country list. Returns
+/// null when no country segment matches — entirely offline, no API.
+Future<CountryCentroid?> countryCentroidFromLocationString(
+    String location) async {
+  final raw = location.trim();
+  if (raw.isEmpty) return null;
+  // "City, Country" → "Country"; a bare "Country" is used as-is.
+  final segment = raw.contains(',') ? raw.split(',').last.trim() : raw;
+  if (segment.isEmpty) return null;
+  final target = normalizeCitySearch(segment);
+
+  final countries = await csc.getAllCountries();
+  for (final c in countries) {
+    if (normalizeCitySearch(c.name) != target) continue;
+    final lat = double.tryParse(c.latitude);
+    final lng = double.tryParse(c.longitude);
+    if (lat == null || lng == null) return null;
+    return CountryCentroid(name: c.name.trim(), lat: lat, lng: lng);
+  }
+  return null;
+}
+
 /// Ranks [cities] against [rawQuery]. Empty query returns the list
 /// unchanged. Exact match ranks above prefix, above word-boundary,
 /// above substring; ties broken by closeness in length then name.

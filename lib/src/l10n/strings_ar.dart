@@ -1608,7 +1608,7 @@ const Map<String, String> arStrings = {
 
   // ── MAP ATTRIBUTION (added) ──
   'map_attribution_short': '© OpenStreetMap',
-  'map_attribution_long': 'مساهمو OpenStreetMap',
+  'map_attribution_long': '© مساهمو OpenStreetMap © CARTO',
 
   // ── STORY TEXT OVERLAY (added) ──
   'story_text_font_sample': 'أأ',
