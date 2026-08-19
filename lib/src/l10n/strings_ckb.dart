@@ -1385,6 +1385,7 @@ const Map<String, String> ckbStrings = {
   'request_hidden_requests': 'داواکارییە شاراوەکان',
   'request_hidden_requests_subtitle':
       'ئەو داواکارییانەی نامەیان تێدایە کە لەوانەیە سووکایەتیپێکردن یان نەخوازراو بن، دەگوازرێنەوە بۆ ئەم فۆڵدەرە.',
+  'request_no_requests_yet': 'هیچ داواکارییەک نییە هێشتا.',
   'about_editor_i_am_a': 'من…',
   'about_editor_field': 'بوار',
   'about_editor_academic_level': 'ئاستی ئەکادیمی',

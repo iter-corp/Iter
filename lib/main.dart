@@ -61,7 +61,7 @@ Future<void> main() async {
       await dotenv.load(fileName: '.env');
       debugPrint('[boot] dotenv loaded');
     } catch (e) {
-      debugPrint('[boot] dotenv load failed (ignored): $e');
+      debugPrint('[boot]                               dotenv load failed (ignored): $e');
     }
 
     // The `.env` file is bundled as an asset (see pubspec.yaml). On iOS it can

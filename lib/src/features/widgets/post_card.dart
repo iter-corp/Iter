@@ -420,38 +420,28 @@ class _PostCardState extends ConsumerState<PostCard>
                   key: _captionPanelKey,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    AnimatedSlide(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      offset: _captionBoxLowered
-                          ? const Offset(0, 0.72)
-                          : Offset.zero,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!_captionBoxLowered &&
-                              repostsEnabled &&
-                              currentUid != null)
-                            _RepostBubbleCluster(
-                              postId: post.id,
-                              viewerUid: currentUid,
-                            ),
-                          if (isMulti) ...[
-                            Center(
-                              child: _frostedPanel(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                  child: _PageDots(
-                                    count: imageCount,
-                                    activeIndex: _currentPage,
-                                  ),
-                                ),
+                    if (!_captionBoxLowered) ...[
+                      if (repostsEnabled && currentUid != null)
+                        _RepostBubbleCluster(
+                          postId: post.id,
+                          viewerUid: currentUid,
+                        ),
+                      if (isMulti) ...[
+                        Center(
+                          child: _frostedPanel(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              child: _PageDots(
+                                count: imageCount,
+                                activeIndex: _currentPage,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                          ],
-                          GestureDetector(
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () {},
                             child: _frostedPanel(
@@ -711,8 +701,6 @@ class _PostCardState extends ConsumerState<PostCard>
                             ),
                           ),
                         ],
-                      ),
-                    ),
                   ],
                 ),
               ),

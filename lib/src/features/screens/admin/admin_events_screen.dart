@@ -921,7 +921,6 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               _refinedField(
                 label: context.t.adminFieldTitle,
                 controller: _titleCtrl,
-                hint: context.t.adminEnterEventTitle,
                 maxLength: 50,
                 required: false,
                 errorText: _titleError,
@@ -935,7 +934,6 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               _refinedField(
                 label: context.t.adminFieldSubtitle,
                 controller: _subtitleCtrl,
-                hint: context.t.adminShortSubtitleOptional,
                 maxLength: 50,
                 textInputAction: TextInputAction.next,
               ),
@@ -1042,7 +1040,6 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               _refinedField(
                 label: context.t.adminFieldDescription,
                 controller: _descCtrl,
-                hint: context.t.adminDescribeTheEvent,
                 maxLines: 4,
                 required: false,
                 errorText: _descError,
@@ -1056,21 +1053,18 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
               _refinedField(
                 label: context.t.adminFieldLink,
                 controller: _linkCtrl,
-                hint: context.t.adminRegistrationOrInfoLink,
                 keyboardType: TextInputType.url,
                 textInputAction: TextInputAction.next,
               ),
               _refinedField(
                 label: context.t.adminFieldPhone,
                 controller: _phoneCtrl,
-                hint: context.t.adminContactPhoneOptional,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
               ),
               _refinedField(
                 label: context.t.adminFieldEmail,
                 controller: _emailCtrl,
-                hint: context.t.adminContactEmailOptional,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.done,
               ),
@@ -1149,7 +1143,6 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
   Widget _refinedField({
     required String label,
     required TextEditingController controller,
-    String? hint,
     int maxLines = 1,
     bool required = false,
     int? maxLength,
@@ -1172,36 +1165,45 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
         builder: (field) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppGlassCard(
-              radius: 12,
-              borderAlpha: field.hasError ? 0.7 : null,
-              child: TextField(
-                controller: controller,
-                maxLines: maxLines,
-                keyboardType: keyboardType,
-                textInputAction: textInputAction,
-                onChanged: (value) {
-                  field.didChange(value);
-                  onChanged?.call(value);
-                },
-                inputFormatters: [
-                  if (maxLength != null)
-                    LengthLimitingTextInputFormatter(maxLength),
-                ],
-                style: TextStyle(fontSize: 15, color: context.textPrimary),
-                decoration: InputDecoration(
-                  labelText: label,
-                  hintText: hint ?? label,
-                  filled: true,
-                  fillColor: Colors.transparent,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  counterText: maxLength != null ? '' : null,
+            TextField(
+              controller: controller,
+              maxLines: maxLines,
+              keyboardType: keyboardType,
+              textInputAction: textInputAction,
+              onChanged: (value) {
+                field.didChange(value);
+                onChanged?.call(value);
+              },
+              inputFormatters: [
+                if (maxLength != null)
+                  LengthLimitingTextInputFormatter(maxLength),
+              ],
+              style: TextStyle(fontSize: 15, color: context.textPrimary),
+              decoration: InputDecoration(
+                labelText: label,
+                filled: true,
+                fillColor: context.isDark
+                    ? const Color(0xFF1E1E2C).withValues(alpha: 0.50)
+                    : Colors.white.withValues(alpha: 0.40),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                      color: field.hasError ? AppColors.red : context.borderColor),
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                      color: field.hasError ? AppColors.red : context.borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                      color: field.hasError ? AppColors.red : AppColors.purple,
+                      width: 1.6),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 16),
+                counterText: maxLength != null ? '' : null,
               ),
             ),
             if (field.hasError) _FieldError(text: field.errorText!),

@@ -53,6 +53,7 @@ class DefaultFirebaseOptions {
     projectId: 'coil-50528',
     authDomain: 'coil-50528.firebaseapp.com',
     storageBucket: 'coil-50528.firebasestorage.app',
+    databaseURL: 'https://coil-50528-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

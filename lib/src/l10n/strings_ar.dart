@@ -1365,6 +1365,7 @@ const Map<String, String> arStrings = {
   'request_hidden_requests': 'الطلبات المخفية',
   'request_hidden_requests_subtitle':
       'الطلبات التي تحتوي على رسائل قد تكون مسيئة أو غير مرغوب فيها تُنقل إلى هذا المجلد.',
+  'request_no_requests_yet': 'لا يوجد طلب بعد.',
   'about_editor_i_am_a': 'أنا…',
   'about_editor_field': 'المجال',
   'about_editor_academic_level': 'المستوى الأكاديمي',

@@ -125,6 +125,14 @@ class RequestsTab extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    if (requests.isEmpty) {
+      return Center(
+        child: Text(
+          context.t.requestNoRequestsYet,
+          style: TextStyle(color: context.textSecondary),
+        ),
+      );
+    }
     return Column(
       children: [
         /// REQUEST LIST

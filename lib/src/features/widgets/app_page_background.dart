@@ -150,12 +150,18 @@ class AppGlassCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(radius),
               border: Border.all(color: borderColor),
             ),
-            child: padding == null
-                ? child
-                : Padding(
-                    padding: padding!,
-                    child: child,
-                  ),
+            // Gives descendants like ListTile a Material ancestor to paint
+            // ink splashes on — otherwise they'd render behind this card's
+            // own background DecoratedBox and be invisible.
+            child: Material(
+              type: MaterialType.transparency,
+              child: padding == null
+                  ? child
+                  : Padding(
+                      padding: padding!,
+                      child: child,
+                    ),
+            ),
           ),
         ),
       ),

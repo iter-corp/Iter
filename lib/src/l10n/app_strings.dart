@@ -1623,6 +1623,7 @@ class AppStrings {
   String get requestHiddenRequests => _get('request_hidden_requests');
   String get requestHiddenRequestsSubtitle =>
       _get('request_hidden_requests_subtitle');
+  String get requestNoRequestsYet => _get('request_no_requests_yet');
   String get aboutEditorIAmA => _get('about_editor_i_am_a');
   String get aboutEditorField => _get('about_editor_field');
   String get aboutEditorAcademicLevel => _get('about_editor_academic_level');

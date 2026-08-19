@@ -1407,6 +1407,7 @@ const Map<String, String> enStrings = {
   'request_hidden_requests_subtitle':
       'Requests containing messages that may be offensive or unwanted are '
           'moved to this folder.',
+  'request_no_requests_yet': 'No request yet.',
   'about_editor_i_am_a': 'I am a…',
   'about_editor_field': 'Field',
   'about_editor_academic_level': 'Academic level',
