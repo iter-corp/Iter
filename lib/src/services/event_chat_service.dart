@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_service.dart';
+import 'user_service.dart';
+import 'package:flutter/foundation.dart';
+import '../utils/mention_utils.dart';
 
 class EventChatMessage {
   final String id;
@@ -107,6 +110,23 @@ class EventChatService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notifications = NotificationService();
+  final UserService _userService = UserService();
+
+  Future<void> _processMentions(String text, String actorUid, String eventId, String messageId) async {
+    final usernames = MentionUtils.extractMentions(text);
+    if (usernames.isEmpty) return;
+    try {
+      final uidMap = await _userService.getUidsByUsernames(usernames);
+      final targetUids = uidMap.values.toList();
+      await _notifications.sendMentionNotifications(
+        targetUids: targetUids,
+        actorUid: actorUid,
+        targetId: eventId,
+      );
+    } catch (e) {
+      debugPrint('[EventChatService] Error processing mentions: $e');
+    }
+  }
 
   DocumentReference<Map<String, dynamic>> _chatDoc(String eventId) =>
       _db.collection('eventChats').doc(eventId);
@@ -149,6 +169,8 @@ class EventChatService {
       SetOptions(merge: true),
     );
     await batch.commit();
+
+    await _processMentions(trimmed, user.uid, eventId, msgRef.id);
   }
 
   /// Messages stream (oldest first).

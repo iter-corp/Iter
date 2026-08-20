@@ -228,4 +228,41 @@ class UserService {
     }
     return false;
   }
+
+  /// Resolves a list of usernames to their corresponding UIDs.
+  Future<Map<String, String>> getUidsByUsernames(List<String> usernames) async {
+    final Map<String, String> result = {};
+    if (usernames.isEmpty) return result;
+
+    // Remove duplicates and normalize
+    final uniqueUsernames =
+        usernames.map(normalizeUsername).toSet().toList();
+
+    // Firestore `in` queries are limited to 10 items per batch
+    for (var i = 0; i < uniqueUsernames.length; i += 10) {
+      final chunk = uniqueUsernames.sublist(
+        i,
+        i + 10 > uniqueUsernames.length ? uniqueUsernames.length : i + 10,
+      );
+
+      try {
+        final snap = await _db
+            .collection('users')
+            .where('usernameLower', whereIn: chunk)
+            .get();
+
+        for (final doc in snap.docs) {
+          final docUsername =
+              (doc.data()['username'] as String?)?.toLowerCase() ?? '';
+          if (docUsername.isNotEmpty) {
+            result[docUsername] = doc.id;
+          }
+        }
+      } catch (e) {
+        // Continue with the next chunk if one fails
+      }
+    }
+
+    return result;
+  }
 }

@@ -17,6 +17,7 @@ import '../model/post_model.dart';
 import '../../utils/text_direction.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/comment_report_sheet.dart';
+import '../widgets/mention_text.dart';
 
 class _ReplyTarget {
   final String parentCommentId;
@@ -759,29 +760,31 @@ class _CommentTile extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  RichText(
+                  MentionText(
                     textDirection: detectTextDirection(comment.text),
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: comment.profanityFiltered
-                            ? const Color(0xFFB00020)
-                            : context.textPrimary,
-                      ),
-                      children: [
-                        if (comment.replyToUsername != null &&
+                    text: comment.text,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: comment.profanityFiltered
+                          ? const Color(0xFFB00020)
+                          : context.textPrimary,
+                    ),
+                    mentionStyle: TextStyle(
+                      fontSize: 13,
+                      color: const Color(0xFFB05ECC),
+                      fontWeight: FontWeight.w700,
+                    ),
+                    prefixSpan: (comment.replyToUsername != null &&
                             comment.replyToUsername!.isNotEmpty)
-                          TextSpan(
+                        ? TextSpan(
                             text:
                                 '${context.t.ltrHandle(comment.replyToUsername!)} ',
                             style: const TextStyle(
                               color: Color(0xFF8A3FB8),
                               fontWeight: FontWeight.w600,
                             ),
-                          ),
-                        TextSpan(text: comment.text),
-                      ],
-                    ),
+                          )
+                        : null,
                   ),
                   if (senderOnlyLabel)
                     Padding(

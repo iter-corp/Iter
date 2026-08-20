@@ -27,6 +27,7 @@ import '../screens/create_discuss_screen.dart';
 import '../screens/image_viewer_screen.dart';
 import '../../navigation/user_profile_nav.dart';
 import 'location_map.dart';
+import 'mention_text.dart';
 
 class PostCard extends ConsumerStatefulWidget {
   final Post post;
@@ -458,8 +459,8 @@ class _PostCardState extends ConsumerState<PostCard>
                                             ? () => _showFullCaption(
                                                 context, avatarUrl, username)
                                             : null,
-                                        child: Text(
-                                          captionPreview,
+                                        child: MentionText(
+                                          text: captionPreview,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -2662,10 +2663,14 @@ class _ExpandableCaptionState extends State<_ExpandableCaption> {
         )..layout(maxWidth: constraints.maxWidth);
 
         if (!tp.didExceedMaxLines) {
-          return Text(
-            widget.text,
+          return MentionText(
+            text: widget.text,
             style: widget.style,
             textAlign: widget.textAlign,
+            mentionStyle: widget.style.copyWith(
+              color: widget.toggleColor,
+              fontWeight: FontWeight.w700,
+            ),
           );
         }
 
@@ -2675,13 +2680,17 @@ class _ExpandableCaptionState extends State<_ExpandableCaption> {
               ? CrossAxisAlignment.center
               : CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.text,
+            MentionText(
+              text: widget.text,
               style: widget.style,
               textAlign: widget.textAlign,
               maxLines: _expanded ? null : widget.collapsedMaxLines,
               overflow:
                   _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              mentionStyle: widget.style.copyWith(
+                color: widget.toggleColor,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 6),
             GestureDetector(

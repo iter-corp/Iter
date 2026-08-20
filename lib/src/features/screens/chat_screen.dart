@@ -40,6 +40,7 @@ import '../../utils/maps_links.dart';
 import '../model/post_model.dart';
 import '../widgets/event_share.dart';
 import '../widgets/location_map.dart';
+import '../widgets/mention_text.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
 import 'chat_media_screen.dart';
@@ -2561,7 +2562,15 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
       return Text(context.t.messageUnavailable, style: originalStyle);
     }
     if (!widget.autoTranslate || isMe || msg.text.trim().isEmpty) {
-      return Text(msg.text, style: originalStyle);
+      return MentionText(
+        textDirection: _detectTextDirection(msg.text),
+        text: msg.text,
+        style: originalStyle,
+        mentionStyle: originalStyle.copyWith(
+          color: isMe ? Colors.white : const Color(0xFFB05ECC),
+          fontWeight: FontWeight.w700,
+        ),
+      );
     }
 
     final body = _showOriginal
@@ -2578,7 +2587,15 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(body, style: originalStyle),
+        MentionText(
+          textDirection: _detectTextDirection(body),
+          text: body,
+          style: originalStyle,
+          mentionStyle: originalStyle.copyWith(
+            color: isMe ? Colors.white : const Color(0xFFB05ECC),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,

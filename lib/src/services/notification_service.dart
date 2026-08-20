@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Notification types written by Cloud Functions or client-side logic.
 /// type values: 'follow', 'like', 'comment', 'comment_like', 'reply',
 /// 'qa_answer', 'qa_reply', 'qa_answer_like', 'qa_answer_dislike',
-/// 'story_like', 'story_comment', 'story_reply', 'new_event'
+/// 'story_like', 'story_comment', 'story_reply', 'new_event', 'mention'
 class AppNotification {
   final String id;
   final String type;
@@ -143,6 +143,30 @@ class NotificationService {
       'read': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Sends a batch of mention notifications.
+  Future<void> sendMentionNotifications({
+    required List<String> targetUids,
+    required String actorUid,
+    String? targetId,
+    String? commentId,
+  }) async {
+    if (targetUids.isEmpty) return;
+    final batch = _db.batch();
+    for (final uid in targetUids) {
+      if (uid == actorUid) continue; // Don't notify self
+      final ref = _items(uid).doc();
+      batch.set(ref, {
+        'type': 'mention',
+        'actorUid': actorUid,
+        if (targetId != null) 'targetId': targetId,
+        if (commentId != null) 'commentId': commentId,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
   }
 
   /// Writes a system notification that doesn't belong to a specific actor
