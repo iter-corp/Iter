@@ -253,9 +253,11 @@ class _EventBodyState extends ConsumerState<EventBody> {
   }
 
   Future<void> _onEventTypeTap() async {
+    final cfg = ref.read(adminConfigProvider).value;
+    final options = cfg?.eventTypes ?? kEventTypes;
     final chosen = await _pickFromSheet(
       title: context.t.eventsFilterByType,
-      options: kEventTypes,
+      options: options,
       selected: _selectedEventType,
     );
     if (chosen == null) return;

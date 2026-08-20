@@ -874,7 +874,7 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     final cfg = ref.watch(adminConfigProvider).value ?? const AdminConfig();
     // Keep event types aligned with the canonical list requested by product.
     final typeOptions = <String>{
-      ...kEventTypes,
+      ...cfg.eventTypes,
       if (_eventType.isNotEmpty) _eventType,
     }.toList();
     final countryOptions = <String>{
