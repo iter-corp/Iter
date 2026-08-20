@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_strings.dart';
@@ -151,7 +152,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       maxWidth: 1024,
     );
     if (picked == null) return;
-    if (mounted) setState(() => _pendingAvatarFile = File(picked.path));
+    
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Photo',
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(
+          title: 'Crop Photo',
+          aspectRatioLockEnabled: true,
+        ),
+      ],
+    );
+    if (cropped == null) return;
+    
+    if (mounted) setState(() => _pendingAvatarFile = File(cropped.path));
   }
 
   Future<void> _pickCover() async {
@@ -164,7 +183,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       maxWidth: 1600,
     );
     if (picked == null) return;
-    if (mounted) setState(() => _pendingCoverFile = File(picked.path));
+    
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      aspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Cover',
+          initAspectRatio: CropAspectRatioPreset.ratio16x9,
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(
+          title: 'Crop Cover',
+          aspectRatioLockEnabled: true,
+        ),
+      ],
+    );
+    if (cropped == null) return;
+    
+    if (mounted) setState(() => _pendingCoverFile = File(cropped.path));
   }
 
   /// Append a unique version query param to a freshly uploaded image URL.
