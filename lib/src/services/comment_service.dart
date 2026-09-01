@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../utils/mention_utils.dart';
 import 'notification_service.dart';
 import 'profanity_filter_service.dart';
+import 'user_service.dart';
 
 /// Thrown by [CommentService.editComment] when the new text would
 /// introduce profanity into a comment that was previously clean.
@@ -80,6 +82,25 @@ class CommentService {
   final _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
   final ProfanityFilterService _profanityFilter = ProfanityFilterService();
+  final UserService _userService = UserService();
+
+  Future<void> _processMentions(String text, String actorUid, String postId, String commentId) async {
+    final usernames = MentionUtils.extractMentions(text);
+    if (usernames.isEmpty) return;
+
+    try {
+      final uidMap = await _userService.getUidsByUsernames(usernames);
+      final targetUids = uidMap.values.toList();
+      await _notifications.sendMentionNotifications(
+        targetUids: targetUids,
+        actorUid: actorUid,
+        targetId: postId,
+        commentId: commentId,
+      );
+    } catch (e) {
+      debugPrint('[CommentService] Error processing mentions: $e');
+    }
+  }
 
   CollectionReference<Map<String, dynamic>> _comments(String postId) =>
       _db.collection('posts').doc(postId).collection('comments');
@@ -283,6 +304,8 @@ class CommentService {
       return;
     }
 
+    await _processMentions(trimmed, authorUid, postId, commentRef.id);
+
     // Spark-safe fallback: generate notifications from the client for Q&A
     // events and replies when backend functions are unavailable.
     try {
@@ -453,6 +476,10 @@ class CommentService {
         'text': trimmed,
         'editedAt': FieldValue.serverTimestamp(),
       });
+      final actorUid = currentUid ?? FirebaseAuth.instance.currentUser?.uid;
+      if (actorUid != null) {
+        await _processMentions(trimmed, actorUid, postId, commentId);
+      }
       return;
     }
     // Surface the rejection through an exception so the UI can show a

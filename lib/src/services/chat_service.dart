@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import 'message_cache.dart';
+import 'notification_service.dart';
 import 'profanity_filter_service.dart';
-
+import 'user_service.dart';
+import '../utils/mention_utils.dart';
 // ─────────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────────
@@ -384,6 +386,24 @@ class ChatService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final ProfanityFilterService _profanityFilter = ProfanityFilterService();
+  final NotificationService _notifications = NotificationService();
+  final UserService _userService = UserService();
+
+  Future<void> _processMentions(String text, String actorUid, String chatId, String messageId) async {
+    final usernames = MentionUtils.extractMentions(text);
+    if (usernames.isEmpty) return;
+    try {
+      final uidMap = await _userService.getUidsByUsernames(usernames);
+      final targetUids = uidMap.values.toList();
+      await _notifications.sendMentionNotifications(
+        targetUids: targetUids,
+        actorUid: actorUid,
+        targetId: chatId,
+      );
+    } catch (e) {
+      debugPrint('[ChatService] Error processing mentions: $e');
+    }
+  }
 
   DocumentReference<Map<String, dynamic>> _chatDoc(String chatId) =>
       _db.collection('chats').doc(chatId);
@@ -799,6 +819,10 @@ class ChatService {
       if (receiver.isNotEmpty && await _isMutualFollow(senderUid, receiver)) {
         acceptedUids.add(receiver);
       }
+    }
+
+    if (!isProfanityFiltered) {
+      await _processMentions(trimmedText, senderUid, chatId, msgRef.id);
     }
 
     final summary = <String, Object?>{

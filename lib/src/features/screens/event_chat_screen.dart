@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import '../../providers/event_chat_providers.dart';
 import '../../providers/preferred_language_provider.dart';
 import '../../services/event_chat_service.dart';
 import '../../services/translate_service.dart';
+import '../widgets/mention_text.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
 import 'event_group_settings_screen.dart';
@@ -300,6 +303,26 @@ class _EventMessageBubble extends ConsumerWidget {
     required this.isFromAdmin,
   });
 
+  ui.TextDirection _detectTextDirection(String text) {
+    for (final r in text.runes) {
+      if ((r >= 0x0590 && r <= 0x05FF) || // Hebrew
+          (r >= 0x0600 && r <= 0x06FF) || // Arabic
+          (r >= 0x0700 && r <= 0x074F) || // Syriac
+          (r >= 0x0750 && r <= 0x077F) || // Arabic Supplement
+          (r >= 0x0780 && r <= 0x07BF) || // Thaana
+          (r >= 0x07C0 && r <= 0x07FF) || // NKo
+          (r >= 0x08A0 && r <= 0x08FF) || // Arabic Extended-A
+          (r >= 0xFB50 && r <= 0xFDFF) || // Arabic Presentation Forms-A
+          (r >= 0xFE70 && r <= 0xFEFF)) { // Arabic Presentation Forms-B
+        return ui.TextDirection.rtl;
+      }
+      if ((r >= 0x0041 && r <= 0x005A) || (r >= 0x0061 && r <= 0x007A)) {
+        return ui.TextDirection.ltr;
+      }
+    }
+    return ui.TextDirection.ltr;
+  }
+
   String _fmt(DateTime? dt) {
     if (dt == null) return '';
     return DateFormat('h:mm a').format(dt);
@@ -407,23 +430,35 @@ class _EventMessageBubble extends ConsumerWidget {
                                 ),
                                 if (msg.text.isNotEmpty) ...[
                                   const SizedBox(height: 6),
-                                  Text(
-                                    msg.text,
+                                  MentionText(
+                                    textDirection: _detectTextDirection(msg.text),
+                                    text: msg.text,
                                     style: TextStyle(
                                       color: isMe
                                           ? Colors.white
                                           : context.textPrimary,
                                       fontSize: 14,
                                     ),
+                                    mentionStyle: TextStyle(
+                                      color: isMe ? Colors.white : const Color(0xFFB05ECC),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ],
                               ],
                             )
-                          : Text(
-                              msg.text,
+                          : MentionText(
+                              textDirection: _detectTextDirection(msg.text),
+                              text: msg.text,
                               style: TextStyle(
                                 color:
                                     isMe ? Colors.white : context.textPrimary,
+                                fontSize: 14,
+                              ),
+                              mentionStyle: TextStyle(
+                                color: isMe ? Colors.white : const Color(0xFFB05ECC),
+                                fontWeight: FontWeight.w700,
                                 fontSize: 14,
                               ),
                             ),

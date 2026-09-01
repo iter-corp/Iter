@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../features/model/post_model.dart';
+import '../utils/mention_utils.dart';
 import 'notification_service.dart';
 import 'profanity_filter_service.dart';
+import 'user_service.dart';
 
 class DiscussPostBlockedException implements Exception {
   final List<String> matchedWords;
@@ -31,9 +33,27 @@ class PostService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notifications = NotificationService();
   final ProfanityFilterService _profanityFilter = ProfanityFilterService();
+  final UserService _userService = UserService();
 
   CollectionReference<Map<String, dynamic>> get _posts =>
       _db.collection('posts');
+
+  Future<void> _processMentions(String text, String actorUid, String postId) async {
+    final usernames = MentionUtils.extractMentions(text);
+    if (usernames.isEmpty) return;
+    
+    try {
+      final uidMap = await _userService.getUidsByUsernames(usernames);
+      final targetUids = uidMap.values.toList();
+      await _notifications.sendMentionNotifications(
+        targetUids: targetUids,
+        actorUid: actorUid,
+        targetId: postId,
+      );
+    } catch (e) {
+      debugPrint('[PostService] Error processing mentions: $e');
+    }
+  }
 
   Future<String> createPost({
     required String caption,
@@ -106,6 +126,8 @@ class PostService {
         'postsCount': FieldValue.increment(1),
       });
       debugPrint('[PostService] postsCount incremented for ${user.uid}');
+
+      await _processMentions(caption, user.uid, ref.id);
 
       return ref.id;
     } catch (e, st) {
@@ -246,6 +268,8 @@ class PostService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    await _processMentions(caption, user.uid, ref.id);
+
     return ref.id;
   }
 
@@ -300,6 +324,8 @@ class PostService {
       'sourcePostId': source.id,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    await _processMentions(caption, user.uid, ref.id);
 
     return ref.id;
   }
@@ -495,11 +521,18 @@ class PostService {
     String? caption,
     bool? isPrivate,
   }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in');
+
     final data = <String, dynamic>{};
     if (caption != null) data['caption'] = caption;
     if (isPrivate != null) data['isPrivate'] = isPrivate;
     if (data.isEmpty) return;
     await _posts.doc(postId).update(data);
+
+    if (caption != null) {
+      await _processMentions(caption, user.uid, postId);
+    }
   }
 
   Future<void> toggleLike(String postId) async {
