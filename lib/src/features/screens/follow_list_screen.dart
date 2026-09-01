@@ -39,21 +39,25 @@ class FollowListScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 2,
       initialIndex: initialTab.clamp(0, 1),
-      // Match the home / profile pages: a transparent Scaffold whose body is
-      // AppPageBackground, with the app bar made see-through (transparent +
-      // flexibleSpace painting the same background) so the gradient + ambient
-      // glow are continuous across the app bar and the list.
+      // One AppPageBackground spanning the whole screen (the app bar is
+      // see-through and extends the body behind it) so there's no seam
+      // where a separate app-bar copy of the gradient would meet the body.
+      // The app bar + tabs + each tab's search box are all fixed; only the
+      // user list scrolls.
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           foregroundColor: context.textPrimary,
           elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+          scrolledUnderElevation: 0,
           bottom: TabBar(
             labelColor: AppColors.purple,
             unselectedLabelColor: context.textSecondary,
             indicatorColor: AppColors.purple,
+            dividerColor: Colors.transparent,
+            dividerHeight: 0,
             tabs: [
               Tab(text: context.t.followers),
               Tab(text: context.t.following),
@@ -61,22 +65,30 @@ class FollowListScreen extends ConsumerWidget {
           ),
         ),
         body: AppPageBackground(
-          child: SafeArea(
-            top: false,
-            child: TabBarView(
-              children: [
-                _UserList(
-                  usersProvider: followersProvider(uid),
-                  kind: _FollowKind.followers,
-                  isOwnProfile: isOwnProfile,
+          child: Column(
+            children: [
+              SizedBox(
+                height: kToolbarHeight +
+                    kTextTabBarHeight +
+                    MediaQuery.of(context).padding.top,
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _UserList(
+                      usersProvider: followersProvider(uid),
+                      kind: _FollowKind.followers,
+                      isOwnProfile: isOwnProfile,
+                    ),
+                    _UserList(
+                      usersProvider: followingProvider(uid),
+                      kind: _FollowKind.following,
+                      isOwnProfile: isOwnProfile,
+                    ),
+                  ],
                 ),
-                _UserList(
-                  usersProvider: followingProvider(uid),
-                  kind: _FollowKind.following,
-                  isOwnProfile: isOwnProfile,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -157,8 +169,7 @@ class _UserListState extends ConsumerState<_UserList> {
                 if (data == null) return false; // unknown name can't match
                 final username =
                     (data['username'] as String?)?.toLowerCase() ?? '';
-                final handle =
-                    (data['handle'] as String?)?.toLowerCase() ?? '';
+                final handle = (data['handle'] as String?)?.toLowerCase() ?? '';
                 return username.contains(_query) || handle.contains(_query);
               }
 
@@ -287,7 +298,8 @@ class _UserListState extends ConsumerState<_UserList> {
         backgroundColor: context.inputFill,
         child: Icon(Icons.person, size: 18, color: context.textSecondary),
       ),
-      title: Align(alignment: AlignmentDirectional.centerStart, child: bar(140)),
+      title:
+          Align(alignment: AlignmentDirectional.centerStart, child: bar(140)),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 6),
         child:

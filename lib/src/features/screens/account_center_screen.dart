@@ -32,83 +32,95 @@ class AccountCenterScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.accountCenter),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-          children: [
-            const SizedBox(height: 4),
-
-            // ── Email ────────────────────────────────────────────────
-            _Tile(
-              leading:
-                  const Icon(Icons.email_outlined, color: AppColors.purple),
-              title: context.t.changeEmail,
-              trailing:
-                  Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => _changeEmail(context),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.accountCenter),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
             ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+              sliver: SliverList.list(
+                children: [
+                  const SizedBox(height: 4),
 
-            // ── Password (email/password accounts only) ──────────────
-            if (isEmailPasswordUser)
-              _Tile(
-                leading:
-                    const Icon(Icons.lock_outline, color: AppColors.purple),
-                title: context.t.changePassword,
-                trailing:
-                    Icon(Icons.chevron_right, color: context.textSecondary),
-                onTap: () async {
-                  final updated = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                        builder: (_) => const ChangePasswordScreen()),
-                  );
-                  if (updated == true && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(context.t.settingsPasswordUpdated)),
-                    );
-                  }
-                },
+                  // ── Email ────────────────────────────────────────────────
+                  _Tile(
+                    leading: const Icon(Icons.email_outlined,
+                        color: AppColors.purple),
+                    title: context.t.changeEmail,
+                    trailing:
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                    onTap: () => _changeEmail(context),
+                  ),
+
+                  // ── Password (email/password accounts only) ──────────────
+                  if (isEmailPasswordUser)
+                    _Tile(
+                      leading: const Icon(Icons.lock_outline,
+                          color: AppColors.purple),
+                      title: context.t.changePassword,
+                      trailing: Icon(Icons.chevron_right,
+                          color: context.textSecondary),
+                      onTap: () async {
+                        final updated = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                              builder: (_) => const ChangePasswordScreen()),
+                        );
+                        if (updated == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text(context.t.settingsPasswordUpdated)),
+                          );
+                        }
+                      },
+                    ),
+
+                  // ── Private account toggle ───────────────────────────────
+                  _Tile(
+                    leading: Icon(
+                      isPrivate ? Icons.lock_outline : Icons.lock_open,
+                      color: AppColors.purple,
+                    ),
+                    title: context.t.privateAccount,
+                    subtitle: isPrivate
+                        ? context.t.profileOnlyFollowersCanSee
+                        : context.t.profileAnyoneCanSee,
+                    trailing: Switch.adaptive(
+                      value: isPrivate,
+                      activeTrackColor: AppColors.purple,
+                      onChanged: (val) async {
+                        final uid =
+                            ref.read(authServiceProvider).currentUser?.uid;
+                        if (uid == null) return;
+                        await ref
+                            .read(userServiceProvider)
+                            .updateUser(uid, {'isPrivate': val});
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Delete account (destructive) ─────────────────────────
+                  _Tile(
+                    leading:
+                        const Icon(Icons.delete_forever, color: Colors.red),
+                    title: context.t.deleteAccount,
+                    titleColor: Colors.red,
+                    subtitle: context.t.profileDeleteAccountSubtitle,
+                    subtitleColor: Colors.red,
+                    onTap: () => _confirmDeleteAccount(context, ref),
+                  ),
+                ],
               ),
-
-            // ── Private account toggle ───────────────────────────────
-            _Tile(
-              leading: Icon(
-                isPrivate ? Icons.lock_outline : Icons.lock_open,
-                color: AppColors.purple,
-              ),
-              title: context.t.privateAccount,
-              subtitle: isPrivate
-                  ? context.t.profileOnlyFollowersCanSee
-                  : context.t.profileAnyoneCanSee,
-              trailing: Switch.adaptive(
-                value: isPrivate,
-                activeTrackColor: AppColors.purple,
-                onChanged: (val) async {
-                  final uid = ref.read(authServiceProvider).currentUser?.uid;
-                  if (uid == null) return;
-                  await ref
-                      .read(userServiceProvider)
-                      .updateUser(uid, {'isPrivate': val});
-                },
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── Delete account (destructive) ─────────────────────────
-            _Tile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: context.t.deleteAccount,
-              titleColor: Colors.red,
-              subtitle: context.t.profileDeleteAccountSubtitle,
-              subtitleColor: Colors.red,
-              onTap: () => _confirmDeleteAccount(context, ref),
             ),
           ],
         ),
@@ -313,10 +325,8 @@ class _Tile extends StatelessWidget {
         onTap: onTap,
         iconColor: AppColors.purple,
         textColor: context.textPrimary,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }

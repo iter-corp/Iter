@@ -15,114 +15,140 @@ class AdminBlacklistScreen extends ConsumerWidget {
     final listAsync = ref.watch(blacklistProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.adminBlacklistedEmails),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: listAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-        data: (items) {
-          if (items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_circle_outline,
-                      size: 48, color: context.textSecondary),
-                  const SizedBox(height: 12),
-                  Text(context.t.adminNoBlacklistedEmails,
-                      style: TextStyle(color: context.textSecondary)),
-                ],
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.adminBlacklistedEmails),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            listAsync.when<Widget>(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
               ),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) {
-              final item = items[i];
-              final email = (item['email'] as String?) ?? '';
-              final deletedAt =
-                  (item['deletedAt'] as dynamic)?.toDate() as DateTime?;
-              return AppGlassCard(
-                padding: const EdgeInsets.all(14),
-                radius: 16,
-                borderAlpha: 0.60,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.block, color: Colors.red, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
+              error: (e, _) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(context.t.errorWithMessage(e))),
+              ),
+              data: (items) {
+                if (items.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            email,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (deletedAt != null)
-                            Text(
-                              context.t.adminDeletedOn(
-                                  DateFormat('MMM d, y').format(deletedAt)),
-                              style: TextStyle(
-                                  color: context.textSecondary, fontSize: 11),
-                            ),
+                          Icon(Icons.check_circle_outline,
+                              size: 48, color: context.textSecondary),
+                          const SizedBox(height: 12),
+                          Text(context.t.adminNoBlacklistedEmails,
+                              style: TextStyle(color: context.textSecondary)),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: () async {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: Text(context.t.adminRemoveFromBlacklistTitle),
-                            content: Text(
-                                context.t.adminAllowToRegisterAgain(email)),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: Text(context.t.cancel),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.all(12),
+                  sliver: SliverList.separated(
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final item = items[i];
+                      final email = (item['email'] as String?) ?? '';
+                      final deletedAt =
+                          (item['deletedAt'] as dynamic)?.toDate() as DateTime?;
+                      return AppGlassCard(
+                        padding: const EdgeInsets.all(14),
+                        radius: 16,
+                        borderAlpha: 0.60,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                shape: BoxShape.circle,
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: Text(context.t.remove,
-                                    style: const TextStyle(color: Colors.green)),
+                              child: const Icon(Icons.block,
+                                  color: Colors.red, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    email,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (deletedAt != null)
+                                    Text(
+                                      context.t.adminDeletedOn(
+                                          DateFormat('MMM d, y')
+                                              .format(deletedAt)),
+                                      style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 11),
+                                    ),
+                                ],
                               ),
-                            ],
-                          ),
-                        );
-                        if (ok == true) {
-                          await ref
-                              .read(adminServiceProvider)
-                              .removeFromBlacklist(email);
-                        }
-                      },
-                      icon: Icon(Icons.restore, color: context.textSecondary),
-                      tooltip: context.t.adminRemoveFromBlacklistTooltip,
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+                            ),
+                            IconButton(
+                              onPressed: () async {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: Text(context
+                                        .t.adminRemoveFromBlacklistTitle),
+                                    content: Text(context.t
+                                        .adminAllowToRegisterAgain(email)),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: Text(context.t.cancel),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: Text(context.t.remove,
+                                            style: const TextStyle(
+                                                color: Colors.green)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (ok == true) {
+                                  await ref
+                                      .read(adminServiceProvider)
+                                      .removeFromBlacklist(email);
+                                }
+                              },
+                              icon: Icon(Icons.restore,
+                                  color: context.textSecondary),
+                              tooltip:
+                                  context.t.adminRemoveFromBlacklistTooltip,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

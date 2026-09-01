@@ -143,8 +143,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (results.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(context.t.createPostNoCoordinates(query))),
+          SnackBar(content: Text(context.t.createPostNoCoordinates(query))),
         );
         return;
       }
@@ -221,8 +220,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         'exists=$exists size=$size');
     if (!exists || size <= 0) {
       if (mounted) {
-        AppFeedback.showError(
-            context, context.t.createPostCouldNotReadVideo);
+        AppFeedback.showError(context, context.t.createPostCouldNotReadVideo);
       }
       return false;
     }
@@ -258,8 +256,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final placeCity = _placeCityCtrl.text.trim();
     if (caption.isEmpty && _pickedImages.isEmpty && _pickedVideos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(context.t.createPostAddCaptionImageVideo)),
+        SnackBar(content: Text(context.t.createPostAddCaptionImageVideo)),
       );
       return;
     }
@@ -399,288 +396,290 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           child: SafeArea(
             child: Column(
               children: [
-              // HEADER
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, size: 26),
-                    ),
-                    Expanded(
-                      child: Text(
-                        context.t.createPostNewPost,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                    _PostButton(loading: _posting, onTap: _submit),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // HEADER
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: Row(
                     children: [
-                      // AUTHOR ROW
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: context.inputFill,
-                            backgroundImage: avatarUrl != null
-                                ? NetworkImage(avatarUrl)
-                                : null,
-                            child: avatarUrl == null
-                                ? Icon(Icons.person,
-                                    size: 22, color: context.textMuted)
-                                : null,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  username.isEmpty
-                                      ? context.t.createPostYou
-                                      : username,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                _PrivacyChip(
-                                  isPrivate: _isPrivate,
-                                  onTap: () =>
-                                      setState(() => _isPrivate = !_isPrivate),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, size: 26),
                       ),
-                      const SizedBox(height: 16),
-
-                      // CAPTION CARD
-                      AppGlassCard(
-                        radius: 18,
-                        surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                        borderAlpha: context.isDark ? 0.14 : 0.50,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                        child: TextField(
-                          controller: _captionCtrl,
-                          maxLines: 6,
-                          minLines: 3,
-                          style: TextStyle(
-                              fontSize: 15, color: context.textPrimary),
-                          decoration: InputDecoration(
-                            hintText: context.t.createPostCaptionHint,
-                            hintStyle: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 15,
-                            ),
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                            filled: false,
+                      Expanded(
+                        child: Text(
+                          context.t.createPostNewPost,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 16),
-
-                      AppGlassCard(
-                        radius: 18,
-                        surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                        borderAlpha: context.isDark ? 0.14 : 0.50,
-                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              context.t.createPostPlace,
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            _PostFormField(
-                              controller: _placeNameCtrl,
-                              hintText: context.t.createPostPlaceNameHint,
-                              icon: Icons.place_outlined,
-                              onChanged: (_) {
-                                if (_placeFromCurrentLocation) {
-                                  setState(
-                                      () => _placeFromCurrentLocation = false);
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 10),
-                            CityPickerField(
-                              value: _placeCityCtrl.text,
-                              hintText: context.t.createPostCityHint,
-                              icon: Icons.location_city_outlined,
-                              glassy: true,
-                              onChanged: (city) {
-                                setState(() {
-                                  _placeCityCtrl.text = city;
-                                  if (_placeFromCurrentLocation) {
-                                    _placeFromCurrentLocation = false;
-                                  }
-                                });
-                              },
-                              onClear: () {
-                                setState(() {
-                                  _placeCityCtrl.clear();
-                                  if (_placeFromCurrentLocation) {
-                                    _placeFromCurrentLocation = false;
-                                  }
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextButton.icon(
-                                    onPressed: _useCurrentLocationForPlace,
-                                    icon: const Icon(
-                                        Icons.my_location_rounded),
-                                    label: Text(
-                                      context.t.createPostUseCurrentLocation,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextButton.icon(
-                                    onPressed: _locateTypedPlaceOnMap,
-                                    icon: const Icon(Icons.map_outlined),
-                                    label: Text(
-                                      context.t.createPostLocateOnMap,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_placeLat != null && _placeLng != null) ...[
-                              const SizedBox(height: 10),
-                              MapPreview(
-                                lat: _placeLat!,
-                                lng: _placeLng!,
-                                label: _placeNameCtrl.text.trim().isEmpty
-                                    ? null
-                                    : _placeNameCtrl.text.trim(),
-                                subtitle: _placeCityCtrl.text.trim().isEmpty
-                                    ? null
-                                    : _placeCityCtrl.text.trim(),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // IMAGE GRID
-                      if (_pickedImages.isNotEmpty)
-                        _ImageGrid(
-                          files: _pickedImages,
-                          onRemove: _removeImage,
-                        ),
-                      if (_pickedImages.isNotEmpty) const SizedBox(height: 16),
-
-                      // VIDEO GRID
-                      if (_pickedVideos.isNotEmpty)
-                        _VideoGrid(
-                          files: _pickedVideos,
-                          onRemove: _removeVideo,
-                        ),
-                      if (_pickedVideos.isNotEmpty) const SizedBox(height: 16),
-
-                      // ACTION TILES
-                      _ActionTile(
-                        icon: Icons.photo_library_outlined,
-                        label: context.t.createPostPhotoFromGallery,
-                        onTap: _pickImages,
-                      ),
-                      const SizedBox(height: 8),
-                      _ActionTile(
-                        icon: Icons.camera_alt_outlined,
-                        label: context.t.createPostTakeAPhoto,
-                        onTap: _pickFromCamera,
-                      ),
-                      const SizedBox(height: 8),
-                      _ActionTile(
-                        icon: Icons.video_library_outlined,
-                        label: context.t.createPostVideoFromGallery,
-                        onTap: _pickVideoFromGallery,
-                      ),
-                      const SizedBox(height: 8),
-                      _ActionTile(
-                        icon: Icons.videocam_outlined,
-                        label: context.t.createPostRecordAVideo,
-                        onTap: _pickVideoFromCamera,
-                      ),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 13,
-                              color: context.textMuted,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                context.t.createPostVideoSizeLimit,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _PostButton(loading: _posting, onTap: _submit),
                     ],
                   ),
                 ),
-              ),
 
-              // BOTTOM PILL TABS
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20, top: 8),
-                child: Center(
-                  child: AppGlassCard(
-                    radius: 30,
-                    surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                    borderAlpha: context.isDark ? 0.14 : 0.50,
-                    padding: const EdgeInsets.all(4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _bottomTab(context.t.post, 0, true),
-                        _bottomTab(context.t.homeDiscussionLabel, 2, false),
-                        _bottomTab(context.t.story, 1, false),
+                        // AUTHOR ROW
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: context.inputFill,
+                              backgroundImage: avatarUrl != null
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null
+                                  ? Icon(Icons.person,
+                                      size: 22, color: context.textMuted)
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    username.isEmpty
+                                        ? context.t.createPostYou
+                                        : username,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  _PrivacyChip(
+                                    isPrivate: _isPrivate,
+                                    onTap: () => setState(
+                                        () => _isPrivate = !_isPrivate),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // CAPTION CARD
+                        AppGlassCard(
+                          radius: 18,
+                          surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                          borderAlpha: context.isDark ? 0.14 : 0.50,
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                          child: TextField(
+                            controller: _captionCtrl,
+                            maxLines: 6,
+                            minLines: 3,
+                            style: TextStyle(
+                                fontSize: 15, color: context.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: context.t.createPostCaptionHint,
+                              hintStyle: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 15,
+                              ),
+                              border: InputBorder.none,
+                              isCollapsed: true,
+                              filled: false,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        AppGlassCard(
+                          radius: 18,
+                          surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                          borderAlpha: context.isDark ? 0.14 : 0.50,
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                context.t.createPostPlace,
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _PostFormField(
+                                controller: _placeNameCtrl,
+                                hintText: context.t.createPostPlaceNameHint,
+                                icon: Icons.place_outlined,
+                                onChanged: (_) {
+                                  if (_placeFromCurrentLocation) {
+                                    setState(() =>
+                                        _placeFromCurrentLocation = false);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              CityPickerField(
+                                value: _placeCityCtrl.text,
+                                hintText: context.t.createPostCityHint,
+                                icon: Icons.location_city_outlined,
+                                glassy: true,
+                                onChanged: (city) {
+                                  setState(() {
+                                    _placeCityCtrl.text = city;
+                                    if (_placeFromCurrentLocation) {
+                                      _placeFromCurrentLocation = false;
+                                    }
+                                  });
+                                },
+                                onClear: () {
+                                  setState(() {
+                                    _placeCityCtrl.clear();
+                                    if (_placeFromCurrentLocation) {
+                                      _placeFromCurrentLocation = false;
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextButton.icon(
+                                      onPressed: _useCurrentLocationForPlace,
+                                      icon:
+                                          const Icon(Icons.my_location_rounded),
+                                      label: Text(
+                                        context.t.createPostUseCurrentLocation,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextButton.icon(
+                                      onPressed: _locateTypedPlaceOnMap,
+                                      icon: const Icon(Icons.map_outlined),
+                                      label: Text(
+                                        context.t.createPostLocateOnMap,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (_placeLat != null && _placeLng != null) ...[
+                                const SizedBox(height: 10),
+                                MapPreview(
+                                  lat: _placeLat!,
+                                  lng: _placeLng!,
+                                  label: _placeNameCtrl.text.trim().isEmpty
+                                      ? null
+                                      : _placeNameCtrl.text.trim(),
+                                  subtitle: _placeCityCtrl.text.trim().isEmpty
+                                      ? null
+                                      : _placeCityCtrl.text.trim(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // IMAGE GRID
+                        if (_pickedImages.isNotEmpty)
+                          _ImageGrid(
+                            files: _pickedImages,
+                            onRemove: _removeImage,
+                          ),
+                        if (_pickedImages.isNotEmpty)
+                          const SizedBox(height: 16),
+
+                        // VIDEO GRID
+                        if (_pickedVideos.isNotEmpty)
+                          _VideoGrid(
+                            files: _pickedVideos,
+                            onRemove: _removeVideo,
+                          ),
+                        if (_pickedVideos.isNotEmpty)
+                          const SizedBox(height: 16),
+
+                        // ACTION TILES
+                        _ActionTile(
+                          icon: Icons.photo_library_outlined,
+                          label: context.t.createPostPhotoFromGallery,
+                          onTap: _pickImages,
+                        ),
+                        const SizedBox(height: 8),
+                        _ActionTile(
+                          icon: Icons.camera_alt_outlined,
+                          label: context.t.createPostTakeAPhoto,
+                          onTap: _pickFromCamera,
+                        ),
+                        const SizedBox(height: 8),
+                        _ActionTile(
+                          icon: Icons.video_library_outlined,
+                          label: context.t.createPostVideoFromGallery,
+                          onTap: _pickVideoFromGallery,
+                        ),
+                        const SizedBox(height: 8),
+                        _ActionTile(
+                          icon: Icons.videocam_outlined,
+                          label: context.t.createPostRecordAVideo,
+                          onTap: _pickVideoFromCamera,
+                        ),
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 13,
+                                color: context.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  context.t.createPostVideoSizeLimit,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
+
+                // BOTTOM PILL TABS
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20, top: 8),
+                  child: Center(
+                    child: AppGlassCard(
+                      radius: 30,
+                      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                      borderAlpha: context.isDark ? 0.14 : 0.50,
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _bottomTab(context.t.post, 0, true),
+                          _bottomTab(context.t.homeDiscussionLabel, 2, false),
+                          _bottomTab(context.t.story, 1, false),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -863,7 +862,8 @@ class _PostFormField extends StatelessWidget {
             border: Border.all(color: border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: context.isDark ? 0.10 : 0.04),
+                color: Colors.black
+                    .withValues(alpha: context.isDark ? 0.10 : 0.04),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),

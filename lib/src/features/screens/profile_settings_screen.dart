@@ -47,310 +47,349 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.settings),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
+      // One background spanning the whole screen with the top bar as a
+      // sliver that scrolls away with the list — no pinned bar band, no
+      // seam, and content never collides with a fixed title.
       body: AppPageBackground(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            8,
-            16,
-            24 + MediaQuery.of(context).padding.bottom,
-          ),
-          children: [
-            _SectionHeader(title: context.t.account),
-            // Email, password, private-account and delete-account all live
-            // behind one Account Center page now, instead of being scattered
-            // across this list.
-            _SettingsTile(
-              leading: const Icon(Icons.manage_accounts_outlined,
-                  color: AppColors.purple),
-              title: Text(context.t.accountCenter),
-              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const AccountCenterScreen()),
-              ),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.settings),
+              centerTitle: false,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
             ),
-            _SettingsTile(
-              leading: const Icon(Icons.visibility_outlined,
-                  color: AppColors.purple),
-              title: Text(context.t.profileVisitors),
-              subtitle: Text(
-                visitorCount == 0
-                    ? context.t.settingsVisitorsSeeWho
-                    : (visitorCount == 1
-                        ? context.t.settingsVisitorsViewedOne
-                        : context.t.settingsVisitorsViewedMany(visitorCount)),
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                24 + MediaQuery.of(context).padding.bottom,
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+              sliver: SliverList.list(
                 children: [
-                  if (visitorCount > 0)
-                    Container(
-                      margin: const EdgeInsetsDirectional.only(end: 6),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: context.purpleSoft,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$visitorCount',
-                        style: const TextStyle(
-                          color: Color(0xFFB05ECC),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
+                  _SectionHeader(title: context.t.account),
+                  // Email, password, private-account and delete-account all live
+                  // behind one Account Center page now, instead of being scattered
+                  // across this list.
+                  _SettingsTile(
+                    leading: const Icon(Icons.manage_accounts_outlined,
+                        color: AppColors.purple),
+                    title: Text(context.t.accountCenter),
+                    trailing:
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const AccountCenterScreen()),
+                    ),
+                  ),
+                  _SettingsTile(
+                    leading: const Icon(Icons.visibility_outlined,
+                        color: AppColors.purple),
+                    title: Text(context.t.profileVisitors),
+                    subtitle: Text(
+                      visitorCount == 0
+                          ? context.t.settingsVisitorsSeeWho
+                          : (visitorCount == 1
+                              ? context.t.settingsVisitorsViewedOne
+                              : context.t
+                                  .settingsVisitorsViewedMany(visitorCount)),
+                      style:
+                          TextStyle(fontSize: 12, color: context.textSecondary),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (visitorCount > 0)
+                          Container(
+                            margin: const EdgeInsetsDirectional.only(end: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: context.purpleSoft,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$visitorCount',
+                              style: const TextStyle(
+                                color: Color(0xFFB05ECC),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                      ],
+                    ),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileVisitorsScreen(),
                       ),
                     ),
-                  Icon(Icons.chevron_right, color: context.textSecondary),
+                  ),
+                  _SectionHeader(title: context.t.settingsSectionNotifications),
+                  _SettingsTile(
+                    leading: const Icon(Icons.event_available_outlined,
+                        color: AppColors.purple),
+                    title: Text(context.t.eventNotifTitle),
+                    subtitle: Text(
+                      context.t.settingsEventNotifSubtitle,
+                      style:
+                          TextStyle(fontSize: 12, color: context.textSecondary),
+                    ),
+                    trailing:
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EventNotificationsSettingsScreen(),
+                      ),
+                    ),
+                  ),
+                  _SectionHeader(title: context.t.languageLabel),
+                  _SettingsTile(
+                    leading:
+                        const Icon(Icons.language, color: AppColors.purple),
+                    title: Text(context.t.appLanguage),
+                    subtitle: Text(
+                      context.t.settingsAppLanguageSubtitle,
+                      style:
+                          TextStyle(fontSize: 12, color: context.textSecondary),
+                    ),
+                    trailing: Text(
+                      uiLanguage.nativeName,
+                      textDirection: uiLanguage.direction,
+                      style: const TextStyle(
+                        color: AppColors.purple,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () => context.push('/language'),
+                  ),
+                  _SettingsTile(
+                    leading:
+                        const Icon(Icons.translate, color: AppColors.purple),
+                    title: Text(context.t.translationLanguage),
+                    subtitle: Text(
+                      context.t.settingsTranslationLanguageSubtitle,
+                      style:
+                          TextStyle(fontSize: 12, color: context.textSecondary),
+                    ),
+                    trailing: Text(
+                      _languageLabel(preferredLang),
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const PreferredTranslationLanguageScreen(),
+                      ),
+                    ),
+                  ),
+                  _SettingsTile(
+                    leading: const Icon(Icons.bookmarks_outlined,
+                        color: AppColors.purple),
+                    title: Text(context.t.savedTranslations),
+                    trailing:
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SavedTranslationsScreen(),
+                      ),
+                    ),
+                  ),
+                  _SectionHeader(title: context.t.appearance),
+                  _SettingsTile(
+                    leading: Icon(
+                      isDark ? Icons.dark_mode : Icons.light_mode,
+                      color: isDark ? Colors.amber : Colors.grey,
+                    ),
+                    title: Text(context.t.darkMode),
+                    trailing: Switch.adaptive(
+                      value: isDark,
+                      activeTrackColor: AppColors.purple,
+                      onChanged: (_) =>
+                          ref.read(themeModeProvider.notifier).toggle(),
+                    ),
+                    onTap: () => ref.read(themeModeProvider.notifier).toggle(),
+                  ),
+                  _SectionHeader(title: context.t.settingsSectionInvite),
+                  _SettingsTile(
+                    leading:
+                        const Icon(Icons.ios_share, color: AppColors.purple),
+                    title: Text(context.t.settingsInviteFriends),
+                    subtitle: Text(
+                      context.t.settingsInviteFriendsSubtitle,
+                      style:
+                          TextStyle(fontSize: 12, color: context.textSecondary),
+                    ),
+                    trailing:
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                    onTap: () {
+                      final cfg = ref.read(adminConfigProvider).valueOrNull ??
+                          const AdminConfig();
+                      shareInviteLink(context, cfg);
+                    },
+                  ),
+                  // Contact us is the channel for regular users to reach the admin
+                  // team. Admins are the recipients of those messages, so the whole
+                  // support section is hidden from them.
+                  if (!isAdmin) ...[
+                    _SectionHeader(title: context.t.settingsSectionSupport),
+                    _SettingsTile(
+                      leading: const Icon(Icons.support_agent_outlined,
+                          color: AppColors.purple),
+                      title: Text(context.t.contactUs),
+                      subtitle: Text(
+                        context.t.settingsContactUsSubtitle,
+                        style: TextStyle(
+                            fontSize: 12, color: context.textSecondary),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasUnreadReply)
+                            Container(
+                              width: 9,
+                              height: 9,
+                              margin: const EdgeInsetsDirectional.only(end: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.purple,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: context.cardBg, width: 1),
+                              ),
+                            ),
+                          Icon(Icons.chevron_right,
+                              color: context.textSecondary),
+                        ],
+                      ),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const ContactUsScreen()),
+                      ),
+                    ),
+                  ],
+                  _SectionHeader(title: context.t.safety),
+                  _SettingsTile(
+                    leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
+                    title: Text(context.t.blockedUsers),
+                    trailing:
+                        Icon(Icons.chevron_right, color: context.textSecondary),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const BlockedUsersScreen()),
+                    ),
+                  ),
+                  // Approved event managers land here with event-posting rights
+                  // but no other admin tooling. Full admins see the broader
+                  // "Admin panel" entry below; this tile is for the limited
+                  // org_admin role granted via Contact us.
+                  if (isOrgAdmin && !isAdmin) ...[
+                    _SectionHeader(
+                        title: context.t.settingsSectionOrganization),
+                    _SettingsTile(
+                      leading: const Icon(Icons.event_outlined,
+                          color: AppColors.purple),
+                      title: Text(context.t.manageEvents,
+                          style: const TextStyle(
+                              color: AppColors.purple,
+                              fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                        context.t.settingsManageEventsSubtitle,
+                        style: TextStyle(
+                            fontSize: 12, color: context.textSecondary),
+                      ),
+                      trailing: Icon(Icons.chevron_right,
+                          color: context.textSecondary),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const AdminEventsScreen()),
+                      ),
+                    ),
+                  ],
+                  if (isAdmin) ...[
+                    _SectionHeader(title: context.t.admin),
+                    _SettingsTile(
+                      leading: const Icon(Icons.shield_outlined,
+                          color: Color(0xFF7E3BE8)),
+                      title: Text(
+                        context.t.profileAdminPanel,
+                        style: const TextStyle(
+                          color: Color(0xFF7E3BE8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasNewReports || hasUnreadContact)
+                            Container(
+                              width: 9,
+                              height: 9,
+                              margin: const EdgeInsetsDirectional.only(end: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE04E5C),
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: context.cardBg, width: 1),
+                              ),
+                            ),
+                          Icon(Icons.chevron_right,
+                              color: context.textSecondary),
+                        ],
+                      ),
+                      onTap: () => context.push('/admin'),
+                    ),
+                  ],
+                  _SectionHeader(title: context.t.dangerZone),
+                  _SettingsTile(
+                    leading: const Icon(Icons.logout, color: Colors.red),
+                    title: Text(context.t.logout,
+                        style: const TextStyle(color: Colors.red)),
+                    onTap: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(ctx.t.logout),
+                          content: Text(ctx.t.logoutConfirmBody),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: Text(ctx.t.cancel),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red),
+                              child: Text(ctx.t.logout),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true || !context.mounted) return;
+                      await ref.read(authServiceProvider).signOut();
+                      ref.invalidate(adminConfigProvider);
+                      ref.invalidate(adminPostsProvider);
+                      ref.invalidate(adminEventsProvider);
+                      ref.invalidate(blacklistProvider);
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    },
+                  ),
+                  // Delete account moved into Account Center (ACCOUNT section above).
+                  const SizedBox(height: 32),
                 ],
               ),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ProfileVisitorsScreen(),
-                ),
-              ),
             ),
-            _SectionHeader(title: context.t.settingsSectionNotifications),
-            _SettingsTile(
-              leading: const Icon(Icons.event_available_outlined,
-                  color: AppColors.purple),
-              title: Text(context.t.eventNotifTitle),
-              subtitle: Text(
-                context.t.settingsEventNotifSubtitle,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const EventNotificationsSettingsScreen(),
-                ),
-              ),
-            ),
-            _SectionHeader(title: context.t.languageLabel),
-            _SettingsTile(
-              leading: const Icon(Icons.language, color: AppColors.purple),
-              title: Text(context.t.appLanguage),
-              subtitle: Text(
-                context.t.settingsAppLanguageSubtitle,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Text(
-                uiLanguage.nativeName,
-                textDirection: uiLanguage.direction,
-                style: const TextStyle(
-                  color: AppColors.purple,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () => context.push('/language'),
-            ),
-            _SettingsTile(
-              leading: const Icon(Icons.translate, color: AppColors.purple),
-              title: Text(context.t.translationLanguage),
-              subtitle: Text(
-                context.t.settingsTranslationLanguageSubtitle,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Text(
-                _languageLabel(preferredLang),
-                style: TextStyle(
-                  color: context.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const PreferredTranslationLanguageScreen(),
-                ),
-              ),
-            ),
-            _SettingsTile(
-              leading:
-                  const Icon(Icons.bookmarks_outlined, color: AppColors.purple),
-              title: Text(context.t.savedTranslations),
-              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SavedTranslationsScreen(),
-                ),
-              ),
-            ),
-            _SectionHeader(title: context.t.appearance),
-            _SettingsTile(
-              leading: Icon(
-                isDark ? Icons.dark_mode : Icons.light_mode,
-                color: isDark ? Colors.amber : Colors.grey,
-              ),
-              title: Text(context.t.darkMode),
-              trailing: Switch.adaptive(
-                value: isDark,
-                activeTrackColor: AppColors.purple,
-                onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
-              ),
-              onTap: () => ref.read(themeModeProvider.notifier).toggle(),
-            ),
-            _SectionHeader(title: context.t.settingsSectionInvite),
-            _SettingsTile(
-              leading: const Icon(Icons.ios_share, color: AppColors.purple),
-              title: Text(context.t.settingsInviteFriends),
-              subtitle: Text(
-                context.t.settingsInviteFriendsSubtitle,
-                style: TextStyle(fontSize: 12, color: context.textSecondary),
-              ),
-              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () {
-                final cfg = ref.read(adminConfigProvider).valueOrNull ??
-                    const AdminConfig();
-                shareInviteLink(context, cfg);
-              },
-            ),
-            // Contact us is the channel for regular users to reach the admin
-            // team. Admins are the recipients of those messages, so the whole
-            // support section is hidden from them.
-            if (!isAdmin) ...[
-              _SectionHeader(title: context.t.settingsSectionSupport),
-              _SettingsTile(
-                leading: const Icon(Icons.support_agent_outlined,
-                    color: AppColors.purple),
-                title: Text(context.t.contactUs),
-                subtitle: Text(
-                  context.t.settingsContactUsSubtitle,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (hasUnreadReply)
-                      Container(
-                        width: 9,
-                        height: 9,
-                        margin: const EdgeInsetsDirectional.only(end: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.purple,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: context.cardBg, width: 1),
-                        ),
-                      ),
-                    Icon(Icons.chevron_right, color: context.textSecondary),
-                  ],
-                ),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ContactUsScreen()),
-                ),
-              ),
-            ],
-            _SectionHeader(title: context.t.safety),
-            _SettingsTile(
-              leading: const Icon(Icons.block, color: Color(0xFFD27B2B)),
-              title: Text(context.t.blockedUsers),
-              trailing: Icon(Icons.chevron_right, color: context.textSecondary),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const BlockedUsersScreen()),
-              ),
-            ),
-            // Approved event managers land here with event-posting rights
-            // but no other admin tooling. Full admins see the broader
-            // "Admin panel" entry below; this tile is for the limited
-            // org_admin role granted via Contact us.
-            if (isOrgAdmin && !isAdmin) ...[
-              _SectionHeader(title: context.t.settingsSectionOrganization),
-              _SettingsTile(
-                leading:
-                    const Icon(Icons.event_outlined, color: AppColors.purple),
-                title: Text(context.t.manageEvents,
-                    style: const TextStyle(
-                        color: AppColors.purple, fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  context.t.settingsManageEventsSubtitle,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-                trailing:
-                    Icon(Icons.chevron_right, color: context.textSecondary),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
-                ),
-              ),
-            ],
-            if (isAdmin) ...[
-              _SectionHeader(title: context.t.admin),
-              _SettingsTile(
-                leading:
-                    const Icon(Icons.shield_outlined, color: Color(0xFF7E3BE8)),
-                title: Text(
-                  context.t.profileAdminPanel,
-                  style: const TextStyle(
-                    color: Color(0xFF7E3BE8),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (hasNewReports || hasUnreadContact)
-                      Container(
-                        width: 9,
-                        height: 9,
-                        margin: const EdgeInsetsDirectional.only(end: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE04E5C),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: context.cardBg, width: 1),
-                        ),
-                      ),
-                    Icon(Icons.chevron_right, color: context.textSecondary),
-                  ],
-                ),
-                onTap: () => context.push('/admin'),
-              ),
-            ],
-            _SectionHeader(title: context.t.dangerZone),
-            _SettingsTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: Text(context.t.logout,
-                  style: const TextStyle(color: Colors.red)),
-              onTap: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: Text(ctx.t.logout),
-                    content: Text(ctx.t.logoutConfirmBody),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(ctx.t.cancel),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: TextButton.styleFrom(
-                            foregroundColor: Colors.red),
-                        child: Text(ctx.t.logout),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true || !context.mounted) return;
-                await ref.read(authServiceProvider).signOut();
-                ref.invalidate(adminConfigProvider);
-                ref.invalidate(adminPostsProvider);
-                ref.invalidate(adminEventsProvider);
-                ref.invalidate(blacklistProvider);
-                if (context.mounted) {
-                  context.go('/login');
-                }
-              },
-            ),
-            // Delete account moved into Account Center (ACCOUNT section above).
-            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -410,102 +449,109 @@ class _PreferredTranslationLanguageScreenState
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.settingsPreferredLanguage),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: AppGlassCard(
-                radius: 16,
-                padding: EdgeInsets.zero,
-                surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                borderAlpha: context.isDark ? 0.14 : 0.50,
-                child: TextField(
-                  controller: _searchCtrl,
-                  textInputAction: TextInputAction.search,
-                  onChanged: (value) => setState(() => _query = value),
-                  decoration: InputDecoration(
-                    hintText: context.t.translateSearchLanguages,
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _query = '');
-                            },
-                          ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.settingsPreferredLanguage),
+              centerTitle: false,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                  borderAlpha: context.isDark ? 0.14 : 0.50,
+                  child: TextField(
+                    controller: _searchCtrl,
+                    textInputAction: TextInputAction.search,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: context.t.translateSearchLanguages,
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() => _query = '');
+                              },
+                            ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-            Expanded(
-              child: entries.isEmpty
-                  ? Center(
-                      child: Text(
-                        context.t.translateNoLanguagesMatch,
-                        style: TextStyle(color: context.textSecondary),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        0,
-                        16,
-                        24 + MediaQuery.of(context).padding.bottom,
-                      ),
-                      itemCount: entries.length,
-                      itemBuilder: (_, i) {
-                        final lang = entries[i];
-                        final selected = lang.code == current;
-                        return AppGlassCard(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 0, vertical: 4),
-                          radius: 16,
-                          surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                          borderAlpha: context.isDark ? 0.14 : 0.50,
-                          child: ListTile(
-                            title: Text(lang.label),
-                            subtitle: Text(
-                              lang.code.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textSecondary,
-                              ),
-                            ),
-                            trailing: selected
-                                ? const Icon(Icons.check,
-                                    color: AppColors.purple)
-                                : null,
-                            onTap: () async {
-                              await ref
-                                  .read(preferredLanguageProvider.notifier)
-                                  .set(
-                                    lang.code,
-                                  );
-                              if (context.mounted) Navigator.of(context).pop();
-                            },
+            if (entries.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Text(
+                    context.t.translateNoLanguagesMatch,
+                    style: TextStyle(color: context.textSecondary),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  16,
+                  24 + MediaQuery.of(context).padding.bottom,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: entries.length,
+                  itemBuilder: (_, i) {
+                    final lang = entries[i];
+                    final selected = lang.code == current;
+                    return AppGlassCard(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 0, vertical: 4),
+                      radius: 16,
+                      surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                      borderAlpha: context.isDark ? 0.14 : 0.50,
+                      child: ListTile(
+                        title: Text(lang.label),
+                        subtitle: Text(
+                          lang.code.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.textSecondary,
                           ),
-                        );
-                      },
-                    ),
-            ),
+                        ),
+                        trailing: selected
+                            ? const Icon(Icons.check, color: AppColors.purple)
+                            : null,
+                        onTap: () async {
+                          await ref
+                              .read(preferredLanguageProvider.notifier)
+                              .set(
+                                lang.code,
+                              );
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),

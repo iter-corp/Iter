@@ -211,9 +211,8 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       // Determine which handle moved by comparing to the existing
       // values; freeze the other so the window slides instead of
       // stretching past the cap.
-      final movedStart =
-          (startMs - _trimStart.inMilliseconds).abs() >
-              (endMs - _trimEnd.inMilliseconds).abs();
+      final movedStart = (startMs - _trimStart.inMilliseconds).abs() >
+          (endMs - _trimEnd.inMilliseconds).abs();
       if (movedStart) {
         endMs = startMs + maxMs;
       } else {
@@ -251,7 +250,8 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     debugPrint('[VideoStoryPublish] state: _uploading=$_uploading '
         '_tooLong=$_tooLong file=${widget.file.path} '
         'overlays.count=${_overlays.length}');
-    final tooLarge = _videoFileSize > _maxStoryVideoBytes && !_shouldExportVideo;
+    final tooLarge =
+        _videoFileSize > _maxStoryVideoBytes && !_shouldExportVideo;
     if (_uploading || _tooLong || tooLarge) {
       debugPrint('[VideoStoryPublish] ABORT: guard hit '
           '(_uploading=$_uploading _tooLong=$_tooLong tooLarge=$tooLarge)');
@@ -314,7 +314,8 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
       debugPrint('[VideoStoryPublish] -> StorageService.uploadStoryVideo()');
       url = await StorageService().uploadStoryVideo(uploadFile);
       final elapsed = DateTime.now().difference(uploadStart);
-      debugPrint('[VideoStoryPublish] <- upload OK in ${elapsed.inMilliseconds}ms');
+      debugPrint(
+          '[VideoStoryPublish] <- upload OK in ${elapsed.inMilliseconds}ms');
       debugPrint('[VideoStoryPublish] publicUrl=$url');
     } catch (e, st) {
       final elapsed = DateTime.now().difference(uploadStart);
@@ -450,16 +451,19 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
     final trimmer = native_trimmer.VideoTrimmer();
     try {
       await trimmer.loadVideo(widget.file.path);
-      final outputPath = await trimmer.trimVideo(
-        startTimeMs: startMs,
-        endTimeMs: endMs,
-        includeAudio: !_muted,
-      ).timeout(
-        const Duration(seconds: 90),
-        onTimeout: () => null,
-      );
+      final outputPath = await trimmer
+          .trimVideo(
+            startTimeMs: startMs,
+            endTimeMs: endMs,
+            includeAudio: !_muted,
+          )
+          .timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => null,
+          );
       if (outputPath == null || outputPath.trim().isEmpty) {
-        throw StorageException('Could not prepare the video. Please try again.');
+        throw StorageException(
+            'Could not prepare the video. Please try again.');
       }
       final file = File(outputPath);
       if (!await file.exists() || await file.length() == 0) {
@@ -533,8 +537,8 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
                           onActivate: () =>
                               setState(() => _activeOverlayId = overlay.id),
                           onChanged: (updated) => setState(() {
-                            final idx = _overlays
-                                .indexWhere((o) => o.id == overlay.id);
+                            final idx =
+                                _overlays.indexWhere((o) => o.id == overlay.id);
                             if (idx != -1) _overlays[idx] = updated;
                           }),
                           onEdit: () => _editOverlay(overlay),
@@ -621,8 +625,7 @@ class _VideoStoryPreviewScreenState extends State<VideoStoryPreviewScreen>
                           if (_controller?.value.isInitialized ?? false) ...[
                             const SizedBox(width: 10),
                             _CircleIcon(
-                              icon:
-                                  _muted ? Icons.volume_off : Icons.volume_up,
+                              icon: _muted ? Icons.volume_off : Icons.volume_up,
                               onTap: _toggleMute,
                             ),
                           ],
@@ -917,16 +920,14 @@ class _TrimBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(18),
-          border:
-              Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                const Icon(Icons.content_cut,
-                    color: Colors.white, size: 16),
+                const Icon(Icons.content_cut, color: Colors.white, size: 16),
                 const SizedBox(width: 8),
                 Text(
                   _fmt(start),
@@ -963,8 +964,8 @@ class _TrimBar extends StatelessWidget {
               data: SliderTheme.of(context).copyWith(
                 activeTrackColor: const Color(0xFFB05ECC),
                 inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
-                rangeThumbShape: const RoundRangeSliderThumbShape(
-                    enabledThumbRadius: 9),
+                rangeThumbShape:
+                    const RoundRangeSliderThumbShape(enabledThumbRadius: 9),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                 trackHeight: 4,
               ),

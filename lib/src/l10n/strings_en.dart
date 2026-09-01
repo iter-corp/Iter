@@ -106,6 +106,10 @@ const Map<String, String> enStrings = {
   'write_comment': 'Write a comment…',
   'no_comments': 'No comments yet',
   'no_posts': 'No posts yet',
+  'user_no_posts_subtitle': "This user hasn't posted anything yet.",
+  'user_no_reposts_subtitle': "This user hasn't reposted anything yet.",
+  'user_no_threads_subtitle': "This user hasn't started any discussions yet.",
+  'user_no_replies_subtitle': "This user hasn't replied to any threads yet.",
   'reply': 'Reply',
   'replies': 'Replies',
   'view_comments': 'View comments',
@@ -823,6 +827,12 @@ const Map<String, String> enStrings = {
   // ── EVENTS SCREENS (added) ──
   'events_search_people': 'Search people',
   'events_search_events': 'Search events',
+  'explore_title': 'Explore',
+  'explore_subtitle': 'Find people, posts and discussions',
+  'explore_search_hint': 'Search',
+  'explore_blank_hint': 'Search to get started',
+  'explore_blank_subtitle':
+      'Type a name, city, or keyword to find people and posts.',
   'events_connect': 'Connect',
   'events_filter_events_by_city': 'Filter events by country',
   'events_filter_by_city': 'Filter by country',
@@ -1538,6 +1548,7 @@ const Map<String, String> enStrings = {
   // ── DISCUSS-A-POST (added) ──
   'post_card_discuss_this_post': 'Discuss this post',
   'post_card_view_in_discuss': 'View in Discuss',
+  'post_card_no_discuss_be_first': 'No discuss yet, be first',
   'post_card_discuss_created': 'Posted to Discuss',
   'post_card_discuss_failed': 'Could not create Discuss topic: {error}',
 

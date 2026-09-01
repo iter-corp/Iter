@@ -55,8 +55,12 @@ class ChatMediaScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               child: _MediaTabBar(
                 tabs: [
-                  _TabSpec(icon: Icons.photo_library_outlined, label: context.t.images),
-                  _TabSpec(icon: Icons.insert_drive_file_outlined, label: context.t.files),
+                  _TabSpec(
+                      icon: Icons.photo_library_outlined,
+                      label: context.t.images),
+                  _TabSpec(
+                      icon: Icons.insert_drive_file_outlined,
+                      label: context.t.files),
                   _TabSpec(icon: Icons.graphic_eq, label: context.t.voices),
                   _TabSpec(icon: Icons.link, label: context.t.links),
                 ],
@@ -68,15 +72,18 @@ class ChatMediaScreen extends ConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (msgs) {
-            final images =
-                msgs.where((m) => (m.imageUrl ?? '').isNotEmpty).toList()
-                  ..sort(_sortNewestFirst);
-            final voices =
-                msgs.where((m) => (m.voiceUrl ?? '').isNotEmpty).toList()
-                  ..sort(_sortNewestFirst);
-            final files =
-                msgs.where((m) => (m.fileUrl ?? '').isNotEmpty).toList()
-                  ..sort(_sortNewestFirst);
+            final images = msgs
+                .where((m) => (m.imageUrl ?? '').isNotEmpty)
+                .toList()
+              ..sort(_sortNewestFirst);
+            final voices = msgs
+                .where((m) => (m.voiceUrl ?? '').isNotEmpty)
+                .toList()
+              ..sort(_sortNewestFirst);
+            final files = msgs
+                .where((m) => (m.fileUrl ?? '').isNotEmpty)
+                .toList()
+              ..sort(_sortNewestFirst);
             final links = _extractLinks(msgs);
 
             return TabBarView(
@@ -329,7 +336,8 @@ Future<void> _saveImage(BuildContext context, String url) async {
     final tempDir = await getTemporaryDirectory();
     final filename = url.split('?').first.split('/').last;
     final ext = filename.contains('.') ? filename.split('.').last : 'jpg';
-    final tempPath = '${tempDir.path}/iter_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final tempPath =
+        '${tempDir.path}/iter_${DateTime.now().millisecondsSinceEpoch}.$ext';
     final res = await http.get(Uri.parse(url));
     if (res.statusCode != 200) {
       throw Exception('download failed: ${res.statusCode}');
@@ -461,9 +469,8 @@ class _FileTileState extends ConsumerState<_FileTile> {
   @override
   Widget build(BuildContext context) {
     final m = widget.message;
-    final name = (m.fileName ?? '').isNotEmpty
-        ? m.fileName!
-        : context.t.unknownFile;
+    final name =
+        (m.fileName ?? '').isNotEmpty ? m.fileName! : context.t.unknownFile;
     final ext = _extOf(name).toUpperCase();
     final size = _formatSize(m.fileSizeBytes);
 
@@ -831,15 +838,14 @@ class _ForwardChatPicker extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 context.t.forwardTo,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
             const Divider(height: 1),
             Expanded(
               child: inbox.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) =>
                     Center(child: Text(context.t.errorWithMessage(e))),
                 data: (chats) {

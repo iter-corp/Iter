@@ -23,51 +23,19 @@ class ContactUsScreen extends ConsumerWidget {
     final profile = ref.watch(currentUserDocProvider).valueOrNull;
     final myThreads = ref.watch(myContactRequestsProvider);
     if (auth == null) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.contactUs),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        ),
-        body: AppPageBackground(
-          child: Center(
-            child: Text(
-              context.t.contactNeedSignIn,
-              style: TextStyle(color: context.textSecondary),
-            ),
-          ),
+      return _ContactMessageScaffold(
+        child: Text(
+          context.t.contactNeedSignIn,
+          style: TextStyle(color: context.textSecondary),
         ),
       );
     }
     return myThreads.when(
-      loading: () => Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.contactUs),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        ),
-        body: const AppPageBackground(
-          child: Center(child: CircularProgressIndicator()),
-        ),
+      loading: () => const _ContactMessageScaffold(
+        child: CircularProgressIndicator(),
       ),
-      error: (e, _) => Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.contactUs),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        ),
-        body: AppPageBackground(
-          child: Center(child: Text('${context.t.contactCouldNotOpen}: $e')),
-        ),
+      error: (e, _) => _ContactMessageScaffold(
+        child: Text('${context.t.contactCouldNotOpen}: $e'),
       ),
       data: (threads) {
         final active = threads.isNotEmpty
@@ -89,6 +57,41 @@ class ContactUsScreen extends ConsumerWidget {
               );
         return ContactThreadScreen(request: active);
       },
+    );
+  }
+}
+
+/// Bare "Contact us" page for the sign-in / loading / error states: a top
+/// bar that scrolls away with the (otherwise empty) page, so it matches the
+/// one-continuous-surface look of the rest of account settings.
+class _ContactMessageScaffold extends StatelessWidget {
+  const _ContactMessageScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.contactUs),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: child),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -185,100 +188,108 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
     final email = (profile?['email'] as String?) ?? auth?.email ?? '';
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.contactNewRequest),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(context.t.contactFromLabel,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: context.textSecondary)),
-              const SizedBox(height: 6),
-              AppGlassCard(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                child: Text(
-                  email.isNotEmpty ? email : context.t.contactNoEmail,
-                  style: TextStyle(color: context.textPrimary, fontSize: 14),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.contactNewRequest),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.t.contactFromLabel,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: context.textSecondary)),
+                    const SizedBox(height: 6),
+                    AppGlassCard(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                      child: Text(
+                        email.isNotEmpty ? email : context.t.contactNoEmail,
+                        style:
+                            TextStyle(color: context.textPrimary, fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(context.t.contactTypeLabel,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: context.textSecondary)),
+                    const SizedBox(height: 6),
+                    _TypeChoice(
+                      value: _type,
+                      onChanged: (v) => setState(() => _type = v),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(context.t.contactMessageLabel,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: context.textSecondary)),
+                    const SizedBox(height: 6),
+                    AppGlassCard(
+                      radius: 16,
+                      padding: EdgeInsets.zero,
+                      child: TextField(
+                        controller: _bodyCtrl,
+                        minLines: 5,
+                        maxLines: 12,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          hintText: _type == ContactRequestType.organization
+                              ? context.t.contactOrgHint
+                              : context.t.contactHowCanWeHelp,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.all(14),
+                        ),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_error!,
+                          style: const TextStyle(color: Colors.redAccent)),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.purple,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _submitting ? null : _submit,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(context.t.contactSendRequest),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(context.t.contactTypeLabel,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: context.textSecondary)),
-              const SizedBox(height: 6),
-              _TypeChoice(
-                value: _type,
-                onChanged: (v) => setState(() => _type = v),
-              ),
-              const SizedBox(height: 16),
-              Text(context.t.contactMessageLabel,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: context.textSecondary)),
-              const SizedBox(height: 6),
-              AppGlassCard(
-                radius: 16,
-                padding: EdgeInsets.zero,
-                child: TextField(
-                  controller: _bodyCtrl,
-                  minLines: 5,
-                  maxLines: 12,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    hintText: _type == ContactRequestType.organization
-                        ? context.t.contactOrgHint
-                        : context.t.contactHowCanWeHelp,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.all(14),
-                  ),
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.purple,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _submitting ? null : _submit,
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : Text(context.t.contactSendRequest),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
       ),
     );
   }
@@ -335,11 +346,8 @@ class _TypeChoice extends StatelessWidget {
         tile(ContactRequestType.message, context.t.contactTypeMessage,
             context.t.contactTypeMessageDesc, Icons.chat_outlined),
         const SizedBox(width: 10),
-        tile(
-            ContactRequestType.organization,
-            context.t.contactTypeOrg,
-            context.t.contactTypeOrgDesc,
-            Icons.apartment_outlined),
+        tile(ContactRequestType.organization, context.t.contactTypeOrg,
+            context.t.contactTypeOrgDesc, Icons.apartment_outlined),
       ],
     );
   }
@@ -532,8 +540,8 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
       }
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(context.t.contactGenericFailed(e))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.contactGenericFailed(e))));
     }
   }
 
@@ -580,11 +588,15 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
     final canManageRequester = isAdmin && widget.request.userUid.isNotEmpty;
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // A chat can't "scroll its header away" the way a settings list can —
+      // the message list is pinned to the bottom. So this one screen keeps a
+      // fixed bar, but tinted close to the page so it still reads as part of
+      // the same surface and hides bubbles that scroll under it.
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.surfaceSoft.withValues(alpha: 0.92),
         foregroundColor: context.textPrimary,
         elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+        scrolledUnderElevation: 0,
         title: isAdmin
             ? InkWell(
                 borderRadius: BorderRadius.circular(24),
@@ -688,110 +700,111 @@ class _ContactThreadScreenState extends ConsumerState<ContactThreadScreen> {
       body: AppPageBackground(
         child: SafeArea(
           child: Column(
-          children: [
-            // The Message / Event (organization) type selector was removed —
-            // users now have a single plain "Message" thread, so there's no
-            // type bar to show.
-            Expanded(
-              child: msgsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text(context.t.contactErrorPrefix(e))),
-                data: (messages) {
-                  if (messages.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: Text(
-                          _requestType == ContactRequestType.organization
-                              ? context.t.contactEmptyOrgMessage
-                              : context.t.contactEmptyMessage,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: context.textSecondary),
+            children: [
+              // The Message / Event (organization) type selector was removed —
+              // users now have a single plain "Message" thread, so there's no
+              // type bar to show.
+              Expanded(
+                child: msgsAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      Center(child: Text(context.t.contactErrorPrefix(e))),
+                  data: (messages) {
+                    if (messages.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                          child: Text(
+                            _requestType == ContactRequestType.organization
+                                ? context.t.contactEmptyOrgMessage
+                                : context.t.contactEmptyMessage,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: context.textSecondary),
+                          ),
+                        ),
+                      );
+                    }
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!_scrollController.hasClients) return;
+                      _scrollController
+                          .jumpTo(_scrollController.position.maxScrollExtent);
+                    });
+                    return ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      itemCount: messages.length,
+                      itemBuilder: (_, i) {
+                        final m = messages[i];
+                        final fromAdmin = m.senderRole == 'admin';
+                        // Visually, the signed-in user's own messages
+                        // are on the right. Admins see their replies on
+                        // the right; the user sees the same admin reply
+                        // on the left.
+                        final isMine = fromAdmin == isAdmin;
+                        return _Bubble(
+                          body: m.body,
+                          time: m.createdAt,
+                          isMine: isMine,
+                          fromAdmin: fromAdmin,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              AppGlassCard(
+                margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                radius: 24,
+                surfaceAlpha: context.isDark ? 0.46 : 0.38,
+                borderAlpha: context.isDark ? 0.14 : 0.50,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _replyCtrl,
+                        minLines: 1,
+                        maxLines: 5,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          hintText: isAdmin
+                              ? context.t.contactReplyToUser
+                              : _requestType == ContactRequestType.organization
+                                  ? context.t.contactReplyOrgHint
+                                  : context.t.contactReplyTypeReply,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                         ),
                       ),
-                    );
-                  }
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!_scrollController.hasClients) return;
-                    _scrollController
-                        .jumpTo(_scrollController.position.maxScrollExtent);
-                  });
-                  return ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) {
-                      final m = messages[i];
-                      final fromAdmin = m.senderRole == 'admin';
-                      // Visually, the signed-in user's own messages
-                      // are on the right. Admins see their replies on
-                      // the right; the user sees the same admin reply
-                      // on the left.
-                      final isMine = fromAdmin == isAdmin;
-                      return _Bubble(
-                        body: m.body,
-                        time: m.createdAt,
-                        isMine: isMine,
-                        fromAdmin: fromAdmin,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-            AppGlassCard(
-              margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              radius: 24,
-              surfaceAlpha: context.isDark ? 0.46 : 0.38,
-              borderAlpha: context.isDark ? 0.14 : 0.50,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _replyCtrl,
-                      minLines: 1,
-                      maxLines: 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: isAdmin
-                            ? context.t.contactReplyToUser
-                            : _requestType == ContactRequestType.organization
-                                ? context.t.contactReplyOrgHint
-                                : context.t.contactReplyTypeReply,
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _sending ? null : () => _send(isAdmin),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.purple,
+                        foregroundColor: Colors.white,
+                        shape: const CircleBorder(),
+                        padding: const EdgeInsets.all(12),
                       ),
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.send_rounded),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _sending ? null : () => _send(isAdmin),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.purple,
-                      foregroundColor: Colors.white,
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    icon: _sending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.send_rounded),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),

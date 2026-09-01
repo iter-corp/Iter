@@ -102,6 +102,10 @@ const Map<String, String> ckbStrings = {
   'write_comment': 'کۆمێنتێک بنووسە…',
   'no_comments': 'هیچ کۆمێنتێک نییە هێشتا',
   'no_posts': 'هیچ پۆستێک نییە هێشتا',
+  'user_no_posts_subtitle': 'ئەم بەکارهێنەرە هێشتا هیچی پۆست نەکردووە.',
+  'user_no_reposts_subtitle': 'ئەم بەکارهێنەرە هێشتا هیچی دووبارە پۆست نەکردووە.',
+  'user_no_threads_subtitle': 'ئەم بەکارهێنەرە هێشتا هیچ گفتوگۆیەکی دەستپێنەکردووە.',
+  'user_no_replies_subtitle': 'ئەم بەکارهێنەرە هێشتا وەڵامی هیچ گفتوگۆیەکی نەداوەتەوە.',
   'reply': 'وەڵامدانەوە',
   'replies': 'وەڵامەکان',
   'view_comments': 'بینینی کۆمێنتەکان',
@@ -803,6 +807,12 @@ const Map<String, String> ckbStrings = {
   'poll_closed_suffix': ' · داخرا',
   'events_search_people': 'گەڕان بۆ خەڵک',
   'events_search_events': 'گەڕان بۆ بۆنەکان',
+  'explore_title': 'گەڕان',
+  'explore_subtitle': 'گەڕان بۆ کەس، پۆست و گفتوگۆ',
+  'explore_search_hint': 'گەڕان',
+  'explore_blank_hint': 'بۆ دەستپێکردن بگەڕێ',
+  'explore_blank_subtitle':
+      'ناوێک، شارێک یان وشەیەکی سەرەکی بنووسە بۆ دۆزینەوەی کەس و پۆست.',
   'events_connect': 'پەیوەندیگرتن',
   'events_filter_events_by_city': 'پاڵاوتنی بۆنەکان بەپێی وڵات',
   'events_filter_by_city': 'پاڵاوتن بەپێی وڵات',
@@ -1517,6 +1527,7 @@ const Map<String, String> ckbStrings = {
   // ── DISCUSS-A-POST (added) ──
   'post_card_discuss_this_post': 'گفتوگۆ لەسەر ئەم پۆستە بکە',
   'post_card_view_in_discuss': 'بینین لە گفتوگۆ',
+  'post_card_no_discuss_be_first': 'هیچ گفتوگۆیەک نییە هێشتا، یەکەم کەس بە',
   'post_card_discuss_created': 'بڵاوکرایەوە بۆ گفتوگۆ',
   'post_card_discuss_failed': 'نەتوانرا بابەتی گفتوگۆ دروست بکرێت: {error}',
 

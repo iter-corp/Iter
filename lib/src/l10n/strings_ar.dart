@@ -102,6 +102,10 @@ const Map<String, String> arStrings = {
   'write_comment': 'اكتب تعليقاً…',
   'no_comments': 'لا توجد تعليقات بعد',
   'no_posts': 'لا توجد منشورات بعد',
+  'user_no_posts_subtitle': 'لم ينشر هذا المستخدم أي شيء بعد.',
+  'user_no_reposts_subtitle': 'لم يقم هذا المستخدم بإعادة نشر أي شيء بعد.',
+  'user_no_threads_subtitle': 'لم يبدأ هذا المستخدم أي نقاش بعد.',
+  'user_no_replies_subtitle': 'لم يرد هذا المستخدم على أي نقاش بعد.',
   'reply': 'رد',
   'replies': 'ردود',
   'view_comments': 'عرض التعليقات',
@@ -796,6 +800,12 @@ const Map<String, String> arStrings = {
   // ── EVENTS SCREENS (added) ──
   'events_search_people': 'البحث عن أشخاص',
   'events_search_events': 'البحث عن فعاليات',
+  'explore_title': 'استكشف',
+  'explore_subtitle': 'ابحث عن أشخاص ومنشورات ونقاشات',
+  'explore_search_hint': 'بحث',
+  'explore_blank_hint': 'ابحث للبدء',
+  'explore_blank_subtitle':
+      'اكتب اسمًا أو مدينة أو كلمة مفتاحية للعثور على أشخاص ومنشورات.',
   'events_connect': 'تواصل',
   'events_filter_events_by_city': 'تصفية الفعاليات حسب البلد',
   'events_filter_by_city': 'تصفية حسب البلد',
@@ -1493,6 +1503,7 @@ const Map<String, String> arStrings = {
   // ── DISCUSS-A-POST (added) ──
   'post_card_discuss_this_post': 'ناقش هذا المنشور',
   'post_card_view_in_discuss': 'عرض في النقاش',
+  'post_card_no_discuss_be_first': 'لا يوجد نقاش بعد، كن الأول',
   'post_card_discuss_created': 'تم النشر في النقاش',
   'post_card_discuss_failed': 'تعذر إنشاء موضوع النقاش: {error}',
 

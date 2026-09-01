@@ -79,78 +79,80 @@ class _CreateDiscussScreenState extends ConsumerState<CreateDiscussScreen> {
                     // Hidden when discussing an existing post (always a
                     // discussion in that case).
                     if (!_aboutPost)
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        const pad = 4.0;
-                        final pillWidth = (constraints.maxWidth - pad * 2) / 2;
-                        return Container(
-                          height: 48,
-                          padding: const EdgeInsets.all(pad),
-                          decoration: BoxDecoration(
-                            color: context.cardBg,
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: context.borderColor),
-                          ),
-                          child: Stack(
-                            children: [
-                              AnimatedAlign(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                                alignment: isDiscussion
-                                    ? AlignmentDirectional.centerEnd
-                                    : AlignmentDirectional.centerStart,
-                                child: Container(
-                                  width: pillWidth,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        AppColors.purple,
-                                        AppColors.purpleVivid
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(24),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.purple
-                                            .withValues(alpha: 0.35),
-                                        blurRadius: 14,
-                                        offset: const Offset(0, 6),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          const pad = 4.0;
+                          final pillWidth =
+                              (constraints.maxWidth - pad * 2) / 2;
+                          return Container(
+                            height: 48,
+                            padding: const EdgeInsets.all(pad),
+                            decoration: BoxDecoration(
+                              color: context.cardBg,
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(color: context.borderColor),
+                            ),
+                            child: Stack(
+                              children: [
+                                AnimatedAlign(
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOutCubic,
+                                  alignment: isDiscussion
+                                      ? AlignmentDirectional.centerEnd
+                                      : AlignmentDirectional.centerStart,
+                                  child: Container(
+                                    width: pillWidth,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          AppColors.purple,
+                                          AppColors.purpleVivid
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
                                       ),
-                                    ],
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.purple
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _kindTab(
-                                      context,
-                                      Icons.help_outline,
-                                      t.homeQuestionLabel,
-                                      !isDiscussion,
-                                      () => setState(() => _kind = 'question'),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _kindTab(
+                                        context,
+                                        Icons.help_outline,
+                                        t.homeQuestionLabel,
+                                        !isDiscussion,
+                                        () =>
+                                            setState(() => _kind = 'question'),
+                                      ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: _kindTab(
-                                      context,
-                                      Icons.forum_outlined,
-                                      t.homeDiscussionLabel,
-                                      isDiscussion,
-                                      () =>
-                                          setState(() => _kind = 'discussion'),
+                                    Expanded(
+                                      child: _kindTab(
+                                        context,
+                                        Icons.forum_outlined,
+                                        t.homeDiscussionLabel,
+                                        isDiscussion,
+                                        () => setState(
+                                            () => _kind = 'discussion'),
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     if (!_aboutPost) const SizedBox(height: 16),
                     TextField(
                       controller: _questionCtrl,
@@ -408,7 +410,8 @@ class _SourcePostPreview extends StatelessWidget {
                       ? NetworkImage(avatar)
                       : null,
                   child: (avatar == null || avatar.isEmpty)
-                      ? Icon(Icons.person, size: 13, color: context.textSecondary)
+                      ? Icon(Icons.person,
+                          size: 13, color: context.textSecondary)
                       : null,
                 ),
                 const SizedBox(width: 8),

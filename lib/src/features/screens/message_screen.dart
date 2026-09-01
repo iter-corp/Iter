@@ -167,135 +167,133 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
 
     return AppPageBackground(
       child: SafeArea(
-            child: Column(
-              children: [
-                // ── Search bar + New group ──────────────────────────────────
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: context.inputFill,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            controller: _searchCtrl,
-                            onChanged: (v) => setState(() => _query = v),
-                            decoration: InputDecoration(
-                              hintText: context.t.searchWithDots,
-                              hintStyle: TextStyle(
-                                  color: context.textMuted, fontSize: 14),
-                              filled: false,
-                              fillColor: Colors.transparent,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              icon: Icon(Icons.search,
-                                  color: context.textSecondary),
-                            ),
-                          ),
+        child: Column(
+          children: [
+            // ── Search bar + New group ──────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: context.inputFill,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (v) => setState(() => _query = v),
+                        decoration: InputDecoration(
+                          hintText: context.t.searchWithDots,
+                          hintStyle:
+                              TextStyle(color: context.textMuted, fontSize: 14),
+                          filled: false,
+                          fillColor: Colors.transparent,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          icon:
+                              Icon(Icons.search, color: context.textSecondary),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Material(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () => showCreateGroupSheet(context),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Ink(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  AppColors.purple,
-                                  AppColors.purpleVivid,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.purple
-                                      .withValues(alpha: 0.32),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 10),
-                              child: Icon(
-                                Icons.group_add_outlined,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-
-                // ── Tab bar ─────────────────────────────────────────────────
-                MessageTabBar(
-                  selectedTab: selectedTab,
-                  allCount: merged.length,
-                  requestCount: requestConvs.length,
-                  onTap: (i) => setState(() => selectedTab = i),
-                ),
-                const SizedBox(height: 8),
-                // ── Conversation list ────────────────────────────────────────
-                Expanded(
-                  child: selectedTab == 0
-                      ? inboxAsync.when(
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(
-                              child: Text(context.t.errorWithMessage(e))),
-                          data: (_) {
-                            // When the search box has a query, also surface
-                            // followed users the user hasn't messaged yet so
-                            // they can start a new chat directly from results.
-                            final query = _query.trim();
-                            final hasQuery = query.isNotEmpty;
-                            final existingUids = {
-                              for (final r in merged)
-                                if (r is OneToOneRow) r.conv.otherUid,
-                            };
-                            return _SearchableConvList(
-                              merged: merged,
-                              query: query,
-                              hasQuery: hasQuery,
-                              existingUids: existingUids,
-                              onOpenConv: _openChat,
-                              onOpenEvent: _openEventChat,
-                              onStartChat: _openChatWithUser,
-                            );
-                          },
-                        )
-                      : requestsAsync.when(
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(
-                              child: Text(context.t.errorWithMessage(e))),
-                          data: (_) {
-                            return RequestsTab(
-                              requests: requestConvs,
-                              onTap: _openChat,
-                            );
-                          },
+                  const SizedBox(width: 8),
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => showCreateGroupSheet(context),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppColors.purple,
+                              AppColors.purpleVivid,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.purple.withValues(alpha: 0.32),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                ),
-              ],
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 10),
+                          child: Icon(
+                            Icons.group_add_outlined,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+
+            // ── Tab bar ─────────────────────────────────────────────────
+            MessageTabBar(
+              selectedTab: selectedTab,
+              allCount: merged.length,
+              requestCount: requestConvs.length,
+              onTap: (i) => setState(() => selectedTab = i),
+            ),
+            const SizedBox(height: 8),
+            // ── Conversation list ────────────────────────────────────────
+            Expanded(
+              child: selectedTab == 0
+                  ? inboxAsync.when(
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) =>
+                          Center(child: Text(context.t.errorWithMessage(e))),
+                      data: (_) {
+                        // When the search box has a query, also surface
+                        // followed users the user hasn't messaged yet so
+                        // they can start a new chat directly from results.
+                        final query = _query.trim();
+                        final hasQuery = query.isNotEmpty;
+                        final existingUids = {
+                          for (final r in merged)
+                            if (r is OneToOneRow) r.conv.otherUid,
+                        };
+                        return _SearchableConvList(
+                          merged: merged,
+                          query: query,
+                          hasQuery: hasQuery,
+                          existingUids: existingUids,
+                          onOpenConv: _openChat,
+                          onOpenEvent: _openEventChat,
+                          onStartChat: _openChatWithUser,
+                        );
+                      },
+                    )
+                  : requestsAsync.when(
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) =>
+                          Center(child: Text(context.t.errorWithMessage(e))),
+                      data: (_) {
+                        return RequestsTab(
+                          requests: requestConvs,
+                          onTap: _openChat,
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -553,14 +551,11 @@ class _ConvTile extends ConsumerWidget {
     // Presence + typing — only for 1:1 (group chats don't have a
     // single "other party").
     final isOneToOne = !conv.isGroup && conv.otherUid.isNotEmpty;
-    final presenceAsync = isOneToOne
-        ? ref.watch(presenceWatchProvider(conv.otherUid))
-        : null;
-    final isOnline =
-        presenceAsync?.whenOrNull(data: (p) => p.online) ?? false;
+    final presenceAsync =
+        isOneToOne ? ref.watch(presenceWatchProvider(conv.otherUid)) : null;
+    final isOnline = presenceAsync?.whenOrNull(data: (p) => p.online) ?? false;
     final typingAsync = (isOneToOne && currentUid != null)
-        ? ref.watch(
-            typingWatchProvider('${conv.chatId}|${conv.otherUid}'))
+        ? ref.watch(typingWatchProvider('${conv.chatId}|${conv.otherUid}'))
         : null;
     final isTyping = typingAsync?.whenOrNull(data: (t) => t) ?? false;
 
@@ -697,8 +692,7 @@ class _ConvTile extends ConsumerWidget {
                 timeLabel,
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight:
-                      hasUnread ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: hasUnread ? FontWeight.w600 : FontWeight.w500,
                   color: hasUnread
                       ? const Color(0xFFB05ECC)
                       : context.textSecondary,
@@ -968,8 +962,7 @@ Future<void> _showEventChatActions({
                   final confirmed = await _confirmDestructive(
                     context: context,
                     title: context.t.deleteEventGroupQuestion,
-                    body:
-                        context.t.deleteEventGroupBody(chat.eventTitle),
+                    body: context.t.deleteEventGroupBody(chat.eventTitle),
                   );
                   if (confirmed != true) return;
                   try {

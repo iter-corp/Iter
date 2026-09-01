@@ -7,32 +7,6 @@ import 'auth_providers.dart';
 import 'block_providers.dart';
 import 'follow_providers.dart';
 
-class TravelFeedQuery {
-  final String placeQuery;
-  final double? lat;
-  final double? lng;
-  final int limit;
-
-  const TravelFeedQuery({
-    this.placeQuery = '',
-    this.lat,
-    this.lng,
-    this.limit = 60,
-  });
-
-  @override
-  bool operator ==(Object other) {
-    return other is TravelFeedQuery &&
-        other.placeQuery == placeQuery &&
-        other.lat == lat &&
-        other.lng == lng &&
-        other.limit == limit;
-  }
-
-  @override
-  int get hashCode => Object.hash(placeQuery, lat, lng, limit);
-}
-
 final postServiceProvider = Provider<PostService>((_) => PostService());
 
 /// Fetches a single post by id. Used to embed a post inside other
@@ -69,19 +43,12 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
   );
 });
 
-/// When non-null, the Discuss tab is filtered to only show discussions whose
-/// `sourcePostId` matches this id — i.e. all the discussions made about one
-/// specific post. Set by "view in discuss" on a post; cleared (back to the
-/// full discuss feed) by the X on the filter header. Null = show everything.
-final discussFilterPostIdProvider = StateProvider<String?>((_) => null);
-
 final qaFeedProvider = StreamProvider<List<Post>>((ref) {
   final currentUid = ref.watch(
     authStateProvider.select((a) => a.value?.uid),
   );
   if (currentUid == null) return const Stream.empty();
 
-  final filterPostId = ref.watch(discussFilterPostIdProvider);
   final followService = ref.watch(followServiceProvider);
   final blockedStream =
       ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
@@ -96,10 +63,59 @@ final qaFeedProvider = StreamProvider<List<Post>>((ref) {
       return posts
           .where((p) => !blockedSet.contains(p.authorUid))
           .where((p) => !p.isPrivate || allowed.contains(p.authorUid))
-          // When a post filter is active, keep only discussions about it.
-          .where((p) => filterPostId == null || p.sourcePostId == filterPostId)
           .toList();
     },
+  );
+});
+
+/// One item in the merged home feed — either a regular post or a
+/// standalone Discuss question, tagged so the UI knows which card to
+/// render for it.
+class HomeFeedItem {
+  final Post post;
+  final bool isQa;
+  const HomeFeedItem({required this.post, required this.isQa});
+}
+
+/// The home feed: regular posts and standalone Discuss questions (ones not
+/// tied to any specific post — see [postDiscussionsProvider] for those)
+/// merged into a single list, newest first. Replaces the old separate
+/// Feed/Discuss tabs.
+final homeFeedProvider = Provider<AsyncValue<List<HomeFeedItem>>>((ref) {
+  final feed = ref.watch(feedProvider);
+  final qa = ref.watch(qaFeedProvider);
+  return feed.when(
+    data: (feedPosts) => qa.when(
+      data: (qaPosts) {
+        final items = <HomeFeedItem>[
+          ...feedPosts.map((p) => HomeFeedItem(post: p, isQa: false)),
+          ...qaPosts
+              .where((p) => p.sourcePostId == null || p.sourcePostId!.isEmpty)
+              .map((p) => HomeFeedItem(post: p, isQa: true)),
+        ]..sort((a, b) {
+            final at = a.post.createdAt ?? DateTime(0);
+            final bt = b.post.createdAt ?? DateTime(0);
+            return bt.compareTo(at);
+          });
+        return AsyncValue.data(items);
+      },
+      loading: () => const AsyncValue.loading(),
+      error: (e, st) => AsyncValue.error(e, st),
+    ),
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
+});
+
+/// Discuss threads made about one specific post (its `sourcePostId`) —
+/// shown on that post's own "swipe to see Discuss" panel. Reuses
+/// [qaFeedProvider]'s already-open stream rather than opening a new one
+/// per post card.
+final postDiscussionsProvider =
+    Provider.family<AsyncValue<List<Post>>, String>((ref, postId) {
+  final qa = ref.watch(qaFeedProvider);
+  return qa.whenData(
+    (posts) => posts.where((p) => p.sourcePostId == postId).toList(),
   );
 });
 
@@ -123,16 +139,6 @@ final userQaAnsweredProvider =
   final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
   if (authed == null) return const Stream.empty();
   return ref.watch(postServiceProvider).streamUserQaAnswered(uid);
-});
-
-final travelFeedProvider =
-    FutureProvider.family<List<Post>, TravelFeedQuery>((ref, query) async {
-  return ref.watch(postServiceProvider).getTravelPosts(
-        placeQuery: query.placeQuery,
-        currentLat: query.lat,
-        currentLng: query.lng,
-        limit: query.limit,
-      );
 });
 
 final isLikedProvider = StreamProvider.family<bool, String>((ref, postId) {

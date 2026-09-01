@@ -154,9 +154,8 @@ class _AppIntroScreenState extends ConsumerState<AppIntroScreen> {
               const SizedBox(height: 22),
               PrimaryActionButton(
                 label: isLast ? context.t.appIntroStart : context.t.next,
-                icon: isLast
-                    ? Icons.check_rounded
-                    : Icons.arrow_forward_rounded,
+                icon:
+                    isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
                 onPressed: _loading ? null : _next,
                 loading: _loading,
                 size: PrimaryActionSize.large,

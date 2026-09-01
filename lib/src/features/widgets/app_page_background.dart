@@ -181,3 +181,102 @@ class AppGlassCard extends StatelessWidget {
     return card;
   }
 }
+
+/// Frosted-glass strip used behind a pinned [TabBar] / search row so the
+/// header blends into the app's glass UI instead of showing a flat grey
+/// slab. Blurs whatever sits behind it and lays a translucent surface tint
+/// on top, matching [AppGlassCard].
+class GlassBar extends StatelessWidget {
+  const GlassBar({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF1E1E2C).withValues(alpha: 0.55)
+                : Colors.white.withValues(alpha: 0.55),
+            border: Border(
+              bottom: BorderSide(
+                color: (isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          // Keeps TabBar / field ink splashes painting on a Material.
+          child: Material(type: MaterialType.transparency, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// A tabbed page whose title bar and [TabBar] are completely fixed — only
+/// the content below the tabs scrolls. Drop-in replacement for the
+/// `DefaultTabController` + `Scaffold` + `AppBar(bottom: TabBar)` +
+/// `TabBarView` shape the admin screens used, with the tab row sitting on a
+/// [GlassBar] so it blends into the app's glass UI.
+class AppScrollTabScaffold extends StatelessWidget {
+  const AppScrollTabScaffold({
+    super.key,
+    required this.length,
+    required this.title,
+    required this.tabs,
+    required this.body,
+    this.actions,
+  });
+
+  final int length;
+  final Widget title;
+  final List<Widget> tabs;
+  final List<Widget>? actions;
+
+  /// Content shown below the fixed tab bar — usually a [TabBarView], or a
+  /// centered spinner / error while the data loads.
+  final Widget body;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: length,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        // A plain AppBar never scrolls; the GlassBar covers the seam where
+        // its gradient meets the body's.
+        appBar: AppBar(
+          title: title,
+          actions: actions,
+          centerTitle: false,
+          backgroundColor: Colors.transparent,
+          foregroundColor: context.textPrimary,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+        ),
+        body: AppPageBackground(
+          child: Column(
+            children: [
+              GlassBar(
+                child: TabBar(
+                  labelColor: AppColors.purple,
+                  unselectedLabelColor: context.textSecondary,
+                  indicatorColor: AppColors.purple,
+                  dividerColor: Colors.transparent,
+                  dividerHeight: 0,
+                  tabs: tabs,
+                ),
+              ),
+              Expanded(child: body),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

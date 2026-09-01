@@ -9,9 +9,9 @@ import '../../services/chat_service.dart';
 import '../../services/error_report_service.dart';
 import '../screens/home_screen.dart';
 import '../screens/event_screen.dart'; // ✅ Added
+import '../screens/explore_screen.dart';
 import '../screens/message_screen.dart';
 import '../screens/profile_screen.dart';
-import '../screens/translate_screen.dart';
 import '../widgets/app_page_background.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -29,7 +29,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   final List<String> _navIcons = [
     "assets/icons/Home.svg",
     "assets/icons/Event.svg",
-    "assets/icons/Translate.svg",
+    "assets/icons/Translate.svg", // unused — index 2 renders Icons.explore_outlined instead
     "assets/icons/Message.svg",
     "assets/icons/Profile.svg",
   ];
@@ -39,7 +39,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   static const List<String> _tabScreenNames = [
     'Home',
     'Events',
-    'Translate',
+    'Explore',
     'Messages',
     'Profile',
   ];
@@ -116,7 +116,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             children: [
               HomeBody(scrollController: _homeScrollController),
               const EventBody(),
-              const TranslateBody(),
+              const ExploreBody(),
               const MessageBody(),
               const ProfileScreen(),
             ],
@@ -215,7 +215,16 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                                                         ? Colors.black
                                                         : Colors.white,
                                                   )
-                                                : SvgPicture.asset(
+                                                : index == 2
+                                                    ? Icon(
+                                                        Icons
+                                                            .explore_outlined,
+                                                        size: 22,
+                                                        color: isSelected
+                                                            ? Colors.black
+                                                            : Colors.white,
+                                                      )
+                                                    : SvgPicture.asset(
                                                     _navIcons[index],
                                                     width: 22,
                                                     height: 22,

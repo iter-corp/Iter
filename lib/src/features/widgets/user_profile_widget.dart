@@ -93,10 +93,10 @@ class UserCoverAvatar extends StatelessWidget {
 
     final avatar = CircleAvatar(
       radius: 40,
-      backgroundColor: Colors.grey.shade200,
+      backgroundColor: context.inputFill,
       backgroundImage: _avatarImage,
       child: _avatarImage == null
-          ? const Icon(Icons.person, size: 40, color: Colors.grey)
+          ? Icon(Icons.person, size: 40, color: context.textMuted)
           : null,
     );
 
@@ -266,8 +266,10 @@ class UserNameBio extends StatelessWidget {
             children: [
               Text(
                 username,
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimary),
               ),
               if (isPrivate) ...[
                 const SizedBox(width: 6),
@@ -288,54 +290,44 @@ class UserNameBio extends StatelessWidget {
             ),
           ],
           if (bio.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                bio,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.textPrimary,
-                  height: 1.35,
-                ),
-              ),
+            const SizedBox(height: 4),
+            Text(
+              bio,
+              style: TextStyle(fontSize: 13, color: context.textSecondary),
+              textAlign: TextAlign.center,
             ),
           ],
           if (badges.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: badges.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final label = entry.value['label']!;
-                  final kind = entry.value['kind']!;
-                  final fg = badgeColorFor(label: label, kind: kind, idx: idx);
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: badges.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final label = entry.value['label']!;
+                final kind = entry.value['kind']!;
+                final fg = badgeColorFor(label: label, kind: kind, idx: idx);
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: fg.withValues(alpha: 0.55)),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: fg,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: fg.withValues(alpha: 0.55)),
-                    ),
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: fg,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+                  ),
+                );
+              }).toList(),
             ),
           ],
         ],
@@ -442,41 +434,48 @@ class UserButtons extends StatelessWidget {
     final String text = isFollowing
         ? context.t.following
         : (isRequested ? context.t.requested : context.t.follow);
+    final IconData icon = isFollowing
+        ? Icons.check
+        : (isRequested ? Icons.access_time : Icons.person_add_alt_1_outlined);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          /// FOLLOW BUTTON
+          /// FOLLOW BUTTON — same OutlinedButton shape as ProfileButtons
+          /// once following/requested; a filled purple CTA (matching the
+          /// app's other primary actions) while not yet following.
           Expanded(
-            child: SizedBox(
-              height: 40,
-              child: GestureDetector(
-                onTap: onFollowTap,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  decoration: BoxDecoration(
-                    color: active ? context.cardBg : const Color(0xFFB05ECC),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: active
-                          ? context.borderColor
-                          : const Color(0xFFB05ECC),
+            child: active
+                ? OutlinedButton.icon(
+                    onPressed: onFollowTap,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: context.borderColor),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
                     ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      text,
-                      style: TextStyle(
-                        color: active ? context.textPrimary : Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
+                    icon: Icon(icon, size: 16, color: context.textPrimary),
+                    label: Text(text,
+                        style: TextStyle(
+                            color: context.textPrimary,
+                            fontWeight: FontWeight.w600)),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: onFollowTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFB05ECC),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      elevation: 0,
                     ),
+                    icon: const Icon(Icons.person_add_alt_1_outlined,
+                        size: 16, color: Colors.white),
+                    label: Text(text,
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
-                ),
-              ),
-            ),
           ),
 
           /// MESSAGE BUTTON — shown for public profiles, AND for
@@ -486,28 +485,20 @@ class UserButtons extends StatelessWidget {
           if (!isPrivate || isFollowing) ...[
             const SizedBox(width: 10),
             Expanded(
-              child: SizedBox(
-                height: 40,
-                child: OutlinedButton(
-                  onPressed: onMessageTap,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: context.borderColor),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    context.t.message,
-                    style: TextStyle(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
+              child: OutlinedButton.icon(
+                onPressed: onMessageTap,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: context.borderColor),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
                 ),
+                icon: Icon(Icons.chat_bubble_outline,
+                    size: 16, color: context.textPrimary),
+                label: Text(context.t.message,
+                    style: TextStyle(
+                        color: context.textPrimary,
+                        fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -530,38 +521,77 @@ class UserTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icons = [
+    const icons = [
       Icons.grid_on,
       Icons.question_answer_outlined,
       Icons.repeat,
     ];
-
-    return Row(
-      children: List.generate(icons.length, (index) {
-        final bool isActive = selectedTab == index;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => onTap(index),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: context.cardBg,
-                border: Border(
-                  bottom: BorderSide(
-                    color: isActive ? context.textPrimary : Colors.transparent,
-                    width: 2,
+    return SizedBox(
+      height: 48,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = constraints.maxWidth / icons.length;
+          return Stack(
+            children: [
+              // Animated underline that slides between tabs.
+              // `start` mirrors with the (auto-flipped) tab Row in RTL.
+              AnimatedPositionedDirectional(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                start: tabWidth * selectedTab,
+                bottom: 0,
+                width: tabWidth,
+                height: 2,
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: context.textPrimary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
               ),
-              child: Icon(
-                icons[index],
-                color: isActive ? context.textPrimary : context.textSecondary,
-                size: 22,
+              Row(
+                children: List.generate(icons.length, (index) {
+                  final isActive = selectedTab == index;
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onTap(index),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        alignment: Alignment.center,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(end: isActive ? 1.0 : 0.0),
+                          duration: const Duration(milliseconds: 220),
+                          builder: (context, t, _) {
+                            return Transform.scale(
+                              scale: 1 + 0.08 * t,
+                              child: Icon(
+                                icons[index],
+                                color: Color.lerp(
+                                  context.textSecondary,
+                                  context.textPrimary,
+                                  t,
+                                ),
+                                size: 22,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ),
-            ),
-          ),
-        );
-      }),
+            ],
+          );
+        },
+      ),
     );
   }
 }

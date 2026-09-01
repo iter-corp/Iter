@@ -1146,8 +1146,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         // the code back to a label for display; kTranslate-
                         // Languages lists English twice (USA / UK) so take the
                         // first match for the code.
-                        final currentCode =
-                            ref.read(preferredLanguageProvider);
+                        final currentCode = ref.read(preferredLanguageProvider);
                         final currentLabel = kTranslateLanguages
                             .firstWhere((l) => l.code == currentCode,
                                 orElse: () => kTranslateLanguages.first)
@@ -3269,7 +3268,6 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
       builder: (_) => _MessageTranslationSheet(text: text, target: target),
     );
   }
-
 }
 
 /// Modern action row used by the message long-press sheet.
@@ -3707,7 +3705,9 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     final lower = url.toLowerCase();
     final q = lower.indexOf('?');
     final path = q == -1 ? lower : lower.substring(0, q);
-    if (path.endsWith('.m4a') || path.endsWith('.aac') || path.endsWith('.mp4')) {
+    if (path.endsWith('.m4a') ||
+        path.endsWith('.aac') ||
+        path.endsWith('.mp4')) {
       return 'audio/mp4';
     }
     if (path.endsWith('.mp3')) return 'audio/mpeg';

@@ -88,8 +88,8 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
     final album = _activeAlbum;
     if (album == null) return;
     _loadingMore = true;
-    final next = await album
-        .getAssetListPaged(page: _page + 1, size: _pageSize);
+    final next =
+        await album.getAssetListPaged(page: _page + 1, size: _pageSize);
     if (!mounted) {
       _loadingMore = false;
       return;
@@ -175,8 +175,7 @@ class _AddToStoryScreenState extends ConsumerState<AddToStoryScreen> {
               children: [
                 Container(
                   color: const Color(0xFF2B2D30),
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                   child: Row(
                     children: [
                       GestureDetector(
@@ -422,15 +421,13 @@ class _AlbumCover extends StatelessWidget {
         child: FutureBuilder<List<AssetEntity>>(
           future: album.getAssetListPaged(page: 0, size: 1),
           builder: (context, snap) {
-            final first = (snap.data ?? const []).isNotEmpty
-                ? snap.data!.first
-                : null;
+            final first =
+                (snap.data ?? const []).isNotEmpty ? snap.data!.first : null;
             if (first == null) {
               return Container(color: const Color(0xFF3A3C3F));
             }
             return FutureBuilder(
-              future:
-                  first.thumbnailDataWithSize(const ThumbnailSize(96, 96)),
+              future: first.thumbnailDataWithSize(const ThumbnailSize(96, 96)),
               builder: (context, thumb) {
                 final bytes = thumb.data;
                 if (bytes == null) {

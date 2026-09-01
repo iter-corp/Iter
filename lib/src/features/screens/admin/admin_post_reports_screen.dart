@@ -23,90 +23,71 @@ class AdminPostReportsScreen extends ConsumerWidget {
     final unresolved = all.where((r) => !r.resolved).toList();
     final resolved = all.where((r) => r.resolved).toList();
 
-    return DefaultTabController(
+    return AppScrollTabScaffold(
       length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.adminPostReports),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-          actions: [
-            if (resolved.isNotEmpty)
-              TextButton.icon(
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(context.t.adminClearResolvedTitle),
-                      content: Text(
-                        context.t.adminClearResolvedBody(resolved.length),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: Text(context.t.cancel),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: Text(context.t.clear),
-                        ),
-                      ],
+      title: Text(context.t.adminPostReports),
+      actions: [
+        if (resolved.isNotEmpty)
+          TextButton.icon(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(context.t.adminClearResolvedTitle),
+                  content: Text(
+                    context.t.adminClearResolvedBody(resolved.length),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(context.t.cancel),
                     ),
-                  );
-                  if (confirmed != true) return;
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(context.t.clear),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
 
-                  await Future.wait(
-                    resolved
-                        .map((r) => ref
-                            .read(adminServiceProvider)
-                            .deletePostReport(r.id))
-                        .toList(),
-                  );
-                  if (!context.mounted) return;
-                  AppFeedback.showSuccess(
-                      context, context.t.adminResolvedReportsCleared);
-                },
-                icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                label: Text(context.t.adminClearResolved),
-              ),
-            const SizedBox(width: 8),
-          ],
-          bottom: TabBar(
-            labelColor: AppColors.purple,
-            unselectedLabelColor: context.textSecondary,
-            indicatorColor: AppColors.purple,
-            dividerColor: Colors.transparent,
-            dividerHeight: 0,
-            tabs: [
-              Tab(text: context.t.adminTabOpen(unresolved.length)),
-              Tab(text: context.t.adminTabResolved(resolved.length)),
-            ],
+              await Future.wait(
+                resolved
+                    .map((r) =>
+                        ref.read(adminServiceProvider).deletePostReport(r.id))
+                    .toList(),
+              );
+              if (!context.mounted) return;
+              AppFeedback.showSuccess(
+                  context, context.t.adminResolvedReportsCleared);
+            },
+            icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+            label: Text(context.t.adminClearResolved),
           ),
-        ),
-        body: AppPageBackground(
-          child: reportsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-            data: (_) => TabBarView(
-              children: [
-                _ReportsList(
-                  reports: unresolved,
-                  emptyTitle: all.isEmpty
-                      ? context.t.adminNoPostReports
-                      : context.t.adminNoOpenReports,
-                  emptySubtitle: context.t.adminFreshReportsHere,
-                ),
-                _ReportsList(
-                  reports: resolved,
-                  emptyTitle: context.t.adminNothingResolvedYet,
-                  emptySubtitle: context.t.adminClosedReportsMoveHere,
-                ),
-              ],
+        const SizedBox(width: 8),
+      ],
+      tabs: [
+        Tab(text: context.t.adminTabOpen(unresolved.length)),
+        Tab(text: context.t.adminTabResolved(resolved.length)),
+      ],
+      body: reportsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+        data: (_) => TabBarView(
+          children: [
+            _ReportsList(
+              reports: unresolved,
+              emptyTitle: all.isEmpty
+                  ? context.t.adminNoPostReports
+                  : context.t.adminNoOpenReports,
+              emptySubtitle: context.t.adminFreshReportsHere,
             ),
-          ),
+            _ReportsList(
+              reports: resolved,
+              emptyTitle: context.t.adminNothingResolvedYet,
+              emptySubtitle: context.t.adminClosedReportsMoveHere,
+            ),
+          ],
         ),
       ),
     );

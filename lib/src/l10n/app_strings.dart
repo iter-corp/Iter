@@ -149,6 +149,10 @@ class AppStrings {
   String get writeComment => _get('write_comment');
   String get noComments => _get('no_comments');
   String get noPosts => _get('no_posts');
+  String get userNoPostsSubtitle => _get('user_no_posts_subtitle');
+  String get userNoRepostsSubtitle => _get('user_no_reposts_subtitle');
+  String get userNoThreadsSubtitle => _get('user_no_threads_subtitle');
+  String get userNoRepliesSubtitle => _get('user_no_replies_subtitle');
   String get reply => _get('reply');
   String get replies => _get('replies');
   String get viewComments => _get('view_comments');
@@ -656,6 +660,8 @@ class AppStrings {
   String get discussAskAction => _get('discuss_ask_action');
   String get postCardDiscussThisPost => _get('post_card_discuss_this_post');
   String get postCardViewInDiscuss => _get('post_card_view_in_discuss');
+  String get postCardNoDiscussBeFirst =>
+      _get('post_card_no_discuss_be_first');
   String get postCardDiscussCreated => _get('post_card_discuss_created');
   String postCardDiscussFailed(Object error) =>
       _fmt('post_card_discuss_failed', {'error': error});
@@ -966,6 +972,11 @@ class AppStrings {
   // ── EVENTS SCREENS (added) ──
   String get eventsSearchPeople => _get('events_search_people');
   String get eventsSearchEvents => _get('events_search_events');
+  String get exploreTitle => _get('explore_title');
+  String get exploreSubtitle => _get('explore_subtitle');
+  String get exploreSearchHint => _get('explore_search_hint');
+  String get exploreBlankHint => _get('explore_blank_hint');
+  String get exploreBlankSubtitle => _get('explore_blank_subtitle');
   String get eventsConnect => _get('events_connect');
   String get eventsFilterEventsByCity => _get('events_filter_events_by_city');
   String get eventsFilterByCity => _get('events_filter_by_city');

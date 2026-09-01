@@ -22,85 +22,66 @@ class AdminCommentReportsScreen extends ConsumerWidget {
     final unresolved = all.where((r) => !r.resolved).toList();
     final resolved = all.where((r) => r.resolved).toList();
 
-    return DefaultTabController(
+    return AppScrollTabScaffold(
       length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.adminCommentReports),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-          actions: [
-            if (resolved.isNotEmpty)
-              TextButton.icon(
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(context.t.adminClearResolvedTitle),
-                      content: Text(
-                        context.t.adminClearResolvedBody(resolved.length),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: Text(context.t.cancel),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: Text(context.t.clear),
-                        ),
-                      ],
+      title: Text(context.t.adminCommentReports),
+      actions: [
+        if (resolved.isNotEmpty)
+          TextButton.icon(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(context.t.adminClearResolvedTitle),
+                  content: Text(
+                    context.t.adminClearResolvedBody(resolved.length),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(context.t.cancel),
                     ),
-                  );
-                  if (confirmed != true) return;
-                  await Future.wait(
-                    resolved.map((r) => ref
-                        .read(adminServiceProvider)
-                        .deleteCommentReport(r.id)),
-                  );
-                  if (!context.mounted) return;
-                  AppFeedback.showSuccess(
-                      context, context.t.adminResolvedReportsCleared);
-                },
-                icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                label: Text(context.t.adminClearResolved),
-              ),
-            const SizedBox(width: 8),
-          ],
-          bottom: TabBar(
-            labelColor: AppColors.purple,
-            unselectedLabelColor: context.textSecondary,
-            indicatorColor: AppColors.purple,
-            dividerColor: Colors.transparent,
-            dividerHeight: 0,
-            tabs: [
-              Tab(text: context.t.adminTabOpen(unresolved.length)),
-              Tab(text: context.t.adminTabResolved(resolved.length)),
-            ],
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(context.t.clear),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              await Future.wait(
+                resolved.map((r) =>
+                    ref.read(adminServiceProvider).deleteCommentReport(r.id)),
+              );
+              if (!context.mounted) return;
+              AppFeedback.showSuccess(
+                  context, context.t.adminResolvedReportsCleared);
+            },
+            icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+            label: Text(context.t.adminClearResolved),
           ),
-        ),
-        body: AppPageBackground(
-          child: reportsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-            data: (_) => TabBarView(
-              children: [
-                _CommentReportsList(
-                  reports: unresolved,
-                  emptyTitle: context.t.adminNoCommentReports,
-                  emptySubtitle: context.t.adminFreshReportsHere,
-                ),
-                _CommentReportsList(
-                  reports: resolved,
-                  emptyTitle: context.t.adminNothingResolvedYet,
-                  emptySubtitle: context.t.adminClosedReportsMoveHere,
-                ),
-              ],
+        const SizedBox(width: 8),
+      ],
+      tabs: [
+        Tab(text: context.t.adminTabOpen(unresolved.length)),
+        Tab(text: context.t.adminTabResolved(resolved.length)),
+      ],
+      body: reportsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+        data: (_) => TabBarView(
+          children: [
+            _CommentReportsList(
+              reports: unresolved,
+              emptyTitle: context.t.adminNoCommentReports,
+              emptySubtitle: context.t.adminFreshReportsHere,
             ),
-          ),
+            _CommentReportsList(
+              reports: resolved,
+              emptyTitle: context.t.adminNothingResolvedYet,
+              emptySubtitle: context.t.adminClosedReportsMoveHere,
+            ),
+          ],
         ),
       ),
     );
@@ -197,8 +178,7 @@ class _CommentReportTile extends ConsumerWidget {
                 tooltip: context.t.copy,
                 icon: const Icon(Icons.copy_rounded, size: 18),
                 padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 36, minHeight: 36),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 visualDensity: VisualDensity.compact,
                 onPressed: () {
                   Clipboard.setData(ClipboardData(
@@ -279,8 +259,7 @@ class _CommentReportTile extends ConsumerWidget {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          PostDetailScreen(postId: report.postId),
+                      builder: (_) => PostDetailScreen(postId: report.postId),
                     ),
                   ),
                   icon: const Icon(Icons.open_in_new, size: 16),

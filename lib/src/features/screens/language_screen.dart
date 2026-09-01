@@ -20,39 +20,47 @@ class LanguageScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.appLanguage),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            8,
-            16,
-            24 + MediaQuery.of(context).padding.bottom,
-          ),
-          children: [
-            for (final lang in AppLanguage.values)
-              _LanguageTile(
-                language: lang,
-                selected: lang == current,
-                onTap: () {
-                  ref.read(localeProvider.notifier).setLanguage(lang);
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: Text(context.t.languageChanged),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                },
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.appLanguage),
+              centerTitle: false,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                24 + MediaQuery.of(context).padding.bottom,
               ),
+              sliver: SliverList.list(
+                children: [
+                  for (final lang in AppLanguage.values)
+                    _LanguageTile(
+                      language: lang,
+                      selected: lang == current,
+                      onTap: () {
+                        ref.read(localeProvider.notifier).setLanguage(lang);
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(context.t.languageChanged),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                      },
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

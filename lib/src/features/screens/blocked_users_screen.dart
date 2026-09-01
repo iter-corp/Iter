@@ -15,22 +15,25 @@ class BlockedUsersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(context.t.blockedUsers),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
-      body: const AppPageBackground(
-        child: SafeArea(
-          top: false,
-          child: _BlockedUsersList(),
+      body: AppPageBackground(
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: Text(context.t.blockedUsers),
+              centerTitle: false,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            const _BlockedUsersList(),
+          ],
         ),
       ),
     );
@@ -43,58 +46,69 @@ class _BlockedUsersList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final blockedAsync = ref.watch(blockedUsersProvider);
-    return blockedAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            context.t.errorWithMessage(e),
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.textSecondary),
+    return blockedAsync.when<Widget>(
+      loading: () => const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              context.t.errorWithMessage(e),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.textSecondary),
+            ),
           ),
         ),
       ),
       data: (uids) {
         if (uids.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.block, size: 48, color: context.textMuted),
-                  const SizedBox(height: 12),
-                  Text(
-                    context.t.profileNoBlockedUsers,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: context.textPrimary,
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.block, size: 48, color: context.textMuted),
+                    const SizedBox(height: 12),
+                    Text(
+                      context.t.profileNoBlockedUsers,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: context.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    context.t.profileBlockedUsersHint,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: context.textSecondary,
-                      fontSize: 13,
+                    const SizedBox(height: 4),
+                    Text(
+                      context.t.profileBlockedUsersHint,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
         }
 
         final bottomPadding = MediaQuery.viewPaddingOf(context).bottom + 24;
-        return ListView.separated(
+        return SliverPadding(
           padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-          itemCount: uids.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) => _BlockedUserCard(uid: uids[i]),
+          sliver: SliverList.separated(
+            itemCount: uids.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, i) => _BlockedUserCard(uid: uids[i]),
+          ),
         );
       },
     );

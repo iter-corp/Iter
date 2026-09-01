@@ -65,16 +65,21 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
       length: 5,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(context.t.adminTileUsersTitle),
+          centerTitle: false,
           backgroundColor: Colors.transparent,
           foregroundColor: context.textPrimary,
           elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
+          scrolledUnderElevation: 0,
         ),
         body: AppPageBackground(
           child: Column(
             children: [
+              SizedBox(
+                height: kToolbarHeight + MediaQuery.of(context).padding.top,
+              ),
               // One shared search field above the tabs so the query persists
               // and applies to whichever tab is active.
               Padding(
@@ -123,8 +128,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                       children: [
                         // Scrollable so longer translated labels (Arabic /
                         // Kurdish) don't crowd or clip on small screens.
-                        Material(
-                          color: Colors.transparent,
+                        GlassBar(
                           child: TabBar(
                             isScrollable: true,
                             labelColor: AppColors.purple,

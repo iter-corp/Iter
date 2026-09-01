@@ -25,30 +25,15 @@ import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../screens/create_discuss_screen.dart';
 import '../screens/image_viewer_screen.dart';
+import '../screens/qa_thread_screen.dart';
 import '../../navigation/user_profile_nav.dart';
-import 'location_map.dart';
 
 class PostCard extends ConsumerStatefulWidget {
   final Post post;
-  final bool travelMode;
-  final String? travelPlace;
-  final String? travelDistance;
-
-  /// When true the viewer's GPS location isn't available (services off or
-  /// permission denied). The travel-mode card replaces the distance pill
-  /// with a tappable "Turn on location" CTA so users know why distance
-  /// is missing and can fix it in one tap.
-  final bool viewerLocationOff;
-  final VoidCallback? onTurnOnLocationTap;
 
   const PostCard({
     super.key,
     required this.post,
-    this.travelMode = false,
-    this.travelPlace,
-    this.travelDistance,
-    this.viewerLocationOff = false,
-    this.onTurnOnLocationTap,
   });
 
   @override
@@ -88,6 +73,11 @@ class _PostCardState extends ConsumerState<PostCard>
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
+  // Outer carousel: page 0 is Discuss threads (swipe right to reach it),
+  // page 1 (the default) is the post itself.
+  final PageController _discussPageController =
+      PageController(initialPage: 1);
+
   // Double-tap-to-like heart burst animation. Driven once per double tap;
   // a value of 0 means the overlay is hidden.
   late final AnimationController _heartBurst = AnimationController(
@@ -98,6 +88,7 @@ class _PostCardState extends ConsumerState<PostCard>
   @override
   void dispose() {
     _pageController.dispose();
+    _discussPageController.dispose();
     _heartBurst.dispose();
     super.dispose();
   }
@@ -169,8 +160,6 @@ class _PostCardState extends ConsumerState<PostCard>
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
-    final travelPlace = widget.travelPlace?.trim();
-    final travelDistance = widget.travelDistance?.trim();
     final userData = ref.watch(userByUidProvider(post.authorUid)).value;
     final avatarUrl = userData?['avatarUrl'] as String?;
     final username = userData?['username'] as String? ?? post.authorUsername;
@@ -191,10 +180,7 @@ class _PostCardState extends ConsumerState<PostCard>
     final imageCount = post.imageUrls.length;
     final isMulti = !hasVideo && imageCount > 1;
     final hasCaption = post.caption.trim().isNotEmpty;
-    final hasTravelPlace =
-        widget.travelMode && travelPlace != null && travelPlace.isNotEmpty;
-    final captionPreview =
-        hasCaption ? post.caption.trim() : (hasTravelPlace ? travelPlace : '');
+    final captionPreview = hasCaption ? post.caption.trim() : '';
     final postTime = context.t.timeAgo(post.createdAt);
     // Measure the caption panel after the frame so the video player
     // can position its scrubber above it on the next paint. The
@@ -230,9 +216,17 @@ class _PostCardState extends ConsumerState<PostCard>
         borderRadius: BorderRadius.circular(30),
         child: SizedBox(
           height: hasMedia ? 480 : 430,
-          child: Stack(
+          // Page 0 is the Discuss threads made about this post (swipe
+          // right from the post to reach it); page 1 is the post itself,
+          // unchanged below.
+          child: PageView(
+            controller: _discussPageController,
+            physics: const ClampingScrollPhysics(),
             children: [
-              Positioned.fill(
+              _PostDiscussPage(post: post),
+              Stack(
+                children: [
+                  Positioned.fill(
                 child: hasVideo
                     ? GestureDetector(
                         // Double-tap to like, layered on top of the video so
@@ -622,79 +616,6 @@ class _PostCardState extends ConsumerState<PostCard>
                                         ),
                                       ],
                                     ),
-                                    if (hasTravelPlace) ...[
-                                      const SizedBox(height: 10),
-                                      GestureDetector(
-                                        behavior: HitTestBehavior.opaque,
-                                        onTap: () {
-                                          final lat = post.postLat;
-                                          final lng = post.postLng;
-                                          if (lat == null || lng == null) {
-                                            return;
-                                          }
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => LocationMapScreen(
-                                                lat: lat,
-                                                lng: lng,
-                                                label: travelPlace,
-                                                subtitle: post.postPlaceCity,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.location_on,
-                                              size: 13,
-                                              color: Colors.white,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                travelPlace,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.92),
-                                                  fontSize: 11,
-                                                  decoration: post.postLat !=
-                                                              null &&
-                                                          post.postLng != null
-                                                      ? TextDecoration.underline
-                                                      : null,
-                                                ),
-                                              ),
-                                            ),
-                                            if (widget.viewerLocationOff)
-                                              GestureDetector(
-                                                onTap:
-                                                    widget.onTurnOnLocationTap,
-                                                child: _frostedChip(
-                                                  icon: Icons.location_off,
-                                                  text: context
-                                                      .t.postCardTurnOnLocation,
-                                                  compact: true,
-                                                  textDirection:
-                                                      Directionality.of(
-                                                          context),
-                                                ),
-                                              )
-                                            else if (travelDistance != null &&
-                                                travelDistance.isNotEmpty)
-                                              _frostedChip(
-                                                icon: Icons.route,
-                                                text: travelDistance,
-                                                compact: true,
-                                                textDirection:
-                                                    Directionality.of(context),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -741,6 +662,8 @@ class _PostCardState extends ConsumerState<PostCard>
                     ),
                   ),
                 ),
+            ],
+          ),
             ],
           ),
         ),
@@ -1108,6 +1031,158 @@ class _PostCardState extends ConsumerState<PostCard>
           Text(text, style: const TextStyle(color: Colors.white)),
         ],
       ],
+    );
+  }
+}
+
+/// The Discuss page of a post's swipe carousel (page 2, reached by
+/// swiping left on the card). Shows every discussion thread made about
+/// this specific post, or an invite to start the first one.
+class _PostDiscussPage extends ConsumerWidget {
+  final Post post;
+  const _PostDiscussPage({required this.post});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final threadsAsync = ref.watch(postDiscussionsProvider(post.id));
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF1A1A1E) : Colors.white,
+      ),
+      child: threadsAsync.when(
+        data: (threads) {
+          if (threads.isEmpty) {
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => discussPost(context, ref, post),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.forum_outlined,
+                        size: 40, color: context.textSecondary),
+                    const SizedBox(height: 12),
+                    Text(
+                      context.t.postCardNoDiscussBeFirst,
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: threads.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, i) => _DiscussPreviewRow(thread: threads[i]),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => Center(
+          child: Text(
+            context.t.errorGeneric,
+            style: TextStyle(color: context.textSecondary),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One discussion thread in [_PostDiscussPage]'s list — author, question
+/// preview, and reply count. Tapping opens the full thread.
+class _DiscussPreviewRow extends StatelessWidget {
+  final Post thread;
+  const _DiscussPreviewRow({required this.thread});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceSoft,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => QaThreadScreen(post: thread)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: context.purpleSoft,
+                backgroundImage: (thread.authorAvatar != null &&
+                        thread.authorAvatar!.isNotEmpty)
+                    ? CachedNetworkImageProvider(thread.authorAvatar!)
+                    : null,
+                child: (thread.authorAvatar == null ||
+                        thread.authorAvatar!.isEmpty)
+                    ? Icon(Icons.person, size: 16, color: context.textSecondary)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            thread.authorUsername,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          context.t.timeAgo(thread.createdAt),
+                          style: TextStyle(
+                              fontSize: 11, color: context.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      thread.caption.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.3,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.mode_comment_outlined,
+                            size: 14, color: context.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${thread.commentsCount < 0 ? 0 : thread.commentsCount}',
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2196,8 +2271,8 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
 /// post, then creates the topic (question + linked post) and opens it.
 /// Starts a NEW discussion about [post] and opens its thread. Every user can
 /// create their own discussion of the same post — we always ask for the
-/// question and always create a fresh topic (no reuse/dedupe). To browse the
-/// discussions others already made about this post, see [viewPostDiscussions].
+/// question and always create a fresh topic (no reuse/dedupe). To browse
+/// discussions others already made about this post, swipe left on its card.
 Future<void> discussPost(
   BuildContext context,
   WidgetRef ref,
@@ -2210,19 +2285,6 @@ Future<void> discussPost(
   await Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => CreateDiscussScreen(sourcePost: post)),
   );
-}
-
-/// Opens the Discuss tab filtered to all discussions about [post]. Sets the
-/// shared [discussFilterPostIdProvider] so the Discuss feed shows only this
-/// post's threads (with a thumbnail header + X to clear back to all), then
-/// pops to the root where the home Discuss tab lives.
-void viewPostDiscussions(
-  BuildContext context,
-  WidgetRef ref,
-  Post post,
-) {
-  ref.read(discussFilterPostIdProvider.notifier).state = post.id;
-  Navigator.of(context).popUntil((r) => r.isFirst);
 }
 
 class _OwnerMenu extends StatelessWidget {
@@ -2248,8 +2310,6 @@ class _OwnerMenu extends StatelessWidget {
             await _toggleVisibility(context);
           } else if (action == 'discuss') {
             await discussPost(context, ref, post);
-          } else if (action == 'view_discuss') {
-            viewPostDiscussions(context, ref, post);
           } else if (action == 'delete') {
             await _delete(context);
           }
@@ -2275,21 +2335,14 @@ class _OwnerMenu extends StatelessWidget {
             ]),
           ),
           // Always available: start your OWN discussion of this post.
+          // (Discussions others made about it are reachable by swiping
+          // left on the card itself.)
           PopupMenuItem(
             value: 'discuss',
             child: Row(children: [
               const Icon(Icons.forum_outlined, size: 18),
               const SizedBox(width: 8),
               Text(context.t.postCardDiscussThisPost),
-            ]),
-          ),
-          // Browse every discussion others made about this post.
-          PopupMenuItem(
-            value: 'view_discuss',
-            child: Row(children: [
-              const Icon(Icons.visibility_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(context.t.postCardViewInDiscuss),
             ]),
           ),
           PopupMenuItem(
@@ -2379,7 +2432,6 @@ class _OwnerMenu extends StatelessWidget {
       try {
         await ref.read(postServiceProvider).deletePost(post.id);
         ref.invalidate(feedProvider);
-        ref.invalidate(travelFeedProvider);
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2421,27 +2473,18 @@ class _ViewerMenu extends StatelessWidget {
             await _report(context);
           } else if (action == 'discuss') {
             await discussPost(context, ref, post);
-          } else if (action == 'view_discuss') {
-            viewPostDiscussions(context, ref, post);
           }
         },
         itemBuilder: (_) => [
           // Always available: start your OWN discussion of this post.
+          // (Discussions others made about it are reachable by swiping
+          // left on the card itself.)
           PopupMenuItem(
             value: 'discuss',
             child: Row(children: [
               const Icon(Icons.forum_outlined, size: 18),
               const SizedBox(width: 8),
               Text(context.t.postCardDiscussThisPost),
-            ]),
-          ),
-          // Browse every discussion others made about this post.
-          PopupMenuItem(
-            value: 'view_discuss',
-            child: Row(children: [
-              const Icon(Icons.visibility_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(context.t.postCardViewInDiscuss),
             ]),
           ),
           PopupMenuItem(

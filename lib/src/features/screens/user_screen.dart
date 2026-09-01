@@ -11,6 +11,7 @@ import '../../providers/post_providers.dart';
 import '../../providers/profile_visitor_providers.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
+import '../widgets/app_page_background.dart';
 import '../widgets/user_profile_widget.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart' show PostDetailScreen, PostThumbTile;
@@ -303,8 +304,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _messageBusy = false);
@@ -413,250 +414,257 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final isBlockedByAsync = ref.watch(isBlockedByProvider(widget.uid));
 
     return Scaffold(
-      backgroundColor: context.cardBg,
-      body: userAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-        data: (user) {
-          if (user == null) {
-            return SafeArea(
+      backgroundColor: Colors.transparent,
+      body: AppPageBackground(
+        child: userAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+          data: (user) {
+            if (user == null) {
+              return SafeArea(
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: AlignmentDirectional.topStart,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(context.t.userNotFound),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final username = (user['username'] as String?) ?? context.t.user;
+            final displayName = (user['name'] as String?) ?? username;
+            final handle = (user['handle'] as String?) ?? '@$username';
+            final avatarUrl = user['avatarUrl'] as String?;
+            final coverUrl = user['coverUrl'] as String?;
+            final isPrivate = (user['isPrivate'] as bool?) ?? false;
+            // Merge local overrides with stream values for instant feedback.
+            final isFollowing =
+                _localIsFollowing ?? (isFollowingAsync.value ?? false);
+            final isRequested =
+                _localIsRequested ?? (isRequestedAsync.value ?? false);
+            final followers = followersAsync.valueOrNull?.length ??
+                (user['followersCount'] as int?) ??
+                0;
+            final following = followingAsync.valueOrNull?.length ??
+                (user['followingCount'] as int?) ??
+                0;
+            // Prefer the real post count (length of the streamed posts) over the
+            // denormalized `postsCount` counter, which can drift — and even go
+            // negative — when create/delete increments are dropped or run
+            // unbalanced. Fall back to the stored counter only until the list
+            // loads, and never display a negative.
+            final storedPostsCount = (user['postsCount'] as int?) ?? 0;
+            final posts =
+                ref.watch(userPostsProvider(widget.uid)).valueOrNull?.length ??
+                    (storedPostsCount < 0 ? 0 : storedPostsCount);
+
+            final isBlocked = isBlockedAsync.value ?? false;
+            final isBlockedBy = isBlockedByAsync.value ?? false;
+
+            // If current user is blocked by target user, or blocked target user
+            final hideContent = isBlocked || isBlockedBy;
+            // If private and not following and not own profile
+            final enforcePrivacy = isPrivate && !isFollowing && !isOwnProfile;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 24),
               child: Column(
                 children: [
-                  Align(
-                    alignment: AlignmentDirectional.topStart,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.pop(context),
+                  UserCoverAvatar(
+                    avatarUrl: avatarUrl,
+                    coverUrl: coverUrl,
+                    isPrivate: isPrivate,
+                    onBack: () => Navigator.pop(context),
+                    showMenu: !isOwnProfile,
+                    onReportTap: () => _reportProfile(
+                      targetUid: widget.uid,
+                      targetUsername: username,
+                      targetAvatar: avatarUrl,
                     ),
+                    onBlockTap: () async {
+                      if (currentUser == null) return;
+                      try {
+                        if (isBlocked) {
+                          await ref.read(blockServiceProvider).unblockUser(
+                                currentUid: currentUser.uid,
+                                targetUid: widget.uid,
+                              );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(context.t.userUnblocked)),
+                            );
+                          }
+                        } else {
+                          await ref.read(blockServiceProvider).blockUser(
+                                currentUid: currentUser.uid,
+                                targetUid: widget.uid,
+                              );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(context.t.userBlocked)),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content:
+                                  Text(context.t.userFailedBlockUnblock(e)),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    isBlocked: isBlocked,
                   ),
-                  Expanded(
-                    child: Center(
-                      child: Text(context.t.userNotFound),
+                  UserNameBio(
+                    username: displayName,
+                    handle: handle,
+                    bio: (user['bio'] as String?) ?? '',
+                    profession: (user['profession'] as String?) ?? '',
+                    educationLevel: (user['academicLevel'] as String?) ?? '',
+                    fieldOfStudy: (user['field'] as String?) ?? '',
+                    isPrivate: isPrivate,
+                  ),
+                  if (!hideContent) ...[
+                    UserStats(
+                      followers: followers,
+                      following: following,
+                      posts: posts,
+                      onFollowersTap: () => _showUserListSheet(
+                        title: context.t.followers,
+                        uids: followersAsync.value ?? const [],
+                      ),
+                      onFollowingTap: () => _showUserListSheet(
+                        title: context.t.following,
+                        uids: followingAsync.value ?? const [],
+                      ),
+                      isPrivateAndNotFollowing: enforcePrivacy,
                     ),
-                  ),
+                    if (!isOwnProfile && !isBlockedBy)
+                      UserButtons(
+                        isFollowing: isFollowing,
+                        isRequested: isRequested,
+                        isPrivate: isPrivate,
+                        onFollowTap: _followBusy
+                            ? () {}
+                            : () => _toggleFollow(
+                                isFollowing, isRequested, isPrivate),
+                        onMessageTap: _messageBusy
+                            ? null
+                            : () => _openMessage(username, avatarUrl ?? ''),
+                      ),
+                    if (enforcePrivacy)
+                      const UserPrivateMessage()
+                    else ...[
+                      UserTabBar(
+                        selectedTab: selectedTab,
+                        onTap: (i) => setState(() => selectedTab = i),
+                      ),
+                      if (selectedTab == 0)
+                        _UserPostsGrid(uid: widget.uid)
+                      else if (selectedTab == 1)
+                        _UserQaActivitySection(uid: widget.uid)
+                      else
+                        _UserRepostsGrid(uid: widget.uid),
+                    ]
+                  ] else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 32),
+                      child: Column(
+                        children: [
+                          Icon(
+                            isBlockedBy
+                                ? Icons.person_off_outlined
+                                : Icons.block,
+                            size: 36,
+                            color: context.textSecondary,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            isBlockedBy
+                                ? context.t.userNotFound
+                                : context.t.userYouBlockedThisUser,
+                            style: TextStyle(
+                                fontSize: 16, color: context.textSecondary),
+                          ),
+                          if (isBlocked && !isBlockedBy) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              context.t.userBlockedContentHidden,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.lock_open, size: 18),
+                                label: Text(context.t.unblock),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFB05ECC),
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  if (currentUser == null) return;
+                                  try {
+                                    await ref
+                                        .read(blockServiceProvider)
+                                        .unblockUser(
+                                          currentUid: currentUser.uid,
+                                          targetUid: widget.uid,
+                                        );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content:
+                                                Text(context.t.userUnblocked)),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              context.t.userFailedUnblock(e)),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );
-          }
-          final username = (user['username'] as String?) ?? context.t.user;
-          final displayName = (user['name'] as String?) ?? username;
-          final handle = (user['handle'] as String?) ?? '@$username';
-          final avatarUrl = user['avatarUrl'] as String?;
-          final coverUrl = user['coverUrl'] as String?;
-          final isPrivate = (user['isPrivate'] as bool?) ?? false;
-          // Merge local overrides with stream values for instant feedback.
-          final isFollowing =
-              _localIsFollowing ?? (isFollowingAsync.value ?? false);
-          final isRequested =
-              _localIsRequested ?? (isRequestedAsync.value ?? false);
-          final followers = followersAsync.valueOrNull?.length ??
-              (user['followersCount'] as int?) ??
-              0;
-          final following = followingAsync.valueOrNull?.length ??
-              (user['followingCount'] as int?) ??
-              0;
-          // Prefer the real post count (length of the streamed posts) over the
-          // denormalized `postsCount` counter, which can drift — and even go
-          // negative — when create/delete increments are dropped or run
-          // unbalanced. Fall back to the stored counter only until the list
-          // loads, and never display a negative.
-          final storedPostsCount = (user['postsCount'] as int?) ?? 0;
-          final posts = ref.watch(userPostsProvider(widget.uid)).valueOrNull?.length ??
-              (storedPostsCount < 0 ? 0 : storedPostsCount);
-
-          final isBlocked = isBlockedAsync.value ?? false;
-          final isBlockedBy = isBlockedByAsync.value ?? false;
-
-          // If current user is blocked by target user, or blocked target user
-          final hideContent = isBlocked || isBlockedBy;
-          // If private and not following and not own profile
-          final enforcePrivacy = isPrivate && !isFollowing && !isOwnProfile;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Column(
-              children: [
-                UserCoverAvatar(
-                  avatarUrl: avatarUrl,
-                  coverUrl: coverUrl,
-                  isPrivate: isPrivate,
-                  onBack: () => Navigator.pop(context),
-                  showMenu: !isOwnProfile,
-                  onReportTap: () => _reportProfile(
-                    targetUid: widget.uid,
-                    targetUsername: username,
-                    targetAvatar: avatarUrl,
-                  ),
-                  onBlockTap: () async {
-                    if (currentUser == null) return;
-                    try {
-                      if (isBlocked) {
-                        await ref.read(blockServiceProvider).unblockUser(
-                              currentUid: currentUser.uid,
-                              targetUid: widget.uid,
-                            );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(context.t.userUnblocked)),
-                          );
-                        }
-                      } else {
-                        await ref.read(blockServiceProvider).blockUser(
-                              currentUid: currentUser.uid,
-                              targetUid: widget.uid,
-                            );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(context.t.userBlocked)),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content:
-                                Text(context.t.userFailedBlockUnblock(e)),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  isBlocked: isBlocked,
-                ),
-                UserNameBio(
-                  username: displayName,
-                  handle: handle,
-                  bio: (user['bio'] as String?) ?? '',
-                  profession: (user['profession'] as String?) ?? '',
-                  educationLevel: (user['academicLevel'] as String?) ?? '',
-                  fieldOfStudy: (user['field'] as String?) ?? '',
-                  isPrivate: isPrivate,
-                ),
-                if (!hideContent) ...[
-                  UserStats(
-                    followers: followers,
-                    following: following,
-                    posts: posts,
-                    onFollowersTap: () => _showUserListSheet(
-                      title: context.t.followers,
-                      uids: followersAsync.value ?? const [],
-                    ),
-                    onFollowingTap: () => _showUserListSheet(
-                      title: context.t.following,
-                      uids: followingAsync.value ?? const [],
-                    ),
-                    isPrivateAndNotFollowing: enforcePrivacy,
-                  ),
-                  if (!isOwnProfile && !isBlockedBy)
-                    UserButtons(
-                      isFollowing: isFollowing,
-                      isRequested: isRequested,
-                      isPrivate: isPrivate,
-                      onFollowTap: _followBusy
-                          ? () {}
-                          : () => _toggleFollow(
-                              isFollowing, isRequested, isPrivate),
-                      onMessageTap: _messageBusy
-                          ? null
-                          : () => _openMessage(username, avatarUrl ?? ''),
-                    ),
-                  if (enforcePrivacy)
-                    const UserPrivateMessage()
-                  else ...[
-                    UserTabBar(
-                      selectedTab: selectedTab,
-                      onTap: (i) => setState(() => selectedTab = i),
-                    ),
-                    if (selectedTab == 0)
-                      _UserPostsGrid(uid: widget.uid)
-                    else if (selectedTab == 1)
-                      _UserQaActivitySection(uid: widget.uid)
-                    else
-                      _UserRepostsGrid(uid: widget.uid),
-                  ]
-                ] else ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 32),
-                    child: Column(
-                      children: [
-                        Icon(
-                          isBlockedBy ? Icons.person_off_outlined : Icons.block,
-                          size: 36,
-                          color: context.textSecondary,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          isBlockedBy
-                              ? context.t.userNotFound
-                              : context.t.userYouBlockedThisUser,
-                          style: TextStyle(
-                              fontSize: 16, color: context.textSecondary),
-                        ),
-                        if (isBlocked && !isBlockedBy) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            context.t.userBlockedContentHidden,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.lock_open, size: 18),
-                              label: Text(context.t.unblock),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFB05ECC),
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-                              onPressed: () async {
-                                if (currentUser == null) return;
-                                try {
-                                  await ref
-                                      .read(blockServiceProvider)
-                                      .unblockUser(
-                                        currentUid: currentUser.uid,
-                                        targetUid: widget.uid,
-                                      );
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content:
-                                              Text(context.t.userUnblocked)),
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                            context.t.userFailedUnblock(e)),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -680,12 +688,10 @@ class _UserPostsGrid extends ConsumerWidget {
       ),
       data: (posts) {
         if (posts.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 60),
-            child: Center(
-              child: Text(context.t.noPosts,
-                  style: TextStyle(color: context.textSecondary)),
-            ),
+          return _EmptyTab(
+            icon: Icons.image_outlined,
+            title: context.t.noPosts,
+            subtitle: context.t.userNoPostsSubtitle,
           );
         }
         return _postsGrid(context, posts);
@@ -712,12 +718,10 @@ class _UserRepostsGrid extends ConsumerWidget {
       ),
       data: (posts) {
         if (posts.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 60),
-            child: Center(
-              child: Text(context.t.profileNoRepostsYet,
-                  style: TextStyle(color: context.textSecondary)),
-            ),
+          return _EmptyTab(
+            icon: Icons.repeat,
+            title: context.t.profileNoRepostsYet,
+            subtitle: context.t.userNoRepostsSubtitle,
           );
         }
         return _postsGrid(context, posts);
@@ -757,16 +761,14 @@ class _UserQaActivitySectionState
         ),
         data: (posts) {
           if (posts.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 60),
-              child: Center(
-                child: Text(
-                  asked
-                      ? context.t.profileNoThreadsStarted
-                      : context.t.profileNoRepliesYet,
-                  style: TextStyle(color: context.textSecondary),
-                ),
-              ),
+            return _EmptyTab(
+              icon: asked ? Icons.help_outline_rounded : Icons.rate_review,
+              title: asked
+                  ? context.t.profileNoThreadsStarted
+                  : context.t.profileNoRepliesYet,
+              subtitle: asked
+                  ? context.t.userNoThreadsSubtitle
+                  : context.t.userNoRepliesSubtitle,
             );
           }
           return ListView.separated(
@@ -916,6 +918,42 @@ class _UserQaInnerTab extends StatelessWidget {
             color: context.textPrimary,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Icon + bold title + subtitle empty state — matches profile_screen.dart's
+/// own `_EmptyTab` treatment so a user's profile looks the same whether
+/// it's yours or someone else's.
+class _EmptyTab extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _EmptyTab({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: context.textMuted),
+          const SizedBox(height: 12),
+          Text(title,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: context.textPrimary)),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.textSecondary, fontSize: 13)),
+        ],
       ),
     );
   }

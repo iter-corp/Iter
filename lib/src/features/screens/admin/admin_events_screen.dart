@@ -133,13 +133,6 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.events),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
@@ -151,113 +144,144 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
             style: const TextStyle(color: Colors.white)),
       ),
       body: AppPageBackground(
-        child: eventsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-          data: (events) {
-            // Build option sets from the actual data so the filter sheet
-            // only ever offers values that exist on real events.
-            final typeOptions = <String>{
-              for (final e in events)
-                if (e.eventType.isNotEmpty) e.eventType,
-            };
-            final countryOptions = <String>{
-              for (final e in events)
-                if (e.country.isNotEmpty) e.country,
-            };
-            final fundingOptions = <String>{
-              for (final e in events)
-                if (e.funds.isNotEmpty) e.funds,
-            };
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.events),
+              centerTitle: false,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            eventsAsync.when<Widget>(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(context.t.errorWithMessage(e))),
+              ),
+              data: (events) {
+                // Build option sets from the actual data so the filter sheet
+                // only ever offers values that exist on real events.
+                final typeOptions = <String>{
+                  for (final e in events)
+                    if (e.eventType.isNotEmpty) e.eventType,
+                };
+                final countryOptions = <String>{
+                  for (final e in events)
+                    if (e.country.isNotEmpty) e.country,
+                };
+                final fundingOptions = <String>{
+                  for (final e in events)
+                    if (e.funds.isNotEmpty) e.funds,
+                };
 
-            // Collect author usernames so search can match by author name.
-            // Watching one provider per author would cause N rebuilds on
-            // every cache fire, so we collect a snapshot once per build.
-            final authorNames = <String, String>{};
-            for (final e in events) {
-              if (e.createdByUid.isEmpty) continue;
-              final doc = ref.watch(userByUidProvider(e.createdByUid)).value;
-              final name = (doc?['username'] as String?)?.trim() ?? '';
-              if (name.isNotEmpty) authorNames[e.createdByUid] = name;
-            }
+                // Collect author usernames so search can match by author name.
+                // Watching one provider per author would cause N rebuilds on
+                // every cache fire, so we collect a snapshot once per build.
+                final authorNames = <String, String>{};
+                for (final e in events) {
+                  if (e.createdByUid.isEmpty) continue;
+                  final doc =
+                      ref.watch(userByUidProvider(e.createdByUid)).value;
+                  final name = (doc?['username'] as String?)?.trim() ?? '';
+                  if (name.isNotEmpty) authorNames[e.createdByUid] = name;
+                }
 
-            final filtered =
-                events.where((e) => _matches(e, authorNames)).toList();
+                final filtered =
+                    events.where((e) => _matches(e, authorNames)).toList();
 
-            return Column(
-              children: [
-                // Search + filter toolbar. Kept above the list so the user
-                // can refine the visible set without scrolling.
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: AppGlassCard(
-                          radius: 16,
-                          padding: EdgeInsets.zero,
-                          child: Theme(
-                            data: Theme.of(context).copyWith(
-                              inputDecorationTheme: const InputDecorationTheme(
-                                filled: false,
-                                fillColor: Colors.transparent,
+                return SliverMainAxisGroup(
+                  slivers: [
+                    // Search + filter toolbar. Kept above the list so the user
+                    // can refine the visible set without scrolling.
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: AppGlassCard(
+                                radius: 16,
+                                padding: EdgeInsets.zero,
+                                child: Theme(
+                                  data: Theme.of(context).copyWith(
+                                    inputDecorationTheme:
+                                        const InputDecorationTheme(
+                                      filled: false,
+                                      fillColor: Colors.transparent,
+                                    ),
+                                  ),
+                                  child: TextField(
+                                    controller: _searchCtrl,
+                                    textInputAction: TextInputAction.search,
+                                    textAlignVertical: TextAlignVertical.center,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      hintText: context.t.adminEventsSearchHint,
+                                      prefixIcon:
+                                          const Icon(Icons.search, size: 20),
+                                      prefixIconConstraints:
+                                          const BoxConstraints(
+                                              minWidth: 48, minHeight: 48),
+                                      suffixIcon: _searchCtrl.text.isEmpty
+                                          ? null
+                                          : IconButton(
+                                              tooltip: context.t.clear,
+                                              icon: const Icon(Icons.close,
+                                                  size: 18),
+                                              onPressed: () =>
+                                                  _searchCtrl.clear(),
+                                            ),
+                                      filled: false,
+                                      fillColor: Colors.transparent,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 14),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            child: TextField(
-                              controller: _searchCtrl,
-                              textInputAction: TextInputAction.search,
-                              textAlignVertical: TextAlignVertical.center,
-                              decoration: InputDecoration(
-                                isDense: true,
-                                hintText: context.t.adminEventsSearchHint,
-                                prefixIcon: const Icon(Icons.search, size: 20),
-                                prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 48, minHeight: 48),
-                                suffixIcon: _searchCtrl.text.isEmpty
-                                    ? null
-                                    : IconButton(
-                                        tooltip: context.t.clear,
-                                        icon: const Icon(Icons.close, size: 18),
-                                        onPressed: () => _searchCtrl.clear(),
-                                      ),
-                                filled: false,
-                                fillColor: Colors.transparent,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
+                            const SizedBox(width: 8),
+                            _FilterChipButton(
+                              activeCount: _activeFilterCount,
+                              onTap: () => _openFilterSheet(
+                                typeOptions: typeOptions,
+                                countryOptions: countryOptions,
+                                fundingOptions: fundingOptions,
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _FilterChipButton(
-                        activeCount: _activeFilterCount,
-                        onTap: () => _openFilterSheet(
-                          typeOptions: typeOptions,
-                          countryOptions: countryOptions,
-                          fundingOptions: fundingOptions,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: filtered.isEmpty
-                      ? Center(
+                    ),
+                    if (filtered.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
                           child: Text(
                             events.isEmpty
                                 ? context.t.adminNoEventsYet
                                 : context.t.adminNoResults,
                             style: TextStyle(color: context.textSecondary),
                           ),
-                        )
-                      : ListView.builder(
-                          padding:
-                              EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding:
+                            EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
+                        sliver: SliverList.builder(
                           itemCount: filtered.length,
                           itemBuilder: (_, i) {
                             final e = filtered[i];
@@ -325,10 +349,12 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
                             );
                           },
                         ),
-                ),
-              ],
-            );
-          },
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -887,252 +913,268 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
     }.toList();
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(isNew ? context.t.adminNewEvent : context.t.adminEditEvent),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        actions: [
-          TextButton(
-            onPressed: _saving
-                ? null
-                : () {
-                    if (_formKey.currentState?.validate() ?? false) {
-                      _save();
-                    }
-                  },
-            child: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(context.t.save),
-          ),
-        ],
-      ),
       body: AppPageBackground(
         child: Form(
           key: _formKey,
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset + 12),
-            children: [
-              _refinedField(
-                label: context.t.adminFieldTitle,
-                controller: _titleCtrl,
-                maxLength: 50,
-                required: false,
-                errorText: _titleError,
-                textInputAction: TextInputAction.next,
-                onChanged: (v) {
-                  if (_titleError != null && v.trim().isNotEmpty) {
-                    setState(() => _titleError = null);
-                  }
-                },
-              ),
-              _refinedField(
-                label: context.t.adminFieldSubtitle,
-                controller: _subtitleCtrl,
-                maxLength: 50,
-                textInputAction: TextInputAction.next,
-              ),
-              _SearchablePickerField(
-                placeholder: context.t.adminFieldEventType,
-                sheetTitle: context.t.adminChooseEventType,
-                searchHint: context.t.adminSearchEventType,
-                options: typeOptions,
-                selected: _eventType.isEmpty ? null : _eventType,
-                onChanged: (v) {
-                  setState(() {
-                    _eventType = v;
-                    _eventTypeError = null;
-                  });
-                },
-              ),
-              if (_eventTypeError != null) _FieldError(text: _eventTypeError!),
-              _SearchablePickerField(
-                placeholder: context.t.adminFieldCountry,
-                sheetTitle: context.t.adminChooseCountry,
-                searchHint: context.t.adminSearchCountry,
-                options: countryOptions,
-                selected: _country.isEmpty ? null : _country,
-                onChanged: (v) {
-                  setState(() {
-                    if (v != _country) _city = '';
-                    _country = v;
-                    _countryError = null;
-                  });
-                },
-              ),
-              if (_countryError != null) _FieldError(text: _countryError!),
-              // City picker — only meaningful once a country is picked. The
-              // option list is derived from `worldCitiesProvider` filtered
-              // down to cities whose `countryName` matches the chosen
-              // country. Optional: leaving it empty stores just the country.
-              Consumer(
-                builder: (context, ref, _) {
-                  final hasCountry = _country.trim().isNotEmpty;
-                  final citiesAsync = ref.watch(worldCitiesProvider);
-                  if (!hasCountry) {
-                    return _SearchablePickerField(
-                      placeholder: context.t.adminCityPickCountryFirst,
-                      sheetTitle: context.t.adminChooseCity,
-                      searchHint: context.t.adminSearchCity,
-                      options: const [],
-                      selected: null,
-                      enabled: false,
-                      onChanged: (_) {},
-                    );
-                  }
-                  if (citiesAsync.isLoading) {
-                    return _SearchablePickerField(
-                      placeholder: context.t.cityPickerLoading,
-                      sheetTitle: context.t.adminChooseCity,
-                      searchHint: context.t.adminSearchCity,
-                      options: const [],
-                      selected: _city.isEmpty ? null : _city,
-                      enabled: false,
-                      onChanged: (_) {},
-                    );
-                  }
-                  final cities = citiesAsync.value ?? const <CityOption>[];
-                  final selectedCountry = normalizeCitySearch(_country);
-                  final cityOptions = cities
-                      .where((c) =>
-                          normalizeCitySearch(c.countryName) == selectedCountry)
-                      .map((c) => c.name)
-                      .toSet()
-                      .toList()
-                    ..sort();
-                  return _SearchablePickerField(
-                    placeholder: context.t.adminFieldCity,
-                    sheetTitle: context.t.adminChooseCity,
-                    searchHint: context.t.adminSearchCity,
-                    options: cityOptions,
-                    selected: _city.isEmpty ? null : _city,
-                    onChanged: (v) => setState(() => _city = v),
-                  );
-                },
-              ),
-              _SearchablePickerField(
-                placeholder: context.t.adminEventsFundsPlaceholder,
-                sheetTitle: context.t.adminEventsFundsSheetTitle,
-                searchHint: context.t.adminEventsFundsSearchHint,
-                options: fundsOptions,
-                selected: _funds.isEmpty ? null : _funds,
-                enableSearch: false,
-                onChanged: (v) {
-                  setState(() {
-                    _funds = v;
-                    _fundsError = null;
-                  });
-                },
-              ),
-              if (_fundsError != null) _FieldError(text: _fundsError!),
-              _DeadlineField(
-                deadlineAt: _deadlineAt,
-                onPick: _pickDeadline,
-                onClear: _deadlineAt == null
-                    ? null
-                    : () => setState(() => _deadlineAt = null),
-              ),
-              _refinedField(
-                label: context.t.adminFieldDescription,
-                controller: _descCtrl,
-                maxLines: 4,
-                required: false,
-                errorText: _descError,
-                textInputAction: TextInputAction.newline,
-                onChanged: (v) {
-                  if (_descError != null && v.trim().isNotEmpty) {
-                    setState(() => _descError = null);
-                  }
-                },
-              ),
-              _refinedField(
-                label: context.t.adminFieldLink,
-                controller: _linkCtrl,
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-              ),
-              _refinedField(
-                label: context.t.adminFieldPhone,
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-              ),
-              _refinedField(
-                label: context.t.adminFieldEmail,
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(context.t.adminFieldImages,
-                      style: TextStyle(
-                          color: context.textSecondary,
-                          fontWeight: FontWeight.w600)),
-                  const Text(' *',
-                      style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.w700)),
-                ],
-              ),
-              if (_imagesError != null) _FieldError(text: _imagesError!),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ..._imageUrls.map((u) => Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: CachedNetworkImage(
-                              imageUrl: u,
-                              width: 86,
-                              height: 86,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          Positioned(
-                            top: 2,
-                            right: 2,
-                            child: GestureDetector(
-                              onTap: () => setState(() => _imageUrls.remove(u)),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                padding: const EdgeInsets.all(3),
-                                child: const Icon(Icons.close,
-                                    size: 14, color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )),
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: AppGlassCard(
-                      width: 86,
-                      height: 86,
-                      radius: 10,
-                      child: _uploadingImage
-                          ? const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(Icons.add_a_photo_outlined,
-                              color: context.textSecondary),
-                    ),
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                title: Text(
+                    isNew ? context.t.adminNewEvent : context.t.adminEditEvent),
+                centerTitle: false,
+                backgroundColor: Colors.transparent,
+                foregroundColor: context.textPrimary,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                floating: true,
+                snap: true,
+                actions: [
+                  TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () {
+                            if (_formKey.currentState?.validate() ?? false) {
+                              _save();
+                            }
+                          },
+                    child: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(context.t.save),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset + 12),
+                sliver: SliverList.list(
+                  children: [
+                    _refinedField(
+                      label: context.t.adminFieldTitle,
+                      controller: _titleCtrl,
+                      maxLength: 50,
+                      required: false,
+                      errorText: _titleError,
+                      textInputAction: TextInputAction.next,
+                      onChanged: (v) {
+                        if (_titleError != null && v.trim().isNotEmpty) {
+                          setState(() => _titleError = null);
+                        }
+                      },
+                    ),
+                    _refinedField(
+                      label: context.t.adminFieldSubtitle,
+                      controller: _subtitleCtrl,
+                      maxLength: 50,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    _SearchablePickerField(
+                      placeholder: context.t.adminFieldEventType,
+                      sheetTitle: context.t.adminChooseEventType,
+                      searchHint: context.t.adminSearchEventType,
+                      options: typeOptions,
+                      selected: _eventType.isEmpty ? null : _eventType,
+                      onChanged: (v) {
+                        setState(() {
+                          _eventType = v;
+                          _eventTypeError = null;
+                        });
+                      },
+                    ),
+                    if (_eventTypeError != null)
+                      _FieldError(text: _eventTypeError!),
+                    _SearchablePickerField(
+                      placeholder: context.t.adminFieldCountry,
+                      sheetTitle: context.t.adminChooseCountry,
+                      searchHint: context.t.adminSearchCountry,
+                      options: countryOptions,
+                      selected: _country.isEmpty ? null : _country,
+                      onChanged: (v) {
+                        setState(() {
+                          if (v != _country) _city = '';
+                          _country = v;
+                          _countryError = null;
+                        });
+                      },
+                    ),
+                    if (_countryError != null)
+                      _FieldError(text: _countryError!),
+                    // City picker — only meaningful once a country is picked. The
+                    // option list is derived from `worldCitiesProvider` filtered
+                    // down to cities whose `countryName` matches the chosen
+                    // country. Optional: leaving it empty stores just the country.
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final hasCountry = _country.trim().isNotEmpty;
+                        final citiesAsync = ref.watch(worldCitiesProvider);
+                        if (!hasCountry) {
+                          return _SearchablePickerField(
+                            placeholder: context.t.adminCityPickCountryFirst,
+                            sheetTitle: context.t.adminChooseCity,
+                            searchHint: context.t.adminSearchCity,
+                            options: const [],
+                            selected: null,
+                            enabled: false,
+                            onChanged: (_) {},
+                          );
+                        }
+                        if (citiesAsync.isLoading) {
+                          return _SearchablePickerField(
+                            placeholder: context.t.cityPickerLoading,
+                            sheetTitle: context.t.adminChooseCity,
+                            searchHint: context.t.adminSearchCity,
+                            options: const [],
+                            selected: _city.isEmpty ? null : _city,
+                            enabled: false,
+                            onChanged: (_) {},
+                          );
+                        }
+                        final cities =
+                            citiesAsync.value ?? const <CityOption>[];
+                        final selectedCountry = normalizeCitySearch(_country);
+                        final cityOptions = cities
+                            .where((c) =>
+                                normalizeCitySearch(c.countryName) ==
+                                selectedCountry)
+                            .map((c) => c.name)
+                            .toSet()
+                            .toList()
+                          ..sort();
+                        return _SearchablePickerField(
+                          placeholder: context.t.adminFieldCity,
+                          sheetTitle: context.t.adminChooseCity,
+                          searchHint: context.t.adminSearchCity,
+                          options: cityOptions,
+                          selected: _city.isEmpty ? null : _city,
+                          onChanged: (v) => setState(() => _city = v),
+                        );
+                      },
+                    ),
+                    _SearchablePickerField(
+                      placeholder: context.t.adminEventsFundsPlaceholder,
+                      sheetTitle: context.t.adminEventsFundsSheetTitle,
+                      searchHint: context.t.adminEventsFundsSearchHint,
+                      options: fundsOptions,
+                      selected: _funds.isEmpty ? null : _funds,
+                      enableSearch: false,
+                      onChanged: (v) {
+                        setState(() {
+                          _funds = v;
+                          _fundsError = null;
+                        });
+                      },
+                    ),
+                    if (_fundsError != null) _FieldError(text: _fundsError!),
+                    _DeadlineField(
+                      deadlineAt: _deadlineAt,
+                      onPick: _pickDeadline,
+                      onClear: _deadlineAt == null
+                          ? null
+                          : () => setState(() => _deadlineAt = null),
+                    ),
+                    _refinedField(
+                      label: context.t.adminFieldDescription,
+                      controller: _descCtrl,
+                      maxLines: 4,
+                      required: false,
+                      errorText: _descError,
+                      textInputAction: TextInputAction.newline,
+                      onChanged: (v) {
+                        if (_descError != null && v.trim().isNotEmpty) {
+                          setState(() => _descError = null);
+                        }
+                      },
+                    ),
+                    _refinedField(
+                      label: context.t.adminFieldLink,
+                      controller: _linkCtrl,
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    _refinedField(
+                      label: context.t.adminFieldPhone,
+                      controller: _phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    _refinedField(
+                      label: context.t.adminFieldEmail,
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(context.t.adminFieldImages,
+                            style: TextStyle(
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.w600)),
+                        const Text(' *',
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                    if (_imagesError != null) _FieldError(text: _imagesError!),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ..._imageUrls.map((u) => Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: CachedNetworkImage(
+                                    imageUrl: u,
+                                    width: 86,
+                                    height: 86,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 2,
+                                  right: 2,
+                                  child: GestureDetector(
+                                    onTap: () =>
+                                        setState(() => _imageUrls.remove(u)),
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      padding: const EdgeInsets.all(3),
+                                      child: const Icon(Icons.close,
+                                          size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )),
+                        GestureDetector(
+                          onTap: _pickImage,
+                          child: AppGlassCard(
+                            width: 86,
+                            height: 86,
+                            radius: 10,
+                            child: _uploadingImage
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Icon(Icons.add_a_photo_outlined,
+                                    color: context.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1188,12 +1230,14 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                      color: field.hasError ? AppColors.red : context.borderColor),
+                      color:
+                          field.hasError ? AppColors.red : context.borderColor),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                      color: field.hasError ? AppColors.red : context.borderColor),
+                      color:
+                          field.hasError ? AppColors.red : context.borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1201,8 +1245,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                       color: field.hasError ? AppColors.red : AppColors.purple,
                       width: 1.6),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 16),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 counterText: maxLength != null ? '' : null,
               ),
             ),

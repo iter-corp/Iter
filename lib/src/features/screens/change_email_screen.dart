@@ -120,102 +120,111 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.changeEmail),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        actions: [
-          TextButton(
-            onPressed: _busy ? null : _save,
-            child: _loading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    context.t.save,
-                    style: const TextStyle(color: AppColors.purple),
-                  ),
-          ),
-        ],
-      ),
       body: AppPageBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-                20, 20, 20, 24 + MediaQuery.of(context).padding.bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppGlassCard(
-                  radius: 16,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    decoration:
-                        _fieldDecoration(label: context.t.settingsNewEmail),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                AppGlassCard(
-                  radius: 16,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
-                    controller: _passCtrl,
-                    obscureText: _obscure,
-                    autofillHints: const [AutofillHints.password],
-                    decoration: _fieldDecoration(
-                      label: context.t.settingsCurrentPassword,
-                      suffix: IconButton(
-                        icon: Icon(
-                            _obscure ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.purple,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: _busy ? null : _save,
-                    child: _loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            context.t.save,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                  ),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.changeEmail),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+              actions: [
+                TextButton(
+                  onPressed: _busy ? null : _save,
+                  child: _loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          context.t.save,
+                          style: const TextStyle(color: AppColors.purple),
+                        ),
                 ),
               ],
             ),
-          ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                  20, 20, 20, 24 + MediaQuery.of(context).padding.bottom),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AppGlassCard(
+                      radius: 16,
+                      padding: EdgeInsets.zero,
+                      child: TextField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                        decoration:
+                            _fieldDecoration(label: context.t.settingsNewEmail),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    AppGlassCard(
+                      radius: 16,
+                      padding: EdgeInsets.zero,
+                      child: TextField(
+                        controller: _passCtrl,
+                        obscureText: _obscure,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: _fieldDecoration(
+                          label: context.t.settingsCurrentPassword,
+                          suffix: IconButton(
+                            icon: Icon(_obscure
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.purple,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: _busy ? null : _save,
+                        child: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                context.t.save,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

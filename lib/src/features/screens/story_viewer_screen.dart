@@ -201,8 +201,8 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
 
   void _updateReplyPauseState() {
     if (!mounted) return;
-    final composing = _commentFocusNode.hasFocus ||
-        _commentController.text.isNotEmpty;
+    final composing =
+        _commentFocusNode.hasFocus || _commentController.text.isNotEmpty;
     if (composing) {
       // Reset progress to 0 so the user gets the full 5s window once
       // they're done typing, rather than the story snapping to the next
@@ -397,9 +397,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       // independent animation timer for video stories, so the bar
       // can't drift or race the video.
       await _waitForVideoReady(token);
-      if (!mounted ||
-          _loadingForStoryId != story.id ||
-          token != _navToken) {
+      if (!mounted || _loadingForStoryId != story.id || token != _navToken) {
         return;
       }
       _progress.stop();
@@ -417,9 +415,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
       // Fall through — still start the timer so the viewer never
       // locks up if precache fails.
     }
-    if (!mounted ||
-        _loadingForStoryId != story.id ||
-        token != _navToken) {
+    if (!mounted || _loadingForStoryId != story.id || token != _navToken) {
       return;
     }
     // Images use the fixed 5s tick.
@@ -620,8 +616,8 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     );
   }
 
-  Future<void> _sendStoryToChat(
-      Story story, String chatId, String otherUid, String recipientTitle) async {
+  Future<void> _sendStoryToChat(Story story, String chatId, String otherUid,
+      String recipientTitle) async {
     final me = _currentUid;
     if (me == null) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -909,313 +905,319 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                 _next();
               }
             },
-          onLongPressStart: (_) {
-            _progress.stop();
-            // Notify the video player (if any) so it pauses in sync.
-            _longPressPaused.value = true;
-          },
-          onLongPressEnd: (_) {
-            _longPressPaused.value = false;
-            _resumeProgress();
-          },
-          onVerticalDragEnd: (details) {
-            if ((details.primaryVelocity ?? 0) > 200) {
-              _close();
-            }
-          },
-          onHorizontalDragEnd: (details) {
-            // Block group swipes while the keyboard is open / user is
-            // composing a reply — same rule as tap-to-advance. Otherwise
-            // a slight horizontal motion while reaching for the keyboard
-            // could yank them off the story.
-            final keyboardVisible =
-                MediaQuery.of(context).viewInsets.bottom > 0;
-            if (keyboardVisible ||
-                _commentFocusNode.hasFocus ||
-                _commentController.text.isNotEmpty) {
-              return;
-            }
-            // Swipe semantics: leading-direction swipe = next group,
-            // trailing-direction swipe = previous group. Velocity sign
-            // is unaffected by Directionality, so flip the mapping in
-            // RTL to match the user's mental model.
-            final v = details.primaryVelocity ?? 0;
-            final swipedToNext = isRtl ? v > 200 : v < -200;
-            final swipedToPrev = isRtl ? v < -200 : v > 200;
-            if (swipedToNext) {
-              _nextGroup();
-            } else if (swipedToPrev) {
-              _prevGroup();
-            }
-          },
-          child: SafeArea(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  // AnimatedSwitcher fades the previous story out and
-                  // the new one in whenever the keyed story changes.
-                  // The slide direction depends on whether we're
-                  // crossing into a new author (horizontal slide) or
-                  // just advancing within the same author (subtle
-                  // zoom/fade) — gives the user a felt difference
-                  // between "next story" and "next person".
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 280),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    transitionBuilder: (child, anim) {
-                      // Parse the group index out of the child's key and
-                      // compare against the previous group (captured in
-                      // `_lastGroupIndexForAnim`, which is updated on
-                      // the next frame so this read still sees the old
-                      // value during the transition). Author-to-author
-                      // crossings get a horizontal slide; same-author
-                      // advance gets a subtle fade+scale so the user
-                      // feels which kind of jump happened.
-                      int? childGroup;
-                      final k = child.key;
-                      if (k is ValueKey<String>) {
-                        final match = RegExp(r'^group-(-?\d+)/')
-                            .firstMatch(k.value);
-                        if (match != null) {
-                          childGroup = int.tryParse(match.group(1)!);
+            onLongPressStart: (_) {
+              _progress.stop();
+              // Notify the video player (if any) so it pauses in sync.
+              _longPressPaused.value = true;
+            },
+            onLongPressEnd: (_) {
+              _longPressPaused.value = false;
+              _resumeProgress();
+            },
+            onVerticalDragEnd: (details) {
+              if ((details.primaryVelocity ?? 0) > 200) {
+                _close();
+              }
+            },
+            onHorizontalDragEnd: (details) {
+              // Block group swipes while the keyboard is open / user is
+              // composing a reply — same rule as tap-to-advance. Otherwise
+              // a slight horizontal motion while reaching for the keyboard
+              // could yank them off the story.
+              final keyboardVisible =
+                  MediaQuery.of(context).viewInsets.bottom > 0;
+              if (keyboardVisible ||
+                  _commentFocusNode.hasFocus ||
+                  _commentController.text.isNotEmpty) {
+                return;
+              }
+              // Swipe semantics: leading-direction swipe = next group,
+              // trailing-direction swipe = previous group. Velocity sign
+              // is unaffected by Directionality, so flip the mapping in
+              // RTL to match the user's mental model.
+              final v = details.primaryVelocity ?? 0;
+              final swipedToNext = isRtl ? v > 200 : v < -200;
+              final swipedToPrev = isRtl ? v < -200 : v > 200;
+              if (swipedToNext) {
+                _nextGroup();
+              } else if (swipedToPrev) {
+                _prevGroup();
+              }
+            },
+            child: SafeArea(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    // AnimatedSwitcher fades the previous story out and
+                    // the new one in whenever the keyed story changes.
+                    // The slide direction depends on whether we're
+                    // crossing into a new author (horizontal slide) or
+                    // just advancing within the same author (subtle
+                    // zoom/fade) — gives the user a felt difference
+                    // between "next story" and "next person".
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, anim) {
+                        // Parse the group index out of the child's key and
+                        // compare against the previous group (captured in
+                        // `_lastGroupIndexForAnim`, which is updated on
+                        // the next frame so this read still sees the old
+                        // value during the transition). Author-to-author
+                        // crossings get a horizontal slide; same-author
+                        // advance gets a subtle fade+scale so the user
+                        // feels which kind of jump happened.
+                        int? childGroup;
+                        final k = child.key;
+                        if (k is ValueKey<String>) {
+                          final match =
+                              RegExp(r'^group-(-?\d+)/').firstMatch(k.value);
+                          if (match != null) {
+                            childGroup = int.tryParse(match.group(1)!);
+                          }
                         }
-                      }
-                      final isNewAuthor = childGroup != null &&
-                          _lastGroupIndexForAnim != -1 &&
-                          childGroup != _lastGroupIndexForAnim;
-                      if (isNewAuthor) {
-                        final slide = Tween<Offset>(
-                          begin: const Offset(0.18, 0),
-                          end: Offset.zero,
-                        ).animate(anim);
+                        final isNewAuthor = childGroup != null &&
+                            _lastGroupIndexForAnim != -1 &&
+                            childGroup != _lastGroupIndexForAnim;
+                        if (isNewAuthor) {
+                          final slide = Tween<Offset>(
+                            begin: const Offset(0.18, 0),
+                            end: Offset.zero,
+                          ).animate(anim);
+                          return FadeTransition(
+                            opacity: anim,
+                            child:
+                                SlideTransition(position: slide, child: child),
+                          );
+                        }
+                        final scale =
+                            Tween<double>(begin: 1.04, end: 1.0).animate(anim);
                         return FadeTransition(
                           opacity: anim,
-                          child: SlideTransition(
-                              position: slide, child: child),
+                          child: ScaleTransition(scale: scale, child: child),
                         );
-                      }
-                      final scale = Tween<double>(begin: 1.04, end: 1.0)
-                          .animate(anim);
-                      return FadeTransition(
-                        opacity: anim,
-                        child: ScaleTransition(scale: scale, child: child),
-                      );
-                    },
-                    child: KeyedSubtree(
-                      // The combined key changes both on story id and on
-                      // group, so AnimatedSwitcher triggers a transition
-                      // for either kind of advance.
-                      key: ValueKey<String>(
-                          'group-$_groupIndex/story-${story.id}'),
-                      child: _buildStoryBody(story),
+                      },
+                      child: KeyedSubtree(
+                        // The combined key changes both on story id and on
+                        // group, so AnimatedSwitcher triggers a transition
+                        // for either kind of advance.
+                        key: ValueKey<String>(
+                            'group-$_groupIndex/story-${story.id}'),
+                        child: _buildStoryBody(story),
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  right: 8,
-                  child: Row(
-                    children: List.generate(_stories.length, (i) {
-                      return Expanded(
-                        child: Container(
-                          height: 2.5,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: Stack(
-                              children: [
-                                Container(
-                                  color: Colors.white.withValues(alpha: 0.35),
-                                ),
-                                i < _index ? Container(color: Colors.white) : i == _index ? AnimatedBuilder(
-                                  animation: _progress,
-                                  builder: (context, _) =>
-                                      FractionallySizedBox(
-                                    alignment: AlignmentDirectional.centerStart,
-                                    widthFactor: _progress.value,
-                                    child: Container(color: Colors.white),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    right: 8,
+                    child: Row(
+                      children: List.generate(_stories.length, (i) {
+                        return Expanded(
+                          child: Container(
+                            height: 2.5,
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    color: Colors.white.withValues(alpha: 0.35),
                                   ),
-                                ) : const SizedBox.shrink(),
+                                  i < _index
+                                      ? Container(color: Colors.white)
+                                      : i == _index
+                                          ? AnimatedBuilder(
+                                              animation: _progress,
+                                              builder: (context, _) =>
+                                                  FractionallySizedBox(
+                                                alignment: AlignmentDirectional
+                                                    .centerStart,
+                                                widthFactor: _progress.value,
+                                                child: Container(
+                                                    color: Colors.white),
+                                              ),
+                                            )
+                                          : const SizedBox.shrink(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  Positioned(
+                    top: 20,
+                    left: 12,
+                    right: 12,
+                    child: Row(
+                      children: [
+                        // Author block: avatar + username on top, timestamp
+                        // stacked underneath. Tap opens the author profile.
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _openAuthorProfile(story.authorUid),
+                            child: Row(
+                              children: [
+                                Hero(
+                                  tag: 'story_avatar_${story.authorUid}',
+                                  child: CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: Colors.grey.shade700,
+                                    backgroundImage: avatarUrl != null
+                                        ? CachedNetworkImageProvider(avatarUrl)
+                                        : null,
+                                    child: avatarUrl == null
+                                        ? const Icon(
+                                            Icons.person,
+                                            size: 18,
+                                            color: Colors.white70,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        username,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        context.t.timeAgo(story.createdAt),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.75),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ),
-                      );
-                    }),
-                  ),
-                ),
-                Positioned(
-                  top: 20,
-                  left: 12,
-                  right: 12,
-                  child: Row(
-                    children: [
-                      // Author block: avatar + username on top, timestamp
-                      // stacked underneath. Tap opens the author profile.
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => _openAuthorProfile(story.authorUid),
-                          child: Row(
-                            children: [
-                              Hero(
-                                tag: 'story_avatar_${story.authorUid}',
-                                child: CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: Colors.grey.shade700,
-                                  backgroundImage: avatarUrl != null
-                                      ? CachedNetworkImageProvider(avatarUrl)
-                                      : null,
-                                  child: avatarUrl == null
-                                      ? const Icon(
-                                          Icons.person,
-                                          size: 18,
-                                          color: Colors.white70,
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      username,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      context.t.timeAgo(story.createdAt),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.75),
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                        IconButton(
+                          onPressed: () => _openShareSheet(story),
+                          tooltip: context.t.share,
+                          icon: const Icon(
+                            Icons.ios_share,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _openShareSheet(story),
-                        tooltip: context.t.share,
-                        icon: const Icon(
-                          Icons.ios_share,
-                          color: Colors.white,
-                        ),
-                      ),
-                      // Own stories show a direct trash icon — no overflow
-                      // menu, no Close item. Back gesture / swipe down
-                      // closes the viewer. Wears the same translucent
-                      // black pill chrome as the views counter so the
-                      // header reads as one design system.
-                      if (isOwnStory)
-                        GestureDetector(
-                          onTap: _deleteCurrentStory,
-                          behavior: HitTestBehavior.opaque,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.15),
+                        // Own stories show a direct trash icon — no overflow
+                        // menu, no Close item. Back gesture / swipe down
+                        // closes the viewer. Wears the same translucent
+                        // black pill chrome as the views counter so the
+                        // header reads as one design system.
+                        if (isOwnStory)
+                          GestureDetector(
+                            onTap: _deleteCurrentStory,
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline,
+                                color: Color(0xFFEF476F),
+                                size: 20,
                               ),
                             ),
-                            child: const Icon(
-                              Icons.delete_outline,
-                              color: Color(0xFFEF476F),
-                              size: 20,
-                            ),
                           ),
-                        ),
-                      // Always-available close button. Lives in the header
-                      // (above the media + any loading spinner), so the user
-                      // can leave the viewer even while a story is still
-                      // loading — same exit as the swipe-down gesture.
-                      const SizedBox(width: 4),
-                      IconButton(
-                        onPressed: _close,
-                        tooltip: context.t.close,
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // The old floating heart-like + comment-count column used to
-                // sit at bottom+100 and overlapped the new reactions strip,
-                // hiding all reactions except the heart. We merged the
-                // story-level like into the reactions row (tap ❤️ both
-                // toggles the story like AND DMs the author), so this
-                // floating column is no longer needed.
-                // Comment input
-                Positioned(
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                  left: 16,
-                  right: 16,
-                  child: _currentUid == null
-                      ? _StorySignInBanner()
-                      : isOwnStory
-                          ? const SizedBox.shrink()
-                          : _StoryReplyComposer(
-                              controller: _commentController,
-                              focusNode: _commentFocusNode,
-                              sending: _sendingComment,
-                              storyId: story.id,
-                              service: _storyService,
-                              onSend: _addComment,
-                              onHeartTap: () => _toggleLike(),
-                            ),
-                ),
-                if (isOwnStory)
-                  Positioned(
-                    // Own stories have no reply composer, so the pills sit
-                    // at the same low offset the composer would use.
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                    left: 16,
-                    right: 16,
-                    child: Row(
-                      children: [
-                        _ViewsPill(
-                          storyId: story.id,
-                          service: _storyService,
-                          onTap: () => _showViewersSheet(story.id),
-                        ),
-                        const SizedBox(width: 8),
-                        _LikesPill(
-                          storyId: story.id,
-                          service: _storyService,
-                          onTap: () => _showLikersSheet(story.id),
+                        // Always-available close button. Lives in the header
+                        // (above the media + any loading spinner), so the user
+                        // can leave the viewer even while a story is still
+                        // loading — same exit as the swipe-down gesture.
+                        const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: _close,
+                          tooltip: context.t.close,
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
                   ),
-              ],
+                  // The old floating heart-like + comment-count column used to
+                  // sit at bottom+100 and overlapped the new reactions strip,
+                  // hiding all reactions except the heart. We merged the
+                  // story-level like into the reactions row (tap ❤️ both
+                  // toggles the story like AND DMs the author), so this
+                  // floating column is no longer needed.
+                  // Comment input
+                  Positioned(
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    left: 16,
+                    right: 16,
+                    child: _currentUid == null
+                        ? _StorySignInBanner()
+                        : isOwnStory
+                            ? const SizedBox.shrink()
+                            : _StoryReplyComposer(
+                                controller: _commentController,
+                                focusNode: _commentFocusNode,
+                                sending: _sendingComment,
+                                storyId: story.id,
+                                service: _storyService,
+                                onSend: _addComment,
+                                onHeartTap: () => _toggleLike(),
+                              ),
+                  ),
+                  if (isOwnStory)
+                    Positioned(
+                      // Own stories have no reply composer, so the pills sit
+                      // at the same low offset the composer would use.
+                      bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                      left: 16,
+                      right: 16,
+                      child: Row(
+                        children: [
+                          _ViewsPill(
+                            storyId: story.id,
+                            service: _storyService,
+                            onTap: () => _showViewersSheet(story.id),
+                          ),
+                          const SizedBox(width: 8),
+                          _LikesPill(
+                            storyId: story.id,
+                            service: _storyService,
+                            onTap: () => _showLikersSheet(story.id),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -1566,7 +1568,8 @@ class _ViewersSheet extends ConsumerWidget {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
                         final v = viewers[i];
-                        final userData = ref.watch(userByUidProvider(v.uid)).value;
+                        final userData =
+                            ref.watch(userByUidProvider(v.uid)).value;
                         final avatarUrl = userData?['avatarUrl'] as String?;
                         final username =
                             userData?['username'] as String? ?? v.username;
@@ -1750,16 +1753,14 @@ class _StoryReplyComposer extends StatelessWidget {
                           end: Alignment.bottomRight,
                           colors: [Color(0xFFCE5DE5), Color(0xFFB05ECC)],
                         ),
-                  color: sending
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : null,
+                  color: sending ? Colors.white.withValues(alpha: 0.15) : null,
                   shape: BoxShape.circle,
                   boxShadow: sending
                       ? const []
                       : [
                           BoxShadow(
-                            color: const Color(0xFFB05ECC)
-                                .withValues(alpha: 0.45),
+                            color:
+                                const Color(0xFFB05ECC).withValues(alpha: 0.45),
                             blurRadius: 10,
                             offset: const Offset(0, 3),
                           ),
@@ -1983,11 +1984,11 @@ class _SharedPostCard extends StatelessWidget {
                           post.authorAvatar!.isNotEmpty)
                       ? CachedNetworkImageProvider(post.authorAvatar!)
                       : null,
-                  child: (post.authorAvatar == null ||
-                          post.authorAvatar!.isEmpty)
-                      ? Icon(Icons.person,
-                          size: 16, color: context.textSecondary)
-                      : null,
+                  child:
+                      (post.authorAvatar == null || post.authorAvatar!.isEmpty)
+                          ? Icon(Icons.person,
+                              size: 16, color: context.textSecondary)
+                          : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2091,8 +2092,8 @@ class _StoryShareSheet extends ConsumerWidget {
   final Story story;
   final Future<void> Function() onAddToMyStory;
   final Future<void> Function() onShareExternally;
-  final Future<void> Function(
-      String chatId, String otherUid, String title) onSendToChat;
+  final Future<void> Function(String chatId, String otherUid, String title)
+      onSendToChat;
 
   const _StoryShareSheet({
     required this.story,
@@ -2178,17 +2179,15 @@ class _StoryShareSheet extends ConsumerWidget {
                       }
                       return ListView.separated(
                         controller: scrollController,
-                        padding:
-                            const EdgeInsets.fromLTRB(14, 10, 14, 16),
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
                         itemCount: chats.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, i) {
                           final c = chats[i];
                           final title =
                               c.isGroup ? c.groupName : c.otherUsername;
-                          final avatar = c.isGroup
-                              ? c.groupAvatarUrl
-                              : c.otherAvatarUrl;
+                          final avatar =
+                              c.isGroup ? c.groupAvatarUrl : c.otherAvatarUrl;
                           return _StoryShareRecipientCard(
                             avatarUrl: avatar,
                             title: title,
@@ -2346,8 +2345,8 @@ class _StoryShareRecipientCard extends StatelessWidget {
               GestureDetector(
                 onTap: onSend,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFB05ECC), Color(0xFF7E3BE8)],
@@ -2357,8 +2356,7 @@ class _StoryShareRecipientCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            const Color(0xFFB05ECC).withValues(alpha: 0.35),
+                        color: const Color(0xFFB05ECC).withValues(alpha: 0.35),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -2604,8 +2602,7 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
       // (and, after the first wraparound, the codec surface ended up in
       // a bad state showing a black frame). End-of-window is detected in
       // [_onTick] which fires [onCompleted] exactly once.
-      final hasTrim =
-          widget.trimStart != null || widget.trimEnd != null;
+      final hasTrim = widget.trimStart != null || widget.trimEnd != null;
       await c.setLooping(false);
       // Pick a seek target: the explicit resume position from the
       // lifecycle handler wins; otherwise honor the trim start.

@@ -57,9 +57,8 @@ class _EventNotificationsSettingsScreenState
 
   void _toggleType(String t, int totalTypes) {
     final has = _prefs.types.contains(t);
-    final next = has
-        ? _prefs.types.where((x) => x != t).toList()
-        : [..._prefs.types, t];
+    final next =
+        has ? _prefs.types.where((x) => x != t).toList() : [..._prefs.types, t];
     // If the user just selected every type one-by-one, collapse back to the
     // "All" state so it reads the same as never having customized it.
     setState(() {
@@ -109,188 +108,210 @@ class _EventNotificationsSettingsScreenState
     final prefsAsync = ref.watch(eventNotifPrefsProvider);
     final cfg = ref.watch(adminConfigProvider).value ?? const AdminConfig();
     final eventTypes = cfg.eventTypes;
-    final eventCountries = kEventCountries;
+    const eventCountries = kEventCountries;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(
-          context.t.eventNotifTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          // Smaller than the default 20sp so longer translations
-          // (Arabic/Kurdish) fit on a single line alongside the
-          // back arrow and the Save action.
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        titleSpacing: 8,
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(context.t.save),
-          ),
-        ],
-      ),
       body: AppPageBackground(
-        child: prefsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-          data: (loaded) {
-            _hydrate(loaded);
-            final enabled = _prefs.mode != EventNotifMode.off;
-            return ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                24 + MediaQuery.of(context).padding.bottom,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(
+                context.t.eventNotifTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                // Smaller than the default 20sp so longer translations
+                // (Arabic/Kurdish) fit on a single line alongside the
+                // back arrow and the Save action.
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              children: [
-              _switchTile(
-                title: context.t.eventNotifNewEventNotifications,
-                subtitle: context.t.eventNotifNewEventSubtitle,
-                value: enabled,
-                onChanged: (v) => setState(() => _prefs = _prefs.copyWith(
-                    mode: v ? EventNotifMode.all : EventNotifMode.off)),
+              titleSpacing: 8,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+              actions: [
+                TextButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(context.t.save),
+                ),
+              ],
+            ),
+            prefsAsync.when<Widget>(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
               ),
-              if (enabled) ...[
-                const SizedBox(height: 16),
-                _sectionLabel(context.t.eventNotifEventTypes),
-                Text(
-                  _allTypes
-                      ? context.t.eventNotifAllTypesDesc
-                      : context.t.eventNotifCustomTypesDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildChoiceChip(
-                      label: context.t.eventNotifAllTypes,
-                      selected: _allTypes,
-                      onSelected: (_) => _selectAllTypes(),
-                    ),
-                    ...eventTypes.map((t) {
-                      final selected = !_allTypes && _prefs.types.contains(t);
-                      return _buildFilterChip(
-                        label: t,
-                        selected: selected,
-                        onSelected: (_) =>
-                            _toggleType(t, eventTypes.length),
-                      );
-                    }),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _sectionLabel(context.t.eventNotifCountries),
-                Text(
-                  _allCountries
-                      ? context.t.eventNotifAllCountriesDesc
-                      : context.t.eventNotifCustomCountriesDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-                const SizedBox(height: 10),
-                // Inline search field over the country chips. Filters
-                // case-insensitively; selected countries are always
-                // included even when they don't match the query so the
-                // user can deselect them from the same list.
-                AppGlassCard(
-                  radius: 16,
-                  surfaceAlpha: context.isDark ? 0.42 : 0.36,
-                  borderAlpha: context.isDark ? 0.14 : 0.50,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
-                    controller: _countrySearchCtrl,
-                    onChanged: (v) =>
-                        setState(() => _countryQuery = v.trim().toLowerCase()),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      hintText: context.t.adminSearchCountry,
-                      suffixIcon: _countryQuery.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.close, size: 18),
-                              onPressed: () {
-                                _countrySearchCtrl.clear();
-                                setState(() => _countryQuery = '');
-                              },
-                            ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                    ),
+              error: (e, _) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(context.t.errorWithMessage(e))),
+              ),
+              data: (loaded) {
+                _hydrate(loaded);
+                final enabled = _prefs.mode != EventNotifMode.off;
+                return SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    24 + MediaQuery.of(context).padding.bottom,
                   ),
-                ),
-                const SizedBox(height: 10),
-                if (!_allCountries) ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  sliver: SliverList.list(
                     children: [
-                      _buildChoiceChip(
-                        label: context.t.eventNotifAllCountries,
-                        selected: false,
-                        onSelected: (_) => _selectAllCountries(),
+                      _switchTile(
+                        title: context.t.eventNotifNewEventNotifications,
+                        subtitle: context.t.eventNotifNewEventSubtitle,
+                        value: enabled,
+                        onChanged: (v) => setState(() => _prefs =
+                            _prefs.copyWith(
+                                mode: v
+                                    ? EventNotifMode.all
+                                    : EventNotifMode.off)),
                       ),
-                      ...eventCountries
-                          .where((c) => _prefs.countries.contains(_countryKey(c)))
-                          .map((c) => _buildFilterChip(
-                                label: c,
+                      if (enabled) ...[
+                        const SizedBox(height: 16),
+                        _sectionLabel(context.t.eventNotifEventTypes),
+                        Text(
+                          _allTypes
+                              ? context.t.eventNotifAllTypesDesc
+                              : context.t.eventNotifCustomTypesDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildChoiceChip(
+                              label: context.t.eventNotifAllTypes,
+                              selected: _allTypes,
+                              onSelected: (_) => _selectAllTypes(),
+                            ),
+                            ...eventTypes.map((t) {
+                              final selected =
+                                  !_allTypes && _prefs.types.contains(t);
+                              return _buildFilterChip(
+                                label: t,
+                                selected: selected,
+                                onSelected: (_) =>
+                                    _toggleType(t, eventTypes.length),
+                              );
+                            }),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _sectionLabel(context.t.eventNotifCountries),
+                        Text(
+                          _allCountries
+                              ? context.t.eventNotifAllCountriesDesc
+                              : context.t.eventNotifCustomCountriesDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                        const SizedBox(height: 10),
+                        // Inline search field over the country chips. Filters
+                        // case-insensitively; selected countries are always
+                        // included even when they don't match the query so the
+                        // user can deselect them from the same list.
+                        AppGlassCard(
+                          radius: 16,
+                          surfaceAlpha: context.isDark ? 0.42 : 0.36,
+                          borderAlpha: context.isDark ? 0.14 : 0.50,
+                          padding: EdgeInsets.zero,
+                          child: TextField(
+                            controller: _countrySearchCtrl,
+                            onChanged: (v) => setState(
+                                () => _countryQuery = v.trim().toLowerCase()),
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              hintText: context.t.adminSearchCountry,
+                              suffixIcon: _countryQuery.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () {
+                                        _countrySearchCtrl.clear();
+                                        setState(() => _countryQuery = '');
+                                      },
+                                    ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 14),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (!_allCountries) ...[
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildChoiceChip(
+                                label: context.t.eventNotifAllCountries,
+                                selected: false,
+                                onSelected: (_) => _selectAllCountries(),
+                              ),
+                              ...eventCountries
+                                  .where((c) =>
+                                      _prefs.countries.contains(_countryKey(c)))
+                                  .map((c) => _buildFilterChip(
+                                        label: c,
+                                        selected: true,
+                                        onSelected: (_) => _toggleCountry(
+                                            c, eventCountries.length),
+                                      )),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (_allCountries)
+                              _buildChoiceChip(
+                                label: context.t.eventNotifAllCountries,
                                 selected: true,
+                                onSelected: (_) => _selectAllCountries(),
+                              ),
+                            ...eventCountries.where((c) {
+                              final isSelected = !_allCountries &&
+                                  _prefs.countries.contains(_countryKey(c));
+                              if (isSelected) return false;
+                              if (_countryQuery.isEmpty) return true;
+                              return c.toLowerCase().contains(_countryQuery);
+                            }).map((c) {
+                              final selected = !_allCountries &&
+                                  _prefs.countries.contains(_countryKey(c));
+                              return _buildFilterChip(
+                                label: c,
+                                selected: selected,
                                 onSelected: (_) =>
                                     _toggleCountry(c, eventCountries.length),
-                              )),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 24),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                ],
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (_allCountries)
-                      _buildChoiceChip(
-                        label: context.t.eventNotifAllCountries,
-                        selected: true,
-                        onSelected: (_) => _selectAllCountries(),
-                      ),
-                    ...eventCountries.where((c) {
-                      final isSelected =
-                          !_allCountries && _prefs.countries.contains(_countryKey(c));
-                      if (isSelected) return false;
-                      if (_countryQuery.isEmpty) return true;
-                      return c.toLowerCase().contains(_countryQuery);
-                    }).map((c) {
-                      final selected = !_allCountries &&
-                          _prefs.countries.contains(_countryKey(c));
-                      return _buildFilterChip(
-                        label: c,
-                        selected: selected,
-                        onSelected: (_) =>
-                            _toggleCountry(c, eventCountries.length),
-                      );
-                    }),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 24),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

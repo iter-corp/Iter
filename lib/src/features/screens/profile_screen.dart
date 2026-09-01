@@ -897,9 +897,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
                                   p.commentsCount < 0 ? 0 : p.commentsCount,
                               builder: (context, snap) {
                                 final count = snap.data ??
-                                    (p.commentsCount < 0
-                                        ? 0
-                                        : p.commentsCount);
+                                    (p.commentsCount < 0 ? 0 : p.commentsCount);
                                 return Text(
                                   '$time • ${context.t.homeAnswersCount(count)}',
                                   style: TextStyle(

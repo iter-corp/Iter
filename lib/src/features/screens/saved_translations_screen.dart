@@ -52,47 +52,69 @@ class SavedTranslationsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.savedTranslations),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: uid == null
-            ? Center(child: Text(context.t.savedTranslationsSignInPrompt))
-            : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.savedTranslations),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            if (uid == null)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Text(context.t.savedTranslationsSignInPrompt),
+                ),
+              )
+            else
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: query!.snapshots(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snap.hasError) {
-                    return Center(
-                      child: Text(context.t.errorWithMessage(snap.error!)),
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(child: CircularProgressIndicator()),
                     );
                   }
-                  final items = snap.data?.docs
-                          .map(SavedTranslation.fromDoc)
-                          .toList() ??
-                      [];
-                  if (items.isEmpty) {
-                    return _EmptyState();
+                  if (snap.hasError) {
+                    return SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(context.t.errorWithMessage(snap.error!)),
+                      ),
+                    );
                   }
-                  return ListView.separated(
+                  final items =
+                      snap.data?.docs.map(SavedTranslation.fromDoc).toList() ??
+                          [];
+                  if (items.isEmpty) {
+                    return SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyState(),
+                    );
+                  }
+                  return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                       16,
                       12,
                       16,
                       24 + MediaQuery.of(context).padding.bottom,
                     ),
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _SavedTile(item: items[i]),
+                    sliver: SliverList.separated(
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) => _SavedTile(item: items[i]),
+                    ),
                   );
                 },
               ),
+          ],
+        ),
       ),
     );
   }
@@ -210,8 +232,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.bookmark_border,
-                size: 48, color: context.textMuted),
+            Icon(Icons.bookmark_border, size: 48, color: context.textMuted),
             const SizedBox(height: 12),
             Text(
               context.t.savedTranslationsEmpty,

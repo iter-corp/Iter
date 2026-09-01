@@ -53,8 +53,8 @@ class ApiLogEntry {
   final String provider;
   final String keyId;
   final bool success;
-  final bool wasFallback;    // true = another provider was tried first
-  final String? error;       // set when success==false
+  final bool wasFallback; // true = another provider was tried first
+  final String? error; // set when success==false
   final String? nextProvider; // which provider it fell back TO (if any)
   final DateTime? createdAt;
 
@@ -150,13 +150,11 @@ class _ApiKeyService {
   // Keys stream — sorted client-side by priority then createdAt to avoid
   // needing a Firestore composite index.
   Stream<List<ApiKeyEntry>> streamKeys() {
-    return _col
-        .snapshots()
-        .map((s) {
-          final list = s.docs.map(ApiKeyEntry.fromDoc).toList();
-          list.sort((a, b) => a.priority.compareTo(b.priority));
-          return list;
-        });
+    return _col.snapshots().map((s) {
+      final list = s.docs.map(ApiKeyEntry.fromDoc).toList();
+      list.sort((a, b) => a.priority.compareTo(b.priority));
+      return list;
+    });
   }
 
   // Error log stream — newest first, last 200.
@@ -168,7 +166,8 @@ class _ApiKeyService {
         .map((s) => s.docs.map(ApiLogEntry.fromDoc).toList());
   }
 
-  Future<void> add({required String provider, required String key, required int priority}) {
+  Future<void> add(
+      {required String provider, required String key, required int priority}) {
     return _col.add({
       'provider': provider,
       'key': key,
@@ -188,8 +187,7 @@ class _ApiKeyService {
   Future<void> setPriority(String id, int priority) =>
       _col.doc(id).update({'priority': priority});
 
-  Future<void> clearLogs() =>
-      _logCol.limit(500).get().then((s) async {
+  Future<void> clearLogs() => _logCol.limit(500).get().then((s) async {
         for (final d in s.docs) {
           await d.reference.delete();
         }
@@ -215,43 +213,26 @@ class AdminApiManagerScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DefaultTabController(
+    return AppScrollTabScaffold(
       length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.adminApiManager),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-          bottom: TabBar(
-            labelColor: AppColors.purple,
-            unselectedLabelColor: context.textSecondary,
-            indicatorColor: AppColors.purple,
-            dividerColor: Colors.transparent,
-            tabs: const [
-              Tab(icon: Icon(Icons.vpn_key_outlined), text: 'Keys'),
-              Tab(icon: Icon(Icons.history_outlined), text: 'API Log'),
-            ],
-          ),
-          actions: [
-            IconButton(
-              tooltip: context.t.add,
-              icon: const Icon(Icons.add_rounded),
-              onPressed: () => _showAddSheet(context, ref),
-            ),
-            const SizedBox(width: 4),
-          ],
+      title: Text(context.t.adminApiManager),
+      actions: [
+        IconButton(
+          tooltip: context.t.add,
+          icon: const Icon(Icons.add_rounded),
+          onPressed: () => _showAddSheet(context, ref),
         ),
-        body: AppPageBackground(
-          child: TabBarView(
-            children: [
-              _KeysTab(onAddTap: () => _showAddSheet(context, ref)),
-              const _LogTab(),
-            ],
-          ),
-        ),
+        const SizedBox(width: 4),
+      ],
+      tabs: const [
+        Tab(icon: Icon(Icons.vpn_key_outlined), text: 'Keys'),
+        Tab(icon: Icon(Icons.history_outlined), text: 'API Log'),
+      ],
+      body: TabBarView(
+        children: [
+          _KeysTab(onAddTap: () => _showAddSheet(context, ref)),
+          const _LogTab(),
+        ],
       ),
     );
   }
@@ -299,7 +280,7 @@ class _KeysTab extends ConsumerWidget {
 
         return ListView(
           padding: EdgeInsets.fromLTRB(
-            16, 16, 16, 28 + MediaQuery.paddingOf(context).bottom),
+              16, 16, 16, 28 + MediaQuery.paddingOf(context).bottom),
           children: [
             // Fallback order explanation banner.
             _FallbackOrderBanner(keys: keys),
@@ -346,7 +327,9 @@ class _KeysTab extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(
               context.t.adminApiManagerEmpty,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
                   color: context.textPrimary),
               textAlign: TextAlign.center,
             ),
@@ -391,8 +374,8 @@ class _FallbackOrderBanner extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.alt_route_outlined, size: 16,
-                  color: AppColors.purple),
+              const Icon(Icons.alt_route_outlined,
+                  size: 16, color: AppColors.purple),
               const SizedBox(width: 6),
               Text(
                 'Fallback order',
@@ -434,8 +417,8 @@ class _ProviderBadge extends StatelessWidget {
     final meta = _providerMeta(entry.provider);
     final color = meta?.color ?? AppColors.purple;
     final name = meta?.name ?? entry.provider;
-    final hasError = entry.statusMessage != null &&
-        entry.statusMessage!.isNotEmpty;
+    final hasError =
+        entry.statusMessage != null && entry.statusMessage!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -470,8 +453,8 @@ class _ProviderBadge extends StatelessWidget {
           ),
           if (hasError) ...[
             const SizedBox(width: 4),
-            const Icon(Icons.warning_amber_rounded, size: 11,
-                color: Colors.orange),
+            const Icon(Icons.warning_amber_rounded,
+                size: 11, color: Colors.orange),
           ],
         ],
       ),
@@ -569,7 +552,8 @@ class _ApiKeyTile extends ConsumerWidget {
                       ),
                       // Status dot.
                       Container(
-                        width: 8, height: 8,
+                        width: 8,
+                        height: 8,
                         margin: const EdgeInsetsDirectional.only(start: 4),
                         decoration: BoxDecoration(
                           color: statusColor,
@@ -623,8 +607,8 @@ class _ApiKeyTile extends ConsumerWidget {
               ),
             ),
             PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: context.textSecondary,
-                  size: 20),
+              icon:
+                  Icon(Icons.more_vert, color: context.textSecondary, size: 20),
               onSelected: (action) async {
                 if (action == 'toggle') {
                   await service.setActive(entry.id, !entry.active);
@@ -650,8 +634,7 @@ class _ApiKeyTile extends ConsumerWidget {
                   );
                   if (ok == true) await service.delete(entry.id);
                 } else if (action == 'copy') {
-                  await Clipboard.setData(
-                      ClipboardData(text: entry.maskedKey));
+                  await Clipboard.setData(ClipboardData(text: entry.maskedKey));
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(context.t.copied)),
@@ -764,8 +747,8 @@ class _LogTab extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Translation requests will appear here.',
-                        style:
-                            TextStyle(color: context.textSecondary, fontSize: 13),
+                        style: TextStyle(
+                            color: context.textSecondary, fontSize: 13),
                       ),
                     ],
                   ),
@@ -800,9 +783,8 @@ class _LogTile extends StatelessWidget {
     final name = meta?.name ?? entry.provider;
     final icon = meta?.icon ?? Icons.key_outlined;
     final ts = entry.createdAt;
-    final timeStr = ts == null
-        ? '—'
-        : DateFormat('MMM d, HH:mm:ss').format(ts.toLocal());
+    final timeStr =
+        ts == null ? '—' : DateFormat('MMM d, HH:mm:ss').format(ts.toLocal());
 
     return AppGlassCard(
       margin: const EdgeInsets.only(bottom: 8),
@@ -961,7 +943,10 @@ class _AddKeySheetState extends State<_AddKeySheet> {
       setState(() => _error = context.t.adminApiManagerKeyRequired);
       return;
     }
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await widget.service.add(
         provider: _selectedProvider,
@@ -981,7 +966,7 @@ class _AddKeySheetState extends State<_AddKeySheet> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          20, 16, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+            20, 16, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1009,8 +994,7 @@ class _AddKeySheetState extends State<_AddKeySheet> {
               Text(
                 context.t.adminApiManagerSelectProvider,
                 style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: context.textSecondary),
+                    fontWeight: FontWeight.w600, color: context.textSecondary),
               ),
               const SizedBox(height: 12),
               ..._kProviders.map((p) {
@@ -1064,8 +1048,7 @@ class _AddKeySheetState extends State<_AddKeySheet> {
               Text(
                 context.t.adminApiManagerApiKey,
                 style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: context.textSecondary),
+                    fontWeight: FontWeight.w600, color: context.textSecondary),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -1111,8 +1094,10 @@ class _AddKeySheetState extends State<_AddKeySheet> {
                       ),
                       child: _saving
                           ? const SizedBox(
-                              width: 18, height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                              width: 18,
+                              height: 18,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2.5),
                             )
                           : Text(context.t.save),
                     ),

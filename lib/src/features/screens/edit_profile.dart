@@ -97,12 +97,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
     _avatarUrl = user['avatarUrl'] as String?;
     _coverUrl = user['coverUrl'] as String?;
-    _profession = _matchOption(user['profession'], cfg.profileProfessionOptions);
+    _profession =
+        _matchOption(user['profession'], cfg.profileProfessionOptions);
     _field = _matchOption(user['field'], cfg.profileFieldOptions);
     _academicLevel =
-      _matchOption(user['academicLevel'], cfg.profileAcademicLevelOptions);
+        _matchOption(user['academicLevel'], cfg.profileAcademicLevelOptions);
     _goals = ((user['goals'] as List?)?.cast<String>() ?? const [])
-      .where(cfg.profileGoalOptions.contains)
+        .where(cfg.profileGoalOptions.contains)
         .toList();
     _initialized = true;
   }
@@ -298,8 +299,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         AppFeedback.showSuccessOn(messenger, updatedMsg);
       }
     } catch (e) {
-      AppFeedback.showErrorOn(
-          messenger, strings.editProfileCouldNotSave(e));
+      AppFeedback.showErrorOn(messenger, strings.editProfileCouldNotSave(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -314,7 +314,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserDocProvider);
-    final cfg = ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
+    final cfg =
+        ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -586,8 +587,7 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Text(
               context.t.editProfile,
-              style:
-                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
           ),
           TextButton(

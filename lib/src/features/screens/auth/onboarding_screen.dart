@@ -184,7 +184,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cfg = ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
+    final cfg =
+        ref.watch(adminConfigProvider).valueOrNull ?? const AdminConfig();
     final pad = context.scaleW(16, 24);
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -196,152 +197,153 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: AppPageBackground(
         child: SafeArea(
           child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(pad, pad, pad, pad + context.bottomSafeInset),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _nameCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: context.t.onboardingName,
-                    hintText: context.t.onboardingNameHint,
+            padding: EdgeInsets.fromLTRB(
+                pad, pad, pad, pad + context.bottomSafeInset),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: context.t.onboardingName,
+                      hintText: context.t.onboardingNameHint,
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? context.t.onboardingNameRequired
+                        : null,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? context.t.onboardingNameRequired
-                      : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _usernameCtrl,
-                  decoration: InputDecoration(labelText: context.t.username),
-                  validator: (v) => (v == null || v.trim().length < 3)
-                      ? context.t.onboardingMin3Chars
-                      : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _bioCtrl,
-                  decoration: InputDecoration(labelText: context.t.bio),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: _gender,
-                  decoration:
-                      InputDecoration(labelText: context.t.onboardingGender),
-                  items: [
-                    DropdownMenuItem(
-                        value: 'Male',
-                        child: Text(context.t.onboardingGenderMale)),
-                    DropdownMenuItem(
-                        value: 'Female',
-                        child: Text(context.t.onboardingGenderFemale)),
-                    DropdownMenuItem(
-                        value: 'Non-binary',
-                        child: Text(context.t.onboardingGenderNonBinary)),
-                    DropdownMenuItem(
-                        value: 'Other',
-                        child: Text(context.t.onboardingGenderOther)),
-                  ],
-                  onChanged: (v) => setState(() => _gender = v),
-                ),
-                const SizedBox(height: 24),
-                _LocationSection(
-                  hasGps: _lat != null,
-                  busy: _gpsBusy,
-                  error: _gpsError,
-                  cityCtrl: _cityCtrl,
-                  onCityChanged: () => setState(() {}),
-                  onUseGps: _useGps,
-                  onClear: _clearLocation,
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: context.surfaceSoft,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: context.borderColor),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _usernameCtrl,
+                    decoration: InputDecoration(labelText: context.t.username),
+                    validator: (v) => (v == null || v.trim().length < 3)
+                        ? context.t.onboardingMin3Chars
+                        : null,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.tune_rounded,
-                              color: AppColors.purple, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              context.t.onboardingAboutYou,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: context.textPrimary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            context.t.onboardingOptional,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: context.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        context.t.onboardingAboutYouDesc,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.textSecondary,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      AboutYouEditor(
-                        profession: _profession,
-                        field: _field,
-                        academicLevel: _academicLevel,
-                        goals: _goals,
-                        professionOptions: cfg.profileProfessionOptions,
-                        fieldOptions: cfg.profileFieldOptions,
-                        academicLevelOptions: cfg.profileAcademicLevelOptions,
-                        goalOptions: cfg.profileGoalOptions,
-                        onProfessionChanged: (v) =>
-                            setState(() => _profession = v),
-                        onFieldChanged: (v) => setState(() => _field = v),
-                        onAcademicLevelChanged: (v) =>
-                            setState(() => _academicLevel = v),
-                        onGoalsChanged: (v) => setState(() => _goals = v),
-                      ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _bioCtrl,
+                    decoration: InputDecoration(labelText: context.t.bio),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: _gender,
+                    decoration:
+                        InputDecoration(labelText: context.t.onboardingGender),
+                    items: [
+                      DropdownMenuItem(
+                          value: 'Male',
+                          child: Text(context.t.onboardingGenderMale)),
+                      DropdownMenuItem(
+                          value: 'Female',
+                          child: Text(context.t.onboardingGenderFemale)),
+                      DropdownMenuItem(
+                          value: 'Non-binary',
+                          child: Text(context.t.onboardingGenderNonBinary)),
+                      DropdownMenuItem(
+                          value: 'Other',
+                          child: Text(context.t.onboardingGenderOther)),
                     ],
+                    onChanged: (v) => setState(() => _gender = v),
                   ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 24),
+                  _LocationSection(
+                    hasGps: _lat != null,
+                    busy: _gpsBusy,
+                    error: _gpsError,
+                    cityCtrl: _cityCtrl,
+                    onCityChanged: () => setState(() {}),
+                    onUseGps: _useGps,
+                    onClear: _clearLocation,
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.surfaceSoft,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.tune_rounded,
+                                color: AppColors.purple, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                context.t.onboardingAboutYou,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              context.t.onboardingOptional,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          context.t.onboardingAboutYouDesc,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        AboutYouEditor(
+                          profession: _profession,
+                          field: _field,
+                          academicLevel: _academicLevel,
+                          goals: _goals,
+                          professionOptions: cfg.profileProfessionOptions,
+                          fieldOptions: cfg.profileFieldOptions,
+                          academicLevelOptions: cfg.profileAcademicLevelOptions,
+                          goalOptions: cfg.profileGoalOptions,
+                          onProfessionChanged: (v) =>
+                              setState(() => _profession = v),
+                          onFieldChanged: (v) => setState(() => _field = v),
+                          onAcademicLevelChanged: (v) =>
+                              setState(() => _academicLevel = v),
+                          onGoalsChanged: (v) => setState(() => _goals = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _loading ? null : _submit,
+                    child: _loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(context.t.continueLabel),
+                  ),
                 ],
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(context.t.continueLabel),
-                ),
-              ],
+              ),
             ),
-          ),
           ),
         ),
       ),

@@ -31,69 +31,50 @@ class _AdminErrorReportsScreenState
     final unsolved = all.where((r) => !r.resolved).toList();
     final solved = all.where((r) => r.resolved).toList();
 
-    return DefaultTabController(
+    return AppScrollTabScaffold(
       length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(context.t.errorReports),
-          backgroundColor: Colors.transparent,
-          foregroundColor: context.textPrimary,
-          elevation: 0,
-          flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-          actions: [
-            PopupMenuButton<String>(
-              onSelected: (v) async {
-                if (v == 'clear_resolved') {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final t = context.t;
-                  final n =
-                      await ref.read(errorReportAdminProvider).clearResolved();
-                  AppFeedback.showInfoOn(
-                      messenger, t.adminClearedSolvedReports(n));
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'clear_resolved',
-                  child: Text(context.t.adminClearAllSolvedReports),
-                ),
-              ],
+      title: Text(context.t.errorReports),
+      actions: [
+        PopupMenuButton<String>(
+          onSelected: (v) async {
+            if (v == 'clear_resolved') {
+              final messenger = ScaffoldMessenger.of(context);
+              final t = context.t;
+              final n =
+                  await ref.read(errorReportAdminProvider).clearResolved();
+              AppFeedback.showInfoOn(messenger, t.adminClearedSolvedReports(n));
+            }
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'clear_resolved',
+              child: Text(context.t.adminClearAllSolvedReports),
             ),
           ],
-          bottom: TabBar(
-            labelColor: AppColors.purple,
-            unselectedLabelColor: context.textSecondary,
-            indicatorColor: AppColors.purple,
-            dividerColor: Colors.transparent,
-            dividerHeight: 0,
-            tabs: [
-              Tab(text: context.t.adminTabUnsolved(unsolved.length)),
-              Tab(text: context.t.adminTabSolved(solved.length)),
-            ],
-          ),
         ),
-        body: AppPageBackground(
-          child: reportsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-            data: (_) => TabBarView(
-              children: [
-                _ReportsList(
-                  reports: unsolved,
-                  emptyTitle: all.isEmpty
-                      ? context.t.adminNoErrorReports
-                      : context.t.adminNoUnsolvedErrors,
-                  emptySubtitle: context.t.adminCapturedErrorsHere,
-                ),
-                _ReportsList(
-                  reports: solved,
-                  emptyTitle: context.t.adminNothingSolvedYet,
-                  emptySubtitle: context.t.adminSolvedReportsMoveHere,
-                ),
-              ],
+      ],
+      tabs: [
+        Tab(text: context.t.adminTabUnsolved(unsolved.length)),
+        Tab(text: context.t.adminTabSolved(solved.length)),
+      ],
+      body: reportsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
+        data: (_) => TabBarView(
+          children: [
+            _ReportsList(
+              reports: unsolved,
+              emptyTitle: all.isEmpty
+                  ? context.t.adminNoErrorReports
+                  : context.t.adminNoUnsolvedErrors,
+              emptySubtitle: context.t.adminCapturedErrorsHere,
             ),
-          ),
+            _ReportsList(
+              reports: solved,
+              emptyTitle: context.t.adminNothingSolvedYet,
+              emptySubtitle: context.t.adminSolvedReportsMoveHere,
+            ),
+          ],
         ),
       ),
     );

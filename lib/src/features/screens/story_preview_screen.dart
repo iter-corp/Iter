@@ -115,8 +115,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
           as RenderRepaintBoundary?;
       if (boundary == null) return widget.file;
       final image = await boundary.toImage(pixelRatio: 3);
-      final byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return widget.file;
       final bytes = byteData.buffer.asUint8List();
       final dir = await getTemporaryDirectory();
@@ -181,7 +180,8 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
               key: _canvasKey,
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final size = Size(constraints.maxWidth, constraints.maxHeight);
+                  final size =
+                      Size(constraints.maxWidth, constraints.maxHeight);
                   return Stack(
                     fit: StackFit.expand,
                     children: [
@@ -208,8 +208,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                             // viewer. The RepaintBoundary rasterizes exactly
                             // what's shown here, so editor == output.
                             child: SizedBox.expand(
-                              child:
-                                  Image.file(widget.file, fit: BoxFit.cover),
+                              child: Image.file(widget.file, fit: BoxFit.cover),
                             ),
                           ),
                         ),
@@ -220,11 +219,11 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                           overlay: overlay,
                           canvasSize: size,
                           isActive: overlay.id == _activeOverlayId,
-                          onActivate: () => setState(
-                              () => _activeOverlayId = overlay.id),
+                          onActivate: () =>
+                              setState(() => _activeOverlayId = overlay.id),
                           onChanged: (updated) => setState(() {
-                            final idx = _overlays
-                                .indexWhere((o) => o.id == overlay.id);
+                            final idx =
+                                _overlays.indexWhere((o) => o.id == overlay.id);
                             if (idx != -1) _overlays[idx] = updated;
                           }),
                           onEdit: () => _editOverlay(overlay),
@@ -233,8 +232,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                             _activeOverlayId = overlay.id;
                           }),
                           onDragUpdate: (globalPos) {
-                            final overTrash =
-                                _isOverTrash(globalPos, size);
+                            final overTrash = _isOverTrash(globalPos, size);
                             if (overTrash != _overTrash) {
                               setState(() => _overTrash = overTrash);
                             }

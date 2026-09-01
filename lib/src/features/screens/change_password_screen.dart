@@ -217,162 +217,170 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final busy = _loading;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.changePassword),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        actions: [
-          TextButton(
-            onPressed: busy ? null : _save,
-            child: _loading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    context.t.save,
-                    style: const TextStyle(color: AppColors.purple),
-                  ),
-          ),
-        ],
-      ),
       body: AppPageBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              24 + MediaQuery.of(context).padding.bottom,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppGlassCard(
-                  radius: 16,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
-                    controller: _currentPassCtrl,
-                    obscureText: _obscureCurrent,
-                    autofillHints: const [AutofillHints.password],
-                    decoration: _fieldDecoration(
-                      label: context.t.settingsCurrentPassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureCurrent
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.changePassword),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+              actions: [
+                TextButton(
+                  onPressed: busy ? null : _save,
+                  child: _loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          context.t.save,
+                          style: const TextStyle(color: AppColors.purple),
                         ),
-                        onPressed: () =>
-                            setState(() => _obscureCurrent = !_obscureCurrent),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                AppGlassCard(
-                  radius: 16,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
-                    controller: _newPassCtrl,
-                    obscureText: _obscureNew,
-                    autofillHints: const [AutofillHints.newPassword],
-                    decoration: _fieldDecoration(
-                      label: context.t.settingsNewPassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureNew ? Icons.visibility_off : Icons.visibility,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscureNew = !_obscureNew),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                AppGlassCard(
-                  radius: 16,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
-                    controller: _confirmPassCtrl,
-                    obscureText: _obscureConfirm,
-                    autofillHints: const [AutofillHints.newPassword],
-                    decoration: _fieldDecoration(
-                      label: context.t.settingsConfirmNewPassword,
-                      // Live mismatch error — `_confirmError` is null until the
-                      // user has typed something AND the value differs from the
-                      // new-password field, so it doesn't yell at them while
-                      // they're still in the middle of typing the same value.
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirm
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscureConfirm = !_obscureConfirm),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_confirmError != null) _FieldError(_confirmError!),
-                const SizedBox(height: 8),
-                // "Forgot current password?" — navigates to the same
-                // forgot-password screen used from the login page rather
-                // than firing a reset email inline. Keeping it as a single
-                // flow means the user gets the full email-entry +
-                // confirmation UX they're already familiar with.
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => context.push('/forgot-password'),
-                    child: Text(context.t.forgotPassword),
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.purple,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: busy ? null : _save,
-                    child: _loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            context.t.save,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
                 ),
               ],
             ),
-          ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                24 + MediaQuery.of(context).padding.bottom,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AppGlassCard(
+                      radius: 16,
+                      padding: EdgeInsets.zero,
+                      child: TextField(
+                        controller: _currentPassCtrl,
+                        obscureText: _obscureCurrent,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: _fieldDecoration(
+                          label: context.t.settingsCurrentPassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureCurrent
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () => setState(
+                                () => _obscureCurrent = !_obscureCurrent),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    AppGlassCard(
+                      radius: 16,
+                      padding: EdgeInsets.zero,
+                      child: TextField(
+                        controller: _newPassCtrl,
+                        obscureText: _obscureNew,
+                        autofillHints: const [AutofillHints.newPassword],
+                        decoration: _fieldDecoration(
+                          label: context.t.settingsNewPassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureNew
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscureNew = !_obscureNew),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    AppGlassCard(
+                      radius: 16,
+                      padding: EdgeInsets.zero,
+                      child: TextField(
+                        controller: _confirmPassCtrl,
+                        obscureText: _obscureConfirm,
+                        autofillHints: const [AutofillHints.newPassword],
+                        decoration: _fieldDecoration(
+                          label: context.t.settingsConfirmNewPassword,
+                          // Live mismatch error — `_confirmError` is null until the
+                          // user has typed something AND the value differs from the
+                          // new-password field, so it doesn't yell at them while
+                          // they're still in the middle of typing the same value.
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirm
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () => setState(
+                                () => _obscureConfirm = !_obscureConfirm),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_confirmError != null) _FieldError(_confirmError!),
+                    const SizedBox(height: 8),
+                    // "Forgot current password?" — navigates to the same
+                    // forgot-password screen used from the login page rather
+                    // than firing a reset email inline. Keeping it as a single
+                    // flow means the user gets the full email-entry +
+                    // confirmation UX they're already familiar with.
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () => context.push('/forgot-password'),
+                        child: Text(context.t.forgotPassword),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.purple,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: busy ? null : _save,
+                        child: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                context.t.save,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

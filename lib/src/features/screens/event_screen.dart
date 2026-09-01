@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,21 +9,17 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/app_strings.dart';
-import '../../navigation/user_profile_nav.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/auth_providers.dart';
-import '../../providers/chat_providers.dart';
 import '../../services/admin_service.dart';
 import '../../services/city_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/maps_links.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/event_detail.dart';
-import 'chat_screen.dart';
 
 const _kBrandPurple = Color(0xFFB05ECC);
 const _kBrandDeep = Color(0xFF8A3FB8);
-const _kTagOrangeText = Color(0xFFD27B2B);
 
 double? _distanceKm(dynamic a, dynamic b) {
   if (a is! Map || b is! Map) return null;
@@ -46,8 +41,6 @@ double? _distanceKm(dynamic a, dynamic b) {
 }
 
 double _toRad(double d) => d * math.pi / 180;
-
-enum _MainTab { partners, events }
 
 enum _EventsLayout { list, map }
 
@@ -96,74 +89,6 @@ int _eventRelevanceScore(AdminEvent e, Map<String, dynamic>? userDoc) {
   return score;
 }
 
-/// Heuristic relevance of a candidate [other] user to the signed-in [me] for
-/// the Connect list. Higher = more relevant. Mirrors [_eventRelevanceScore]:
-/// shared field / goals / academic level, same city, and GPS proximity all
-/// raise the score so the most relevant people surface first when browsing.
-int _partnerRelevanceScore(
-  Map<String, dynamic> other,
-  Map<String, dynamic> me,
-) {
-  var score = 0;
-
-  String s(Map<String, dynamic> m, String k) =>
-      (m[k] as String? ?? '').trim().toLowerCase();
-  List<String> goalsOf(Map<String, dynamic> m) =>
-      ((m['goals'] as List?)?.cast<String>() ?? const [])
-          .map((g) => g.toLowerCase())
-          .toList();
-
-  // Same academic field is the strongest single signal.
-  final myField = s(me, 'field');
-  if (myField.isNotEmpty && s(other, 'field') == myField) score += 3;
-
-  // Same academic level (e.g. both "Masters").
-  final myLevel = s(me, 'academicLevel');
-  if (myLevel.isNotEmpty && s(other, 'academicLevel') == myLevel) score += 1;
-
-  // Same profession (Student/Researcher/…).
-  final myProfession = s(me, 'profession');
-  if (myProfession.isNotEmpty && s(other, 'profession') == myProfession) {
-    score += 1;
-  }
-
-  // Overlapping goals (Internships, Conferences, …) — +2 per shared goal.
-  final myGoals = goalsOf(me).toSet();
-  if (myGoals.isNotEmpty) {
-    for (final g in goalsOf(other)) {
-      if (myGoals.contains(g)) score += 2;
-    }
-  }
-
-  // Same city, then GPS proximity as a softer fallback.
-  final myCity = s(me, 'city');
-  if (myCity.isNotEmpty && s(other, 'city') == myCity) {
-    score += 2;
-  } else {
-    final myLoc = me['location'];
-    final otherLoc = other['location'];
-    if (myLoc is Map && otherLoc is Map) {
-      final km = _distanceKm(myLoc, otherLoc);
-      if (km != null && km <= 100) score += 1;
-    }
-  }
-
-  return score;
-}
-
-final _partnersStreamProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('users')
-      .limit(300)
-      .snapshots()
-      .map((snap) => snap.docs.map((d) {
-            final data = d.data();
-            data['__id'] = d.id;
-            return data;
-          }).toList());
-});
-
 class EventBody extends ConsumerStatefulWidget {
   const EventBody({super.key});
 
@@ -172,11 +97,6 @@ class EventBody extends ConsumerStatefulWidget {
 }
 
 class _EventBodyState extends ConsumerState<EventBody> {
-  _MainTab _mainTab = _MainTab.events;
-  String? _selectedCity;
-  bool _nearbyMode = false;
-  String? _selectedField;
-  String? _selectedAcademicLevel;
   String? _selectedEventCity;
   String? _selectedEventType;
   _EventsLayout _eventsLayout = _EventsLayout.list;
@@ -187,9 +107,7 @@ class _EventBodyState extends ConsumerState<EventBody> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_mainTab == _MainTab.events) {
-        _maybeShowEventsQuickStart();
-      }
+      _maybeShowEventsQuickStart();
     });
     _searchController.addListener(() {
       final next = _searchController.text.trim();
@@ -201,17 +119,6 @@ class _EventBodyState extends ConsumerState<EventBody> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _setTab(_MainTab tab) {
-    if (tab == _mainTab) return;
-    setState(() {
-      _mainTab = tab;
-      _searchController.clear();
-    });
-    if (tab == _MainTab.events) {
-      _maybeShowEventsQuickStart();
-    }
   }
 
   Future<void> _maybeShowEventsQuickStart() async {
@@ -262,92 +169,6 @@ class _EventBodyState extends ConsumerState<EventBody> {
     setState(() => _selectedEventType = chosen.isEmpty ? null : chosen);
   }
 
-  Future<void> _onPartnerFilterTap(int i) async {
-    final users = ref.read(_partnersStreamProvider).valueOrNull ?? const [];
-
-    if (i == 0) {
-      // All — clear every filter
-      setState(() {
-        _nearbyMode = false;
-        _selectedCity = null;
-        _selectedField = null;
-        _selectedAcademicLevel = null;
-      });
-    } else if (i == 1) {
-      // City filter - deselect if already active
-      if (_nearbyMode || _selectedCity != null) {
-        setState(() {
-          _nearbyMode = false;
-          _selectedCity = null;
-        });
-        return;
-      }
-
-      // Open the world-city picker directly; "Nearby" is a pinned row
-      // at the top of the same list.
-      final chosen = await showCityPicker(context, showNearby: true);
-      if (chosen == null || chosen.isEmpty) return;
-
-      if (chosen == kCityPickerNearby) {
-        setState(() {
-          _nearbyMode = true;
-          _selectedCity = null;
-        });
-      } else {
-        setState(() {
-          _nearbyMode = false;
-          _selectedCity = chosen;
-        });
-      }
-    } else if (i == 2) {
-      // Field filter - deselect if already active
-      if (_selectedField != null) {
-        setState(() => _selectedField = null);
-        return;
-      }
-
-      final fields = users
-          .map((u) => (u['field'] as String? ?? '').trim())
-          .where((f) => f.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-
-      if (fields.isEmpty) return;
-
-      final chosen = await _pickFromSheet(
-        title: context.t.eventsFilterByField,
-        options: fields,
-        selected: _selectedField,
-      );
-      if (chosen == null) return;
-      setState(() => _selectedField = chosen.isEmpty ? null : chosen);
-    } else if (i == 3) {
-      // Academic Level filter - deselect if already active
-      if (_selectedAcademicLevel != null) {
-        setState(() => _selectedAcademicLevel = null);
-        return;
-      }
-
-      final levels = users
-          .map((u) => (u['academicLevel'] as String? ?? '').trim())
-          .where((l) => l.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-
-      if (levels.isEmpty) return;
-
-      final chosen = await _pickFromSheet(
-        title: context.t.eventsFilterByAcademicLevel,
-        options: levels,
-        selected: _selectedAcademicLevel,
-      );
-      if (chosen == null) return;
-      setState(() => _selectedAcademicLevel = chosen.isEmpty ? null : chosen);
-    }
-  }
-
   Future<String?> _pickFromSheet({
     required String title,
     required List<String> options,
@@ -374,216 +195,55 @@ class _EventBodyState extends ConsumerState<EventBody> {
       body: SafeArea(
         bottom: false,
         child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _MainToggle(active: _mainTab, onChanged: _setTab),
-                    const SizedBox(height: 14),
-                    if (_mainTab == _MainTab.events)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _SearchBar(
-                              controller: _searchController,
-                              hint: context.t.eventsSearchEvents,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _LayoutToggle(
-                            layout: _eventsLayout,
-                            onChanged: (l) => setState(() => _eventsLayout = l),
-                          ),
-                          const SizedBox(width: 6),
-                          GestureDetector(
-                            onTap: () => showEventsQuickStartSheet(context),
-                            child: AppGlassCard(
-                              width: 38,
-                              height: 38,
-                              radius: 19,
-                              surfaceAlpha: context.isDark ? 0.24 : 0.52,
-                              borderAlpha: context.isDark ? 0.16 : 0.50,
-                              child: const Icon(
-                                Icons.help_outline_rounded,
-                                size: 18,
-                                color: _kBrandPurple,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      _SearchBar(
-                        controller: _searchController,
-                        hint: context.t.eventsSearchPeople,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 260),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) {
-                    final offset = Tween<Offset>(
-                      begin: const Offset(0, 0.03),
-                      end: Offset.zero,
-                    ).animate(animation);
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(position: offset, child: child),
-                    );
-                  },
-                  child: _mainTab == _MainTab.partners
-                      ? _PartnersView(
-                          key: const ValueKey('partners'),
-                          query: _query,
-                          selectedCity: _selectedCity,
-                          nearbyMode: _nearbyMode,
-                          selectedField: _selectedField,
-                          selectedAcademicLevel: _selectedAcademicLevel,
-                          onFilterTap: _onPartnerFilterTap,
-                        )
-                      : _EventsView(
-                          key: const ValueKey('events'),
-                          query: _query,
-                          selectedCity: _selectedEventCity,
-                          selectedEventType: _selectedEventType,
-                          layout: _eventsLayout,
-                          onCityTap: _onEventCityTap,
-                          onClearCity: () =>
-                              setState(() => _selectedEventCity = null),
-                          onTypeTap: _onEventTypeTap,
-                          onClearType: () =>
-                              setState(() => _selectedEventType = null),
-                        ),
-                ),
-              ),
-            ],
-          ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Main segmented toggle: Connect / Events
-// ─────────────────────────────────────────────────────────
-class _MainToggle extends StatelessWidget {
-  final _MainTab active;
-  final ValueChanged<_MainTab> onChanged;
-  const _MainToggle({required this.active, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const padding = 4.0;
-        final innerWidth = constraints.maxWidth - padding * 2;
-        final pillWidth = innerWidth / 2;
-        final isEvents = active == _MainTab.events;
-        return AppGlassCard(
-          height: 48,
-          padding: const EdgeInsets.all(padding),
-          radius: 28,
-          surfaceAlpha: context.isDark ? 0.28 : 0.54,
-          borderAlpha: context.isDark ? 0.18 : 0.52,
-          child: Stack(
-            children: [
-              AnimatedAlign(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                alignment: isEvents
-                    ? AlignmentDirectional.centerStart
-                    : AlignmentDirectional.centerEnd,
-                child: Container(
-                  width: pillWidth,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_kBrandPurple, _kBrandDeep],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _kBrandPurple.withValues(alpha: 0.35),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: Row(
                 children: [
                   Expanded(
-                    child: _ToggleItem(
-                      label: context.t.events,
-                      icon: Icons.event_rounded,
-                      active: isEvents,
-                      onTap: () => onChanged(_MainTab.events),
+                    child: _SearchBar(
+                      controller: _searchController,
+                      hint: context.t.eventsSearchEvents,
                     ),
                   ),
-                  Expanded(
-                    child: _ToggleItem(
-                      label: context.t.eventsConnect,
-                      icon: Icons.people_alt_rounded,
-                      active: !isEvents,
-                      onTap: () => onChanged(_MainTab.partners),
+                  const SizedBox(width: 8),
+                  _LayoutToggle(
+                    layout: _eventsLayout,
+                    onChanged: (l) => setState(() => _eventsLayout = l),
+                  ),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => showEventsQuickStartSheet(context),
+                    child: AppGlassCard(
+                      width: 38,
+                      height: 38,
+                      radius: 19,
+                      surfaceAlpha: context.isDark ? 0.24 : 0.52,
+                      borderAlpha: context.isDark ? 0.16 : 0.50,
+                      child: const Icon(
+                        Icons.help_outline_rounded,
+                        size: 18,
+                        color: _kBrandPurple,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ToggleItem extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
-  const _ToggleItem({
-    required this.label,
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Center(
-        child: AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 220),
-          style: TextStyle(
-            color: active ? Colors.white : context.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: 13.5,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 17,
-                color: active ? Colors.white : context.textSecondary,
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: _EventsView(
+                query: _query,
+                selectedCity: _selectedEventCity,
+                selectedEventType: _selectedEventType,
+                layout: _eventsLayout,
+                onCityTap: _onEventCityTap,
+                onClearCity: () => setState(() => _selectedEventCity = null),
+                onTypeTap: _onEventTypeTap,
+                onClearType: () => setState(() => _selectedEventType = null),
               ),
-              const SizedBox(width: 6),
-              Text(label),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -642,656 +302,6 @@ class _SearchBar extends StatelessWidget {
                       color: context.textSecondary,
                     ),
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Partners view
-// ─────────────────────────────────────────────────────────
-class _PartnersView extends ConsumerWidget {
-  final String query;
-  final String? selectedCity;
-  final bool nearbyMode;
-  final String? selectedField;
-  final String? selectedAcademicLevel;
-  final ValueChanged<int> onFilterTap;
-
-  const _PartnersView({
-    super.key,
-    required this.query,
-    required this.selectedCity,
-    required this.nearbyMode,
-    required this.selectedField,
-    required this.selectedAcademicLevel,
-    required this.onFilterTap,
-  });
-
-  List<Map<String, dynamic>> _filter(
-    List<Map<String, dynamic>> users,
-    String currentUid,
-    Map<String, dynamic>? currentUser,
-  ) {
-    final myBlocked = List<String>.from(currentUser?['blockedUsers'] ?? []);
-    final q = query.toLowerCase();
-    final filtered = users.where((u) {
-      if (u['__id'] == currentUid) return false;
-
-      // Filter out users I've blocked
-      if (myBlocked.contains(u['__id'])) return false;
-
-      // Filter out users who have blocked me
-      final theirBlocked = List<String>.from(u['blockedUsers'] ?? []);
-      if (theirBlocked.contains(currentUid)) return false;
-
-      if (q.isEmpty) return true;
-      final name = (u['username'] as String? ?? '').toLowerCase();
-      final handle = (u['handle'] as String? ?? '').toLowerCase();
-      final bio = (u['bio'] as String? ?? '').toLowerCase();
-      final city = (u['city'] as String? ?? '').toLowerCase();
-      return name.contains(q) ||
-          handle.contains(q) ||
-          bio.contains(q) ||
-          city.contains(q);
-    }).toList();
-
-    // Apply all active filters simultaneously
-    var result = filtered;
-
-    // City / Nearby filter
-    if (nearbyMode) {
-      result = result.where((u) => u['location'] is Map).toList();
-      final myLoc = currentUser?['location'];
-      if (myLoc is Map) {
-        result.sort((a, b) {
-          final dA = _distanceKm(myLoc, a['location']) ?? double.infinity;
-          final dB = _distanceKm(myLoc, b['location']) ?? double.infinity;
-          return dA.compareTo(dB);
-        });
-      }
-    } else if (selectedCity != null && selectedCity!.isNotEmpty) {
-      final pick = selectedCity!.toLowerCase().trim();
-      result = result
-          .where(
-              (u) => (u['city'] as String? ?? '').toLowerCase().trim() == pick)
-          .toList();
-    }
-
-    // Field filter
-    if (selectedField != null && selectedField!.isNotEmpty) {
-      final pick = selectedField!.toLowerCase().trim();
-      result = result
-          .where(
-              (u) => (u['field'] as String? ?? '').toLowerCase().trim() == pick)
-          .toList();
-    }
-
-    // Academic level filter
-    if (selectedAcademicLevel != null && selectedAcademicLevel!.isNotEmpty) {
-      final pick = selectedAcademicLevel!.toLowerCase().trim();
-      result = result
-          .where((u) =>
-              (u['academicLevel'] as String? ?? '').toLowerCase().trim() ==
-              pick)
-          .toList();
-    }
-
-    // Personalized ordering: when the user is just browsing (no search query
-    // and no active filter) order the list by how well each person matches the
-    // viewer's own profile, so the most relevant people surface first. As soon
-    // as the viewer searches or applies a filter we leave ordering untouched —
-    // search must be able to find ANYONE, unranked by personalization.
-    if (q.isEmpty && !_hasActiveFilter && currentUser != null) {
-      final scored = {
-        for (final u in result)
-          u['__id'] as String: _partnerRelevanceScore(u, currentUser),
-      };
-      result = [...result]..sort(
-          (a, b) => (scored[b['__id']] ?? 0).compareTo(scored[a['__id']] ?? 0));
-    }
-
-    return result;
-  }
-
-  bool get _hasActiveFilter =>
-      nearbyMode ||
-      (selectedCity?.isNotEmpty ?? false) ||
-      (selectedField?.isNotEmpty ?? false) ||
-      (selectedAcademicLevel?.isNotEmpty ?? false);
-
-  IconData get _emptyIcon {
-    if (nearbyMode) return Icons.near_me_outlined;
-    if (selectedCity?.isNotEmpty ?? false) return Icons.location_city_outlined;
-    if (selectedField?.isNotEmpty ?? false) return Icons.school_outlined;
-    if (selectedAcademicLevel?.isNotEmpty ?? false)
-      return Icons.trending_up_outlined;
-    return Icons.search_off_rounded;
-  }
-
-  String _emptySubtitle(BuildContext context) {
-    if (nearbyMode) return context.t.eventsNoOneNearby;
-    if (selectedCity?.isNotEmpty ?? false) {
-      return context.t.eventsNoOneFromCity;
-    }
-    if (selectedField?.isNotEmpty ?? false) {
-      return context.t.eventsNoOneInField;
-    }
-    if (selectedAcademicLevel?.isNotEmpty ?? false) {
-      return context.t.eventsNoOneAtAcademicLevel;
-    }
-    return context.t.eventsBeFirstSayHi;
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final usersAsync = ref.watch(_partnersStreamProvider);
-    final currentUid = ref.watch(authStateProvider).value?.uid ?? '';
-    final currentUserDoc = ref.watch(currentUserDocProvider).valueOrNull;
-
-    final chipLabels = <String>[
-      context.t.eventsFilterAll,
-      nearbyMode
-          ? context.t.eventsFilterNearby
-          : (selectedCity ?? context.t.eventsFilterCity),
-      selectedField ?? context.t.eventsFilterField,
-      selectedAcademicLevel ?? context.t.eventsFilterLevel,
-    ];
-
-    final activeIndices = <int>{
-      if (!_hasActiveFilter) 0,
-      if (nearbyMode || (selectedCity?.isNotEmpty ?? false)) 1,
-      if (selectedField?.isNotEmpty ?? false) 2,
-      if (selectedAcademicLevel?.isNotEmpty ?? false) 3,
-    };
-
-    return Column(
-      children: [
-        _FilterChipRow(
-          activeIndices: activeIndices,
-          labels: chipLabels,
-          dropdownIndices: const {1, 2, 3},
-          onTap: onFilterTap,
-        ),
-        const SizedBox(height: 4),
-        Expanded(
-          child: usersAsync.when(
-            loading: () => const _LoadingList(),
-            error: (e, _) => _EmptyState(
-              icon: Icons.error_outline,
-              title: context.t.somethingWentWrong,
-              subtitle: '$e',
-            ),
-            data: (users) {
-              final results = _filter(users, currentUid, currentUserDoc);
-              if (results.isEmpty) {
-                return _EmptyState(
-                  icon: _emptyIcon,
-                  title: query.isEmpty
-                      ? (_hasActiveFilter
-                          ? context.t.eventsNoMatchingPeople
-                          : context.t.eventsNoPeopleYet)
-                      : context.t.eventsNoResultsFor(query),
-                  subtitle: query.isEmpty
-                      ? _emptySubtitle(context)
-                      : context.t.eventsTryDifferentKeyword,
-                );
-              }
-              return RefreshIndicator(
-                color: _kBrandPurple,
-                onRefresh: () async {
-                  ref.invalidate(_partnersStreamProvider);
-                  await Future.delayed(const Duration(milliseconds: 400));
-                },
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  itemCount: results.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) {
-                    final u = results[i];
-                    return _PartnerCard(
-                      uid: u['__id'] as String,
-                      username: (u['username'] as String?) ?? 'User',
-                      handle: (u['handle'] as String?) ?? '',
-                      avatarUrl: u['avatarUrl'] as String?,
-                      bio: (u['bio'] as String?) ?? '',
-                      postsCount: (u['postsCount'] as int?) ?? 0,
-                      createdAt: (u['createdAt'] as Timestamp?)?.toDate(),
-                      city: (u['city'] as String?) ?? '',
-                      field: u['field'] as String?,
-                      profession: u['profession'] as String?,
-                      academicLevel: u['academicLevel'] as String?,
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FilterChipRow extends StatelessWidget {
-  final Set<int> activeIndices;
-  final List<String> labels;
-  final Set<int> dropdownIndices;
-  final ValueChanged<int> onTap;
-  const _FilterChipRow({
-    required this.activeIndices,
-    required this.labels,
-    required this.dropdownIndices,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 56,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        itemCount: labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final selected = activeIndices.contains(i);
-          final isDropdown = dropdownIndices.contains(i);
-          final child = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                labels[i],
-                style: TextStyle(
-                  color: selected ? Colors.white : context.textSecondary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  height: 1.1,
-                ),
-              ),
-              if (isDropdown) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  selected
-                      ? Icons.close_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  size: 16,
-                  color: selected ? Colors.white : context.textSecondary,
-                ),
-              ],
-            ],
-          );
-          return GestureDetector(
-            onTap: () => onTap(i),
-            child: selected
-                ? AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _kBrandPurple,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: _kBrandPurple),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _kBrandPurple.withValues(alpha: 0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: child,
-                  )
-                : AppGlassCard(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 10),
-                    radius: 22,
-                    surfaceAlpha: context.isDark ? 0.22 : 0.50,
-                    borderAlpha: context.isDark ? 0.14 : 0.46,
-                    child: child,
-                  ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PartnerCard extends ConsumerStatefulWidget {
-  final String uid;
-  final String username;
-  final String handle;
-  final String? avatarUrl;
-  final String bio;
-  final int postsCount;
-  final DateTime? createdAt;
-  final String city;
-  final String? field;
-  final String? profession;
-  final String? academicLevel;
-
-  const _PartnerCard({
-    required this.uid,
-    required this.username,
-    required this.handle,
-    required this.avatarUrl,
-    required this.bio,
-    required this.postsCount,
-    required this.createdAt,
-    required this.city,
-    this.field,
-    this.profession,
-    this.academicLevel,
-  });
-
-  @override
-  ConsumerState<_PartnerCard> createState() => _PartnerCardState();
-}
-
-class _PartnerCardState extends ConsumerState<_PartnerCard> {
-  bool _sending = false;
-  bool _pressed = false;
-
-  Future<void> _wave() async {
-    if (_sending) return;
-    final currentUid = ref.read(authStateProvider).value?.uid;
-    if (currentUid == null) return;
-    setState(() => _sending = true);
-    try {
-      final chatId = await ref.read(chatServiceProvider).openChat(
-            currentUid: currentUid,
-            otherUid: widget.uid,
-          );
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChatScreen(
-            chatId: chatId,
-            otherUid: widget.uid,
-            otherName: widget.username,
-            otherAvatar: widget.avatarUrl ?? '',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.t.eventsFailedToOpenChat(e))),
-      );
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  String _joinedAgo(BuildContext context, DateTime? dt) {
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return context.t.eventsJoinedJustNow;
-    if (diff.inHours < 24) return context.t.eventsJoinedHoursAgo(diff.inHours);
-    if (diff.inDays < 30) return context.t.eventsJoinedDaysAgo(diff.inDays);
-    if (diff.inDays < 365) {
-      final months = (diff.inDays / 30).floor();
-      return context.t.eventsJoinedMonthsAgo(months);
-    }
-    final years = (diff.inDays / 365).floor();
-    return context.t.eventsJoinedYearsAgo(years);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final presenceAsync = ref.watch(presenceWatchProvider(widget.uid));
-    final isOnline = presenceAsync.whenOrNull(data: (p) => p.online) ?? false;
-    final joined = _joinedAgo(context, widget.createdAt);
-
-    return AnimatedScale(
-      scale: _pressed ? 0.98 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTap: () => openUserProfile(context, uid: widget.uid),
-        child: AppGlassCard(
-          padding: const EdgeInsets.all(14),
-          radius: 22,
-          emphasize: isOnline,
-          surfaceAlpha: context.isDark ? 0.24 : 0.52,
-          borderAlpha: context.isDark ? 0.16 : 0.50,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: isOnline
-                              ? const LinearGradient(
-                                  colors: [_kBrandPurple, _kBrandDeep],
-                                )
-                              : null,
-                          border: isOnline
-                              ? null
-                              : Border.all(
-                                  color: context.borderColor, width: 2),
-                        ),
-                        child: CircleAvatar(
-                          radius: 28,
-                          backgroundColor: const Color(0xFFF0F0F5),
-                          backgroundImage: widget.avatarUrl != null
-                              ? CachedNetworkImageProvider(widget.avatarUrl!)
-                              : null,
-                          child: widget.avatarUrl == null
-                              ? Icon(Icons.person, color: context.textMuted)
-                              : null,
-                        ),
-                      ),
-                      if (isOnline)
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3BD671),
-                              shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: context.cardBg, width: 2.5),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            color: context.textPrimary,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: isOnline
-                                    ? const Color(0xFF3BD671)
-                                    : context.textSecondary
-                                        .withValues(alpha: 0.4),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                isOnline ? context.t.eventsActiveNow : joined,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isOnline
-                                      ? const Color(0xFF3BD671)
-                                      : context.textSecondary,
-                                  fontWeight: isOnline
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  _WaveButton(busy: _sending, onTap: _wave),
-                ],
-              ),
-              if (widget.bio.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  widget.bio,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.textPrimary,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              if ((widget.field?.isNotEmpty ?? false) ||
-                  (widget.profession?.isNotEmpty ?? false) ||
-                  (widget.academicLevel?.isNotEmpty ?? false) ||
-                  widget.city.isNotEmpty ||
-                  widget.postsCount > 0) ...[
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    // Show field, profession, academic level if available
-                    if (widget.field?.isNotEmpty ?? false)
-                      _Tag(label: widget.field!),
-                    if (widget.profession?.isNotEmpty ?? false)
-                      _Tag(label: widget.profession!),
-                    if (widget.academicLevel?.isNotEmpty ?? false)
-                      _Tag(label: widget.academicLevel!),
-                    // Show location as fallback if no field/profession/academic level
-                    if ((widget.field?.isEmpty ?? true) &&
-                        (widget.profession?.isEmpty ?? true) &&
-                        (widget.academicLevel?.isEmpty ?? true) &&
-                        widget.city.isNotEmpty)
-                      _Tag(label: widget.city, icon: Icons.location_on_rounded),
-                    if (widget.postsCount > 0)
-                      _Tag(label: context.t.eventsPostsCount(widget.postsCount)),
-                    if (widget.postsCount >= 3)
-                      _Tag(label: context.t.eventsVeryActive),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WaveButton extends StatelessWidget {
-  final bool busy;
-  final VoidCallback onTap;
-  const _WaveButton({required this.busy, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: busy ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 54,
-        height: 40,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [_kBrandPurple, _kBrandDeep],
-          ),
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: _kBrandPurple.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: busy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(
-                Icons.waving_hand_rounded,
-                color: Colors.white,
-                size: 21,
-              ),
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  const _Tag({required this.label, this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppGlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      radius: 20,
-      surfaceAlpha: context.isDark ? 0.20 : 0.44,
-      borderAlpha: context.isDark ? 0.12 : 0.38,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 11, color: _kTagOrangeText),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            label,
-            style: const TextStyle(
-              color: _kTagOrangeText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
           ),
         ],
       ),
@@ -1415,7 +425,7 @@ class _EventsView extends ConsumerWidget {
                               parent: BouncingScrollPhysics(),
                             ),
                             slivers: [
-                                              SliverPadding(
+                              SliverPadding(
                                 padding:
                                     const EdgeInsets.fromLTRB(20, 8, 20, 120),
                                 sliver: SliverGrid(
@@ -1487,7 +497,8 @@ class _EventFilterBar extends StatelessWidget {
             child: _EventFilterChip(
               active: typeActive,
               icon: Icons.tune_rounded,
-              label: typeActive ? selectedType! : context.t.eventsFilterByTypeChip,
+              label:
+                  typeActive ? selectedType! : context.t.eventsFilterByTypeChip,
               onTap: onTypeTap,
               onClear: onClearType,
             ),
@@ -1643,7 +654,6 @@ class _LayoutToggle extends StatelessWidget {
     );
   }
 }
-
 
 class _EventCard extends StatefulWidget {
   final AdminEvent event;
@@ -1941,21 +951,6 @@ class _EventCardState extends State<_EventCard> {
 // ─────────────────────────────────────────────────────────
 // Loading skeletons + empty state
 // ─────────────────────────────────────────────────────────
-class _LoadingList extends StatelessWidget {
-  const _LoadingList();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 4,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, __) => const _ShimmerBlock(height: 112),
-    );
-  }
-}
-
 class _LoadingGrid extends StatelessWidget {
   const _LoadingGrid();
 
@@ -2540,9 +1535,7 @@ class _EventsMapViewState extends ConsumerState<_EventsMapView> {
             // so they aren't dropped tight on a pin and forced to zoom out.
             // Without a saved home location, fall back to the events overview
             // (wide for many, regional for one).
-            initialZoom: home != null
-                ? 5.5
-                : (markers.length > 1 ? 4 : 9),
+            initialZoom: home != null ? 5.5 : (markers.length > 1 ? 4 : 9),
             minZoom: 2,
             maxZoom: 18,
           ),

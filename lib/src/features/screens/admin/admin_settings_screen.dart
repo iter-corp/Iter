@@ -236,8 +236,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.t.failedWithError(e))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.t.failedWithError(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -249,233 +249,254 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     final cfgAsync = ref.watch(adminConfigProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.adminAppSettings),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(context.t.save),
-          ),
-        ],
-      ),
       body: AppPageBackground(
-        child: cfgAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
-        data: (cfg) {
-          _hydrate(cfg);
-          return ListView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              16 + MediaQuery.of(context).padding.bottom + 8,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.adminAppSettings),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+              actions: [
+                TextButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(context.t.save),
+                ),
+              ],
             ),
-            children: [
-              _section(context.t.adminSectionFeatureFlags),
-              _flag(
-                title: context.t.adminFlagStories,
-                value: _cfg.storiesEnabled,
-                onChanged: (v) =>
-                    setState(() => _cfg = _cfg.copyWith(storiesEnabled: v)),
+            cfgAsync.when<Widget>(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
               ),
-              _flag(
-                title: context.t.adminFlagReposts,
-                value: _cfg.repostsEnabled,
-                onChanged: (v) =>
-                    setState(() => _cfg = _cfg.copyWith(repostsEnabled: v)),
+              error: (e, _) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(context.t.errorWithMessage(e))),
               ),
-              _flag(
-                title: context.t.adminFlagTranslate,
-                value: _cfg.translateEnabled,
-                onChanged: (v) =>
-                    setState(() => _cfg = _cfg.copyWith(translateEnabled: v)),
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSectionAnnouncement),
-              _textInputCard(
-                controller: _announcementCtrl,
-                hintText: context.t.adminAnnouncementHint,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSectionMaintenance),
-              _flag(
-                title: context.t.adminFlagMaintenance,
-                value: _cfg.maintenanceMode,
-                onChanged: (v) =>
-                    setState(() => _cfg = _cfg.copyWith(maintenanceMode: v)),
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSectionMinAppVersion),
-              _textInputCard(
-                controller: _minVersionCtrl,
-                hintText: context.t.adminMinVersionHint,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSectionAppStoreLinks),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminAppStoreLinksDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _textInputCard(
-                controller: _iosUrlCtrl,
-                hintText: context.t.adminIosUrlHint,
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 8),
-              _textInputCard(
-                controller: _androidUrlCtrl,
-                hintText: context.t.adminAndroidUrlHint,
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSectionEventTypes),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminEventTypesDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _editableList(
-                items: _cfg.eventTypes,
-                controller: _newTypeCtrl,
-                hint: context.t.adminAddEventType,
-                errorText: _newTypeError,
-                onInputChanged: (_) {
-                  if (_newTypeError != null) {
-                    setState(() => _newTypeError = null);
-                  }
-                },
-                onAdd: _addEventType,
-                onRemove: _removeEventType,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSettingsSectionProfessions),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminSettingsSectionProfessionsDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _editableList(
-                items: _cfg.profileProfessionOptions,
-                controller: _newProfessionCtrl,
-                hint: context.t.adminSettingsAddProfession,
-                errorText: _newProfessionError,
-                onInputChanged: (_) {
-                  if (_newProfessionError != null) {
-                    setState(() => _newProfessionError = null);
-                  }
-                },
-                onAdd: _addProfession,
-                onRemove: _removeProfession,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSettingsSectionFields),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminSettingsSectionFieldsDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _editableList(
-                items: _cfg.profileFieldOptions,
-                controller: _newFieldCtrl,
-                hint: context.t.adminSettingsAddField,
-                errorText: _newFieldError,
-                onInputChanged: (_) {
-                  if (_newFieldError != null)
-                    setState(() => _newFieldError = null);
-                },
-                onAdd: _addField,
-                onRemove: _removeField,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSettingsSectionAcademicLevels),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminSettingsSectionAcademicLevelsDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _editableList(
-                items: _cfg.profileAcademicLevelOptions,
-                controller: _newAcademicLevelCtrl,
-                hint: context.t.adminSettingsAddAcademicLevel,
-                errorText: _newAcademicLevelError,
-                onInputChanged: (_) {
-                  if (_newAcademicLevelError != null) {
-                    setState(() => _newAcademicLevelError = null);
-                  }
-                },
-                onAdd: _addAcademicLevel,
-                onRemove: _removeAcademicLevel,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSettingsSectionGoals),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminSettingsSectionGoalsDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _editableList(
-                items: _cfg.profileGoalOptions,
-                controller: _newGoalCtrl,
-                hint: context.t.adminSettingsAddGoal,
-                errorText: _newGoalError,
-                onInputChanged: (_) {
-                  if (_newGoalError != null)
-                    setState(() => _newGoalError = null);
-                },
-                onAdd: _addGoal,
-                onRemove: _removeGoal,
-              ),
-              const SizedBox(height: 16),
-              _section(context.t.adminSettingsSectionProfanity),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  context.t.adminSettingsSectionProfanityDesc,
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ),
-              _editableList(
-                items: _cfg.profanityWordsEn,
-                controller: _newProfanityCtrl,
-                hint: context.t.adminSettingsAddProfanity,
-                errorText: _newProfanityError,
-                onInputChanged: (_) {
-                  if (_newProfanityError != null) {
-                    setState(() => _newProfanityError = null);
-                  }
-                },
-                onAdd: _addProfanity,
-                onRemove: _removeProfanity,
-              ),
-              const SizedBox(height: 24),
-            ],
-          );
-        },
+              data: (cfg) {
+                _hydrate(cfg);
+                return SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    16 + MediaQuery.of(context).padding.bottom + 8,
+                  ),
+                  sliver: SliverList.list(
+                    children: [
+                      _section(context.t.adminSectionFeatureFlags),
+                      _flag(
+                        title: context.t.adminFlagStories,
+                        value: _cfg.storiesEnabled,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(storiesEnabled: v)),
+                      ),
+                      _flag(
+                        title: context.t.adminFlagReposts,
+                        value: _cfg.repostsEnabled,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(repostsEnabled: v)),
+                      ),
+                      _flag(
+                        title: context.t.adminFlagTranslate,
+                        value: _cfg.translateEnabled,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(translateEnabled: v)),
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSectionAnnouncement),
+                      _textInputCard(
+                        controller: _announcementCtrl,
+                        hintText: context.t.adminAnnouncementHint,
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSectionMaintenance),
+                      _flag(
+                        title: context.t.adminFlagMaintenance,
+                        value: _cfg.maintenanceMode,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(maintenanceMode: v)),
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSectionMinAppVersion),
+                      _textInputCard(
+                        controller: _minVersionCtrl,
+                        hintText: context.t.adminMinVersionHint,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSectionAppStoreLinks),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminAppStoreLinksDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _textInputCard(
+                        controller: _iosUrlCtrl,
+                        hintText: context.t.adminIosUrlHint,
+                        keyboardType: TextInputType.url,
+                      ),
+                      const SizedBox(height: 8),
+                      _textInputCard(
+                        controller: _androidUrlCtrl,
+                        hintText: context.t.adminAndroidUrlHint,
+                        keyboardType: TextInputType.url,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSectionEventTypes),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminEventTypesDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _editableList(
+                        items: _cfg.eventTypes,
+                        controller: _newTypeCtrl,
+                        hint: context.t.adminAddEventType,
+                        errorText: _newTypeError,
+                        onInputChanged: (_) {
+                          if (_newTypeError != null) {
+                            setState(() => _newTypeError = null);
+                          }
+                        },
+                        onAdd: _addEventType,
+                        onRemove: _removeEventType,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSettingsSectionProfessions),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminSettingsSectionProfessionsDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _editableList(
+                        items: _cfg.profileProfessionOptions,
+                        controller: _newProfessionCtrl,
+                        hint: context.t.adminSettingsAddProfession,
+                        errorText: _newProfessionError,
+                        onInputChanged: (_) {
+                          if (_newProfessionError != null) {
+                            setState(() => _newProfessionError = null);
+                          }
+                        },
+                        onAdd: _addProfession,
+                        onRemove: _removeProfession,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSettingsSectionFields),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminSettingsSectionFieldsDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _editableList(
+                        items: _cfg.profileFieldOptions,
+                        controller: _newFieldCtrl,
+                        hint: context.t.adminSettingsAddField,
+                        errorText: _newFieldError,
+                        onInputChanged: (_) {
+                          if (_newFieldError != null)
+                            setState(() => _newFieldError = null);
+                        },
+                        onAdd: _addField,
+                        onRemove: _removeField,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSettingsSectionAcademicLevels),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminSettingsSectionAcademicLevelsDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _editableList(
+                        items: _cfg.profileAcademicLevelOptions,
+                        controller: _newAcademicLevelCtrl,
+                        hint: context.t.adminSettingsAddAcademicLevel,
+                        errorText: _newAcademicLevelError,
+                        onInputChanged: (_) {
+                          if (_newAcademicLevelError != null) {
+                            setState(() => _newAcademicLevelError = null);
+                          }
+                        },
+                        onAdd: _addAcademicLevel,
+                        onRemove: _removeAcademicLevel,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSettingsSectionGoals),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminSettingsSectionGoalsDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _editableList(
+                        items: _cfg.profileGoalOptions,
+                        controller: _newGoalCtrl,
+                        hint: context.t.adminSettingsAddGoal,
+                        errorText: _newGoalError,
+                        onInputChanged: (_) {
+                          if (_newGoalError != null)
+                            setState(() => _newGoalError = null);
+                        },
+                        onAdd: _addGoal,
+                        onRemove: _removeGoal,
+                      ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSettingsSectionProfanity),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(
+                          context.t.adminSettingsSectionProfanityDesc,
+                          style: TextStyle(
+                              fontSize: 12, color: context.textSecondary),
+                        ),
+                      ),
+                      _editableList(
+                        items: _cfg.profanityWordsEn,
+                        controller: _newProfanityCtrl,
+                        hint: context.t.adminSettingsAddProfanity,
+                        errorText: _newProfanityError,
+                        onInputChanged: (_) {
+                          if (_newProfanityError != null) {
+                            setState(() => _newProfanityError = null);
+                          }
+                        },
+                        onAdd: _addProfanity,
+                        onRemove: _removeProfanity,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -696,7 +717,8 @@ class _FocusInputRowState extends State<_FocusInputRow> {
   Widget build(BuildContext context) {
     return AppGlassCard(
       radius: 16,
-      borderAlpha: widget.errorText != null || _focusNode.hasFocus ? 0.65 : null,
+      borderAlpha:
+          widget.errorText != null || _focusNode.hasFocus ? 0.65 : null,
       padding: const EdgeInsets.fromLTRB(14, 2, 10, 2),
       child: Row(
         children: [

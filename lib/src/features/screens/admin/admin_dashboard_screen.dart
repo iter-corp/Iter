@@ -43,128 +43,141 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.adminDashboardTitle),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            28 + MediaQuery.paddingOf(context).bottom,
-          ),
-          children: [
-            _AdminTile(
-            icon: Icons.people_alt_outlined,
-            title: context.t.adminTileUsersTitle,
-            subtitle: context.t.adminTileUsersSubtitle,
-            color: const Color(0xFF7E3BE8),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminUsersScreen()),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.adminDashboardTitle),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
             ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.feed_outlined,
-            title: context.t.adminTilePostsTitle,
-            subtitle: context.t.adminTilePostsSubtitle,
-            color: const Color(0xFFD044E8),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminPostsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.forum_outlined,
-            title: context.t.adminDiscussPosts,
-            subtitle: context.t.adminDiscussPostsSubtitle,
-            color: const Color(0xFF9C6ADE),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminDiscussPostsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.assessment_outlined,
-            title: context.t.reports,
-            subtitle: context.t.adminTileReportsSubtitle,
-            color: const Color(0xFFE04E5C),
-            showNotificationDot: hasNewReports,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminReportsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.support_agent_outlined,
-            title: context.t.contactRequests,
-            subtitle: context.t.adminTileContactSubtitle,
-            color: AppColors.purple,
-            showNotificationDot: hasUnreadContact,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminContactRequestsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.event_outlined,
-            title: context.t.events,
-            subtitle: context.t.adminTileEventsSubtitle,
-            color: const Color(0xFFFF6B35),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.block_outlined,
-            title: context.t.adminBlacklistedEmails,
-            subtitle: context.t.adminTileBlacklistSubtitle,
-            color: Colors.red,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const AdminBlacklistScreen(),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                28 + MediaQuery.paddingOf(context).bottom,
+              ),
+              sliver: SliverList.list(
+                children: [
+                  _AdminTile(
+                    icon: Icons.people_alt_outlined,
+                    title: context.t.adminTileUsersTitle,
+                    subtitle: context.t.adminTileUsersSubtitle,
+                    color: const Color(0xFF7E3BE8),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminUsersScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.feed_outlined,
+                    title: context.t.adminTilePostsTitle,
+                    subtitle: context.t.adminTilePostsSubtitle,
+                    color: const Color(0xFFD044E8),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminPostsScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.forum_outlined,
+                    title: context.t.adminDiscussPosts,
+                    subtitle: context.t.adminDiscussPostsSubtitle,
+                    color: const Color(0xFF9C6ADE),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminDiscussPostsScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.assessment_outlined,
+                    title: context.t.reports,
+                    subtitle: context.t.adminTileReportsSubtitle,
+                    color: const Color(0xFFE04E5C),
+                    showNotificationDot: hasNewReports,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminReportsScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.support_agent_outlined,
+                    title: context.t.contactRequests,
+                    subtitle: context.t.adminTileContactSubtitle,
+                    color: AppColors.purple,
+                    showNotificationDot: hasUnreadContact,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminContactRequestsScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.event_outlined,
+                    title: context.t.events,
+                    subtitle: context.t.adminTileEventsSubtitle,
+                    color: const Color(0xFFFF6B35),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminEventsScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.block_outlined,
+                    title: context.t.adminBlacklistedEmails,
+                    subtitle: context.t.adminTileBlacklistSubtitle,
+                    color: Colors.red,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminBlacklistScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.vpn_key_outlined,
+                    title: context.t.adminApiManager,
+                    subtitle: context.t.adminApiManagerEmptySubtitle,
+                    color: const Color(0xFF10A37F),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminApiManagerScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _AdminTile(
+                    icon: Icons.settings_outlined,
+                    title: context.t.adminAppSettings,
+                    subtitle: context.t.adminTileSettingsSubtitle,
+                    color: const Color(0xFF3AB0FF),
+                    showNotificationDot: hasUnreadContact,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminSettingsScreen()),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.vpn_key_outlined,
-            title: context.t.adminApiManager,
-            subtitle: context.t.adminApiManagerEmptySubtitle,
-            color: const Color(0xFF10A37F),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminApiManagerScreen()),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _AdminTile(
-            icon: Icons.settings_outlined,
-            title: context.t.adminAppSettings,
-            subtitle: context.t.adminTileSettingsSubtitle,
-            color: const Color(0xFF3AB0FF),
-            showNotificationDot: hasUnreadContact,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
-            ),
-          ),
           ],
         ),
       ),
@@ -198,73 +211,73 @@ class _AdminTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(icon, color: color),
-                    if (showNotificationDot)
-                      Positioned(
-                        right: -3,
-                        top: -3,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE04E5C),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: context.isDark
-                                  ? const Color(0xFF1E1E2C)
-                                  : Colors.white,
-                              width: 1.2,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(icon, color: color),
+                      if (showNotificationDot)
+                        Positioned(
+                          right: -3,
+                          top: -3,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE04E5C),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: context.isDark
+                                    ? const Color(0xFF1E1E2C)
+                                    : Colors.white,
+                                width: 1.2,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: context.textPrimary,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: context.textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.textSecondary,
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: Color(0xFFB1B1B6)),
-            ],
+                const Icon(Icons.chevron_right, color: Color(0xFFB1B1B6)),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

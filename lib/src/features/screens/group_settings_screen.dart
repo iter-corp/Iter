@@ -89,8 +89,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(context.t.groupSettingsError(e))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.groupSettingsError(e))));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

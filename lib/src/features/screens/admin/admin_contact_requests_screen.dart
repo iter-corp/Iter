@@ -40,40 +40,50 @@ class _AdminContactRequestsScreenState
     final async = ref.watch(allContactRequestsProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.contactRequests),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: SafeArea(
-          child: Column(
-          children: [
-            _FilterBar(
-              onlyUnread: _onlyUnread,
-              onUnreadChanged: (v) => setState(() => _onlyUnread = v),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.contactRequests),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
             ),
-            Expanded(
-              child: async.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text(context.t.adminCouldNotLoad(e))),
-                data: (all) {
-                  final filtered = all.where((r) {
-                    if (_onlyUnread && !r.unreadByAdmin) return false;
-                    return true;
-                  }).toList();
-                  if (filtered.isEmpty) {
-                    return Center(
+            SliverToBoxAdapter(
+              child: _FilterBar(
+                onlyUnread: _onlyUnread,
+                onUnreadChanged: (v) => setState(() => _onlyUnread = v),
+              ),
+            ),
+            async.when<Widget>(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(context.t.adminCouldNotLoad(e))),
+              ),
+              data: (all) {
+                final filtered = all.where((r) {
+                  if (_onlyUnread && !r.unreadByAdmin) return false;
+                  return true;
+                }).toList();
+                if (filtered.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
                       child: Text(context.t.adminNoRequests,
                           style: TextStyle(color: context.textSecondary)),
-                    );
-                  }
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                  sliver: SliverList.separated(
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) => _AdminRequestTile(
@@ -85,12 +95,11 @@ class _AdminContactRequestsScreenState
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ],
-          ),
         ),
       ),
     );
@@ -160,148 +169,148 @@ class _AdminRequestTile extends ConsumerWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isOrg
-                                ? AppColors.purple.withValues(alpha: 0.12)
-                                : context.surfaceSoft,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            isOrg
-                                ? context.t.adminBadgeOrganization
-                                : context.t.adminBadgeMessage,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.6,
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
                               color: isOrg
-                                  ? AppColors.purple
-                                  : context.textSecondary,
+                                  ? AppColors.purple.withValues(alpha: 0.12)
+                                  : context.surfaceSoft,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isOrg
+                                  ? context.t.adminBadgeOrganization
+                                  : context.t.adminBadgeMessage,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                                color: isOrg
+                                    ? AppColors.purple
+                                    : context.textSecondary,
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          _StatusPill(status: request.status),
+                          const Spacer(),
+                          Text(
+                            context.t.timeAgo(
+                                request.lastMessageAt ?? request.createdAt),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                          if (unread) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 9,
+                              height: 9,
+                              decoration: const BoxDecoration(
+                                color: AppColors.purple,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        request.userName.isNotEmpty
+                            ? request.userName
+                            : request.userEmail,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary,
                         ),
-                        const SizedBox(width: 8),
-                        _StatusPill(status: request.status),
-                        const Spacer(),
+                      ),
+                      if (request.userName.isNotEmpty &&
+                          request.userEmail.isNotEmpty) ...[
+                        const SizedBox(height: 2),
                         Text(
-                          context.t.timeAgo(
-                              request.lastMessageAt ?? request.createdAt),
+                          request.userEmail,
                           style: TextStyle(
                             fontSize: 11,
                             color: context.textSecondary,
                           ),
                         ),
-                        if (unread) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 9,
-                            height: 9,
-                            decoration: const BoxDecoration(
-                              color: AppColors.purple,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
                       ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      request.userName.isNotEmpty
-                          ? request.userName
-                          : request.userEmail,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: context.textPrimary,
-                      ),
-                    ),
-                    if (request.userName.isNotEmpty &&
-                        request.userEmail.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 8),
                       Text(
-                        request.userEmail,
+                        request.lastMessagePreview.isNotEmpty
+                            ? request.lastMessagePreview
+                            : request.subject,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11,
-                          color: context.textSecondary,
+                          fontSize: 13,
+                          color: context.textPrimary,
+                          height: 1.35,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    Text(
-                      request.lastMessagePreview.isNotEmpty
-                          ? request.lastMessagePreview
-                          : request.subject,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: context.textPrimary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: context.t.adminDeleteConversationTooltip,
-                icon: const Icon(Icons.delete_outline,
-                    size: 18, color: Colors.red),
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(context.t.adminDeleteConversationTitle),
-                      content: Text(context.t.adminDeleteConversationBody),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: Text(context.t.cancel),
-                        ),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.red,
+                IconButton(
+                  tooltip: context.t.adminDeleteConversationTooltip,
+                  icon: const Icon(Icons.delete_outline,
+                      size: 18, color: Colors.red),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text(context.t.adminDeleteConversationTitle),
+                        content: Text(context.t.adminDeleteConversationBody),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: Text(context.t.cancel),
                           ),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: Text(context.t.delete),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed != true) return;
-                  try {
-                    await ref
-                        .read(contactRequestServiceProvider)
-                        .deleteRequest(request.id);
-                    if (!context.mounted) return;
-                    AppFeedback.showSuccess(
-                        context, context.t.adminConversationDeleted);
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    AppFeedback.showError(
-                        context, context.t.failedWithError(e));
-                  }
-                },
-              ),
-            ],
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: Text(context.t.delete),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
+                    try {
+                      await ref
+                          .read(contactRequestServiceProvider)
+                          .deleteRequest(request.id);
+                      if (!context.mounted) return;
+                      AppFeedback.showSuccess(
+                          context, context.t.adminConversationDeleted);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      AppFeedback.showError(
+                          context, context.t.failedWithError(e));
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

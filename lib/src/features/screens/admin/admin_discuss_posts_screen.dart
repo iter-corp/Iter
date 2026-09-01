@@ -27,79 +27,92 @@ class _AdminDiscussPostsScreenState
     final postsAsync = ref.watch(adminDiscussPostsProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.adminDiscussPosts),
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: AppGlassCard(
-                radius: 16,
-                padding: EdgeInsets.zero,
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    inputDecorationTheme: const InputDecorationTheme(
-                      filled: false,
-                      fillColor: Colors.transparent,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.adminDiscussPosts),
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: AppGlassCard(
+                  radius: 16,
+                  padding: EdgeInsets.zero,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      inputDecorationTheme: const InputDecorationTheme(
+                        filled: false,
+                        fillColor: Colors.transparent,
+                      ),
                     ),
-                  ),
-                  child: TextField(
-                    onChanged: (v) => setState(() => _query = v),
-                    textAlignVertical: TextAlignVertical.center,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.search),
-                      prefixIconConstraints:
-                          const BoxConstraints(minWidth: 48, minHeight: 48),
-                      hintText: context.t.adminDiscussSearchHint,
-                      filled: false,
-                      fillColor: Colors.transparent,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
+                    child: TextField(
+                      onChanged: (v) => setState(() => _query = v),
+                      textAlignVertical: TextAlignVertical.center,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search),
+                        prefixIconConstraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 48),
+                        hintText: context.t.adminDiscussSearchHint,
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-            Expanded(
-              child: postsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text(context.t.errorWithMessage(e))),
-                data: (allPosts) {
-                  final q = _query.trim().toLowerCase();
-                  final posts = q.isEmpty
-                      ? allPosts
-                      : allPosts.where((p) {
-                          final author = (p['authorUsername'] as String? ?? '')
-                              .toLowerCase();
-                          final caption =
-                              (p['caption'] as String? ?? '').toLowerCase();
-                          return author.contains(q) || caption.contains(q);
-                        }).toList();
-                  if (posts.isEmpty) {
-                    return Center(
+            postsAsync.when<Widget>(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(context.t.errorWithMessage(e))),
+              ),
+              data: (allPosts) {
+                final q = _query.trim().toLowerCase();
+                final posts = q.isEmpty
+                    ? allPosts
+                    : allPosts.where((p) {
+                        final author = (p['authorUsername'] as String? ?? '')
+                            .toLowerCase();
+                        final caption =
+                            (p['caption'] as String? ?? '').toLowerCase();
+                        return author.contains(q) || caption.contains(q);
+                      }).toList();
+                if (posts.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
                       child: Text(
                         q.isEmpty
                             ? context.t.adminDiscussNoPosts
                             : context.t.adminDiscussNoPostsMatch,
                         style: TextStyle(color: context.textSecondary),
                       ),
-                    );
-                  }
-                  final bottomPadding =
-                      MediaQuery.viewPaddingOf(context).bottom + 28;
-                  return ListView.builder(
-                    padding: EdgeInsets.fromLTRB(12, 0, 12, bottomPadding),
+                    ),
+                  );
+                }
+                final bottomPadding =
+                    MediaQuery.viewPaddingOf(context).bottom + 28;
+                return SliverPadding(
+                  padding: EdgeInsets.fromLTRB(12, 0, 12, bottomPadding),
+                  sliver: SliverList.builder(
                     itemCount: posts.length,
                     itemBuilder: (_, i) {
                       final p = posts[i];
@@ -168,9 +181,9 @@ class _AdminDiscussPostsScreenState
                         ),
                       );
                     },
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ],
         ),

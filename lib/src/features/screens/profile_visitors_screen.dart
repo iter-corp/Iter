@@ -25,99 +25,120 @@ class ProfileVisitorsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(context.t.profileVisitors),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        foregroundColor: context.textPrimary,
-        elevation: 0,
-        flexibleSpace: const AppPageBackground(child: SizedBox.expand()),
-      ),
       body: AppPageBackground(
-        child: Column(
-          children: [
-            AppGlassCard(
-              margin: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              radius: 18,
-              child: Row(
-                children: [
-                  const Icon(Icons.visibility_outlined,
-                      color: Color(0xFFB05ECC)),
-                  const SizedBox(width: 10),
-                  Text(
-                    countAsync.when(
-                      data: (c) => context.t.profileVisitorsCount(c),
-                      loading: () => context.t.profileVisitorsCount('...'),
-                      error: (_, __) => context.t.profileVisitorsCount('-'),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: Text(context.t.profileVisitors),
+              centerTitle: false,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.textPrimary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              floating: true,
+              snap: true,
+            ),
+            // Plain header row sitting directly on the page background — no
+            // boxed card, so the top of the screen reads as one continuous
+            // scrollable surface rather than a second bar.
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.visibility_outlined,
+                        color: Color(0xFFB05ECC)),
+                    const SizedBox(width: 10),
+                    Text(
+                      countAsync.when(
+                        data: (c) => context.t.profileVisitorsCount(c),
+                        loading: () => context.t.profileVisitorsCount('...'),
+                        error: (_, __) => context.t.profileVisitorsCount('-'),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            Expanded(
-              child: visitorsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text(context.t.errorWithMessage(e))),
-                data: (visitors) {
-                  if (visitors.isEmpty) {
-                    return Center(
-                      child: AppGlassCard(
-                        margin: const EdgeInsets.all(24),
-                        padding: const EdgeInsets.all(24),
-                        radius: 20,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.search_off,
-                                size: 48, color: context.textMuted),
-                            const SizedBox(height: 12),
-                            Text(
-                              context.t.profileNoVisitsYet,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: context.textPrimary,
+            ...visitorsAsync.when(
+              loading: () => const <Widget>[
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ],
+              error: (e, _) => <Widget>[
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: Text(context.t.errorWithMessage(e))),
+                ),
+              ],
+              data: (visitors) {
+                if (visitors.isEmpty) {
+                  return <Widget>[
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: AppGlassCard(
+                          margin: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
+                          radius: 20,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off,
+                                  size: 48, color: context.textMuted),
+                              const SizedBox(height: 12),
+                              Text(
+                                context.t.profileNoVisitsYet,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  color: context.textPrimary,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              context.t.profileNoVisitsSubtitle,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: context.textSecondary,
+                              const SizedBox(height: 4),
+                              Text(
+                                context.t.profileNoVisitsSubtitle,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: context.textSecondary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    );
-                  }
-                  return ListView.separated(
+                    ),
+                  ];
+                }
+                return <Widget>[
+                  SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                       16,
                       0,
                       16,
                       20 + MediaQuery.paddingOf(context).bottom,
                     ),
-                    itemCount: visitors.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) {
-                      final v = visitors[i];
-                      return _VisitorTile(
-                        entry: v,
-                        relative: context.t.timeAgo(v.lastVisitedAt),
-                      );
-                    },
-                  );
-                },
-              ),
+                    sliver: SliverList.separated(
+                      itemCount: visitors.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) {
+                        final v = visitors[i];
+                        return _VisitorTile(
+                          entry: v,
+                          relative: context.t.timeAgo(v.lastVisitedAt),
+                        );
+                      },
+                    ),
+                  ),
+                ];
+              },
             ),
           ],
         ),
