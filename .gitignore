@@ -79,3 +79,4 @@ service-account.json
 # ─────────────────────────────────────────────
 .env
 .env.*
+"android/local.properties" 
