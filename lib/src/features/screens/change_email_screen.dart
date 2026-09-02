@@ -125,12 +125,15 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
           slivers: [
             SliverAppBar(
               title: Text(context.t.changeEmail),
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
               actions: [
                 TextButton(
                   onPressed: _busy ? null : _save,

@@ -83,6 +83,79 @@ class _AmbientGlow extends StatelessWidget {
   }
 }
 
+/// Circular frosted back button that floats over a scrolling settings list,
+/// matching the pill Instagram keeps pinned in the top-left of its
+/// "Settings and activity" screen. Blurs whatever scrolls behind it and lays
+/// a faint tint on top so it stays legible over any content.
+class FrostedCircleBackButton extends StatelessWidget {
+  const FrostedCircleBackButton({super.key, this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: 6),
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Material(
+              color: (isDark ? Colors.white : Colors.black)
+                  .withValues(alpha: isDark ? 0.14 : 0.06),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onTap ?? () => Navigator.of(context).maybePop(),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    Icons.arrow_back_ios_new,
+                    size: 18,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Frosted-glass fill for a pinned [SliverAppBar.flexibleSpace] so the list
+/// blurs as it scrolls behind the title — the header treatment Instagram uses
+/// on its "Settings and activity" screen. Blurs whatever sits behind the bar
+/// and lays a translucent tint on top, matching [GlassBar].
+class FrostedAppBarBackground extends StatelessWidget {
+  const FrostedAppBarBackground({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: (isDark ? const Color(0xFF12121A) : Colors.white)
+                .withValues(alpha: 0.55),
+            border: Border(
+              bottom: BorderSide(
+                color: (isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Shared glass surface used for cards and tool panels on the app background.
 class AppGlassCard extends StatelessWidget {
   final Widget child;

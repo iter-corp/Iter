@@ -26,12 +26,15 @@ class LanguageScreen extends ConsumerWidget {
             SliverAppBar(
               title: Text(context.t.appLanguage),
               centerTitle: false,
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
             ),
             SliverPadding(
               padding: EdgeInsets.fromLTRB(

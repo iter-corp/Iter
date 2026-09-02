@@ -78,12 +78,15 @@ class _ContactMessageScaffold extends StatelessWidget {
           slivers: [
             SliverAppBar(
               title: Text(context.t.contactUs),
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
             ),
             SliverFillRemaining(
               hasScrollBody: false,
@@ -193,12 +196,15 @@ class _NewRequestScreenState extends ConsumerState<_NewRequestScreen> {
           slivers: [
             SliverAppBar(
               title: Text(context.t.contactNewRequest),
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),

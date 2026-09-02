@@ -19,18 +19,17 @@ class BlockedUsersScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               title: Text(context.t.blockedUsers),
               centerTitle: false,
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
             ),
             const _BlockedUsersList(),
           ],

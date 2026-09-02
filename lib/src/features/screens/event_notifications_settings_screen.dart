@@ -126,12 +126,15 @@ class _EventNotificationsSettingsScreenState
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               titleSpacing: 8,
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
               actions: [
                 TextButton(
                   onPressed: _saving ? null : _save,

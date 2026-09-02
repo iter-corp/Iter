@@ -37,12 +37,15 @@ class AccountCenterScreen extends ConsumerWidget {
           slivers: [
             SliverAppBar(
               title: Text(context.t.accountCenter),
+              automaticallyImplyLeading: false,
+              leading: const FrostedCircleBackButton(),
+              leadingWidth: 56,
+              flexibleSpace: const FrostedAppBarBackground(),
               backgroundColor: Colors.transparent,
               foregroundColor: context.textPrimary,
               elevation: 0,
               scrolledUnderElevation: 0,
-              floating: true,
-              snap: true,
+              pinned: true,
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),

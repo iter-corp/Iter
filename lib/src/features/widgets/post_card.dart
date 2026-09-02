@@ -5,7 +5,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -473,26 +472,13 @@ class _PostCardState extends ConsumerState<PostCard>
                                         GestureDetector(
                                           behavior: HitTestBehavior.opaque,
                                           onTap: _toggleLike,
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                isLiked
-                                                    ? Icons.favorite
-                                                    : Icons.favorite_border,
-                                                color: isLiked
-                                                    ? AppColors.purple
-                                                    : Colors.white,
-                                                size: 20,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '${post.likesCount}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
+                                          child: PoppingActionIcon(
+                                            active: isLiked,
+                                            activeIcon: Icons.favorite,
+                                            inactiveIcon: Icons.favorite_border,
+                                            activeColor: AppColors.purple,
+                                            inactiveColor: Colors.white,
+                                            size: 20,
                                           ),
                                         ),
                                         const SizedBox(width: 14),
@@ -511,13 +497,15 @@ class _PostCardState extends ConsumerState<PostCard>
                                             builder: (_) =>
                                                 CommentScreen(post: post),
                                           ),
-                                          child: _miniIcon(
-                                            'assets/icons/Group.svg',
-                                            // Clamp at 0 — legacy posts
-                                            // sometimes carry a negative
-                                            // cached count; surface 0
-                                            // instead of "-3".
-                                            '${post.commentsCount < 0 ? 0 : post.commentsCount}',
+                                          child: const PoppingActionIcon(
+                                            active: false,
+                                            activeIcon:
+                                                Icons.mode_comment_outlined,
+                                            inactiveIcon:
+                                                Icons.mode_comment_outlined,
+                                            activeColor: Colors.white,
+                                            inactiveColor: Colors.white,
+                                            size: 20,
                                           ),
                                         ),
                                         if (repostsEnabled) ...[
@@ -525,41 +513,14 @@ class _PostCardState extends ConsumerState<PostCard>
                                           GestureDetector(
                                             behavior: HitTestBehavior.opaque,
                                             onTap: _toggleRepost,
-                                            child: Row(
-                                              children: [
-                                                PoppingActionIcon(
-                                                  active: isReposted,
-                                                  activeIcon: Icons.repeat,
-                                                  inactiveIcon: Icons.repeat,
-                                                  activeColor:
-                                                      const Color(0xFFB05ECC),
-                                                  inactiveColor: Colors.white,
-                                                  size: 20,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                // Live count from the
-                                                // post's reposts
-                                                // subcollection. Mirrors
-                                                // how the heart shows
-                                                // `${post.likesCount}`.
-                                                Consumer(
-                                                  builder: (_, ref, __) {
-                                                    final count = ref
-                                                            .watch(
-                                                                repostsCountProvider(
-                                                                    post.id))
-                                                            .value ??
-                                                        0;
-                                                    return Text(
-                                                      '$count',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 12,
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ],
+                                            child: PoppingActionIcon(
+                                              active: isReposted,
+                                              activeIcon: Icons.repeat,
+                                              inactiveIcon: Icons.repeat,
+                                              activeColor:
+                                                  const Color(0xFFB05ECC),
+                                              inactiveColor: Colors.white,
+                                              size: 20,
                                             ),
                                           ),
                                         ],
@@ -568,8 +529,14 @@ class _PostCardState extends ConsumerState<PostCard>
                                           behavior: HitTestBehavior.opaque,
                                           onTap: () =>
                                               _openShareSheet(context, ref),
-                                          child: _miniIcon(
-                                              'assets/icons/Send.svg', ''),
+                                          child: const PoppingActionIcon(
+                                            active: false,
+                                            activeIcon: Icons.send_outlined,
+                                            inactiveIcon: Icons.send_outlined,
+                                            activeColor: Colors.white,
+                                            inactiveColor: Colors.white,
+                                            size: 20,
+                                          ),
                                         ),
                                         const Spacer(),
                                         GestureDetector(
@@ -1017,23 +984,6 @@ class _PostCardState extends ConsumerState<PostCard>
     }
   }
 
-  Widget _miniIcon(String svgPath, String text) {
-    return Row(
-      children: [
-        SvgPicture.asset(
-          svgPath,
-          width: 20,
-          height: 20,
-          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          placeholderBuilder: (_) => const SizedBox(width: 20, height: 20),
-        ),
-        if (text.isNotEmpty) ...[
-          const SizedBox(width: 4),
-          Text(text, style: const TextStyle(color: Colors.white)),
-        ],
-      ],
-    );
-  }
 }
 
 /// The Discuss page of a post's swipe carousel (page 2, reached by
