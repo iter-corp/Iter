@@ -77,8 +77,9 @@ int _eventRelevanceScore(AdminEvent e, Map<String, dynamic>? userDoc) {
   if (type.isNotEmpty) {
     if (goals.any((g) => type.contains(g) || g.contains(type))) score += 2;
   }
-  if (userCity.isNotEmpty && _eventCity(e).toLowerCase() == userCity)
+  if (userCity.isNotEmpty && _eventCity(e).toLowerCase() == userCity) {
     score += 2;
+  }
   if (userLat != null && userLng != null && e.lat != null && e.lng != null) {
     final km = _distanceKm(
       {'lat': userLat, 'lng': userLng},
@@ -325,7 +326,6 @@ class _EventsView extends ConsumerWidget {
   final VoidCallback onClearType;
 
   const _EventsView({
-    super.key,
     required this.query,
     required this.selectedCity,
     required this.selectedEventType,
@@ -974,9 +974,8 @@ class _LoadingGrid extends StatelessWidget {
 }
 
 class _ShimmerBlock extends StatefulWidget {
-  final double? height;
   final double radius;
-  const _ShimmerBlock({this.height, this.radius = 20});
+  const _ShimmerBlock({this.radius = 20});
 
   @override
   State<_ShimmerBlock> createState() => _ShimmerBlockState();
@@ -1008,7 +1007,6 @@ class _ShimmerBlockState extends State<_ShimmerBlock>
       builder: (context, _) {
         final t = _c.value;
         return Container(
-          height: widget.height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.radius),
             gradient: LinearGradient(
@@ -1133,7 +1131,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                         color: context.textSecondary,
                       ),
                       filled: true,
-                      fillColor: context.surfaceSoft.withOpacity(0.45),
+                      fillColor: context.surfaceSoft.withValues(alpha: 0.45),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       prefixIcon: const Padding(
@@ -1167,14 +1165,14 @@ class _PickerSheetState extends State<_PickerSheet> {
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
                         borderSide: BorderSide(
-                          color: Colors.white.withOpacity(0.06),
+                          color: Colors.white.withValues(alpha: 0.06),
                           width: 1,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
                         borderSide: BorderSide(
-                          color: _kBrandPurple.withOpacity(0.55),
+                          color: _kBrandPurple.withValues(alpha: 0.55),
                           width: 1.4,
                         ),
                       ),
@@ -1203,8 +1201,9 @@ class _PickerSheetState extends State<_PickerSheet> {
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Material(
                                 color: isSel
-                                    ? _kBrandPurple.withOpacity(0.14)
-                                    : context.surfaceSoft.withOpacity(0.3),
+                                    ? _kBrandPurple.withValues(alpha: 0.14)
+                                    : context.surfaceSoft
+                                        .withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(14),
                                 child: ListTile(
                                   onTap: () => Navigator.pop(context, opt),
