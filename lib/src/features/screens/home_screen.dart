@@ -51,6 +51,8 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
   Future<void> _refresh(WidgetRef ref) async {
     ref.invalidate(feedProvider);
     ref.invalidate(qaFeedProvider);
+    ref.invalidate(nasaFeedProvider);
+    ref.invalidate(wikimediaFeedProvider);
     try {
       await ref.read(feedProvider.future);
     } catch (_) {
@@ -58,6 +60,16 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     }
     try {
       await ref.read(qaFeedProvider.future);
+    } catch (_) {
+      // Swallow — the error state already renders in the list.
+    }
+    try {
+      await ref.read(nasaFeedProvider.future);
+    } catch (_) {
+      // Swallow — the error state already renders in the list.
+    }
+    try {
+      await ref.read(wikimediaFeedProvider.future);
     } catch (_) {
       // Swallow — the error state already renders in the list.
     }

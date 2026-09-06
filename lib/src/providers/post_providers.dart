@@ -2,12 +2,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../features/model/post_model.dart';
+import '../services/nasa_apod_service.dart';
 import '../services/post_service.dart';
+import '../services/wikimedia_feed_service.dart';
 import 'auth_providers.dart';
 import 'block_providers.dart';
 import 'follow_providers.dart';
 
 final postServiceProvider = Provider<PostService>((_) => PostService());
+final nasaApodServiceProvider =
+    Provider<NasaApodService>((_) => NasaApodService());
+
+final nasaFeedProvider = FutureProvider<List<Post>>((ref) async {
+  return ref.watch(nasaApodServiceProvider).fetchApodPosts();
+});
+
+final wikimediaFeedServiceProvider =
+    Provider<WikimediaFeedService>((_) => WikimediaFeedService());
+
+final wikimediaFeedProvider = FutureProvider<List<Post>>((ref) async {
+  return ref.watch(wikimediaFeedServiceProvider).fetchFeed();
+});
 
 /// Fetches a single post by id. Used to embed a post inside other
 /// screens (e.g. the discussed post shown in a Discuss thread).
@@ -77,34 +92,60 @@ class HomeFeedItem {
   const HomeFeedItem({required this.post, required this.isQa});
 }
 
-/// The home feed: regular posts and standalone Discuss questions (ones not
-/// tied to any specific post — see [postDiscussionsProvider] for those)
+/// The home feed: regular posts, NASA APOD posts, Wikimedia featured cards, and standalone Discuss questions
 /// merged into a single list, newest first. Replaces the old separate
 /// Feed/Discuss tabs.
 final homeFeedProvider = Provider<AsyncValue<List<HomeFeedItem>>>((ref) {
   final feed = ref.watch(feedProvider);
   final qa = ref.watch(qaFeedProvider);
-  return feed.when(
-    data: (feedPosts) => qa.when(
-      data: (qaPosts) {
-        final items = <HomeFeedItem>[
-          ...feedPosts.map((p) => HomeFeedItem(post: p, isQa: false)),
-          ...qaPosts
-              .where((p) => p.sourcePostId == null || p.sourcePostId!.isEmpty)
-              .map((p) => HomeFeedItem(post: p, isQa: true)),
-        ]..sort((a, b) {
-            final at = a.post.createdAt ?? DateTime(0);
-            final bt = b.post.createdAt ?? DateTime(0);
-            return bt.compareTo(at);
-          });
-        return AsyncValue.data(items);
-      },
-      loading: () => const AsyncValue.loading(),
-      error: (e, st) => AsyncValue.error(e, st),
-    ),
-    loading: () => const AsyncValue.loading(),
-    error: (e, st) => AsyncValue.error(e, st),
-  );
+  final nasa = ref.watch(nasaFeedProvider);
+  final wiki = ref.watch(wikimediaFeedProvider);
+
+  final feedPosts = feed.value ?? const <Post>[];
+  final qaPosts = qa.value ?? const <Post>[];
+  final nasaPosts = nasa.value ?? const <Post>[];
+  final wikiPosts = wiki.value ?? const <Post>[];
+
+  // If initial load across all sources is still in-flight with zero cached items:
+  if (feed.isLoading &&
+      nasa.isLoading &&
+      wiki.isLoading &&
+      feedPosts.isEmpty &&
+      nasaPosts.isEmpty &&
+      wikiPosts.isEmpty &&
+      qaPosts.isEmpty) {
+    return const AsyncValue.loading();
+  }
+
+  // If all sources threw hard errors and there are no posts to show:
+  if (feed.hasError &&
+      nasa.hasError &&
+      wiki.hasError &&
+      feedPosts.isEmpty &&
+      nasaPosts.isEmpty &&
+      wikiPosts.isEmpty &&
+      qaPosts.isEmpty) {
+    return AsyncValue.error(
+      wiki.error ?? nasa.error ?? feed.error!,
+      wiki.stackTrace ?? nasa.stackTrace ?? feed.stackTrace!,
+    );
+  }
+
+  final items = <HomeFeedItem>[
+    ...feedPosts.map((p) => HomeFeedItem(post: p, isQa: false)),
+    ...nasaPosts.map((p) => HomeFeedItem(post: p, isQa: p.imageUrls.isEmpty)),
+    // If an API item does not have an image, create it in the form of discuss (isQa: true):
+    ...wikiPosts.map((p) => HomeFeedItem(post: p, isQa: p.imageUrls.isEmpty)),
+    ...qaPosts
+        .where((p) => p.sourcePostId == null || p.sourcePostId!.isEmpty)
+        .map((p) => HomeFeedItem(post: p, isQa: true)),
+  ]..sort((a, b) {
+      final at = a.post.createdAt ?? DateTime(0);
+      final bt = b.post.createdAt ?? DateTime(0);
+      return bt.compareTo(at);
+    });
+
+  return AsyncValue.data(items);
 });
 
 /// Discuss threads made about one specific post (its `sourcePostId`) —

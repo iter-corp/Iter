@@ -551,11 +551,15 @@ class PostService {
       if (likeSnap.exists) {
         didLike = false;
         tx.delete(likeRef);
-        tx.update(postRef, {'likesCount': FieldValue.increment(-1)});
+        if (postSnap.exists) {
+          tx.update(postRef, {'likesCount': FieldValue.increment(-1)});
+        }
       } else {
         didLike = true;
         tx.set(likeRef, {'createdAt': FieldValue.serverTimestamp()});
-        tx.update(postRef, {'likesCount': FieldValue.increment(1)});
+        if (postSnap.exists) {
+          tx.update(postRef, {'likesCount': FieldValue.increment(1)});
+        }
       }
     });
 
