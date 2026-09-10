@@ -355,7 +355,7 @@ class _EventNotificationsSettingsScreenState
         // second line; isThreeLine gives the tile vertical room for
         // the wrapped title plus the subtitle.
         isThreeLine: true,
-        activeThumbColor: Colors.white,
+        activeColor: Colors.white,
         activeTrackColor: AppColors.purple,
         inactiveThumbColor: context.textSecondary,
         inactiveTrackColor: context.inputFill,

@@ -1,0 +1,381 @@
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { db } from '../db/index.js';
+import { users, follows, blocks, profileVisitors, userReports, notifications, chats, contactRequests, errorReports } from '../db/schema/index.js';
+import { randomBytes } from 'crypto';
+import { eq, and, sql, desc, inArray } from 'drizzle-orm';
+import { AppError } from '../middleware/error-handler.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { sendPushNotification } from '../services/fcm.service.js';
+export const userRoutes = new Hono();
+// ── 1. Check Username Availability ──────────────────────────────────────────
+userRoutes.get('/check-username', async (c) => {
+    const username = c.req.query('username')?.trim().toLowerCase();
+    const excludeUid = c.req.query('excludeUid');
+    if (!username) {
+        return c.json({ success: true, available: false });
+    }
+    const matches = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.usernameLower, username))
+        .limit(1);
+    const available = matches.length === 0 || (excludeUid && matches[0].id === excludeUid);
+    return c.json({ success: true, available: Boolean(available) });
+});
+// ── 2. Batch Resolve Usernames to UIDs (for @mentions) ──────────────────────
+const resolveMentionsSchema = z.object({
+    usernames: z.array(z.string()),
+});
+userRoutes.post('/resolve-usernames', zValidator('json', resolveMentionsSchema), async (c) => {
+    const { usernames } = c.req.valid('json');
+    if (usernames.length === 0) {
+        return c.json({ success: true, data: {} });
+    }
+    const normalized = usernames.map((u) => u.trim().toLowerCase());
+    const found = await db
+        .select({ id: users.id, usernameLower: users.usernameLower })
+        .from(users)
+        .where(inArray(users.usernameLower, normalized));
+    const result = {};
+    for (const row of found) {
+        if (row.usernameLower) {
+            result[row.usernameLower] = row.id;
+        }
+    }
+    return c.json({ success: true, data: result });
+});
+// ── 3. Get Current User Profile ─────────────────────────────────────────────
+userRoutes.get('/me', requireAuth, async (c) => {
+    const uid = c.get('uid');
+    const [user] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
+    if (!user) {
+        throw new AppError('User not found', 404, 'NOT_FOUND');
+    }
+    return c.json({ success: true, data: user });
+});
+// ── 4. Update Current User Profile ──────────────────────────────────────────
+const updateProfileSchema = z.object({
+    username: z.string().min(3).max(30).optional(),
+    bio: z.string().max(500).optional(),
+    avatarUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    isPrivate: z.boolean().optional(),
+    appIntroSeen: z.boolean().optional(),
+    profession: z.string().nullable().optional(),
+    field: z.string().nullable().optional(),
+    academicLevel: z.string().nullable().optional(),
+    goals: z.array(z.string()).optional(),
+    eventNotifPrefs: z.object({
+        mode: z.enum(['all', 'off']),
+        types: z.array(z.string()),
+        countries: z.array(z.string()),
+    }).optional(),
+    metadata: z.record(z.unknown()).optional(),
+});
+userRoutes.patch('/me', requireAuth, zValidator('json', updateProfileSchema), async (c) => {
+    const uid = c.get('uid');
+    const body = c.req.valid('json');
+    const patch = {
+        updatedAt: new Date(),
+    };
+    if (body.username !== undefined) {
+        const normalized = body.username.trim().toLowerCase();
+        const collision = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.usernameLower, normalized), sql `${users.id} != ${uid}`))
+            .limit(1);
+        if (collision.length > 0) {
+            throw new AppError('This username is already taken', 409, 'USERNAME_TAKEN');
+        }
+        patch.username = body.username.trim();
+        patch.usernameLower = normalized;
+        patch.handle = `@${body.username.trim()}`;
+    }
+    if (body.bio !== undefined)
+        patch.bio = body.bio;
+    if (body.avatarUrl !== undefined)
+        patch.avatarUrl = body.avatarUrl;
+    if (body.coverUrl !== undefined)
+        patch.coverUrl = body.coverUrl;
+    if (body.gender !== undefined)
+        patch.gender = body.gender;
+    if (body.isPrivate !== undefined)
+        patch.isPrivate = body.isPrivate;
+    if (body.appIntroSeen !== undefined)
+        patch.appIntroSeen = body.appIntroSeen;
+    if (body.profession !== undefined)
+        patch.profession = body.profession;
+    if (body.field !== undefined)
+        patch.field = body.field;
+    if (body.academicLevel !== undefined)
+        patch.academicLevel = body.academicLevel;
+    if (body.goals !== undefined)
+        patch.goals = body.goals;
+    if (body.eventNotifPrefs !== undefined)
+        patch.eventNotifPrefs = body.eventNotifPrefs;
+    if (body.metadata !== undefined)
+        patch.metadata = body.metadata;
+    const [updated] = await db.update(users).set(patch).where(eq(users.id, uid)).returning();
+    return c.json({ success: true, data: updated });
+});
+// ── 5. Get User by UID ──────────────────────────────────────────────────────
+userRoutes.get('/:uid', optionalAuth, async (c) => {
+    const targetUid = c.req.param('uid');
+    const viewerUid = c.get('uid');
+    const [user] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, targetUid), sql `${users.deletedAt} IS NULL`))
+        .limit(1);
+    if (!user) {
+        throw new AppError('User not found', 404, 'NOT_FOUND');
+    }
+    let isFollowing = false;
+    let isPending = false;
+    let isBlocked = false;
+    if (viewerUid && viewerUid !== targetUid) {
+        const [followRelation] = await db
+            .select()
+            .from(follows)
+            .where(and(eq(follows.followerUid, viewerUid), eq(follows.targetUid, targetUid)))
+            .limit(1);
+        if (followRelation) {
+            isFollowing = followRelation.status === 'active';
+            isPending = followRelation.status === 'pending';
+        }
+        const [blockRelation] = await db
+            .select()
+            .from(blocks)
+            .where(and(eq(blocks.blockerUid, viewerUid), eq(blocks.blockedUid, targetUid)))
+            .limit(1);
+        isBlocked = Boolean(blockRelation);
+    }
+    return c.json({
+        success: true,
+        data: {
+            ...user,
+            isFollowing,
+            isPending,
+            isBlocked,
+        },
+    });
+});
+// ── 6. Profile Visitor Recording ────────────────────────────────────────────
+userRoutes.post('/:uid/visit', requireAuth, async (c) => {
+    const targetUid = c.req.param('uid');
+    const visitorUid = c.get('uid');
+    if (targetUid === visitorUid) {
+        return c.json({ success: true, recorded: false });
+    }
+    await db
+        .insert(profileVisitors)
+        .values({
+        ownerUid: targetUid,
+        visitorUid,
+        visitCount: 1,
+        lastVisitedAt: new Date(),
+    })
+        .onConflictDoUpdate({
+        target: [profileVisitors.ownerUid, profileVisitors.visitorUid],
+        set: {
+            visitCount: sql `${profileVisitors.visitCount} + 1`,
+            lastVisitedAt: new Date(),
+        },
+    });
+    return c.json({ success: true, recorded: true });
+});
+userRoutes.get('/:uid/visitors', requireAuth, async (c) => {
+    const uid = c.get('uid');
+    const requestedUid = c.req.param('uid');
+    if (uid !== requestedUid) {
+        throw new AppError('Unauthorized access to visitor history', 403, 'FORBIDDEN');
+    }
+    const visitors = await db
+        .select({
+        uid: users.id,
+        username: users.username,
+        avatarUrl: users.avatarUrl,
+        visitCount: profileVisitors.visitCount,
+        lastVisitedAt: profileVisitors.lastVisitedAt,
+    })
+        .from(profileVisitors)
+        .innerJoin(users, eq(profileVisitors.visitorUid, users.id))
+        .where(eq(profileVisitors.ownerUid, uid))
+        .orderBy(desc(profileVisitors.lastVisitedAt))
+        .limit(100);
+    return c.json({ success: true, data: visitors });
+});
+// ── 7. Follow / Unfollow ────────────────────────────────────────────────────
+userRoutes.post('/:uid/follow', requireAuth, async (c) => {
+    const targetUid = c.req.param('uid');
+    const followerUid = c.get('uid');
+    if (targetUid === followerUid) {
+        throw new AppError('You cannot follow yourself', 400, 'CANNOT_FOLLOW_SELF');
+    }
+    const [targetUser] = await db.select().from(users).where(eq(users.id, targetUid)).limit(1);
+    if (!targetUser)
+        throw new AppError('User not found', 404, 'NOT_FOUND');
+    const status = targetUser.isPrivate ? 'pending' : 'active';
+    const followId = `${followerUid}_${targetUid}`;
+    await db.insert(follows).values({
+        id: followId,
+        followerUid,
+        targetUid,
+        status,
+    }).onConflictDoNothing();
+    if (status === 'active') {
+        // Increment counts
+        await db.update(users).set({ followersCount: sql `${users.followersCount} + 1` }).where(eq(users.id, targetUid));
+        await db.update(users).set({ followingCount: sql `${users.followingCount} + 1` }).where(eq(users.id, followerUid));
+        // Promote mutual direct chat if exists
+        const [reciprocal] = await db
+            .select()
+            .from(follows)
+            .where(and(eq(follows.followerUid, targetUid), eq(follows.targetUid, followerUid), eq(follows.status, 'active')))
+            .limit(1);
+        if (reciprocal) {
+            const sorted = [followerUid, targetUid].sort();
+            const chatId = `${sorted[0]}_${sorted[1]}`;
+            await db.update(chats).set({
+                acceptedBy: sql `jsonb_set(COALESCE(accepted_by, '[]'::jsonb), '{0}', to_jsonb(${followerUid}::text)) || to_jsonb(${targetUid}::text)`
+            }).where(eq(chats.id, chatId));
+        }
+    }
+    // Create notification
+    const [followerUser] = await db.select().from(users).where(eq(users.id, followerUid)).limit(1);
+    const notifType = status === 'pending' ? 'follow_request' : 'follow';
+    await db.insert(notifications).values({
+        id: `notif_follow_${followerUid}_${targetUid}`,
+        targetUid,
+        actorUid: followerUid,
+        type: notifType,
+        targetId: followerUid,
+    }).onConflictDoNothing();
+    // Send push notification
+    await sendPushNotification({
+        targetUid,
+        title: status === 'pending' ? 'New follow request' : 'New follower',
+        body: `${followerUser?.username || 'Someone'} ${status === 'pending' ? 'requested to follow you' : 'started following you'}`,
+        type: notifType,
+        actorUid: followerUid,
+    });
+    return c.json({ success: true, status });
+});
+userRoutes.delete('/:uid/follow', requireAuth, async (c) => {
+    const targetUid = c.req.param('uid');
+    const followerUid = c.get('uid');
+    const [existing] = await db
+        .select()
+        .from(follows)
+        .where(and(eq(follows.followerUid, followerUid), eq(follows.targetUid, targetUid)))
+        .limit(1);
+    if (existing) {
+        await db.delete(follows).where(and(eq(follows.followerUid, followerUid), eq(follows.targetUid, targetUid)));
+        if (existing.status === 'active') {
+            await db.update(users).set({ followersCount: sql `GREATEST(${users.followersCount} - 1, 0)` }).where(eq(users.id, targetUid));
+            await db.update(users).set({ followingCount: sql `GREATEST(${users.followingCount} - 1, 0)` }).where(eq(users.id, followerUid));
+        }
+        await db.delete(notifications).where(and(eq(notifications.targetUid, targetUid), eq(notifications.actorUid, followerUid), inArray(notifications.type, ['follow', 'follow_request'])));
+    }
+    return c.json({ success: true, message: 'Unfollowed successfully' });
+});
+// ── 8. Block / Unblock ──────────────────────────────────────────────────────
+userRoutes.post('/:uid/block', requireAuth, async (c) => {
+    const targetUid = c.req.param('uid');
+    const blockerUid = c.get('uid');
+    if (targetUid === blockerUid) {
+        throw new AppError('You cannot block yourself', 400, 'INVALID_ACTION');
+    }
+    const blockId = `${blockerUid}_${targetUid}`;
+    await db.insert(blocks).values({ id: blockId, blockerUid, blockedUid: targetUid }).onConflictDoNothing();
+    // Remove follow relations in both directions
+    await db.delete(follows).where(sql `(${follows.followerUid} = ${blockerUid} AND ${follows.targetUid} = ${targetUid}) OR (${follows.followerUid} = ${targetUid} AND ${follows.targetUid} = ${blockerUid})`);
+    return c.json({ success: true, blocked: true });
+});
+userRoutes.delete('/:uid/block', requireAuth, async (c) => {
+    const targetUid = c.req.param('uid');
+    const blockerUid = c.get('uid');
+    await db.delete(blocks).where(and(eq(blocks.blockerUid, blockerUid), eq(blocks.blockedUid, targetUid)));
+    return c.json({ success: true, blocked: false });
+});
+// ── 9. Report User Profile ──────────────────────────────────────────────────
+const reportUserSchema = z.object({
+    reason: z.string().min(1),
+    details: z.string().optional(),
+});
+userRoutes.post('/:uid/report', requireAuth, zValidator('json', reportUserSchema), async (c) => {
+    const targetUid = c.req.param('uid');
+    const reporterUid = c.get('uid');
+    const { reason, details } = c.req.valid('json');
+    if (targetUid === reporterUid) {
+        throw new AppError('You cannot report your own profile', 400, 'CANNOT_REPORT_SELF');
+    }
+    const [target] = await db.select().from(users).where(eq(users.id, targetUid)).limit(1);
+    const [reporter] = await db.select().from(users).where(eq(users.id, reporterUid)).limit(1);
+    if (!target)
+        throw new AppError('Target user not found', 404, 'NOT_FOUND');
+    const reportId = `${targetUid}_${reporterUid}`;
+    await db.insert(userReports).values({
+        id: reportId,
+        targetUid,
+        targetUsername: target.username || 'user',
+        targetAvatar: target.avatarUrl,
+        reporterUid,
+        reporterUsername: reporter?.username || 'user',
+        reason,
+        details: details?.trim() || null,
+    }).onConflictDoNothing();
+    return c.json({ success: true, message: 'User report submitted for moderation review' });
+});
+// ── 10. Submit Contact / Org Promotion Request ──────────────────────────────
+const contactSchema = z.object({
+    type: z.enum(['message', 'organization']).default('message'),
+    subject: z.string().default('Contact Request'),
+    message: z.string().min(1),
+});
+userRoutes.post('/contact-request', requireAuth, zValidator('json', contactSchema), async (c) => {
+    const uid = c.get('uid');
+    const user = c.get('user');
+    const body = c.req.valid('json');
+    const reqId = `cr_${randomBytes(12).toString('hex')}`;
+    const [created] = await db
+        .insert(contactRequests)
+        .values({
+        id: reqId,
+        userUid: uid,
+        username: user.username || 'User',
+        email: user.email,
+        type: body.type,
+        subject: body.subject,
+        message: body.message,
+    })
+        .returning();
+    return c.json({ success: true, data: created }, 201);
+});
+// ── 11. Submit Error / Crash Report ─────────────────────────────────────────
+const errorReportSchema = z.object({
+    error: z.string().min(1),
+    stackTrace: z.string().optional(),
+    screen: z.string().default('unknown'),
+    appVersion: z.string().optional(),
+    platform: z.string().optional(),
+});
+userRoutes.post('/error-report', optionalAuth, zValidator('json', errorReportSchema), async (c) => {
+    const uid = c.get('uid') || null;
+    const body = c.req.valid('json');
+    const reportId = `err_${randomBytes(12).toString('hex')}`;
+    await db.insert(errorReports).values({
+        id: reportId,
+        error: body.error,
+        stackTrace: body.stackTrace || null,
+        screen: body.screen,
+        appVersion: body.appVersion || null,
+        platform: body.platform || null,
+        userUid: uid,
+    });
+    return c.json({ success: true, recorded: true }, 201);
+});

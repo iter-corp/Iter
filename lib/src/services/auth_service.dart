@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'api_client.dart';
+import 'realtime_client.dart';
 
 /// Legacy exception kept for compatibility with existing UI catches.
 class AccountDeletedException implements Exception {
@@ -42,6 +44,69 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  AuthService() {
+    _auth.authStateChanges().listen((user) {
+      if (user != null) {
+        if (!ApiClient.instance.isAuthenticated) {
+          _syncHonoAuth(user);
+        }
+      } else {
+        ApiClient.instance.clearTokens();
+        RealtimeClient.instance.disconnect();
+      }
+    });
+  }
+
+  Future<void> _syncHonoAuth(User user, {String? avatarUrl, String? password}) async {
+    try {
+      if (password != null && password.isNotEmpty) {
+        try {
+          final res = await ApiClient.instance.post('/auth/login', body: {
+            'email': user.email ?? '',
+            'password': password,
+          });
+          if (res is Map<String, dynamic> && res['tokens'] != null) {
+            final tokens = res['tokens'] as Map<String, dynamic>;
+            await ApiClient.instance.setTokens(
+              accessToken: tokens['accessToken'] as String,
+              refreshToken: tokens['refreshToken'] as String,
+              userId: user.uid,
+              userEmail: user.email,
+            );
+            RealtimeClient.instance.connect();
+            return;
+          }
+        } catch (_) {}
+      }
+
+      final syncRes = await ApiClient.instance.post('/auth/firebase-sync', body: {
+        'uid': user.uid,
+        'email': user.email ?? '',
+        'displayName': user.displayName,
+        'avatarUrl': avatarUrl ?? user.photoURL,
+      });
+      if (syncRes is Map<String, dynamic> && syncRes['tokens'] != null) {
+        final tokens = syncRes['tokens'] as Map<String, dynamic>;
+        await ApiClient.instance.setTokens(
+          accessToken: tokens['accessToken'] as String,
+          refreshToken: tokens['refreshToken'] as String,
+          userId: user.uid,
+          userEmail: user.email,
+        );
+        RealtimeClient.instance.connect();
+      }
+    } catch (e) {
+      debugPrint('[AuthService] _syncHonoAuth error: $e');
+    }
+  }
+
+  Future<void> syncCurrentSession() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await _syncHonoAuth(user);
+    }
+  }
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -132,12 +197,10 @@ class AuthService {
       // freeing the email so the user can restart signup on the Spark plan.
     }
     try {
-      await user.delete().timeout(const Duration(seconds: 8));
-    } on FirebaseAuthException catch (e) {
-      if (e.code != 'no-current-user' && e.code != 'user-not-found') {
-        rethrow;
-      }
-    }
+      await ApiClient.instance.delete('/auth/account');
+    } catch (_) {}
+    await ApiClient.instance.clearTokens();
+    RealtimeClient.instance.disconnect();
     justSignedUp = false;
   }
 
@@ -215,6 +278,27 @@ class AuthService {
     if (user == null) return null;
 
     justSignedUp = true;
+    try {
+      final res = await ApiClient.instance.post('/auth/signup', body: {
+        'email': user.email ?? email.trim(),
+        'password': password,
+        'uid': user.uid,
+      });
+      if (res is Map<String, dynamic> && res['tokens'] != null) {
+        final tokens = res['tokens'] as Map<String, dynamic>;
+        await ApiClient.instance.setTokens(
+          accessToken: tokens['accessToken'] as String,
+          refreshToken: tokens['refreshToken'] as String,
+          userId: user.uid,
+          userEmail: user.email,
+        );
+        RealtimeClient.instance.connect();
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Hono signup fallback: $e');
+      await _syncHonoAuth(user, password: password);
+    }
+
     await _db.collection('users').doc(user.uid).set({
       'uid': user.uid,
       'email': user.email,
@@ -261,6 +345,7 @@ class AuthService {
     );
     final user = cred.user;
     if (user != null) {
+      await _syncHonoAuth(user, password: password);
       await _ensureUserDoc(user);
     }
     return user;
@@ -307,6 +392,7 @@ class AuthService {
     }
 
     // Intent validated — safe to persist/update the user doc now.
+    await _syncHonoAuth(user, avatarUrl: user.photoURL);
     await _ensureUserDoc(user, avatarUrl: user.photoURL);
 
     if (isNew) {
@@ -354,6 +440,7 @@ class AuthService {
     final user = cred.user;
     if (user == null) return null;
 
+    await _syncHonoAuth(user);
     await _ensureUserDoc(user);
 
     final isNew = cred.additionalUserInfo?.isNewUser ?? false;
@@ -401,6 +488,11 @@ class AuthService {
 
   Future<void> signOut() async {
     justSignedUp = false;
+    try {
+      await ApiClient.instance.post('/auth/logout');
+    } catch (_) {}
+    await ApiClient.instance.clearTokens();
+    RealtimeClient.instance.disconnect();
     try {
       await _googleSignIn.signOut();
     } catch (_) {}

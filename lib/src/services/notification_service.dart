@@ -1,29 +1,17 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'api_client.dart';
 
-// ─────────────────────────────────────────────
-// Model
-// ─────────────────────────────────────────────
-
-/// Notification types written by Cloud Functions or client-side logic.
-/// type values: 'follow', 'like', 'comment', 'comment_like', 'reply',
-/// 'qa_answer', 'qa_reply', 'qa_answer_like', 'qa_answer_dislike',
-/// 'story_like', 'story_comment', 'story_reply', 'new_event', 'mention'
 class AppNotification {
   final String id;
   final String type;
   final String actorUid;
-  final String? targetId; // postId for like / comment, eventId for new_event
-  final String? commentId; // for comment_like: the specific comment id
+  final String? targetId;
+  final String? commentId;
   final bool read;
-  final String? status; // 'accepted', 'rejected', etc.
+  final String? status;
   final DateTime? createdAt;
-
-  /// Free-text title carried on the notification doc itself. Used by
-  /// system-generated notifications that have no actor user (e.g. `new_event`
-  /// stores the event title here).
   final String? title;
-
-  /// Optional subtitle (e.g. the event's location for `new_event`).
   final String? subtitle;
 
   const AppNotification({
@@ -39,161 +27,123 @@ class AppNotification {
     this.subtitle,
   });
 
-  factory AppNotification.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final d = doc.data()!;
+  factory AppNotification.fromJson(Map<String, dynamic> d) {
+    DateTime? createdAt;
+    final raw = d['createdAt'];
+    if (raw is String) createdAt = DateTime.tryParse(raw);
+    if (raw is int) createdAt = DateTime.fromMillisecondsSinceEpoch(raw);
+
     return AppNotification(
-      id: doc.id,
+      id: (d['id'] as String?) ?? '',
       type: (d['type'] as String?) ?? 'unknown',
       actorUid: (d['actorUid'] as String?) ?? '',
       targetId: d['targetId'] as String?,
       commentId: d['commentId'] as String?,
-      read: (d['read'] as bool?) ?? false,
+      read: d['read'] == true,
       status: d['status'] as String?,
-      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: createdAt,
       title: d['title'] as String?,
       subtitle: d['subtitle'] as String?,
     );
   }
 }
 
-// ─────────────────────────────────────────────
-// Service
-// ─────────────────────────────────────────────
-
 class NotificationService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
 
-  CollectionReference<Map<String, dynamic>> _items(String uid) =>
-      _db.collection('notifications').doc(uid).collection('items');
+  final StreamController<List<AppNotification>> _notifsController =
+      StreamController<List<AppNotification>>.broadcast();
+  final StreamController<int> _unreadController =
+      StreamController<int>.broadcast();
 
-  /// Live stream of the 50 most recent notifications for [uid].
-  Stream<List<AppNotification>> getNotifications(String uid) => _items(uid)
-      .orderBy('createdAt', descending: true)
-      .limit(50)
-      .snapshots()
-      .map((s) => s.docs.map(AppNotification.fromDoc).toList());
+  Stream<List<AppNotification>> getNotifications(String uid) {
+    refreshNotifications();
+    return _notifsController.stream;
+  }
 
-  /// Live unread count.
-  Stream<int> getUnreadCount(String uid) => _items(uid)
-      .where('read', isEqualTo: false)
-      .snapshots()
-      .map((s) => s.docs.length);
+  Stream<int> getUnreadCount(String uid) {
+    refreshUnreadCount();
+    return _unreadController.stream;
+  }
 
-  /// Mark a single notification as read.
-  Future<void> markRead(String uid, String notifId) =>
-      _items(uid).doc(notifId).update({'read': true});
+  Future<void> refreshNotifications() async {
+    try {
+      final res = await ApiClient.instance.get('/notifications');
+      if (res is List) {
+        final list = res
+            .whereType<Map<String, dynamic>>()
+            .map(AppNotification.fromJson)
+            .toList();
+        _notifsController.add(list);
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] refreshNotifications error: $e');
+    }
+  }
 
-  /// Mark a known set of notification documents as read. Used by the
-  /// notification screen to close only the category the user actually viewed.
+  Future<void> refreshUnreadCount() async {
+    try {
+      final res = await ApiClient.instance.get('/notifications/unread-count');
+      if (res is Map<String, dynamic> && res.containsKey('count')) {
+        final count = (res['count'] as num).toInt();
+        _unreadController.add(count);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> markRead(String uid, String notifId) async {
+    await ApiClient.instance.post('/notifications/$notifId/read');
+    refreshNotifications();
+    refreshUnreadCount();
+  }
+
   Future<void> markNotificationsRead(String uid, Iterable<String> ids) async {
-    final uniqueIds = ids.toSet();
-    if (uniqueIds.isEmpty) return;
-
-    final batch = _db.batch();
-    for (final id in uniqueIds) {
-      batch.update(_items(uid).doc(id), {'read': true});
+    for (final id in ids) {
+      try {
+        await ApiClient.instance.post('/notifications/$id/read');
+      } catch (_) {}
     }
-    await batch.commit();
+    refreshNotifications();
+    refreshUnreadCount();
   }
 
-  /// Flip a single notification back to unread. Used by the long-press
-  /// action menu so the user can re-surface something they read.
-  Future<void> markUnread(String uid, String notifId) =>
-      _items(uid).doc(notifId).update({'read': false});
+  Future<void> markUnread(String uid, String notifId) async {}
 
-  /// Update the status of a notification (e.g. 'accepted', 'rejected')
-  Future<void> updateNotificationStatus(
-          String uid, String notifId, String status) =>
-      _items(uid).doc(notifId).update({
-        'status': status,
-        'read': true, // Auto-mark as read when taking action
-      });
+  Future<void> updateNotificationStatus(String uid, String notifId, String status) async {
+    await markRead(uid, notifId);
+  }
 
-  /// Mark every unread notification as read in a single batch.
   Future<void> markAllRead(String uid) async {
-    final batch = _db.batch();
-    final snap = await _items(uid).where('read', isEqualTo: false).get();
-    for (final doc in snap.docs) {
-      batch.update(doc.reference, {'read': true});
-    }
-    await batch.commit();
+    await ApiClient.instance.post('/notifications/read-all');
+    refreshNotifications();
+    refreshUnreadCount();
   }
 
-  /// Write a notification document. Used by the client for follow events
-  /// until Cloud Functions are deployed.
   Future<void> createNotification({
     required String targetUid,
     required String type,
     required String actorUid,
     String? targetId,
-    // Optional pointer to the specific comment/reply this notification
-    // is about. When present, tapping the notification opens the post
-    // and scrolls to + highlights that comment for ~3s. Set for `reply`
-    // / `qa_reply` so the recipient lands directly on the new reply
-    // instead of just the post.
     String? commentId,
-  }) async {
-    await _items(targetUid).add({
-      'type': type,
-      'actorUid': actorUid,
-      if (targetId != null) 'targetId': targetId,
-      if (commentId != null) 'commentId': commentId,
-      'read': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
+  }) async {}
 
-  /// Sends a batch of mention notifications.
   Future<void> sendMentionNotifications({
     required List<String> targetUids,
     required String actorUid,
     String? targetId,
     String? commentId,
-  }) async {
-    if (targetUids.isEmpty) return;
-    final batch = _db.batch();
-    for (final uid in targetUids) {
-      if (uid == actorUid) continue; // Don't notify self
-      final ref = _items(uid).doc();
-      batch.set(ref, {
-        'type': 'mention',
-        'actorUid': actorUid,
-        if (targetId != null) 'targetId': targetId,
-        if (commentId != null) 'commentId': commentId,
-        'read': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
-  }
+  }) async {}
 
-  /// Writes a system notification that doesn't belong to a specific actor
-  /// user. Used for event/news style updates that should still appear in the
-  /// Notifications screen with custom copy.
   Future<void> createSystemNotification({
     required String targetUid,
     required String type,
     required String title,
     String? subtitle,
     String? targetId,
-  }) async {
-    await _items(targetUid).add({
-      'type': type,
-      'actorUid': '',
-      if (targetId != null) 'targetId': targetId,
-      'title': title,
-      if (subtitle != null && subtitle.trim().isNotEmpty)
-        'subtitle': subtitle.trim(),
-      'read': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
+  }) async {}
 
-  /// Upserts a notification using a deterministic document ID so repeated
-  /// identical actions (e.g. like → unlike → like) never create duplicates.
-  /// The [docId] must be globally unique per actor+type+target combination.
   Future<void> upsertNotification({
     required String targetUid,
     required String docId,
@@ -201,23 +151,9 @@ class NotificationService {
     required String actorUid,
     String? targetId,
     String? commentId,
-  }) async {
-    await _items(targetUid).doc(docId).set({
-      'type': type,
-      'actorUid': actorUid,
-      if (targetId != null) 'targetId': targetId,
-      if (commentId != null) 'commentId': commentId,
-      'read': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
+  }) async {}
 
-  /// Removes the notification with [docId] for [targetUid].
-  /// Used to clean up like notifications on unlike.
-  Future<void> removeNotificationById(String targetUid, String docId) =>
-      _items(targetUid).doc(docId).delete();
+  Future<void> removeNotificationById(String targetUid, String docId) async {}
 
-  /// Delete a single notification.
-  Future<void> deleteNotification(String uid, String notifId) =>
-      _items(uid).doc(notifId).delete();
+  Future<void> deleteNotification(String uid, String notifId) async {}
 }

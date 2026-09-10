@@ -81,6 +81,45 @@ class Post {
     );
   }
 
+  factory Post.fromJson(Map<String, dynamic> data) {
+    final postLocation = data['postLocation'];
+    final postLocationMap = postLocation is Map ? postLocation : null;
+
+    DateTime? createdAt;
+    final createdRaw = data['createdAt'];
+    if (createdRaw is Timestamp) {
+      createdAt = createdRaw.toDate();
+    } else if (createdRaw is String) {
+      createdAt = DateTime.tryParse(createdRaw);
+    } else if (createdRaw is int) {
+      createdAt = DateTime.fromMillisecondsSinceEpoch(createdRaw);
+    }
+
+    return Post(
+      id: (data['id'] ?? data['postId']) as String? ?? '',
+      authorUid: data['authorUid'] as String? ?? '',
+      authorUsername: data['authorUsername'] as String? ?? 'unknown',
+      authorAvatar: data['authorAvatar'] as String?,
+      caption: data['caption'] as String? ?? '',
+      imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? const [],
+      videoUrls: (data['videoUrls'] as List?)?.cast<String>() ?? const [],
+      likesCount: (data['likesCount'] as num?)?.toInt() ?? 0,
+      commentsCount: (data['commentsCount'] as num?)?.toInt() ?? 0,
+      isPrivate: (data['isPrivate'] as bool?) ?? false,
+      createdAt: createdAt,
+      postPlaceName: (data['postPlaceName'] as String?)?.trim(),
+      postPlaceCity: (data['postPlaceCity'] as String?)?.trim(),
+      postLat: (postLocationMap?['lat'] as num?)?.toDouble() ?? (data['postLat'] as num?)?.toDouble(),
+      postLng: (postLocationMap?['lng'] as num?)?.toDouble() ?? (data['postLng'] as num?)?.toDouble(),
+      postLocationExact: (data['postLocationExact'] as bool?) ?? false,
+      discussTopicId: (data['discussTopicId'] as String?)?.trim(),
+      sourcePostId: (data['sourcePostId'] as String?)?.trim(),
+      discussKind: (data['discussKind'] as String?)?.trim(),
+      travelDistanceKm: (data['travelDistanceKm'] ?? data['distanceKm'] as num?)?.toDouble(),
+      travelDistanceLabel: (data['travelDistanceLabel'] ?? data['distanceLabel'] as String?)?.trim(),
+    );
+  }
+
   factory Post.fromTravelMap(Map<String, dynamic> data) {
     final postLocation = data['postLocation'];
     final postLocationMap = postLocation is Map ? postLocation : null;

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: iter-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: iter_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: iter-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/iter_db
+      JWT_SECRET: production_super_secret_jwt_key_at_least_32_characters_long
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /app/uploads
+      STORAGE_PUBLIC_URL: http://localhost:3000/uploads
+    volumes:
+      - iter-uploads:/app/uploads
+
+volumes:
+  pgdata:
+  iter-uploads:

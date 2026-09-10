@@ -825,7 +825,7 @@ class _LabeledDropdown extends StatelessWidget {
               ],
             ),
             DropdownButtonFormField<String>(
-              initialValue: value,
+              value: value,
               isExpanded: true,
               icon: Icon(Icons.keyboard_arrow_down_rounded,
                   color: context.textSecondary),

@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'api_client.dart';
 
 /// Lightweight, app-wide error logging.
 ///
@@ -133,26 +133,21 @@ class ErrorReportService {
       _lastSentAt = now;
       _sentThisSession++;
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
       final stackStr = (stack ?? StackTrace.current).toString();
       // Use the explicitly-passed screen if any, otherwise whatever the
       // navigator observer last recorded.
       final screenName = (screen != null && screen.trim().isNotEmpty)
           ? screen.trim()
           : _currentScreen;
-      await db.collection('errorReports').add({
-        'message': message,
-        // Cap the stack so a giant trace doesn't bloat the doc.
-        'stack': stackStr.length > 6000 ? stackStr.substring(0, 6000) : stackStr,
-        'kind': kind ?? 'manual',
-        if (context != null && context.isNotEmpty) 'context': context,
-        if (screenName.isNotEmpty) 'screen': screenName,
-        'uid': uid,
-        'platform': defaultTargetPlatform.name,
-        'appVersion': _appVersion ?? '',
-        'resolved': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      try {
+        await ApiClient.instance.post('/users/error-report', body: {
+          'error': message,
+          'stackTrace': stackStr.length > 6000 ? stackStr.substring(0, 6000) : stackStr,
+          'screen': screenName.isNotEmpty ? screenName : 'unknown',
+          'platform': defaultTargetPlatform.name,
+          'appVersion': _appVersion ?? '',
+        });
+      } catch (_) {}
     } catch (_) {
       // Never let the error reporter itself crash the app.
     }

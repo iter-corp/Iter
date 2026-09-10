@@ -231,7 +231,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    initialValue: _gender,
+                    value: _gender,
                     decoration:
                         InputDecoration(labelText: context.t.onboardingGender),
                     items: [

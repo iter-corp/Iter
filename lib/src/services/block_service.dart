@@ -1,92 +1,71 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:rxdart/rxdart.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'api_client.dart';
 
 class BlockService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final BlockService _instance = BlockService._internal();
+  factory BlockService() => _instance;
+  BlockService._internal();
 
-  DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
-      _db.collection('users').doc(uid);
+  final Map<String, Set<String>> _blockedMap = {};
+  final Map<String, StreamController<List<String>>> _blockedControllers = {};
 
-  /// Block a user. Stores it directly in the user document's blockedUsers array
-  /// to bypass subcollection rule restrictions. Also removes all follow relationships.
   Future<void> blockUser({
     required String currentUid,
     required String targetUid,
   }) async {
     if (currentUid == targetUid) return;
 
-    final batch = _db.batch();
-
-    // Add to my blockedUsers array
-    batch.update(_userDoc(currentUid), {
-      'blockedUsers': FieldValue.arrayUnion([targetUid]),
-    });
-
-    // Clean up all follow relationships:
-    // 1. I unfollow them
-    final myFollowingRef = _userDoc(currentUid).collection('following').doc(targetUid);
-    batch.delete(myFollowingRef);
-
-    // 2. I remove myself from their followers
-    final theirFollowerRef = _userDoc(targetUid).collection('followers').doc(currentUid);
-    batch.delete(theirFollowerRef);
-
-    // 3. They unfollow me (remove them from my followers)
-    final theirFollowingRef = _userDoc(targetUid).collection('following').doc(currentUid);
-    batch.delete(theirFollowingRef);
-
-    // 4. Remove them from my followers
-    final myFollowerRef = _userDoc(currentUid).collection('followers').doc(targetUid);
-    batch.delete(myFollowerRef);
-
-    await batch.commit();
+    try {
+      await ApiClient.instance.post('/users/$targetUid/block');
+      _blockedMap.putIfAbsent(currentUid, () => {}).add(targetUid);
+      _blockedControllers[currentUid]?.add(_blockedMap[currentUid]!.toList());
+    } catch (e) {
+      debugPrint('[BlockService] blockUser error: $e');
+    }
   }
 
-  /// Unblock a user.
   Future<void> unblockUser({
     required String currentUid,
     required String targetUid,
   }) async {
     if (currentUid == targetUid) return;
-    await _userDoc(currentUid).update({
-      'blockedUsers': FieldValue.arrayRemove([targetUid]),
-    });
+
+    try {
+      await ApiClient.instance.delete('/users/$targetUid/block');
+      _blockedMap[currentUid]?.remove(targetUid);
+      _blockedControllers[currentUid]?.add(_blockedMap[currentUid]?.toList() ?? []);
+    } catch (e) {
+      debugPrint('[BlockService] unblockUser error: $e');
+    }
   }
 
-  /// Stream whether [currentUid] has blocked [targetUid].
   Stream<bool> isBlocked({
     required String currentUid,
     required String targetUid,
   }) {
     if (currentUid == targetUid) return Stream.value(false);
-    return _userDoc(currentUid).snapshots().map((s) {
-      final data = s.data();
-      if (data == null) return false;
-      final blocked = List<String>.from(data['blockedUsers'] ?? []);
-      return blocked.contains(targetUid);
-    }).onErrorReturn(false);
+    final blocked = _blockedMap[currentUid]?.contains(targetUid) ?? false;
+    return Stream.value(blocked);
   }
 
-  /// Stream whether [targetUid] has blocked [currentUid].
   Stream<bool> isBlockedBy({
     required String currentUid,
     required String targetUid,
   }) {
     if (currentUid == targetUid) return Stream.value(false);
-    return _userDoc(targetUid).snapshots().map((s) {
-      final data = s.data();
-      if (data == null) return false;
-      final blocked = List<String>.from(data['blockedUsers'] ?? []);
-      return blocked.contains(currentUid);
-    }).onErrorReturn(false);
+    return Stream.value(false);
   }
 
-  /// Stream the list of UIDs that [uid] has blocked.
   Stream<List<String>> getBlockedUsers(String uid) {
-    return _userDoc(uid).snapshots().map((s) {
-      final data = s.data();
-      if (data == null) return <String>[];
-      return List<String>.from(data['blockedUsers'] ?? []);
-    }).onErrorReturn(<String>[]);
+    if (!_blockedControllers.containsKey(uid) || _blockedControllers[uid]!.isClosed) {
+      _blockedControllers[uid] = StreamController<List<String>>.broadcast();
+    }
+
+    if (_blockedMap.containsKey(uid)) {
+      Timer.run(() => _blockedControllers[uid]?.add(_blockedMap[uid]!.toList()));
+    }
+
+    return _blockedControllers[uid]!.stream;
   }
 }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'api_client.dart';
 import 'notification_service.dart';
 import 'post_service.dart';
 import 'sticker_service.dart';
@@ -742,17 +743,25 @@ class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
 
-  DocumentReference<Map<String, dynamic>> get _configRef =>
-      _db.collection('adminConfig').doc('app');
-
-  Stream<AdminConfig> streamConfig() {
-    return _configRef
-        .snapshots()
-        .map((snap) => AdminConfig.fromMap(snap.data()));
+  Stream<AdminConfig> streamConfig() async* {
+    try {
+      final res = await ApiClient.instance.get('/dynamic/config');
+      if (res is Map<String, dynamic>) {
+        yield AdminConfig.fromMap(res);
+      } else {
+        yield const AdminConfig();
+      }
+    } catch (_) {
+      yield const AdminConfig();
+    }
   }
 
-  Future<void> saveConfig(AdminConfig cfg) {
-    return _configRef.set(cfg.toMap(), SetOptions(merge: true));
+  Future<void> saveConfig(AdminConfig cfg) async {
+    try {
+      await ApiClient.instance.patch('/admin/config', body: cfg.toMap());
+    } catch (e) {
+      debugPrint('[AdminService] saveConfig error: $e');
+    }
   }
 
   // -------- Users --------

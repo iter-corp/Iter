@@ -1,16 +1,14 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'api_client.dart';
 
 // ─────────────────────────────────────────────
 // Background message handler (top-level, not a class method)
 // ─────────────────────────────────────────────
 
-/// Must be a top-level function annotated vm:entry-point.
-/// The OS shows the notification payload automatically; no extra work needed.
 @pragma('vm:entry-point')
 Future<void> _onBackgroundMessage(RemoteMessage message) async {}
 
@@ -30,7 +28,6 @@ class FcmMessageEvent {
 
 class FcmService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   static final StreamController<FcmMessageEvent> _eventsController =
       StreamController<FcmMessageEvent>.broadcast();
@@ -60,9 +57,6 @@ class FcmService {
 
     // Persist the current token. Skip on web (needs VAPID key separately).
     if (!kIsWeb) {
-      // On iOS/macOS, getToken() fails unless the APNS token is already set by
-      // the OS. On first launch (and occasionally on cold start) APNS registration
-      // hasn't completed yet, so poll briefly before giving up.
       if (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) {
         String? apns;
@@ -72,8 +66,6 @@ class FcmService {
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
         if (apns == null) {
-          // No APNS token (e.g. simulator, permission denied, no provisioning).
-          // Skip FCM token fetch this session; onTokenRefresh will fire later.
           _messaging.onTokenRefresh.listen((t) => _saveToken(uid, t));
           return;
         }
@@ -83,10 +75,9 @@ class FcmService {
         final token = await _messaging.getToken();
         if (token != null) await _saveToken(uid, token);
       } catch (_) {
-        // APNS token race or transient FCM error — let onTokenRefresh recover.
+        // Transient FCM error — let onTokenRefresh recover.
       }
 
-      // Keep the token fresh across app restarts.
       _messaging.onTokenRefresh.listen((t) => _saveToken(uid, t));
     }
 
@@ -112,24 +103,27 @@ class FcmService {
     }
   }
 
-  /// Remove this device's token when the user signs out so no stale
-  /// push notifications are delivered.
+  /// Remove this device's token when the user signs out.
   Future<void> removeToken(String uid) async {
     if (kIsWeb) return;
     try {
       final token = await _messaging.getToken();
       if (token == null) return;
-      await _db.collection('users').doc(uid).set({
-        'fcmTokens': FieldValue.arrayRemove([token]),
-      }, SetOptions(merge: true));
+      await ApiClient.instance.delete('/notifications/fcm-token', body: {'token': token});
     } catch (_) {
-      // No APNS/FCM token to remove — ignore.
+      // No token to remove — ignore.
     }
   }
 
   Future<void> _saveToken(String uid, String token) async {
-    await _db.collection('users').doc(uid).set({
-      'fcmTokens': FieldValue.arrayUnion([token]),
-    }, SetOptions(merge: true));
+    try {
+      final deviceType = defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ios'
+          : (defaultTargetPlatform == TargetPlatform.android ? 'android' : 'web');
+      await ApiClient.instance.post('/notifications/fcm-token', body: {
+        'token': token,
+        'deviceType': deviceType,
+      });
+    } catch (_) {}
   }
 }

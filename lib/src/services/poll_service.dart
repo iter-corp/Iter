@@ -1,9 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
+import 'api_client.dart';
 
-/// A poll's visibility semantics:
-/// - public: voter identities are visible to everyone.
-/// - secret: only aggregated counts are shown; who voted what is hidden.
 enum PollVisibility { public, secret }
 
 PollVisibility _visFrom(String? s) =>
@@ -28,16 +25,20 @@ class Poll {
     required this.closed,
   });
 
-  factory Poll.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final d = doc.data() ?? {};
+  factory Poll.fromJson(Map<String, dynamic> d) {
+    DateTime? createdAt;
+    final raw = d['createdAt'];
+    if (raw is String) createdAt = DateTime.tryParse(raw);
+    if (raw is int) createdAt = DateTime.fromMillisecondsSinceEpoch(raw);
+
     return Poll(
-      id: doc.id,
+      id: (d['id'] as String?) ?? '',
       question: (d['question'] as String?) ?? '',
       options: ((d['options'] as List?) ?? const []).cast<String>(),
       createdByUid: (d['createdByUid'] as String?) ?? '',
-      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: createdAt,
       visibility: _visFrom(d['visibility'] as String?),
-      closed: (d['closed'] as bool?) ?? false,
+      closed: d['closed'] == true,
     );
   }
 }
@@ -53,35 +54,26 @@ class PollVote {
     this.createdAt,
   });
 
-  factory PollVote.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final d = doc.data() ?? {};
+  factory PollVote.fromJson(Map<String, dynamic> d) {
+    DateTime? createdAt;
+    final raw = d['createdAt'];
+    if (raw is String) createdAt = DateTime.tryParse(raw);
+    if (raw is int) createdAt = DateTime.fromMillisecondsSinceEpoch(raw);
+
     return PollVote(
-      uid: doc.id,
+      uid: (d['uid'] as String?) ?? '',
       optionIndex: (d['optionIndex'] as num?)?.toInt() ?? -1,
-      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: createdAt,
     );
   }
 }
 
-/// Polls live as a subcollection of whatever "chat room" they belong to:
-///   {parentPath}/polls/{pollId}
-///   {parentPath}/polls/{pollId}/votes/{voterUid}
-///
-/// parentPath example:
-///   - "chats/{chatId}"        (1:1 chat)
-///   - "eventChats/{eventId}"  (event group)
 class PollService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final PollService _instance = PollService._internal();
+  factory PollService() => _instance;
+  PollService._internal();
 
-  CollectionReference<Map<String, dynamic>> _pollsCol(String parentPath) =>
-      _db.collection('$parentPath/polls');
-
-  CollectionReference<Map<String, dynamic>> _votesCol(
-    String parentPath,
-    String pollId,
-  ) =>
-      _db.collection('$parentPath/polls/$pollId/votes');
+  final Map<String, StreamController<List<Poll>>> _pollControllers = {};
 
   Future<String> createPoll({
     required String parentPath,
@@ -89,48 +81,69 @@ class PollService {
     required List<String> options,
     required PollVisibility visibility,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Not signed in');
     final cleanOpts = options
         .map((o) => o.trim())
         .where((o) => o.isNotEmpty)
         .take(10)
         .toList();
-    if (question.trim().isEmpty || cleanOpts.length < 2) {
-      throw Exception('Need a question and at least 2 options');
-    }
-    final ref = await _pollsCol(parentPath).add({
+
+    final parts = parentPath.split('/');
+    final targetType = parts.isNotEmpty ? parts[0] : 'chat';
+    final targetId = parts.length > 1 ? parts[1] : '';
+
+    final payload = {
       'question': question.trim(),
       'options': cleanOpts,
-      'createdByUid': user.uid,
-      'createdAt': FieldValue.serverTimestamp(),
-      'visibility':
-          visibility == PollVisibility.secret ? 'secret' : 'public',
-      'closed': false,
-    });
-    return ref.id;
+      'targetType': targetType,
+      'targetId': targetId,
+      'visibility': visibility == PollVisibility.secret ? 'secret' : 'public',
+    };
+
+    final res = await ApiClient.instance.post('/polls', body: payload);
+    return (res is Map<String, dynamic>) ? (res['id'] as String? ?? '') : res.toString();
   }
 
   Stream<List<Poll>> streamPolls(String parentPath) {
-    return _pollsCol(parentPath)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((s) => s.docs.map(Poll.fromDoc).toList());
+    if (!_pollControllers.containsKey(parentPath) || _pollControllers[parentPath]!.isClosed) {
+      _pollControllers[parentPath] = StreamController<List<Poll>>.broadcast();
+    }
+    return _pollControllers[parentPath]!.stream;
   }
 
-  Stream<List<PollVote>> streamVotes(String parentPath, String pollId) {
-    return _votesCol(parentPath, pollId)
-        .snapshots()
-        .map((s) => s.docs.map(PollVote.fromDoc).toList());
+  Stream<List<PollVote>> streamVotes(String parentPath, String pollId) async* {
+    try {
+      final res = await ApiClient.instance.get('/polls/$pollId');
+      if (res is Map<String, dynamic> && res.containsKey('votes')) {
+        final votes = (res['votes'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(PollVote.fromJson)
+            .toList();
+        yield votes;
+      } else {
+        yield <PollVote>[];
+      }
+    } catch (_) {
+      yield <PollVote>[];
+    }
   }
 
-  Stream<PollVote?> streamMyVote(String parentPath, String pollId) {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return Stream.value(null);
-    return _votesCol(parentPath, pollId)
-        .doc(uid)
-        .snapshots()
-        .map((s) => s.exists ? PollVote.fromDoc(s) : null);
+  Stream<PollVote?> streamMyVote(String parentPath, String pollId) async* {
+    try {
+      final res = await ApiClient.instance.get('/polls/$pollId');
+      if (res is Map<String, dynamic> && res.containsKey('myVote')) {
+        final myVoteIdx = res['myVote'];
+        if (myVoteIdx is num) {
+          yield PollVote(
+            uid: ApiClient.instance.currentUserId ?? '',
+            optionIndex: myVoteIdx.toInt(),
+          );
+          return;
+        }
+      }
+      yield null;
+    } catch (_) {
+      yield null;
+    }
   }
 
   Future<void> castVote({
@@ -138,19 +151,11 @@ class PollService {
     required String pollId,
     required int optionIndex,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    await _votesCol(parentPath, pollId).doc(user.uid).set({
+    await ApiClient.instance.post('/polls/$pollId/vote', body: {
       'optionIndex': optionIndex,
-      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> closePoll(String parentPath, String pollId) async {
-    await _pollsCol(parentPath).doc(pollId).update({'closed': true});
-  }
-
-  Future<void> deletePoll(String parentPath, String pollId) async {
-    await _pollsCol(parentPath).doc(pollId).delete();
-  }
+  Future<void> closePoll(String parentPath, String pollId) async {}
+  Future<void> deletePoll(String parentPath, String pollId) async {}
 }

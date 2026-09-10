@@ -23,6 +23,7 @@ import 'src/providers/locale_provider.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/router/app_router.dart';
 import 'src/services/admin_service.dart';
+import 'src/services/api_client.dart';
 import 'src/services/error_report_service.dart';
 import 'src/services/translate_service.dart';
 import 'src/services/fcm_service.dart';
@@ -61,25 +62,11 @@ Future<void> main() async {
       await dotenv.load(fileName: '.env');
       debugPrint('[boot] dotenv loaded');
     } catch (e) {
-      debugPrint('[boot]                               dotenv load failed (ignored): $e');
+      debugPrint('[boot] dotenv load failed (ignored): $e');
     }
 
-    // The `.env` file is bundled as an asset (see pubspec.yaml). On iOS it can
-    // silently fail to bundle (stale Xcode asset cache, restrictive file
-    // permissions), leaving these keys empty — which later surfaces as a
-    // cryptic "No host specified in URI" error on the first upload. Surface it
-    // here, at boot, where the cause is obvious.
-    final missingEnv = <String>[
-      for (final key in const ['SUPABASE_URL', 'SUPABASE_ANON_KEY'])
-        if ((dotenv.env[key] ?? '').isEmpty) key,
-    ];
-    if (missingEnv.isNotEmpty) {
-      debugPrint('[boot] FATAL: missing .env keys: ${missingEnv.join(', ')} — '
-          'the .env asset likely failed to bundle. Run `flutter clean` and '
-          'rebuild.');
-    } else {
-      debugPrint('[boot] env keys present');
-    }
+    await ApiClient.instance.init();
+    debugPrint('[boot] ApiClient initialized');
 
     try {
       await Firebase.initializeApp(

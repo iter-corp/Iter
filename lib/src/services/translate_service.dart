@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_client.dart';
 
 /// Tag prefix used by every debug print emitted by [TranslateService].
 /// Search the device log with: `flutter logs | grep [translate]`
@@ -469,6 +470,26 @@ class TranslateService {
     );
     if (cached != null) {
       return cached;
+    }
+
+    try {
+      final res = await ApiClient.instance.post('/ai/translate', body: {
+        'text': normalized,
+        'sourceLanguage': effectiveSourceLang,
+        'targetLanguage': targetLang,
+      });
+      if (res is Map<String, dynamic> && res.containsKey('translatedText')) {
+        final translated = res['translatedText'] as String;
+        await _cacheStore(
+          sourceLang: effectiveSourceLang,
+          targetLang: targetLang,
+          text: normalized,
+          result: translated,
+        );
+        return translated;
+      }
+    } catch (e) {
+      _tlog('Hono backend translation error: $e — checking local providers');
     }
 
     final allProviders = _buildProviderList(

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
+import 'api_client.dart';
 import 'notification_service.dart';
 
 class ContactRequestDailyLimitException implements Exception {
@@ -164,13 +166,6 @@ class ContactRequestService {
     return '${t.substring(0, _previewLimit - 1)}…';
   }
 
-  String _dayKeyUtc(DateTime date) {
-    final y = date.year.toString().padLeft(4, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final d = date.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
-  }
-
   Future<void> _deleteCollectionDocs(
     CollectionReference<Map<String, dynamic>> col,
   ) async {
@@ -241,8 +236,20 @@ class ContactRequestService {
       throw ArgumentError('Message cannot be empty');
     }
 
-    // Backward-compatible guard for users created before the daily lock field
-    // existed: if they already opened one request today, block immediately.
+    try {
+      final res = await ApiClient.instance.post('/users/contact-request', body: {
+        'type': _typeToRaw(type),
+        'subject': body.length > 60 ? '${body.substring(0, 59)}…' : body,
+        'message': body,
+      });
+      if (res is Map<String, dynamic>) {
+        return res['id'] as String? ?? 'cr_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    } catch (e) {
+      debugPrint('[ContactRequestService] submit error: $e');
+    }
+
+    // Backward-compatible fallback
     final nowUtc = DateTime.now().toUtc();
     final startOfDayUtc = DateTime.utc(nowUtc.year, nowUtc.month, nowUtc.day);
     final endOfDayUtc = startOfDayUtc.add(const Duration(days: 1));
@@ -258,7 +265,7 @@ class ContactRequestService {
     }
 
     final now = FieldValue.serverTimestamp();
-    final todayKey = _dayKeyUtc(nowUtc);
+    final todayKey = '${nowUtc.year.toString().padLeft(4, '0')}-${nowUtc.month.toString().padLeft(2, '0')}-${nowUtc.day.toString().padLeft(2, '0')}';
     final docRef = _col.doc();
     final userRef = _db.collection('users').doc(userUid);
     final msgRef = docRef.collection('messages').doc();

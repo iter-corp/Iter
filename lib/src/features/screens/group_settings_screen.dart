@@ -545,7 +545,7 @@ class _PermissionCard extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: const Color(0xFFB05ECC),
+            activeColor: const Color(0xFFB05ECC),
             activeTrackColor: const Color(0xFFB05ECC).withValues(alpha: 0.3),
           ),
         ],
