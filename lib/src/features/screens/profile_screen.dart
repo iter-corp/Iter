@@ -17,6 +17,7 @@ import '../../providers/post_providers.dart';
 import '../../providers/theme_provider.dart';
 
 import '../../theme/app_theme.dart';
+import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/post_card.dart';
@@ -72,12 +73,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               return Center(child: Text(context.t.profileNoProfileData));
             }
             return SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 100),
+              padding: EdgeInsets.only(
+                bottom: 140 + MediaQuery.of(context).padding.bottom,
+              ),
               child: Column(
                 children: [
                   ProfileCoverAvatar(
                     coverUrl: user['coverUrl'] as String?,
                     avatarUrl: user['avatarUrl'] as String?,
+                    name: (user['name'] as String?) ??
+                        (user['username'] as String?),
                   ),
                   ProfileNameBio(
                     name: (user['name'] as String?) ??
@@ -522,8 +527,10 @@ class PostThumbTile extends StatelessWidget {
 }
 
 /// Renders the first frame of a network video as a still thumbnail.
-/// We initialise a VideoPlayerController, seek to 0, and never call play —
-/// the plugin paints the decoded frame as the texture.
+/// It downloads to local cache first so it doesn't re-stream, initialises
+/// a VideoPlayerController, and seeks to 0. If decoding fails or times out,
+/// it gracefully falls back to a styled preview card with play badge instead of
+/// getting stuck in an infinite loading spinner.
 class _VideoThumb extends StatefulWidget {
   final String url;
   const _VideoThumb({required this.url});
@@ -534,21 +541,66 @@ class _VideoThumb extends StatefulWidget {
 
 class _VideoThumbState extends State<_VideoThumb> {
   VideoPlayerController? _controller;
+  bool _ready = false;
+  bool _failed = false;
 
   @override
   void initState() {
     super.initState();
-    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _loadThumb();
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoThumb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      _ready = false;
+      _failed = false;
+      _loadThumb();
+    }
+  }
+
+  Future<void> _loadThumb() async {
+    VideoPlayerController? c;
+    try {
+      // 1. First attempt to load via local disk cache (fast and avoids redundant downloads)
+      final file = await MediaCache.videoFile(widget.url)
+          .timeout(const Duration(seconds: 4));
+      if (!mounted) return;
+      c = VideoPlayerController.file(file);
+    } catch (_) {
+      // 2. Cache miss or timeout — fall back to network streaming
+      if (!mounted) return;
+      c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    }
+
+    if (!mounted) {
+      c.dispose();
+      return;
+    }
+
     _controller = c;
     c.setVolume(0);
-    c.initialize().then((_) async {
-      if (!mounted) return;
+
+    try {
+      await c.initialize().timeout(const Duration(seconds: 4));
+      if (!mounted) {
+        c.dispose();
+        return;
+      }
       await c.seekTo(Duration.zero);
       if (!mounted) return;
-      setState(() {});
-    }).catchError((_) {
-      // Leave the placeholder visible on decode failure.
-    });
+      setState(() {
+        _ready = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+      });
+    }
   }
 
   @override
@@ -560,27 +612,44 @@ class _VideoThumbState extends State<_VideoThumb> {
   @override
   Widget build(BuildContext context) {
     final c = _controller;
-    final ready = c != null && c.value.isInitialized;
+    final ready = _ready && c != null && c.value.isInitialized;
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        Container(color: Colors.black),
         if (ready)
           FittedBox(
             fit: BoxFit.cover,
             child: SizedBox(
-              width: c.value.size.width,
-              height: c.value.size.height,
+              width: c.value.size.width > 0 ? c.value.size.width : 100,
+              height: c.value.size.height > 0 ? c.value.size.height : 100,
               child: VideoPlayer(c),
             ),
           )
         else
-          const Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white70),
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF232732), Color(0xFF14171E)],
+              ),
+            ),
+            child: Center(
+              child: _failed
+                  ? Icon(
+                      Icons.play_circle_fill_rounded,
+                      size: 34,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    )
+                  : const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white54,
+                      ),
+                    ),
             ),
           ),
         Positioned(
@@ -589,7 +658,7 @@ class _VideoThumbState extends State<_VideoThumb> {
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.black.withValues(alpha: 0.55),
+              color: Colors.black.withValues(alpha: 0.65),
             ),
             padding: const EdgeInsets.all(4),
             child: const Icon(Icons.play_arrow, color: Colors.white, size: 14),
@@ -835,7 +904,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
           return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 96),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
             itemCount: posts.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (_, i) {

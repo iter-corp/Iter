@@ -476,12 +476,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             final enforcePrivacy = isPrivate && !isFollowing && !isOwnProfile;
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: EdgeInsets.only(
+                bottom: 48 + MediaQuery.of(context).padding.bottom,
+              ),
               child: Column(
                 children: [
                   UserCoverAvatar(
                     avatarUrl: avatarUrl,
                     coverUrl: coverUrl,
+                    name: displayName,
                     isPrivate: isPrivate,
                     onBack: () => Navigator.pop(context),
                     showMenu: !isOwnProfile,

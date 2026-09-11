@@ -88,25 +88,37 @@ int _eventRelevanceScore(AdminEvent e, Map<String, dynamic>? userDoc) {
     if (km != null && km <= 100) score += 1;
   }
   return score;
-}
-
-class EventBody extends ConsumerStatefulWidget {
+}class EventBody extends ConsumerStatefulWidget {
   const EventBody({super.key});
 
   @override
   ConsumerState<EventBody> createState() => _EventBodyState();
 }
 
-class _EventBodyState extends ConsumerState<EventBody> {
+class _EventBodyState extends ConsumerState<EventBody>
+    with SingleTickerProviderStateMixin {
   String? _selectedEventCity;
   String? _selectedEventType;
   _EventsLayout _eventsLayout = _EventsLayout.list;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  late final AnimationController _searchAnimController;
+  late final Animation<double> _searchAnim;
+  bool _isSearchOpen = false;
   String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _searchAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _searchAnim = CurvedAnimation(
+      parent: _searchAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeShowEventsQuickStart();
     });
@@ -119,7 +131,26 @@ class _EventBodyState extends ConsumerState<EventBody> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
+    _searchAnimController.dispose();
     super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => _isSearchOpen = true);
+    _searchAnimController.forward().then((_) {
+      if (mounted && _isSearchOpen) {
+        _searchFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _closeSearch() {
+    _searchFocusNode.unfocus();
+    _searchController.clear();
+    _searchAnimController.reverse().then((_) {
+      if (mounted) setState(() => _isSearchOpen = false);
+    });
   }
 
   Future<void> _maybeShowEventsQuickStart() async {
@@ -138,12 +169,10 @@ class _EventBodyState extends ConsumerState<EventBody> {
     await showEventsQuickStartSheet(context);
   }
 
-  Future<void> _onEventCityTap(List<AdminEvent> events) async {
-    // Tapping the chip while a country is active clears the filter.
-    if (_selectedEventCity != null) {
-      setState(() => _selectedEventCity = null);
-      return;
-    }
+  Future<void> _onEventCityTap([List<AdminEvent>? eventsList]) async {
+    final events = eventsList ??
+        ref.read(adminEventsProvider).valueOrNull ??
+        const <AdminEvent>[];
     final configCountries =
         ref.read(adminConfigProvider).valueOrNull?.eventCountries;
     final eventCountries = {
@@ -193,60 +222,117 @@ class _EventBodyState extends ConsumerState<EventBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _SearchBar(
-                      controller: _searchController,
-                      hint: context.t.eventsSearchEvents,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _LayoutToggle(
-                    layout: _eventsLayout,
-                    onChanged: (l) => setState(() => _eventsLayout = l),
-                  ),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => showEventsQuickStartSheet(context),
-                    child: AppGlassCard(
-                      width: 38,
-                      height: 38,
-                      radius: 19,
-                      surfaceAlpha: context.isDark ? 0.24 : 0.52,
-                      borderAlpha: context.isDark ? 0.16 : 0.50,
-                      child: const Icon(
-                        Icons.help_outline_rounded,
-                        size: 18,
-                        color: _kBrandPurple,
+    final hasCityFilter =
+        _selectedEventCity != null && _selectedEventCity!.isNotEmpty;
+    final hasTypeFilter =
+        _selectedEventType != null && _selectedEventType!.isNotEmpty;
+
+    return PopScope(
+      canPop: !_isSearchOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _isSearchOpen) {
+          _closeSearch();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _AnimatedSearchSection(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        animation: _searchAnim,
+                        isSearchOpen: _isSearchOpen,
+                        onOpenSearch: _openSearch,
+                        onCloseSearch: _closeSearch,
+                        hint: context.t.eventsSearchEvents,
+                        cityActive: hasCityFilter,
+                        onCityTap: _onEventCityTap,
+                        cityTooltip:
+                            _selectedEventCity ?? context.t.eventsFilterByCity,
+                        typeActive: hasTypeFilter,
+                        onTypeTap: _onEventTypeTap,
+                        typeTooltip:
+                            _selectedEventType ?? context.t.eventsFilterByType,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    _LayoutToggle(
+                      layout: _eventsLayout,
+                      onChanged: (l) => setState(() => _eventsLayout = l),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => showEventsQuickStartSheet(context),
+                      child: AppGlassCard(
+                        width: 38,
+                        height: 38,
+                        radius: 19,
+                        surfaceAlpha: context.isDark ? 0.24 : 0.52,
+                        borderAlpha: context.isDark ? 0.16 : 0.50,
+                        child: const Icon(
+                          Icons.help_outline_rounded,
+                          size: 18,
+                          color: _kBrandPurple,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: _EventsView(
-                query: _query,
-                selectedCity: _selectedEventCity,
-                selectedEventType: _selectedEventType,
-                layout: _eventsLayout,
-                onCityTap: _onEventCityTap,
-                onClearCity: () => setState(() => _selectedEventCity = null),
-                onTypeTap: _onEventTypeTap,
-                onClearType: () => setState(() => _selectedEventType = null),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: (hasCityFilter || hasTypeFilter)
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 2),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                if (hasCityFilter)
+                                  _ActiveFilterBadge(
+                                    icon: Icons.location_on_rounded,
+                                    label: _selectedEventCity!,
+                                    onRemove: () => setState(
+                                        () => _selectedEventCity = null),
+                                  ),
+                                if (hasCityFilter && hasTypeFilter)
+                                  const SizedBox(width: 8),
+                                if (hasTypeFilter)
+                                  _ActiveFilterBadge(
+                                    icon: Icons.tune_rounded,
+                                    label: _selectedEventType!,
+                                    onRemove: () => setState(
+                                        () => _selectedEventType = null),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Expanded(
+                child: _EventsView(
+                  query: _query,
+                  selectedCity: _selectedEventCity,
+                  selectedEventType: _selectedEventType,
+                  layout: _eventsLayout,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -254,57 +340,344 @@ class _EventBodyState extends ConsumerState<EventBody> {
 }
 
 // ─────────────────────────────────────────────────────────
-// Search bar
+// Animated Search & Filter Bar Section
 // ─────────────────────────────────────────────────────────
-class _SearchBar extends StatelessWidget {
+class _AnimatedSearchSection extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode focusNode;
+  final Animation<double> animation;
+  final bool isSearchOpen;
+  final VoidCallback onOpenSearch;
+  final VoidCallback onCloseSearch;
   final String hint;
-  const _SearchBar({required this.controller, required this.hint});
+  final bool cityActive;
+  final VoidCallback onCityTap;
+  final String cityTooltip;
+  final bool typeActive;
+  final VoidCallback onTypeTap;
+  final String typeTooltip;
+
+  const _AnimatedSearchSection({
+    required this.controller,
+    required this.focusNode,
+    required this.animation,
+    required this.isSearchOpen,
+    required this.onOpenSearch,
+    required this.onCloseSearch,
+    required this.hint,
+    required this.cityActive,
+    required this.onCityTap,
+    required this.cityTooltip,
+    required this.typeActive,
+    required this.onTypeTap,
+    required this.typeTooltip,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return AppGlassCard(
-      height: 46,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      radius: 18,
-      surfaceAlpha: context.isDark ? 0.24 : 0.52,
-      borderAlpha: context.isDark ? 0.16 : 0.50,
-      child: Row(
-        children: [
-          const Icon(Icons.search_rounded, size: 20, color: _kBrandPurple),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                filled: false,
-                fillColor: Colors.transparent,
-                hintText: hint,
-                hintStyle:
-                    TextStyle(fontSize: 14, color: context.textSecondary),
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            final t = animation.value;
+
+            return SizedBox(
+              height: 38,
+              width: maxWidth,
+              child: Stack(
+                alignment: AlignmentDirectional.centerStart,
+                clipBehavior: Clip.none,
+                children: [
+                  // 1. Filter and Search Icon Buttons (Visible when search is closed)
+                  if (t < 0.99)
+                    PositionedDirectional(
+                      start: 0,
+                      child: Opacity(
+                        opacity: (1.0 - (t * 2.2)).clamp(0.0, 1.0),
+                        child: Transform.scale(
+                          scale: (1.0 - (t * 0.15)).clamp(0.85, 1.0),
+                          alignment: AlignmentDirectional.centerStart,
+                          child: IgnorePointer(
+                            ignoring: t > 0.05,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _GlassIconButton(
+                                  icon: Icons.search_rounded,
+                                  onTap: onOpenSearch,
+                                  tooltip: context.t.search,
+                                ),
+                                const SizedBox(width: 8),
+                                _GlassIconButton(
+                                  icon: Icons.location_on_rounded,
+                                  active: cityActive,
+                                  onTap: onCityTap,
+                                  tooltip: cityTooltip,
+                                ),
+                                const SizedBox(width: 8),
+                                _GlassIconButton(
+                                  icon: Icons.tune_rounded,
+                                  active: typeActive,
+                                  onTap: onTypeTap,
+                                  tooltip: typeTooltip,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // 2. Expanding Search Input (Expands smoothly on tap)
+                  if (t > 0.01)
+                    PositionedDirectional(
+                      start: 0,
+                      child: SizedBox(
+                        width: (38.0 + (maxWidth - 38.0) * t)
+                            .clamp(38.0, maxWidth),
+                        height: 38,
+                        child: Opacity(
+                          opacity: ((t - 0.05) / 0.95).clamp(0.0, 1.0),
+                          child: IgnorePointer(
+                            ignoring: t < 0.8,
+                            child: AppGlassCard(
+                              height: 38,
+                              radius: 19,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              surfaceAlpha: context.isDark ? 0.28 : 0.58,
+                              borderAlpha: context.isDark ? 0.20 : 0.55,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.search_rounded,
+                                    size: 18,
+                                    color: _kBrandPurple,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      textInputAction: TextInputAction.search,
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        disabledBorder: InputBorder.none,
+                                        filled: false,
+                                        fillColor: Colors.transparent,
+                                        hintText: hint,
+                                        hintStyle: TextStyle(
+                                          fontSize: 13,
+                                          color: context.textSecondary,
+                                        ),
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: context.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  ValueListenableBuilder<TextEditingValue>(
+                                    valueListenable: controller,
+                                    builder: (_, value, __) {
+                                      if (value.text.isNotEmpty) {
+                                        return GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: controller.clear,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4),
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              size: 16,
+                                              color: context.textSecondary,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+                                  const SizedBox(width: 2),
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: onCloseSearch,
+                                    child: Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: _kBrandPurple
+                                            .withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close_rounded,
+                                        size: 14,
+                                        color: _kBrandPurple,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              style: TextStyle(fontSize: 14, color: context.textPrimary),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Glass Icon Button
+// ─────────────────────────────────────────────────────────
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool active;
+  final String? tooltip;
+
+  const _GlassIconButton({
+    required this.icon,
+    required this.onTap,
+    this.active = false,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    final button = GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          active
+              ? Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_kBrandPurple, _kBrandDeep],
+                    ),
+                    borderRadius: BorderRadius.circular(19),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kBrandPurple.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, size: 18, color: Colors.white),
+                )
+              : AppGlassCard(
+                  width: 38,
+                  height: 38,
+                  radius: 19,
+                  surfaceAlpha: isDark ? 0.24 : 0.52,
+                  borderAlpha: isDark ? 0.16 : 0.50,
+                  child: Icon(icon, size: 18, color: _kBrandPurple),
+                ),
+          if (active)
+            PositionedDirectional(
+              top: -1,
+              end: -1,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6EE7B7),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF101017) : Colors.white,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (tooltip != null && tooltip!.isNotEmpty) {
+      return Tooltip(message: tooltip!, child: button);
+    }
+    return button;
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Active Filter Badge (Shown when a filter is active)
+// ─────────────────────────────────────────────────────────
+class _ActiveFilterBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onRemove;
+
+  const _ActiveFilterBadge({
+    required this.icon,
+    required this.label,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
+      decoration: BoxDecoration(
+        color: _kBrandPurple.withValues(alpha: isDark ? 0.22 : 0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _kBrandPurple.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: _kBrandPurple),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : _kBrandDeep,
             ),
           ),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, value, __) => value.text.isEmpty
-                ? const SizedBox.shrink()
-                : GestureDetector(
-                    onTap: controller.clear,
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: context.textSecondary,
-                    ),
-                  ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: _kBrandPurple.withValues(alpha: 0.20),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                size: 12,
+                color: _kBrandPurple,
+              ),
+            ),
           ),
         ],
       ),
@@ -320,20 +693,12 @@ class _EventsView extends ConsumerWidget {
   final String? selectedCity;
   final String? selectedEventType;
   final _EventsLayout layout;
-  final ValueChanged<List<AdminEvent>> onCityTap;
-  final VoidCallback onClearCity;
-  final VoidCallback onTypeTap;
-  final VoidCallback onClearType;
 
   const _EventsView({
     required this.query,
     required this.selectedCity,
     required this.selectedEventType,
     required this.layout,
-    required this.onCityTap,
-    required this.onClearCity,
-    required this.onTypeTap,
-    required this.onClearType,
   });
 
   @override
@@ -382,216 +747,70 @@ class _EventsView extends ConsumerWidget {
         filtered
             .sort((a, b) => (scored[b.id] ?? 0).compareTo(scored[a.id] ?? 0));
 
-        return Column(
-          children: [
-            _EventFilterBar(
-              selectedCity: selectedCity,
-              selectedType: selectedEventType,
-              onCityTap: () => onCityTap(events),
-              onClearCity: onClearCity,
-              onTypeTap: onTypeTap,
-              onClearType: onClearType,
+        if (filtered.isEmpty) {
+          return _EmptyState(
+            icon: Icons.event_busy_outlined,
+            title: !hasAnyFilter
+                ? context.t.noEvents
+                : (q.isNotEmpty
+                    ? context.t.eventsNoEventsMatching(query)
+                    : (hasCityFilter && hasTypeFilter
+                        ? context.t.eventsNoTypeEventsInCity(
+                            selectedEventType ?? '',
+                            selectedCity ?? '')
+                        : (hasCityFilter
+                            ? context.t.eventsNoEventsInCity(
+                                selectedCity ?? '')
+                            : context.t.eventsNoTypeEvents(
+                                selectedEventType ?? '')))),
+            subtitle: !hasAnyFilter
+                ? context.t.eventsNewEventsAppearHere
+                : context.t.eventsTryDifferentKeywordLocation,
+          );
+        }
+
+        if (layout == _EventsLayout.map) {
+          return _EventsMapView(events: filtered);
+        }
+
+        return RefreshIndicator(
+          color: _kBrandPurple,
+          onRefresh: () async {
+            ref.invalidate(adminEventsProvider);
+            await Future.delayed(const Duration(milliseconds: 400));
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
-            Expanded(
-              child: filtered.isEmpty
-                  ? _EmptyState(
-                      icon: Icons.event_busy_outlined,
-                      title: !hasAnyFilter
-                          ? context.t.noEvents
-                          : (q.isNotEmpty
-                              ? context.t.eventsNoEventsMatching(query)
-                              : (hasCityFilter && hasTypeFilter
-                                  ? context.t.eventsNoTypeEventsInCity(
-                                      selectedEventType ?? '',
-                                      selectedCity ?? '')
-                                  : (hasCityFilter
-                                      ? context.t.eventsNoEventsInCity(
-                                          selectedCity ?? '')
-                                      : context.t.eventsNoTypeEvents(
-                                          selectedEventType ?? '')))),
-                      subtitle: !hasAnyFilter
-                          ? context.t.eventsNewEventsAppearHere
-                          : context.t.eventsTryDifferentKeywordLocation,
-                    )
-                  : layout == _EventsLayout.map
-                      ? _EventsMapView(events: filtered)
-                      : RefreshIndicator(
-                          color: _kBrandPurple,
-                          onRefresh: () async {
-                            ref.invalidate(adminEventsProvider);
-                            await Future.delayed(
-                                const Duration(milliseconds: 400));
-                          },
-                          child: CustomScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics(),
-                            ),
-                            slivers: [
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                                sliver: SliverGrid(
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                    childAspectRatio: 0.78,
-                                  ),
-                                  delegate: SliverChildBuilderDelegate(
-                                    (context, i) => _EventCard(
-                                      event: filtered[i],
-                                      recommended:
-                                          (scored[filtered[i].id] ?? 0) > 0,
-                                    ),
-                                    childCount: filtered.length,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-            ),
-          ],
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                sliver: SliverGrid(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.66,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _EventCard(
+                      event: filtered[i],
+                      recommended: (scored[filtered[i].id] ?? 0) > 0,
+                    ),
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 }
 
-// Event filter bar: city + type chips.
-class _EventFilterBar extends StatelessWidget {
-  final String? selectedCity;
-  final String? selectedType;
-  final VoidCallback onCityTap;
-  final VoidCallback onClearCity;
-  final VoidCallback onTypeTap;
-  final VoidCallback onClearType;
-
-  const _EventFilterBar({
-    required this.selectedCity,
-    required this.selectedType,
-    required this.onCityTap,
-    required this.onClearCity,
-    required this.onTypeTap,
-    required this.onClearType,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cityActive = selectedCity != null && selectedCity!.isNotEmpty;
-    final typeActive = selectedType != null && selectedType!.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: _EventFilterChip(
-              active: cityActive,
-              icon: Icons.location_on_rounded,
-              label: cityActive ? selectedCity! : context.t.eventsFilterByCity,
-              onTap: onCityTap,
-              onClear: onClearCity,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _EventFilterChip(
-              active: typeActive,
-              icon: Icons.tune_rounded,
-              label:
-                  typeActive ? selectedType! : context.t.eventsFilterByTypeChip,
-              onTap: onTypeTap,
-              onClear: onClearType,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EventFilterChip extends StatelessWidget {
-  final bool active;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final VoidCallback onClear;
-
-  const _EventFilterChip({
-    required this.active,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Row(
-      children: [
-        Icon(icon, size: 16, color: active ? Colors.white : _kBrandPurple),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: active ? Colors.white : context.textSecondary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        if (active)
-          GestureDetector(
-            onTap: onClear,
-            child: const Icon(
-              Icons.close_rounded,
-              size: 15,
-              color: Colors.white,
-            ),
-          )
-        else
-          Icon(
-            Icons.keyboard_arrow_down_rounded,
-            size: 18,
-            color: context.textSecondary,
-          ),
-      ],
-    );
-
-    return GestureDetector(
-      onTap: onTap,
-      child: active
-          ? AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _kBrandPurple,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: _kBrandPurple),
-                boxShadow: [
-                  BoxShadow(
-                    color: _kBrandPurple.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: content,
-            )
-          : AppGlassCard(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              radius: 22,
-              surfaceAlpha: context.isDark ? 0.22 : 0.50,
-              borderAlpha: context.isDark ? 0.14 : 0.46,
-              child: content,
-            ),
-    );
-  }
-}
 
 class _LayoutToggle extends StatelessWidget {
   final _EventsLayout layout;
@@ -811,7 +1030,7 @@ class _EventCardState extends State<_EventCard> {
                         ),
                       ),
                       if (e.eventType.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: Container(
@@ -837,7 +1056,7 @@ class _EventCardState extends State<_EventCard> {
                         ),
                       ],
                       if (widget.recommended) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: Container(
@@ -965,7 +1184,7 @@ class _LoadingGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.66,
       ),
       itemCount: 4,
       itemBuilder: (_, __) => const _ShimmerBlock(radius: 22),

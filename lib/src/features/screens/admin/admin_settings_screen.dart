@@ -17,6 +17,7 @@ class AdminSettingsScreen extends ConsumerStatefulWidget {
 
 class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   final _announcementCtrl = TextEditingController();
+  final _welcomeMessageCtrl = TextEditingController();
   final _minVersionCtrl = TextEditingController();
   final _iosUrlCtrl = TextEditingController();
   final _androidUrlCtrl = TextEditingController();
@@ -51,6 +52,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     if (_hydrated) return;
     _cfg = cfg;
     _announcementCtrl.text = cfg.announcement;
+    _welcomeMessageCtrl.text = cfg.welcomeMessage;
     _minVersionCtrl.text = cfg.minAppVersion;
     _iosUrlCtrl.text = cfg.iosAppStoreUrl;
     _androidUrlCtrl.text = cfg.androidPlayStoreUrl;
@@ -60,6 +62,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   @override
   void dispose() {
     _announcementCtrl.dispose();
+    _welcomeMessageCtrl.dispose();
     _minVersionCtrl.dispose();
     _iosUrlCtrl.dispose();
     _androidUrlCtrl.dispose();
@@ -222,6 +225,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     try {
       final next = _cfg.copyWith(
         announcement: _announcementCtrl.text.trim(),
+        welcomeMessage: _welcomeMessageCtrl.text.trim(),
         minAppVersion: _minVersionCtrl.text.trim(),
         iosAppStoreUrl: _iosUrlCtrl.text.trim(),
         androidPlayStoreUrl: _androidUrlCtrl.text.trim(),
@@ -312,6 +316,22 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                         onChanged: (v) => setState(
                             () => _cfg = _cfg.copyWith(translateEnabled: v)),
                       ),
+                      const SizedBox(height: 16),
+                      _section(context.t.adminSectionWelcomeMessage),
+                      _flag(
+                        title: context.t.adminFlagWelcomeMessage,
+                        value: _cfg.welcomeMessageEnabled,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(welcomeMessageEnabled: v)),
+                      ),
+                      if (_cfg.welcomeMessageEnabled) ...[
+                        const SizedBox(height: 8),
+                        _textInputCard(
+                          controller: _welcomeMessageCtrl,
+                          hintText: context.t.adminWelcomeMessageHint,
+                          maxLines: 3,
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       _section(context.t.adminSectionAnnouncement),
                       _textInputCard(

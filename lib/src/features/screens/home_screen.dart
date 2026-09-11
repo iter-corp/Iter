@@ -9,10 +9,13 @@ import '../../providers/auth_providers.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/preferred_language_provider.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/post_providers.dart';
+import '../../providers/theme_provider.dart' show sharedPreferencesProvider;
+import '../../services/api_client.dart';
 import '../../services/translate_service.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/media_cache.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/post_model.dart';
 import 'create_post_screen.dart';
 import 'notification_screen.dart';
@@ -48,6 +51,28 @@ class HomeBody extends ConsumerStatefulWidget {
 }
 
 class _HomeBodyState extends ConsumerState<HomeBody> {
+  bool _welcomeDismissedLocally = false;
+
+  Future<void> _dismissWelcome(String uid) async {
+    setState(() => _welcomeDismissedLocally = true);
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.setBool('welcome_message_seen_$uid', true);
+    } catch (_) {}
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({'welcomeMessageSeen': true}, SetOptions(merge: true));
+    } catch (_) {}
+    try {
+      await ApiClient.instance.patch('/users/me', body: {
+        'metadata': {'welcomeMessageSeen': true}
+      });
+    } catch (_) {}
+  }
+
+
   Future<void> _refresh(WidgetRef ref) async {
     ref.invalidate(feedProvider);
     ref.invalidate(qaFeedProvider);
@@ -77,12 +102,21 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
 
   /// Top content for the scrolling list: banners, the app bar, and stories.
   List<Widget> _topContent({
+    required bool showWelcome,
+    required String welcomeMessage,
+    required VoidCallback? onDismissWelcome,
+    required bool showAnnouncement,
     required String announcement,
     required bool maintenance,
     required bool showStories,
   }) {
     return [
-      if (announcement.isNotEmpty)
+      if (showWelcome && onDismissWelcome != null)
+        _WelcomeBanner(
+          message: welcomeMessage,
+          onDismiss: onDismissWelcome,
+        ),
+      if (showAnnouncement)
         _AnnouncementBanner(announcement: announcement),
       if (maintenance) const _MaintenanceBanner(),
       const SizedBox(height: 8),
@@ -101,8 +135,33 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
 
     final cfg = ref.watch(adminConfigProvider).valueOrNull;
     final announcement = cfg?.announcement ?? '';
+    final welcomeEnabled = cfg?.welcomeMessageEnabled ?? true;
+    final welcomeMessage = cfg?.welcomeMessage ?? '';
     final maintenance = cfg?.maintenanceMode ?? false;
     final showStories = cfg?.storiesEnabled ?? true;
+
+    final currentUid = ref.watch(authStateProvider).value?.uid;
+    final userDoc = ref.watch(currentUserDocProvider).value;
+    final prefs = ref.watch(sharedPreferencesProvider);
+
+    bool showWelcome = false;
+    if (welcomeEnabled &&
+        welcomeMessage.trim().isNotEmpty &&
+        currentUid != null &&
+        !_welcomeDismissedLocally) {
+      final seenLocally =
+          prefs.getBool('welcome_message_seen_$currentUid') == true;
+      final seenRemotely = userDoc?['welcomeMessageSeen'] == true ||
+          (userDoc?['metadata'] is Map &&
+              userDoc?['metadata']?['welcomeMessageSeen'] == true);
+      showWelcome = !seenLocally && !seenRemotely;
+    }
+
+    final showAnnouncement = announcement.trim().isNotEmpty &&
+        announcement.trim().toLowerCase() != welcomeMessage.trim().toLowerCase();
+
+    void Function()? dismissCallback =
+        currentUid != null ? () => _dismissWelcome(currentUid) : null;
 
     return SafeArea(
       child: RefreshIndicator(
@@ -114,6 +173,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
             padding: const EdgeInsets.only(bottom: 100),
             children: [
               ..._topContent(
+                showWelcome: showWelcome,
+                welcomeMessage: welcomeMessage,
+                onDismissWelcome: dismissCallback,
+                showAnnouncement: showAnnouncement,
                 announcement: announcement,
                 maintenance: maintenance,
                 showStories: showStories,
@@ -128,6 +191,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
             padding: const EdgeInsets.only(bottom: 100),
             children: [
               ..._topContent(
+                showWelcome: showWelcome,
+                welcomeMessage: welcomeMessage,
+                onDismissWelcome: dismissCallback,
+                showAnnouncement: showAnnouncement,
                 announcement: announcement,
                 maintenance: maintenance,
                 showStories: showStories,
@@ -144,6 +211,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 padding: const EdgeInsets.only(bottom: 100),
                 children: [
                   ..._topContent(
+                    showWelcome: showWelcome,
+                    welcomeMessage: welcomeMessage,
+                    onDismissWelcome: dismissCallback,
+                    showAnnouncement: showAnnouncement,
                     announcement: announcement,
                     maintenance: maintenance,
                     showStories: showStories,
@@ -163,6 +234,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 SliverToBoxAdapter(
                   child: Column(
                     children: _topContent(
+                      showWelcome: showWelcome,
+                      welcomeMessage: welcomeMessage,
+                      onDismissWelcome: dismissCallback,
+                      showAnnouncement: showAnnouncement,
                       announcement: announcement,
                       maintenance: maintenance,
                       showStories: showStories,
@@ -1068,6 +1143,80 @@ class _DiscussTranslateSheetState extends State<_DiscussTranslateSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WelcomeBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _WelcomeBanner({
+    required this.message,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color:
+            context.isDark ? const Color(0xFF2D1A30) : const Color(0xFFFFF1F8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFD044E8).withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD044E8).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD044E8).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Color(0xFFD044E8),
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: context.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: context.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

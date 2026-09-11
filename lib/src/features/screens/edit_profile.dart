@@ -15,6 +15,8 @@ import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/personalization_fields.dart';
+import '../widgets/profile_widget.dart'
+    show ProfileDefaultCover, ProfileInitialAvatar;
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -481,6 +483,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Widget _buildCoverAndAvatar() {
     final coverImage = _coverImage;
     final avatarImage = _avatarImage;
+    final name = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : _usernameController.text.trim();
+
     return SizedBox(
       height: 180 + 52,
       child: Stack(
@@ -488,20 +494,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         children: [
           GestureDetector(
             onTap: _pickCover,
-            child: Container(
+            child: SizedBox(
               height: 180,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: context.inputFill,
-                image: coverImage != null
-                    ? DecorationImage(
-                        image: coverImage,
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
               child: Stack(
+                fit: StackFit.expand,
                 children: [
+                  coverImage != null
+                      ? Image(
+                          image: coverImage,
+                          fit: BoxFit.cover,
+                        )
+                      : const ProfileDefaultCover(height: 180),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -559,15 +563,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: context.inputFill,
-                        backgroundImage: avatarImage,
-                        child: avatarImage == null
-                            ? Icon(Icons.person,
-                                size: 44, color: context.textSecondary)
-                            : null,
-                      ),
+                      avatarImage != null
+                          ? CircleAvatar(
+                              radius: 44,
+                              backgroundColor: Colors.transparent,
+                              backgroundImage: avatarImage,
+                            )
+                          : ProfileInitialAvatar(name: name, radius: 44),
                       if (_uploadingAvatar)
                         const CircularProgressIndicator(
                           color: Color(0xFFB05ECC),
