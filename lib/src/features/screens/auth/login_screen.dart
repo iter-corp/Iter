@@ -364,7 +364,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ),
-          if (field.hasError) _authFieldError(field.errorText!),
+          if (field.hasError && field.errorText != null)
+            _authFieldError(field.errorText!),
         ],
       ),
     );

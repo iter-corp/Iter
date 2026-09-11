@@ -1250,7 +1250,8 @@ class _EventEditorScreenState extends ConsumerState<_EventEditorScreen> {
                 counterText: maxLength != null ? '' : null,
               ),
             ),
-            if (field.hasError) _FieldError(text: field.errorText!),
+            if (field.hasError && field.errorText != null)
+              _FieldError(text: field.errorText!),
           ],
         ),
       ),

@@ -419,7 +419,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
               ),
             ),
-            if (field.hasError) _authFieldError(field.errorText!),
+            if (field.hasError && field.errorText != null)
+              _authFieldError(field.errorText!),
           ],
         ),
       ),
