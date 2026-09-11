@@ -1232,6 +1232,11 @@ const Map<String, String> enStrings = {
   'admin_flag_stories': 'Stories enabled',
   'admin_flag_reposts': 'Reposts enabled',
   'admin_flag_translate': 'Translate enabled',
+  'admin_section_welcome_message': 'Welcome Message (New Users)',
+  'admin_flag_welcome_message':
+      'Show welcome banner to newly registered/logged in users',
+  'admin_welcome_message_hint':
+      'Welcome message shown once at the top of the home screen on first login or sign-up...',
   'admin_section_announcement': 'Announcement',
   'admin_announcement_hint':
       'Shown at the top of the home screen. Leave empty to hide.',

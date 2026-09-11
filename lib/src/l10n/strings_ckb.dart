@@ -1217,6 +1217,11 @@ const Map<String, String> ckbStrings = {
   'admin_flag_stories': 'ستۆرییەکان چالاککراون',
   'admin_flag_reposts': 'ڕیپۆست چالاککراوە',
   'admin_flag_translate': 'وەرگێڕان چالاککراوە',
+  'admin_section_welcome_message': 'پەیامی بەخێرهاتن (بەکارهێنەرانی نوێ)',
+  'admin_flag_welcome_message':
+      'نیشاندانی تابلۆی بەخێرهاتن بۆ بەکارهێنەرانی نوێ لە یەکەم چوونەژوورەوەدا',
+  'admin_welcome_message_hint':
+      'پەیامی بەخێرهاتن کە تەنها جارێک لە سەرەوەی شاشەی سەرەکی دەردەکەوێت کاتێک بەکارهێنەر بۆ یەکەمجار دەچێتەژوورەوە...',
   'admin_section_announcement': 'ڕاگەیاندن',
   'admin_announcement_hint':
       'لە سەرەوەی شاشەی سەرەکی دەردەکەوێت. بەتاڵی جێبهێڵە بۆ شاردنەوەی.',
