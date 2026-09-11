@@ -88,17 +88,27 @@ void main() {
       expect(trending.imageUrls, isNotEmpty);
     });
 
-    test('fetchFeed returns posts via http client', () async {
-      final client = MockClient((request) async {
-        expect(request.url.host, 'en.wikipedia.org');
-        expect(request.url.path, contains('/api/rest_v1/feed/featured/'));
-        return http.Response(jsonEncode(mockFeed), 200);
-      });
+    test('falls back to thumbnail PNG when originalimage is SVG', () {
+      final svgFeed = {
+        'tfa': {
+          'title': 'Flight_11',
+          'titles': {'normalized': 'Flight 11'},
+          'extract': 'American Airlines Flight 11 was a hijacked flight.',
+          'originalimage': {
+            'source': 'https://upload.wikimedia.org/path.svg?utm_source=orig',
+          },
+          'thumbnail': {
+            'source': 'https://thumb.wikimedia.org/path.svg/960px-path.svg.png?utm_source=thumb',
+          },
+        },
+      };
 
-      final service = WikimediaFeedService(client: client);
-      final posts = await service.fetchFeed();
+      final service = WikimediaFeedService();
+      final posts = service.parseFeedJson(svgFeed);
 
-      expect(posts.length, 5);
+      expect(posts.length, 1);
+      expect(posts.first.imageUrls.length, 1);
+      expect(posts.first.imageUrls.first, contains('960px-path.svg.png'));
     });
   });
 }
