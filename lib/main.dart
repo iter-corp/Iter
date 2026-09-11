@@ -40,11 +40,17 @@ Future<void> main() async {
   ErrorReportService.instance.runGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
+    if (kIsWeb) {
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) print(message);
+      };
+    }
+
     final originalOnError = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails details) {
-      if (details
-              .exceptionAsString()
-              .contains('EncodingError: The source image cannot be decoded') ||
+      final msg = details.exceptionAsString();
+      if (msg.contains('assets/.env') ||
+          msg.contains('EncodingError: The source image cannot be decoded') ||
           details.library == 'image resource service') {
         return;
       }

@@ -166,17 +166,31 @@
   </div>
 
   <script>
-    // Fade out and remove loading screen on first frame
-    window.addEventListener('flutter-first-frame', function () {
+    function hideIterLoader() {
       var loader = document.getElementById('iter-loader');
-      if (loader) {
+      if (loader && loader.style.display !== 'none') {
         loader.style.opacity = '0';
-        loader.style.transition = 'opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+        loader.style.transition = 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
         setTimeout(function () {
-          if (loader.parentNode) loader.parentNode.removeChild(loader);
+          if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
         }, 450);
       }
+    }
+
+    // 1. Listen for custom event if dispatched
+    window.addEventListener('flutter-first-frame', hideIterLoader);
+
+    // 2. Observe DOM: when Flutter mounts flutter-view, flt-glass-pane, or canvas, dismiss loader
+    var observer = new MutationObserver(function (mutations, obs) {
+      if (document.querySelector('flutter-view, flt-glass-pane, flt-scene-host, canvas')) {
+        setTimeout(hideIterLoader, 200);
+        obs.disconnect();
+      }
     });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // 3. Safety fallback: never block the user for more than 3.5 seconds
+    setTimeout(hideIterLoader, 3500);
   </script>
 
   <script src="flutter_bootstrap.js" async></script>
