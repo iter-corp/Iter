@@ -1,5 +1,10 @@
 RewriteEngine On
 
+# API & Backend proxy to Hono Node.js backend
+RewriteRule ^api/(.*)$ api-proxy.php [QSA,L]
+RewriteRule ^uploads/(.*)$ api-proxy.php [QSA,L]
+RewriteRule ^health$ api-proxy.php [QSA,L]
+
 # Allow assets/.env if requested by Flutter web
 <Files ".env">
     Order allow,deny
@@ -14,4 +19,3 @@ RewriteRule . /index.html [L]
 
 AddType image/x-icon .ico
 AddType image/png .png
-

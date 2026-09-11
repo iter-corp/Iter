@@ -1,0 +1,97 @@
+<?php
+// High-performance API reverse proxy for Node.js / Hono backend on Hostinger
+// Supports REST, JSON, multipart uploads, custom headers, and status code passthrough
+
+$targetPort = getenv('BACKEND_PORT') ? (int)getenv('BACKEND_PORT') : 3000;
+
+// Allow override file in same directory if PORT is specified
+if (file_exists(__DIR__ . '/.backend_port')) {
+    $customPort = (int)trim(file_get_contents(__DIR__ . '/.backend_port'));
+    if ($customPort > 0) {
+        $targetPort = $customPort;
+    }
+}
+
+$backendHost = "http://127.0.0.1:{$targetPort}";
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$targetUrl = $backendHost . $requestUri;
+
+$ch = curl_init($targetUrl);
+
+// Forward all incoming request headers except Host
+$incomingHeaders = [];
+if (function_exists('getallheaders')) {
+    foreach (getallheaders() as $key => $value) {
+        $lower = strtolower($key);
+        if ($lower === 'host' || $lower === 'content-length') {
+            continue;
+        }
+        $incomingHeaders[] = "{$key}: {$value}";
+    }
+} else {
+    foreach ($_SERVER as $key => $value) {
+        if (substr($key, 0, 5) === 'HTTP_') {
+            $header = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
+            if (strtolower($header) !== 'host') {
+                $incomingHeaders[] = "{$header}: {$value}";
+            }
+        }
+    }
+}
+
+$incomingHeaders[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+$incomingHeaders[] = 'X-Forwarded-Proto: ' . ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http');
+$incomingHeaders[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+curl_setopt($ch, CURLOPT_HTTPHEADER, $incomingHeaders);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+curl_setopt($ch, CURLOPT_HEADER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+
+// Forward body for methods that send payload
+if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+    $body = file_get_contents('php://input');
+    if ($body !== false && strlen($body) > 0) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    }
+}
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+
+if ($response !== false) {
+    $rawHeaders = substr($response, 0, $headerSize);
+    $responseBody = substr($response, $headerSize);
+
+    foreach (explode("\r\n", $rawHeaders) as $headerLine) {
+        $trimmed = trim($headerLine);
+        if ($trimmed && 
+            !preg_match('/^Transfer-Encoding:/i', $trimmed) && 
+            !preg_match('/^Connection:/i', $trimmed) && 
+            !preg_match('/^HTTP\//i', $trimmed)) {
+            header($trimmed, false);
+        }
+    }
+
+    if ($httpCode) {
+        http_response_code($httpCode);
+    }
+    echo $responseBody;
+} else {
+    http_response_code(502);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'error' => 'Bad Gateway',
+        'message' => 'Backend service is unavailable',
+        'backendPort' => $targetPort,
+        'curlError' => curl_error($ch)
+    ]);
+}
+
+curl_close($ch);
