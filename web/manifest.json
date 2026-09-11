@@ -1,11 +1,11 @@
 {
-    "name": "coil",
-    "short_name": "coil",
+    "name": "Iter",
+    "short_name": "Iter",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B0E14",
+    "theme_color": "#0B0E14",
+    "description": "Iter — Connect, explore, and share with your community worldwide.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
@@ -20,16 +20,9 @@
             "type": "image/png"
         },
         {
-            "src": "icons/Icon-maskable-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
-            "src": "icons/Icon-maskable-512.png",
+            "src": "icons/app_icon.png",
             "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
+            "type": "image/png"
         }
     ]
 }

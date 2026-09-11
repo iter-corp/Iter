@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# Allow assets/.env if requested by Flutter web
+<Files ".env">
+    Order allow,deny
+    Allow from all
+    Require all granted
+</Files>
+
+# SPA fallback for Flutter Web
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
