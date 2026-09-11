@@ -6,11 +6,26 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 async function migrate() {
   console.log('⏳ Running direct database migrations...');
 
-  const dbHost = process.env.DB_HOST || '127.0.0.1';
-  const dbPort = parseInt(process.env.DB_PORT || '3306', 10);
-  const dbUser = process.env.DB_USER || 'u814384925_iter_user';
-  const dbPassword = process.env.DB_PASSWORD || 'wkjBgrET&3AU8kqE';
-  const dbName = process.env.DB_NAME || 'u814384925_iter_db';
+  let dbHost = process.env.DB_HOST || '127.0.0.1';
+  let dbPort = parseInt(process.env.DB_PORT || '3306', 10);
+  let dbUser = process.env.DB_USER || 'u814384925_iter_user';
+  let dbPassword = process.env.DB_PASSWORD || 'wkjBgrET&3AU8kqE';
+  let dbName = process.env.DB_NAME || 'u814384925_iter_db';
+
+  if (process.env.DATABASE_URL) {
+    try {
+      const parsed = new URL(process.env.DATABASE_URL);
+      dbHost = parsed.hostname || dbHost;
+      dbPort = parsed.port ? parseInt(parsed.port, 10) : dbPort;
+      dbUser = parsed.username ? decodeURIComponent(parsed.username) : dbUser;
+      dbPassword = parsed.password ? decodeURIComponent(parsed.password) : dbPassword;
+      if (parsed.pathname && parsed.pathname.length > 1) {
+        dbName = parsed.pathname.slice(1);
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not parse DATABASE_URL, falling back to DB_* variables:', e.message);
+    }
+  }
 
   const connection = await mysql.createConnection({
     host: dbHost,
