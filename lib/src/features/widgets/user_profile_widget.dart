@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
+import 'profile_widget.dart' show ProfileDefaultCover, ProfileInitialAvatar;
 
 /// COVER + AVATAR — uses live profile data
 class UserCoverAvatar extends StatelessWidget {
   final String? avatarUrl;
   final String? coverUrl;
+  final String? name;
   final bool isPrivate;
   final VoidCallback onBack;
   final bool showMenu;
@@ -21,6 +23,7 @@ class UserCoverAvatar extends StatelessWidget {
     super.key,
     required this.avatarUrl,
     required this.coverUrl,
+    this.name,
     required this.isPrivate,
     required this.onBack,
     this.showMenu = false,
@@ -28,11 +31,6 @@ class UserCoverAvatar extends StatelessWidget {
     this.onReportTap,
     this.isBlocked = false,
   });
-
-  ImageProvider? get _avatarImage =>
-      (avatarUrl != null && avatarUrl!.isNotEmpty)
-          ? CachedNetworkImageProvider(avatarUrl!)
-          : null;
 
   @override
   Widget build(BuildContext context) {
@@ -91,14 +89,23 @@ class UserCoverAvatar extends StatelessWidget {
           )
         : const SizedBox.shrink();
 
-    final avatar = CircleAvatar(
-      radius: 40,
-      backgroundColor: context.inputFill,
-      backgroundImage: _avatarImage,
-      child: _avatarImage == null
-          ? Icon(Icons.person, size: 40, color: context.textMuted)
-          : null,
-    );
+    final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+    final hasCover = coverUrl != null && coverUrl!.trim().isNotEmpty;
+
+    final avatar = hasAvatar
+        ? CachedNetworkImage(
+            imageUrl: avatarUrl!,
+            imageBuilder: (_, imageProvider) => CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.transparent,
+              backgroundImage: imageProvider,
+            ),
+            placeholder: (_, __) =>
+                ProfileInitialAvatar(name: name, radius: 40),
+            errorWidget: (_, __, ___) =>
+                ProfileInitialAvatar(name: name, radius: 40),
+          )
+        : ProfileInitialAvatar(name: name, radius: 40);
 
     if (isPrivate) {
       return SizedBox(
@@ -108,14 +115,18 @@ class UserCoverAvatar extends StatelessWidget {
             ClipRect(
               child: ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: (coverUrl != null && coverUrl!.isNotEmpty)
+                child: hasCover
                     ? CachedNetworkImage(
                         imageUrl: coverUrl!,
                         height: 140,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            const ProfileDefaultCover(height: 140),
+                        errorWidget: (_, __, ___) =>
+                            const ProfileDefaultCover(height: 140),
                       )
-                    : Container(height: 140, color: context.inputFill),
+                    : const ProfileDefaultCover(height: 140),
               ),
             ),
             Container(
@@ -130,10 +141,17 @@ class UserCoverAvatar extends StatelessWidget {
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.all(3),
+                  padding: const EdgeInsets.all(3.5),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: context.cardBg,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: avatar,
                 ),
@@ -152,9 +170,16 @@ class UserCoverAvatar extends StatelessWidget {
           SizedBox(
             height: 180,
             width: double.infinity,
-            child: (coverUrl != null && coverUrl!.isNotEmpty)
-                ? CachedNetworkImage(imageUrl: coverUrl!, fit: BoxFit.cover)
-                : Container(color: context.inputFill),
+            child: hasCover
+                ? CachedNetworkImage(
+                    imageUrl: coverUrl!,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        const ProfileDefaultCover(height: 180),
+                    errorWidget: (_, __, ___) =>
+                        const ProfileDefaultCover(height: 180),
+                  )
+                : const ProfileDefaultCover(height: 180),
           ),
           backArrow,
           menuButton,
@@ -164,10 +189,17 @@ class UserCoverAvatar extends StatelessWidget {
             right: 0,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.all(3),
+                padding: const EdgeInsets.all(3.5),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: context.cardBg,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: avatar,
               ),

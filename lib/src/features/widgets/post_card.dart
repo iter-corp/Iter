@@ -161,7 +161,7 @@ class _PostCardState extends ConsumerState<PostCard>
   Widget build(BuildContext context) {
     final post = widget.post;
     final userData = ref.watch(userByUidProvider(post.authorUid)).value;
-    final avatarUrl = userData?['avatarUrl'] as String?;
+    final avatarUrl = (userData?['avatarUrl'] as String?) ?? post.authorAvatar;
     final username = userData?['username'] as String? ?? post.authorUsername;
     final isLikedAsync = ref.watch(isLikedProvider(post.id));
     // Use optimistic value while in-flight, otherwise use live stream value.
@@ -379,18 +379,23 @@ class _PostCardState extends ConsumerState<PostCard>
                 ),
               ),
               PositionedDirectional(
-                top: 14,
+                top: 12,
                 start: 14,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => openUserProfile(context, uid: post.authorUid),
-                  child: _frostedChip(
-                    avatarUrl: avatarUrl,
-                    // Both runs are isolated so the username and the
-                    // RTL time string each stay intact, and the
-                    // bullet sits between them per the chip direction.
-                    text: '${context.t.isolate(username)} • $postTime',
-                    textDirection: Directionality.of(context),
+                end: 56,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: (post.authorUid == 'wikimedia_foundation' ||
+                            post.authorUid == 'nasa_apod')
+                        ? null
+                        : () => openUserProfile(context, uid: post.authorUid),
+                    child: _frostedChip(
+                      avatarUrl: avatarUrl,
+                      title: context.t.isolate(username),
+                      subtitle: postTime,
+                      textDirection: Directionality.of(context),
+                    ),
                   ),
                 ),
               ),
@@ -666,12 +671,13 @@ class _PostCardState extends ConsumerState<PostCard>
   Widget _frostedChip({
     String? avatarUrl,
     IconData? icon,
-    required String text,
+    required String title,
+    String? subtitle,
     bool compact = false,
     TextDirection? textDirection,
   }) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(compact ? 14 : 22),
+      borderRadius: BorderRadius.circular(compact ? 14 : 20),
       child: BackdropFilter(
         filter: ImageFilter.blur(
           sigmaX: compact ? 10 : 14,
@@ -679,12 +685,12 @@ class _PostCardState extends ConsumerState<PostCard>
         ),
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 12,
-            vertical: compact ? 5 : 8,
+            horizontal: compact ? 8 : 10,
+            vertical: compact ? 4 : (subtitle != null ? 5 : 7),
           ),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(compact ? 14 : 22),
+            color: Colors.black.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(compact ? 14 : 20),
             border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             boxShadow: [
               BoxShadow(
@@ -696,15 +702,11 @@ class _PostCardState extends ConsumerState<PostCard>
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            // Render the avatar + label as one coherent directional
-            // unit. Without this, a mixed string like
-            // "username • ٣ ڕۆژ پێش ئێستا" is reordered by the bidi
-            // algorithm and the number/words split to opposite sides.
             textDirection: textDirection,
             children: [
               if (avatarUrl != null)
                 CircleAvatar(
-                  radius: compact ? 8 : 12,
+                  radius: compact ? 8 : (subtitle != null ? 14 : 12),
                   backgroundColor: Colors.white.withValues(alpha: 0.18),
                   backgroundImage: CachedNetworkImageProvider(avatarUrl),
                 )
@@ -716,15 +718,38 @@ class _PostCardState extends ConsumerState<PostCard>
                 ),
               SizedBox(width: compact ? 5 : 8),
               Flexible(
-                child: Text(
-                  text,
-                  textDirection: textDirection,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: compact ? 11 : 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      textDirection: textDirection,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: compact ? 11 : 12,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                      ),
+                    ),
+                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 1.5),
+                      Text(
+                        subtitle,
+                        textDirection: textDirection,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: compact ? 9.5 : 10.5,
+                          fontWeight: FontWeight.w400,
+                          height: 1.15,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],

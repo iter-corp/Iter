@@ -6,23 +6,183 @@ import '../../theme/app_theme.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/edit_profile.dart';
 
+/// Extracts the first character from a display name or username.
+/// Handles Unicode/runes safely (Arabic, Kurdish, Latin, etc.) and falls back to 'U'.
+String getProfileInitial(String? name) {
+  if (name == null) return 'U';
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return 'U';
+  final firstChar = String.fromCharCode(trimmed.runes.first);
+  return firstChar.toUpperCase();
+}
+
+/// Fallback Cover Gradient shown when a cover is missing or fails to load.
+class ProfileDefaultCover extends StatelessWidget {
+  final double height;
+  final double? width;
+  const ProfileDefaultCover({
+    super.key,
+    this.height = 180,
+    this.width,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return Container(
+      height: height,
+      width: width ?? double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [
+                  Color(0xFF2E1065), // Deep purple
+                  Color(0xFF4C1D95), // Violet
+                  Color(0xFF6B21A8), // Purple
+                  Color(0xFF1E1B4B), // Indigo dark
+                ]
+              : const [
+                  Color(0xFFE9D5FF), // Soft lavender
+                  Color(0xFFC084FC), // Lilac
+                  Color(0xFFA855F7), // Purple 500
+                  Color(0xFF818CF8), // Indigo 400
+                ],
+        ),
+      ),
+      child: Stack(
+        clipBehavior: Clip.antiAlias,
+        children: [
+          Positioned(
+            top: -30,
+            right: -20,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: isDark ? 0.07 : 0.20),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -20,
+            left: 30,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (isDark ? const Color(0xFFC084FC) : Colors.white)
+                    .withValues(alpha: isDark ? 0.08 : 0.16),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: isDark ? 0.24 : 0.08),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Fallback Avatar displaying the user's first initial on a premium gradient.
+class ProfileInitialAvatar extends StatelessWidget {
+  final String? name;
+  final double radius;
+  final double? fontSize;
+
+  const ProfileInitialAvatar({
+    super.key,
+    this.name,
+    this.radius = 40,
+    this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = getProfileInitial(name);
+    final size = radius * 2;
+    final fSize = fontSize ?? (radius * 0.82);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFBA68C8), // Light vibrant purple
+            Color(0xFF8E24AA), // Deep purple
+            Color(0xFF4A148C), // Royal violet
+          ],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontSize: fSize,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          height: 1.0,
+          letterSpacing: -0.5,
+        ),
+      ),
+    );
+  }
+}
+
 /// COVER + AVATAR
 class ProfileCoverAvatar extends StatelessWidget {
   final String? coverUrl;
   final String? avatarUrl;
-  const ProfileCoverAvatar({super.key, this.coverUrl, this.avatarUrl});
+  final String? name;
+
+  const ProfileCoverAvatar({
+    super.key,
+    this.coverUrl,
+    this.avatarUrl,
+    this.name,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasCover = coverUrl != null && coverUrl!.trim().isNotEmpty;
+    final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
         SizedBox(
           height: 180,
           width: double.infinity,
-          child: coverUrl != null
-              ? CachedNetworkImage(imageUrl: coverUrl!, fit: BoxFit.cover)
-              : Container(color: context.inputFill),
+          child: hasCover
+              ? CachedNetworkImage(
+                  imageUrl: coverUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) =>
+                      const ProfileDefaultCover(height: 180),
+                  errorWidget: (_, __, ___) =>
+                      const ProfileDefaultCover(height: 180),
+                )
+              : const ProfileDefaultCover(height: 180),
         ),
         Positioned(
           bottom: -40,
@@ -30,21 +190,32 @@ class ProfileCoverAvatar extends StatelessWidget {
           right: 0,
           child: Center(
             child: Container(
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.all(3.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: context.cardBg,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: CircleAvatar(
-                radius: 40,
-                backgroundColor: context.inputFill,
-                backgroundImage: avatarUrl != null
-                    ? CachedNetworkImageProvider(avatarUrl!)
-                    : null,
-                child: avatarUrl == null
-                    ? Icon(Icons.person, size: 40, color: context.textMuted)
-                    : null,
-              ),
+              child: hasAvatar
+                  ? CachedNetworkImage(
+                      imageUrl: avatarUrl!,
+                      imageBuilder: (_, imageProvider) => CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.transparent,
+                        backgroundImage: imageProvider,
+                      ),
+                      placeholder: (_, __) =>
+                          ProfileInitialAvatar(name: name, radius: 40),
+                      errorWidget: (_, __, ___) =>
+                          ProfileInitialAvatar(name: name, radius: 40),
+                    )
+                  : ProfileInitialAvatar(name: name, radius: 40),
             ),
           ),
         ),
