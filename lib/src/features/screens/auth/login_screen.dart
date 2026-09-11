@@ -1,7 +1,5 @@
-import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   String? _error;
 
-  final bool _isIOS = !kIsWeb && Platform.isIOS;
+  final bool _isIOS = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   /// Maps a [FirebaseAuthException] code to a short human-readable message.
   /// Firebase's default messages leak technical detail ("There is no user

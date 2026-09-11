@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -44,7 +42,8 @@ String? _storeLinkForPlatform(AdminConfig config) {
 
   if (kIsWeb) return android.isNotEmpty ? android : ios;
 
-  final isApple = Platform.isIOS || Platform.isMacOS;
+  final isApple = defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
   if (isApple) return ios.isNotEmpty ? ios : android;
   return android.isNotEmpty ? android : ios;
 }
