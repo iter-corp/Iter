@@ -136,6 +136,12 @@ Future<void> main() async {
 /// exist yet — completely safe to call on every boot.
 Future<void> _seedApiKeysFromEnv() async {
   try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (userDoc.data()?['role'] != 'admin') return;
+
     final db = FirebaseFirestore.instance;
     final col = db.collection('apiKeys');
 
