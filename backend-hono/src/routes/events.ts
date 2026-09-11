@@ -84,7 +84,7 @@ eventRoutes.post('/', requireAuth, requireRole(['admin', 'org_admin']), zValidat
   const eventId = `evt_${randomBytes(12).toString('hex')}`;
   const countryClean = body.locationCountry.trim().toLowerCase();
 
-  const [newEvent] = await db
+  await db
     .insert(events)
     .values({
       id: eventId,
@@ -104,8 +104,9 @@ eventRoutes.post('/', requireAuth, requireRole(['admin', 'org_admin']), zValidat
       isOnline: body.isOnline,
       lat: body.lat || null,
       lng: body.lng || null,
-    })
-    .returning();
+    });
+
+  const [newEvent] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
 
   // Async fan-out notifications based on user's eventNotifPrefs
   (async () => {
@@ -118,7 +119,7 @@ eventRoutes.post('/', requireAuth, requireRole(['admin', 'org_admin']), zValidat
         if (prefs.types.length > 0 && !prefs.types.includes(body.eventType)) continue;
         if (prefs.countries.length > 0 && !prefs.countries.includes(countryClean)) continue;
 
-        await db.insert(notifications).values({
+        await db.insert(notifications).ignore().values({
           id: `new_event_${eventId}_${u.id}`,
           targetUid: u.id,
           actorUid: '',
@@ -126,7 +127,7 @@ eventRoutes.post('/', requireAuth, requireRole(['admin', 'org_admin']), zValidat
           targetId: eventId,
           title: body.title,
           subtitle: body.location,
-        }).onConflictDoNothing();
+        });
 
         sendPushNotification({
           targetUid: u.id,
@@ -161,7 +162,7 @@ eventRoutes.post('/:id/register', requireAuth, zValidator('json', registerEventS
   if (!event) throw new AppError('Event not found', 404, 'NOT_FOUND');
 
   const regId = `${eventId}_${uid}`;
-  const [registration] = await db
+  await db
     .insert(eventRegistrations)
     .values({
       id: regId,
@@ -174,11 +175,11 @@ eventRoutes.post('/:id/register', requireAuth, zValidator('json', registerEventS
       countryCode,
       status: 'pending',
     })
-    .onConflictDoUpdate({
-      target: [eventRegistrations.eventId, eventRegistrations.userUid],
+    .onDuplicateKeyUpdate({
       set: { name, email, phone, countryCode, status: 'pending' },
-    })
-    .returning();
+    });
+
+  const [registration] = await db.select().from(eventRegistrations).where(eq(eventRegistrations.id, regId)).limit(1);
 
   return c.json({ success: true, data: registration }, 201);
 });
@@ -193,15 +194,16 @@ eventRoutes.patch('/registrations/:regId', requireAuth, requireRole(['admin', 'o
   const reviewerUid = c.get('uid');
   const { status } = c.req.valid('json');
 
-  const [reg] = await db
+  await db
     .update(eventRegistrations)
     .set({
       status,
       reviewedAt: new Date(),
       reviewedBy: reviewerUid,
     })
-    .where(eq(eventRegistrations.id, regId))
-    .returning();
+    .where(eq(eventRegistrations.id, regId));
+
+  const [reg] = await db.select().from(eventRegistrations).where(eq(eventRegistrations.id, regId)).limit(1);
 
   if (!reg) throw new AppError('Registration not found', 404, 'NOT_FOUND');
 

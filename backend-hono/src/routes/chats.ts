@@ -27,7 +27,7 @@ chatRoutes.get('/conversations', requireAuth, async (c) => {
   const allChats = await db
     .select()
     .from(chats)
-    .where(sql`${chats.participants} ? ${uid}`)
+    .where(sql`JSON_CONTAINS(${chats.participants}, JSON_QUOTE(${uid}))`)
     .orderBy(desc(chats.lastTime));
 
   const conversations = allChats.map((chat) => {
@@ -101,7 +101,7 @@ chatRoutes.get('/direct/:otherUid', requireAuth, async (c) => {
       [otherUid]: { username: other[0]?.username || 'User', avatarUrl: other[0]?.avatarUrl || undefined },
     };
 
-    const [created] = await db
+    await db
       .insert(chats)
       .values({
         id: chatId,
@@ -109,9 +109,9 @@ chatRoutes.get('/direct/:otherUid', requireAuth, async (c) => {
         participants: [uid, otherUid],
         acceptedBy: [uid], // Creator auto-accepts
         userData,
-      })
-      .returning();
+      });
 
+    const [created] = await db.select().from(chats).where(eq(chats.id, chatId)).limit(1);
     chat = created;
   }
 
@@ -138,7 +138,7 @@ chatRoutes.post('/group', requireAuth, zValidator('json', createGroupSchema), as
   }
 
   const groupId = `grp_${randomBytes(12).toString('hex')}`;
-  const [groupChat] = await db
+  await db
     .insert(chats)
     .values({
       id: groupId,
@@ -149,8 +149,9 @@ chatRoutes.post('/group', requireAuth, zValidator('json', createGroupSchema), as
       participants: allMembers,
       acceptedBy: allMembers,
       userData,
-    })
-    .returning();
+    });
+
+  const [groupChat] = await db.select().from(chats).where(eq(chats.id, groupId)).limit(1);
 
   return c.json({ success: true, data: groupChat }, 201);
 });
@@ -173,7 +174,7 @@ chatRoutes.get('/:chatId/messages', requireAuth, async (c) => {
       and(
         eq(messages.chatId, chatId),
         eq(messages.deletedForEveryone, false),
-        sql`NOT (${messages.deletedForUids} ? ${uid})`,
+        sql`NOT JSON_CONTAINS(COALESCE(${messages.deletedForUids}, '[]'), JSON_QUOTE(${uid}))`,
       ),
     )
     .orderBy(desc(messages.createdAt))
@@ -258,8 +259,9 @@ chatRoutes.post('/:chatId/messages', requireAuth, zValidator('json', sendMessage
       visibleToUids: isProfane ? [uid] : chat.participants,
       profanityFiltered: isProfane,
       createdAt: now,
-    })
-    .returning();
+    });
+
+  const [newMessage] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
 
   // Preview snippet for lastMessage
   let previewText = body.text.trim();
@@ -340,8 +342,8 @@ chatRoutes.post('/:chatId/seen', requireAuth, async (c) => {
   // Update unseen messages
   await db.execute(sql`
     UPDATE messages
-    SET seen_by = seen_by || to_jsonb(${uid}::text)
-    WHERE chat_id = ${chatId} AND NOT (seen_by ? ${uid})
+    SET seen_by = JSON_ARRAY_APPEND(COALESCE(seen_by, JSON_ARRAY()), '$', ${uid})
+    WHERE chat_id = ${chatId} AND NOT JSON_CONTAINS(COALESCE(seen_by, JSON_ARRAY()), JSON_QUOTE(${uid}))
   `);
 
   return c.json({ success: true });

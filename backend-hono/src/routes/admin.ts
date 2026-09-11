@@ -134,10 +134,10 @@ adminRoutes.delete('/users/:uid', async (c) => {
 
   if (target) {
     if (target.email) {
-      await db.insert(blacklist).values({
+      await db.insert(blacklist).ignore().values({
         emailOrDomain: target.email,
         reason: 'Admin cascade delete',
-      }).onConflictDoNothing();
+      });
     }
 
     // Cascade delete user row
@@ -191,7 +191,7 @@ adminRoutes.patch('/contact-requests/:id', async (c) => {
   const body = await c.req.json();
   const { status, adminNotes } = body;
 
-  const [contactReq] = await db
+  await db
     .update(contactRequests)
     .set({
       status,
@@ -199,8 +199,9 @@ adminRoutes.patch('/contact-requests/:id', async (c) => {
       repliedAt: new Date(),
       repliedBy: c.get('uid'),
     })
-    .where(eq(contactRequests.id, reqId))
-    .returning();
+    .where(eq(contactRequests.id, reqId));
+
+  const [contactReq] = await db.select().from(contactRequests).where(eq(contactRequests.id, reqId)).limit(1);
 
   if (contactReq && status === 'promoted') {
     await db.update(users).set({ role: 'org_admin' }).where(eq(users.id, contactReq.userUid));
@@ -230,15 +231,17 @@ adminRoutes.post('/api-keys', async (c) => {
   const body = await c.req.json();
   const { provider, key, priority } = body;
 
-  const [newKey] = await db
+  const keyId = `key_${provider}_${randomBytes(6).toString('hex')}`;
+  await db
     .insert(apiKeys)
     .values({
-      id: `key_${provider}_${randomBytes(6).toString('hex')}`,
+      id: keyId,
       provider,
       key,
       priority: Number(priority) || 10,
-    })
-    .returning();
+    });
+
+  const [newKey] = await db.select().from(apiKeys).where(eq(apiKeys.id, keyId)).limit(1);
 
   return c.json({ success: true, data: newKey });
 });
@@ -257,15 +260,33 @@ adminRoutes.get('/api-logs', async (c) => {
 // ── 7. Update App Config ────────────────────────────────────────────────────
 adminRoutes.patch('/config', async (c) => {
   const body = await c.req.json();
+  const {
+    welcomeMessage,
+    welcomeMessageEnabled,
+    metadata: bodyMetadata,
+    ...directFields
+  } = body;
 
-  const [updated] = await db
+  const [existing] = await db.select().from(appConfigs).where(eq(appConfigs.id, 'app')).limit(1);
+  const existingMetadata = (existing?.metadata as Record<string, unknown>) || {};
+
+  const mergedMetadata = {
+    ...existingMetadata,
+    ...(bodyMetadata || {}),
+    ...(welcomeMessage !== undefined ? { welcomeMessage } : {}),
+    ...(welcomeMessageEnabled !== undefined ? { welcomeMessageEnabled } : {}),
+  };
+
+  await db
     .update(appConfigs)
     .set({
-      ...body,
+      ...directFields,
+      metadata: mergedMetadata,
       updatedAt: new Date(),
     })
-    .where(eq(appConfigs.id, 'app'))
-    .returning();
+    .where(eq(appConfigs.id, 'app'));
+
+  const [updated] = await db.select().from(appConfigs).where(eq(appConfigs.id, 'app')).limit(1);
 
   return c.json({ success: true, data: updated });
 });

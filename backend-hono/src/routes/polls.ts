@@ -22,7 +22,7 @@ pollRoutes.post('/', requireAuth, zValidator('json', createPollSchema), async (c
   const { question, options, visibility } = c.req.valid('json');
 
   const pollId = `pol_${randomBytes(12).toString('hex')}`;
-  const [newPoll] = await db
+  await db
     .insert(polls)
     .values({
       id: pollId,
@@ -30,8 +30,9 @@ pollRoutes.post('/', requireAuth, zValidator('json', createPollSchema), async (c
       options,
       createdByUid: uid,
       visibility,
-    })
-    .returning();
+    });
+
+  const [newPoll] = await db.select().from(polls).where(eq(polls.id, pollId)).limit(1);
 
   return c.json({ success: true, data: newPoll }, 201);
 });
@@ -87,8 +88,7 @@ pollRoutes.post('/:id/vote', requireAuth, zValidator('json', voteSchema), async 
   await db
     .insert(pollVotes)
     .values({ id: voteId, pollId, uid, optionIndex })
-    .onConflictDoUpdate({
-      target: [pollVotes.pollId, pollVotes.uid],
+    .onDuplicateKeyUpdate({
       set: { optionIndex, createdAt: new Date() },
     });
 

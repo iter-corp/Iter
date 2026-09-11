@@ -45,7 +45,7 @@ storyRoutes.post('/', requireAuth, zValidator('json', createStorySchema), async 
   const storyId = `st_${randomBytes(12).toString('hex')}`;
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24-hour TTL
 
-  const [newStory] = await db
+  await db
     .insert(stories)
     .values({
       id: storyId,
@@ -65,8 +65,9 @@ storyRoutes.post('/', requireAuth, zValidator('json', createStorySchema), async 
       sharedEventTitle: body.sharedEventTitle || null,
       overlays: body.overlays,
       expiresAt,
-    })
-    .returning();
+    });
+
+  const [newStory] = await db.select().from(stories).where(eq(stories.id, storyId)).limit(1);
 
   return c.json({ success: true, data: newStory }, 201);
 });
@@ -88,14 +89,14 @@ storyRoutes.post('/:id/view', requireAuth, async (c) => {
 
   await db
     .insert(storyViewers)
+    .ignore()
     .values({
       id: viewerId,
       storyId,
       uid: viewerUid,
       username: viewerUser?.username || 'user',
       avatarUrl: viewerUser?.avatarUrl || null,
-    })
-    .onConflictDoNothing();
+    });
 
   return c.json({ success: true, recorded: true });
 });

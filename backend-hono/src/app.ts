@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { env } from './config/env.js';
 import path from 'path';
 import fs from 'fs';
+import { Readable } from 'stream';
 
 // Routes
 import { authRoutes } from './routes/auth.js';
@@ -29,8 +30,8 @@ app.use('*', logger());
 app.use('*', cors({
   origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(','),
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'x-firebase-token', 'apikey'],
-  exposeHeaders: ['Content-Length', 'Retry-After'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-firebase-token', 'apikey', 'Range'],
+  exposeHeaders: ['Content-Length', 'Retry-After', 'Accept-Ranges', 'Content-Range'],
   maxAge: 600,
 }));
 
@@ -44,7 +45,7 @@ app.get('/health', (c) => {
   });
 });
 
-// Local file serving for uploads directory
+// Local file serving for uploads directory (supports HTTP Range 206 for video streaming)
 app.get('/uploads/:bucket/*', async (c) => {
   const bucket = c.req.param('bucket');
   const filePath = c.req.path.replace(`/uploads/${bucket}/`, '');
@@ -69,11 +70,47 @@ app.get('/uploads/:bucket/*', async (c) => {
     };
 
     const contentType = mimeTypes[ext] || 'application/octet-stream';
-    const buffer = await fs.promises.readFile(localTarget);
+    const totalSize = stat.size;
+    const rangeHeader = c.req.header('range');
 
-    return c.body(buffer, 200, {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=31536000, immutable',
+    if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+      const parts = rangeHeader.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+
+      if (isNaN(start) || start >= totalSize || (parts[1] && end >= totalSize) || start > end) {
+        return c.text('Requested range not satisfiable', 416, {
+          'Content-Range': `bytes */${totalSize}`,
+        });
+      }
+
+      const chunkLength = end - start + 1;
+      const fileStream = fs.createReadStream(localTarget, { start, end });
+      const webStream = Readable.toWeb(fileStream) as ReadableStream;
+
+      return new Response(webStream, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+          'Content-Length': chunkLength.toString(),
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+
+    const fileStream = fs.createReadStream(localTarget);
+    const webStream = Readable.toWeb(fileStream) as ReadableStream;
+
+    return new Response(webStream, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': totalSize.toString(),
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
     });
   } catch {
     return c.text('File not found', 404);

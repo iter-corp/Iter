@@ -101,7 +101,7 @@ dynamicRoutes.post('/admin/screens/:screenId', requireAuth, requireRole('admin')
   const screenId = c.req.param('screenId')!;
   const body = c.req.valid('json');
 
-  const [screen] = await db
+  await db
     .insert(sduiScreens)
     .values({
       id: screenId,
@@ -111,8 +111,7 @@ dynamicRoutes.post('/admin/screens/:screenId', requireAuth, requireRole('admin')
       layout: body.layout as any,
       updatedAt: new Date(),
     })
-    .onConflictDoUpdate({
-      target: [sduiScreens.id],
+    .onDuplicateKeyUpdate({
       set: {
         title: body.title,
         description: body.description || null,
@@ -120,8 +119,9 @@ dynamicRoutes.post('/admin/screens/:screenId', requireAuth, requireRole('admin')
         layout: body.layout as any,
         updatedAt: new Date(),
       },
-    })
-    .returning();
+    });
+
+  const [screen] = await db.select().from(sduiScreens).where(eq(sduiScreens.id, screenId)).limit(1);
 
   return c.json({ success: true, data: screen });
 });
@@ -141,7 +141,7 @@ dynamicRoutes.post('/admin/enums/:enumId', requireAuth, requireRole('admin'), zV
   const enumId = c.req.param('enumId')!;
   const body = c.req.valid('json');
 
-  const [item] = await db
+  await db
     .insert(dynamicEnums)
     .values({
       id: enumId,
@@ -149,15 +149,15 @@ dynamicRoutes.post('/admin/enums/:enumId', requireAuth, requireRole('admin'), zV
       items: body.items,
       updatedAt: new Date(),
     })
-    .onConflictDoUpdate({
-      target: [dynamicEnums.id],
+    .onDuplicateKeyUpdate({
       set: {
         name: body.name,
         items: body.items,
         updatedAt: new Date(),
       },
-    })
-    .returning();
+    });
+
+  const [item] = await db.select().from(dynamicEnums).where(eq(dynamicEnums.id, enumId)).limit(1);
 
   return c.json({ success: true, data: item });
 });
