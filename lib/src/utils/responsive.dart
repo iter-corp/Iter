@@ -3,48 +3,177 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// App-wide responsive helpers.
-///
-/// All widgets should size against [BuildContext] extensions defined here
-/// rather than hard-coding pixel values. Targets ≥360dp width on Android and
-/// ≥320pt width on iOS (iPhone SE 1st gen) without overflow.
-class Breakpoints {
-  static const double xs = 320; // iPhone SE 1st gen
-  static const double sm = 360; // typical Android
-  static const double md = 411; // Pixel-class
-  static const double lg = 600; // small tablet / foldable inner
-  static const double xl = 840; // tablet landscape
+/// Standard screen size categories across the entire application.
+enum AppScreenSize {
+  /// Mobile phones (portrait or narrow landscape) with width < 600dp.
+  compact,
+
+  /// Tablets, foldable displays, and medium viewports with 600dp <= width < 1024dp.
+  medium,
+
+  /// Desktop monitors, large tablets (landscape), and wide web displays with width >= 1024dp.
+  expanded;
+
+  bool get isCompact => this == AppScreenSize.compact;
+  bool get isMedium => this == AppScreenSize.medium;
+  bool get isExpanded => this == AppScreenSize.expanded;
+
+  /// Semantic aliases for standard device terminology:
+  bool get isMobile => isCompact;
+  bool get isTablet => isMedium;
+  bool get isDesktop => isExpanded;
 }
 
+/// Canonical responsive breakpoints across the app.
+class Breakpoints {
+  // Primary size boundaries:
+  static const double mobileMax = 600;
+  static const double tabletMax = 1024;
+
+  // Granular breakpoints for fine-tuned scaling:
+  static const double xs = 320; // Small phones (e.g. iPhone SE 1st gen)
+  static const double sm = 360; // Standard Android compact
+  static const double md = 414; // Large modern phones (Pro Max / Plus / Ultra)
+  static const double lg = 600; // Foldables / tablets (iPad Mini portrait)
+  static const double xl = 1024; // Standard desktop / large tablets
+  static const double xxl = 1440; // Wide screens / large desktop
+
+  /// Maps a viewport width directly to an [AppScreenSize].
+  static AppScreenSize fromWidth(double width) {
+    if (width < mobileMax) return AppScreenSize.compact;
+    if (width < tabletMax) return AppScreenSize.medium;
+    return AppScreenSize.expanded;
+  }
+}
+
+/// Holds responsive context data passed down through the widget tree.
+class ResponsiveData {
+  final AppScreenSize screenSize;
+  final Size windowSize;
+  final Size contentSize;
+  final bool isFramed;
+
+  const ResponsiveData({
+    required this.screenSize,
+    required this.windowSize,
+    required this.contentSize,
+    required this.isFramed,
+  });
+
+  bool get isMobile => screenSize.isMobile;
+  bool get isTablet => screenSize.isTablet;
+  bool get isDesktop => screenSize.isDesktop;
+}
+
+/// InheritedWidget providing [ResponsiveData] to the entire subtree.
+class ResponsiveScope extends InheritedWidget {
+  final ResponsiveData data;
+
+  const ResponsiveScope({
+    super.key,
+    required this.data,
+    required super.child,
+  });
+
+  static ResponsiveData? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ResponsiveScope>()?.data;
+  }
+
+  static ResponsiveData of(BuildContext context) {
+    final result = maybeOf(context);
+    assert(result != null, 'No ResponsiveScope found in context. Wrap the app with ResponsiveBootstrap.');
+    return result!;
+  }
+
+  @override
+  bool updateShouldNotify(ResponsiveScope oldWidget) {
+    return data.screenSize != oldWidget.data.screenSize ||
+        data.windowSize != oldWidget.data.windowSize ||
+        data.contentSize != oldWidget.data.contentSize ||
+        data.isFramed != oldWidget.data.isFramed;
+  }
+}
+
+/// App-wide responsive helpers on [BuildContext].
+///
+/// All widgets can size against [BuildContext] extensions defined here
+/// rather than hard-coding pixel values.
 extension ResponsiveContext on BuildContext {
+  /// The current screen size class (compact / medium / expanded).
+  AppScreenSize get screenSize {
+    final scoped = ResponsiveScope.maybeOf(this);
+    if (scoped != null) return scoped.screenSize;
+    return Breakpoints.fromWidth(MediaQuery.sizeOf(this).width);
+  }
+
+  /// True for mobile phones (< 600dp).
+  bool get isMobile => screenSize.isMobile;
+
+  /// True for tablets (600dp - 1024dp).
+  bool get isTablet => screenSize.isTablet;
+
+  /// True for desktop and wide web screens (>= 1024dp).
+  bool get isDesktop => screenSize.isDesktop;
+
+  /// Semantic size class aliases:
+  bool get isCompact => screenSize.isCompact;
+  bool get isMedium => screenSize.isMedium;
+  bool get isExpanded => screenSize.isExpanded;
+
+  /// Effective content dimensions inside the active responsive viewport.
   Size get _size => MediaQuery.sizeOf(this);
   double get screenWidth => _size.width;
   double get screenHeight => _size.height;
 
+  /// Physical device window dimensions (from ResponsiveScope).
+  Size get deviceSize {
+    final scoped = ResponsiveScope.maybeOf(this);
+    return scoped?.windowSize ?? _size;
+  }
+
+  double get deviceWidth => deviceSize.width;
+  double get deviceHeight => deviceSize.height;
+
   /// True for phones below ~360dp (iPhone SE, small Android).
   bool get isXSmall => screenWidth < Breakpoints.sm;
 
-  /// True for compact phones (≤411dp) — most Android phones in portrait.
-  bool get isCompact => screenWidth < Breakpoints.md;
+  /// Resolve a value based on the current screen size.
+  ///
+  /// Priority:
+  /// - On [AppScreenSize.expanded]: `desktop` ?? `tablet` ?? `mobile`
+  /// - On [AppScreenSize.medium]: `tablet` ?? `mobile`
+  /// - On [AppScreenSize.compact]: `mobile`
+  T responsive<T>({
+    required T mobile,
+    T? tablet,
+    T? desktop,
+    // Backwards compatibility for existing code using compact/medium/expanded:
+    T? compact,
+    T? medium,
+    T? expanded,
+  }) {
+    final effectiveMobile = compact ?? mobile;
+    final effectiveTablet = tablet ?? medium;
+    final effectiveDesktop = desktop ?? expanded;
 
-  /// True for tablet-class widths (≥600dp).
-  bool get isTablet => screenWidth >= Breakpoints.lg;
+    switch (screenSize) {
+      case AppScreenSize.expanded:
+        return effectiveDesktop ?? effectiveTablet ?? effectiveMobile;
+      case AppScreenSize.medium:
+        return effectiveTablet ?? effectiveMobile;
+      case AppScreenSize.compact:
+        return effectiveMobile;
+    }
+  }
 
   /// Linear interpolation between two values based on screen width, clamped
   /// to the [Breakpoints.xs] → [Breakpoints.lg] range.
   ///
   /// `compact` is the value at 320dp, `expanded` is the value at 600dp.
-  double scaleW(double compact, double expanded) {
-    final w = screenWidth.clamp(Breakpoints.xs, Breakpoints.lg);
-    final t = (w - Breakpoints.xs) / (Breakpoints.lg - Breakpoints.xs);
+  double scaleW(double compact, double expanded, {double minW = Breakpoints.xs, double maxW = Breakpoints.lg}) {
+    final w = screenWidth.clamp(minW, maxW);
+    final t = (w - minW) / (maxW - minW);
     return compact + (expanded - compact) * t;
-  }
-
-  /// Pick a value based on width buckets.
-  T responsive<T>({required T compact, T? medium, required T expanded}) {
-    if (screenWidth >= Breakpoints.lg) return expanded;
-    if (screenWidth >= Breakpoints.md) return medium ?? expanded;
-    return compact;
   }
 
   /// Clamped text scaler: respects user accessibility prefs but caps the
@@ -54,9 +183,23 @@ extension ResponsiveContext on BuildContext {
     return raw.clamp(minScaleFactor: 0.85, maxScaleFactor: 1.25);
   }
 
-  /// Standard horizontal screen padding — shrinks on narrow phones.
+  /// Standard horizontal screen padding — adapts based on screen size.
   EdgeInsets get screenPadding => EdgeInsets.symmetric(
-        horizontal: scaleW(12, 20),
+        horizontal: responsive<double>(
+          mobile: scaleW(12, 20),
+          tablet: 24,
+          desktop: 32,
+        ),
+      );
+
+  /// Standard max content width for centering readable layouts:
+  /// - Mobile: unbounded (double.infinity)
+  /// - Tablet: 680dp
+  /// - Desktop: 540dp (mobile/social feed app)
+  double get maxContentWidth => responsive<double>(
+        mobile: double.infinity,
+        tablet: 680.0,
+        desktop: 540.0,
       );
 
   /// Bottom padding accounting for the iOS home indicator / Android nav bar.
@@ -66,24 +209,185 @@ extension ResponsiveContext on BuildContext {
   double get topSafeInset => MediaQuery.viewPaddingOf(this).top;
 }
 
-/// Wraps [child] with a [MediaQuery] that clamps text scaling and applies
-/// safe defaults. Use as the `MaterialApp.builder` to make every screen
-/// inherit consistent sizing on both Android and iOS.
+/// The Universal Responsive Bootstrap.
+///
+/// Wraps the entire application in `MaterialApp.builder`.
+/// Guarantees that EVERY screen, dialog, sheet, and overlay automatically:
+/// 1. Runs with safe text scaling limits.
+/// 2. Scales smoothly on mobile (100% full width).
+/// 3. Centers in an optimal, high-density frame on tablet and desktop/web.
+/// 4. Injects [ResponsiveScope] for unified screen size detection across all pages.
 class ResponsiveBootstrap extends StatelessWidget {
   final Widget child;
-  const ResponsiveBootstrap({super.key, required this.child});
+
+  /// Custom max content width for tablets. Defaults to 680dp.
+  final double tabletMaxWidth;
+
+  /// Custom max content width for desktop. Defaults to 540dp.
+  final double desktopMaxWidth;
+
+  const ResponsiveBootstrap({
+    super.key,
+    required this.child,
+    this.tabletMaxWidth = 680.0,
+    this.desktopMaxWidth = 540.0,
+  });
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    return MediaQuery(
-      data: mq.copyWith(
-        textScaler: mq.textScaler.clamp(
-          minScaleFactor: 0.85,
-          maxScaleFactor: 1.25,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final windowSize = mq.size;
+    final screenSize = Breakpoints.fromWidth(windowSize.width);
+
+    // Calculate effective width per screen size
+    final double effectiveWidth;
+    final bool isFramed;
+
+    switch (screenSize) {
+      case AppScreenSize.compact:
+        effectiveWidth = windowSize.width;
+        isFramed = false;
+        break;
+      case AppScreenSize.medium:
+        effectiveWidth = math.min(windowSize.width, tabletMaxWidth);
+        isFramed = windowSize.width > tabletMaxWidth;
+        break;
+      case AppScreenSize.expanded:
+        effectiveWidth = math.min(windowSize.width, desktopMaxWidth);
+        isFramed = true;
+        break;
+    }
+
+    final effectiveContentSize = Size(effectiveWidth, windowSize.height);
+
+    final effectiveMq = mq.copyWith(
+      size: effectiveContentSize,
+      textScaler: mq.textScaler.clamp(
+        minScaleFactor: 0.85,
+        maxScaleFactor: 1.25,
+      ),
+    );
+
+    final responsiveData = ResponsiveData(
+      screenSize: screenSize,
+      windowSize: windowSize,
+      contentSize: effectiveContentSize,
+      isFramed: isFramed,
+    );
+
+    final innerChild = ResponsiveScope(
+      data: responsiveData,
+      child: MediaQuery(
+        data: effectiveMq,
+        child: child,
+      ),
+    );
+
+    // Mobile / Unframed: render full-width edge-to-edge
+    if (!isFramed) {
+      return innerChild;
+    }
+
+    // Tablet & Desktop framed container: centered responsive frame with ambient background
+    return Material(
+      color: isDark ? const Color(0xFF07090E) : const Color(0xFFE9ECF2),
+      child: Center(
+        child: Container(
+          width: effectiveWidth,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                blurRadius: 36,
+                spreadRadius: 2,
+                offset: const Offset(0, 0),
+              ),
+            ],
+            border: Border.symmetric(
+              vertical: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.06),
+                width: 1,
+              ),
+            ),
+          ),
+          child: ClipRect(
+            child: innerChild,
+          ),
         ),
       ),
-      child: child,
+    );
+  }
+}
+
+/// A responsive widget switcher that renders different widgets
+/// according to screen size: [mobile], [tablet], [desktop].
+class ResponsiveLayout extends StatelessWidget {
+  final Widget mobile;
+  final Widget? tablet;
+  final Widget? desktop;
+
+  const ResponsiveLayout({
+    super.key,
+    required this.mobile,
+    this.tablet,
+    this.desktop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return context.responsive<Widget>(
+      mobile: mobile,
+      tablet: tablet ?? mobile,
+      desktop: desktop ?? tablet ?? mobile,
+    );
+  }
+}
+
+/// A builder that provides [AppScreenSize] directly to child builder.
+class ResponsiveBuilder extends StatelessWidget {
+  final Widget Function(BuildContext context, AppScreenSize size) builder;
+
+  const ResponsiveBuilder({super.key, required this.builder});
+
+  @override
+  Widget build(BuildContext context) {
+    return builder(context, context.screenSize);
+  }
+}
+
+/// Centered container that respects [maxContentWidth] and [screenPadding].
+class ResponsiveContainer extends StatelessWidget {
+  final Widget child;
+  final double? maxWidth;
+  final EdgeInsetsGeometry? padding;
+
+  const ResponsiveContainer({
+    super.key,
+    required this.child,
+    this.maxWidth,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveMax = maxWidth ?? context.maxContentWidth;
+    final effectivePadding = padding ?? context.screenPadding;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: effectiveMax,
+        ),
+        child: Padding(
+          padding: effectivePadding,
+          child: child,
+        ),
+      ),
     );
   }
 }

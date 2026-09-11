@@ -116,6 +116,8 @@ class ErrorReportService {
   }) async {
     try {
       final message = error.toString();
+      final stackStr = (stack ?? StackTrace.current).toString();
+      debugPrint('[ErrorReportService] ($kind): $message\n${stackStr.split("\n").take(4).join("\n")}');
       final signature = '${kind ?? ''}|${message.split('\n').first}';
 
       final now = DateTime.now();
@@ -133,7 +135,6 @@ class ErrorReportService {
       _lastSentAt = now;
       _sentThisSession++;
 
-      final stackStr = (stack ?? StackTrace.current).toString();
       // Use the explicitly-passed screen if any, otherwise whatever the
       // navigator observer last recorded.
       final screenName = (screen != null && screen.trim().isNotEmpty)

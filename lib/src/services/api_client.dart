@@ -37,7 +37,7 @@ class ApiClient {
   String? _currentUserId;
   String? _currentUserEmail;
   bool _initialized = false;
-  http.Client _client = http.Client();
+  final http.Client _client = http.Client();
 
   /// Default API base URL. Can be overridden in `.env` as `API_BASE_URL`.
   /// Uses loopback alias for Android emulator (10.0.2.2) if on Android.
@@ -49,7 +49,14 @@ class ApiClient {
       }
     }
 
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    if (kIsWeb) {
+      if (kReleaseMode) {
+        return 'https://iterglobal.icu/api/v1';
+      }
+      return 'http://localhost:3000/api/v1';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:3000/api/v1';
     }
     return 'http://localhost:3000/api/v1';
