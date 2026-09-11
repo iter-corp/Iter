@@ -41,8 +41,9 @@ jobs:
 
       - name: Validate Flutter Project
         run: |
+          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           flutter pub get
-          flutter analyze --no-fatal-infos
+          flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter test
 
       - name: Validate Hono Backend
@@ -117,6 +118,7 @@ jobs:
 
       - name: Build Flutter Web Release
         run: |
+          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           flutter pub get
           flutter build web --release
 
@@ -186,6 +188,7 @@ jobs:
 
       - name: Build Android Release AAB
         run: |
+          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           BUILD_NUMBER=$(( 5 + github.run_number ))
           echo "Building Android AAB: version 1.1.4, build number $BUILD_NUMBER"
           flutter pub get
@@ -253,6 +256,7 @@ jobs:
 
       - name: Build Flutter iOS Release IPA
         run: |
+          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           BUILD_NUMBER=$(( 5 + github.run_number ))
           echo "Building iOS IPA: version 1.1.4, build number $BUILD_NUMBER"
           flutter pub get

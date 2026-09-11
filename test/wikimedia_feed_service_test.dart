@@ -1,9 +1,5 @@
-import 'dart:convert';
-
 import 'package:coil/src/services/wikimedia_feed_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 
 void main() {
   group('WikimediaFeedService', () {
