@@ -80,5 +80,6 @@ service-account.json
 # ─────────────────────────────────────────────
 .env
 .env.*
+*.sql
 "android/local.properties" 
 **/uploads/

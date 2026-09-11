@@ -231,32 +231,104 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 || secrets.APPLE_PROVISIONING_PROFILE_BASE64 || secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary_runner_keychain_pass' }}
         run: |
-          if [ -n "$BUILD_CERTIFICATE_BASE64" ]; then
-            echo "Installing Apple distribution certificate..."
-            CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-            PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-            echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > $CERTIFICATE_PATH
-            echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > $PP_PATH
-
-            security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-            security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-            security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-            security list-keychain -d user -s $KEYCHAIN_PATH $(security list-keychains -d user | tr -d '"')
-            security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-            PROFILE_UUID=$(strings $PP_PATH | grep -A1 -m1 "<key>UUID</key>" | grep -v "<key>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n ')
-            if [ -n "$PROFILE_UUID" ]; then
-              cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
-            else
-              cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-            fi
-            echo "Apple signing certificate and provisioning profile installed successfully."
+          if [ -z "$BUILD_CERTIFICATE_BASE64" ]; then
+            echo "::error::Missing Apple Distribution Certificate in GitHub Secrets (checked IOS_DISTRIBUTION_CERTIFICATE_BASE64, APPLE_CERTIFICATE_BASE64, BUILD_CERTIFICATE_BASE64)."
+            exit 1
           fi
+          if [ -z "$BUILD_PROVISION_PROFILE_BASE64" ]; then
+            echo "::error::Missing Apple Provisioning Profile in GitHub Secrets (checked IOS_PROVISIONING_PROFILE_BASE64, APPLE_PROVISIONING_PROFILE_BASE64, BUILD_PROVISION_PROFILE_BASE64)."
+            exit 1
+          fi
+
+          echo "Installing Apple distribution certificate..."
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > $CERTIFICATE_PATH
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > $PP_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security default-keychain -s $KEYCHAIN_PATH
+
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH || true
+          echo "Installed Code Signing Identities:"
+          security find-identity -v -p codesigning $KEYCHAIN_PATH || true
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
+          security cms -D -i $PP_PATH > $RUNNER_TEMP/profile.plist 2>/dev/null || true
+          if [ -f "$RUNNER_TEMP/profile.plist" ]; then
+            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" $RUNNER_TEMP/profile.plist 2>/dev/null || true)
+            PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" $RUNNER_TEMP/profile.plist 2>/dev/null || true)
+            TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" $RUNNER_TEMP/profile.plist 2>/dev/null || true)
+          fi
+
+          if [ -z "$PROFILE_UUID" ]; then
+            PROFILE_UUID=$(strings $PP_PATH | grep -A1 -m1 "<key>UUID</key>" | grep -v "<key>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n\r ')
+          fi
+          if [ -z "$PROFILE_NAME" ]; then
+            PROFILE_NAME=$(strings $PP_PATH | grep -A1 -m1 "<key>Name</key>" | grep -v "<key>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n\r ')
+          fi
+          if [ -z "$TEAM_ID" ]; then
+            TEAM_ID=$(strings $PP_PATH | grep -A2 -m1 "<key>TeamIdentifier</key>" | grep "<string>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n\r ')
+          fi
+
+          if [ -n "$PROFILE_UUID" ]; then
+            cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
+          fi
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+          echo "Detected Profile Name: $PROFILE_NAME"
+          echo "Detected Profile UUID: $PROFILE_UUID"
+          echo "Detected Team ID: $TEAM_ID"
+
+          # Configure manual code signing in Release.xcconfig
+          echo "CODE_SIGN_STYLE = Manual" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY = Apple Distribution" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution" >> ios/Flutter/Release.xcconfig
+          if [ -n "$PROFILE_NAME" ]; then
+            echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_NAME" >> ios/Flutter/Release.xcconfig
+          fi
+          if [ -n "$PROFILE_UUID" ]; then
+            echo "PROVISIONING_PROFILE = $PROFILE_UUID" >> ios/Flutter/Release.xcconfig
+          fi
+          if [ -n "$TEAM_ID" ]; then
+            echo "DEVELOPMENT_TEAM = $TEAM_ID" >> ios/Flutter/Release.xcconfig
+          fi
+
+          # Generate ExportOptions.plist
+          cat <<EOF > ios/ExportOptions.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+    <key>teamID</key>
+    <string>${TEAM_ID:-WAC85HB79P}</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>compileBitcode</key>
+    <false/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.iter.ai</key>
+        <string>${PROFILE_NAME:-$PROFILE_UUID}</string>
+    </dict>
+</dict>
+</plist>
+EOF
+
+          echo "Apple signing certificate and provisioning profile installed successfully."
 
       - name: Disable Swift Package Manager (Use CocoaPods)
         run: flutter config --no-enable-swift-package-manager
@@ -264,12 +336,29 @@ jobs:
       - name: Build Flutter iOS Release IPA
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary_runner_keychain_pass' }}
         run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            security default-keychain -s $KEYCHAIN_PATH
+          fi
+
           [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           BUILD_NUMBER=$(( 5 + RUN_NUMBER ))
           echo "Building iOS IPA: version 1.1.4, build number $BUILD_NUMBER"
           flutter pub get
-          flutter build ipa --release --build-name=1.1.4 --build-number=$BUILD_NUMBER
+
+          if [ -f "ios/ExportOptions.plist" ]; then
+            flutter build ipa --release \
+              --build-name=1.1.4 \
+              --build-number=$BUILD_NUMBER \
+              --export-options-plist=ios/ExportOptions.plist
+          else
+            flutter build ipa --release \
+              --build-name=1.1.4 \
+              --build-number=$BUILD_NUMBER
+          fi
 
       - name: Upload to App Store Connect / TestFlight
         env:
