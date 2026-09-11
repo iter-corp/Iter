@@ -6,7 +6,9 @@ $targetPort = getenv('BACKEND_PORT') ? (int)getenv('BACKEND_PORT') : 3000;
 
 // Allow override file in same directory if PORT is specified
 if (file_exists(__DIR__ . '/.backend_port')) {
-    $customPort = (int)trim(file_get_contents(__DIR__ . '/.backend_port'));
+    $raw = file_get_contents(__DIR__ . '/.backend_port');
+    $clean = preg_replace('/[^0-9]/', '', $raw);
+    $customPort = (int)$clean;
     if ($customPort > 0) {
         $targetPort = $customPort;
     }
