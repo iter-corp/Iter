@@ -1,0 +1,140 @@
+name: Development Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: development-pipeline
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  #  1. Quality & Code Validation
+  # ─────────────────────────────────────────────────────────────
+  validate:
+    name: Validate (Flutter & Hono Backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'backend-hono/package-lock.json'
+
+      - name: Validate Flutter Project
+        run: |
+          [ -f .env ] || echo "API_BASE_URL=https://dev.iterglobal.icu/api/v1" > .env
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter test
+
+      - name: Validate Hono Backend
+        run: |
+          cd backend-hono
+          npm ci
+          npm test
+
+  # ─────────────────────────────────────────────────────────────
+  #  2. Hono Backend Deployment (Dev Server via SSH)
+  # ─────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Dev Backend
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Test SSH Authentication
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'echo "SSH authentication verified: $(whoami)@$(hostname)"'
+
+      - name: Sync Backend Files to Dev Server
+        run: |
+          rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude 'uploads' \
+            --exclude '.git' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }}" \
+            backend-hono/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:~/backend-hono-dev/
+
+      - name: Install Dependencies, Migrate & Reload Dev PM2
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
+            export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/opt/alt/alt-nodejs22/root/usr/bin:~/.npm-global/bin:$PATH
+            cd ~/backend-hono-dev
+            npm install
+            if [ -f .env ]; then
+              npm run db:migrate || true
+              npm run db:seed || true
+            fi
+            pm2 reload ecosystem.config.json || pm2 restart ecosystem.config.json || pm2 start ecosystem.config.json
+            pm2 save
+          '
+
+  # ─────────────────────────────────────────────────────────────
+  #  3. Flutter Web Deployment (Dev Domain via SSH)
+  # ─────────────────────────────────────────────────────────────
+  deploy-web:
+    name: Deploy Dev Flutter Web
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Build Flutter Web Release for Dev
+        run: |
+          echo "API_BASE_URL=https://dev.iterglobal.icu/api/v1" > .env
+          flutter pub get
+          flutter build web --release
+          cp web/.htaccess build/web/.htaccess || true
+          cp web/api-proxy.php build/web/api-proxy.php || true
+          echo "3001" > build/web/.backend_port
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy Flutter Web to Dev Web Root
+        run: |
+          TARGET_DIR="/home/${{ secrets.SERVER_USERNAME }}/domains/iterglobal.icu/public_html/dev"
+          echo "Deploying Dev Flutter Web to: $TARGET_DIR"
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} "mkdir -p $TARGET_DIR"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }}" \
+            build/web/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:$TARGET_DIR/

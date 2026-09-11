@@ -123,6 +123,8 @@ jobs:
           flutter pub get
           flutter build web --release
           cp web/.htaccess build/web/.htaccess || true
+          cp web/api-proxy.php build/web/api-proxy.php || true
+          echo "3000" > build/web/.backend_port
 
       - name: Configure SSH
         run: |
@@ -135,12 +137,11 @@ jobs:
 
       - name: Deploy Flutter Web to Web Root
         run: |
-          TARGET_DIR=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'readlink -f ~/domains/*/public_html | head -n 1')
-          if [ -z "$TARGET_DIR" ]; then
-            TARGET_DIR="/home/${{ secrets.SERVER_USERNAME }}/domains/iterglobal.icu/public_html"
-          fi
+          TARGET_DIR="/home/${{ secrets.SERVER_USERNAME }}/domains/iterglobal.icu/public_html"
           echo "Deploying Flutter Web to: $TARGET_DIR"
           rsync -avz --delete \
+            --exclude 'dev' \
+            --exclude 'uploads' \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }}" \
             build/web/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:$TARGET_DIR/
 
