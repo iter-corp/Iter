@@ -55,7 +55,7 @@ commentRoutes.post('/post/:postId', requireAuth, zValidator('json', createCommen
     const matches = await findProfanityMatches(text);
     const isProfane = matches.length > 0;
     const commentId = `cm_${randomBytes(12).toString('hex')}`;
-    const [newComment] = await db
+    await db
         .insert(comments)
         .values({
         id: commentId,
@@ -68,8 +68,8 @@ commentRoutes.post('/post/:postId', requireAuth, zValidator('json', createCommen
         replyToUsername: replyToUsername || null,
         profanityFiltered: isProfane,
         senderOnly: isProfane, // If profane, visible only to sender
-    })
-        .returning();
+    });
+    const [newComment] = await db.select().from(comments).where(eq(comments.id, commentId)).limit(1);
     if (!isProfane) {
         await db.update(posts).set({ commentsCount: sql `${posts.commentsCount} + 1` }).where(eq(posts.id, postId));
         // Notify post author or parent comment author
@@ -108,11 +108,11 @@ commentRoutes.patch('/:id', requireAuth, zValidator('json', editCommentSchema), 
     if (matches.length > 0) {
         throw new AppError('Edited comment contains inappropriate words', 400, 'PROFANITY_BLOCKED');
     }
-    const [updated] = await db
+    await db
         .update(comments)
         .set({ text, updatedAt: new Date() })
-        .where(eq(comments.id, commentId))
-        .returning();
+        .where(eq(comments.id, commentId));
+    const [updated] = await db.select().from(comments).where(eq(comments.id, commentId)).limit(1);
     return c.json({ success: true, data: updated });
 });
 // ── 4. Delete Comment ───────────────────────────────────────────────────────

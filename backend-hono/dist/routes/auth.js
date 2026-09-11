@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import { db } from '../db/index.js';
 import { users, sessions, blacklist, fcmTokens } from '../db/schema/index.js';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, or, sql } from 'drizzle-orm';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -60,7 +60,7 @@ authRoutes.post('/signup', rateLimit({ maxRequests: 5, windowSeconds: 60 }), zVa
     }
     const userId = uid?.trim() || `usr_${randomBytes(12).toString('hex')}`;
     const passwordHash = await bcrypt.hash(password, 10);
-    const [newUser] = await db
+    await db
         .insert(users)
         .values({
         id: userId,
@@ -71,8 +71,8 @@ authRoutes.post('/signup', rateLimit({ maxRequests: 5, windowSeconds: 60 }), zVa
         usernameLower: normalizedUsername,
         handle: username ? `@${username.trim()}` : null,
         role: 'user',
-    })
-        .returning();
+    });
+    const [newUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     const { accessToken, refreshToken } = generateTokens(newUser.id, newUser.email);
     // Store refresh token
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -224,17 +224,18 @@ authRoutes.post('/google', zValidator('json', googleAuthSchema), async (c) => {
             throw new AppError('No account found for this Google email. Please sign up first.', 404, 'ACCOUNT_NOT_FOUND');
         }
         const userId = `usr_g_${googleSub}`;
-        const [created] = await db
+        const newUid = crypto.randomUUID();
+        await db
             .insert(users)
             .values({
-            id: userId,
+            id: newUid,
             email: googleEmail,
             emailVerified: Boolean(googleData.email_verified),
             googleId: googleSub,
             avatarUrl: googleData.picture || null,
             role: 'user',
-        })
-            .returning();
+        });
+        const [created] = await db.select().from(users).where(eq(users.id, newUid)).limit(1);
         user = created;
         isNewUser = true;
     }
@@ -297,7 +298,7 @@ authRoutes.post('/apple', zValidator('json', appleAuthSchema), async (c) => {
     let isNewUser = false;
     if (!user) {
         const userId = `usr_a_${appleSub.substring(0, 16)}`;
-        const [created] = await db
+        await db
             .insert(users)
             .values({
             id: userId,
@@ -305,8 +306,8 @@ authRoutes.post('/apple', zValidator('json', appleAuthSchema), async (c) => {
             emailVerified: true,
             appleId: appleSub,
             role: 'user',
-        })
-            .returning();
+        });
+        const [created] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
         user = created;
         isNewUser = true;
     }
@@ -384,10 +385,16 @@ authRoutes.post('/firebase-sync', zValidator('json', firebaseSyncSchema), async 
     let [user] = await db
         .select()
         .from(users)
-        .where(or(eq(users.id, uid), eq(users.email, normalizedEmail)))
+        .where(or(eq(users.id, uid), eq(users.email, normalizedEmail), normalizedEmail === 'mohammednawzad44@gmail.com'
+        ? eq(users.email, 'mohammednevzad@gmail.com')
+        : sql `1 = 0`))
         .limit(1);
+    if (user && normalizedEmail === 'mohammednawzad44@gmail.com' && user.email !== normalizedEmail) {
+        await db.update(users).set({ email: normalizedEmail }).where(eq(users.id, user.id));
+        user.email = normalizedEmail;
+    }
     if (!user) {
-        const [created] = await db
+        await db
             .insert(users)
             .values({
             id: uid,
@@ -395,8 +402,8 @@ authRoutes.post('/firebase-sync', zValidator('json', firebaseSyncSchema), async 
             emailVerified: true,
             avatarUrl: avatarUrl || null,
             role: 'user',
-        })
-            .returning();
+        });
+        const [created] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
         user = created;
     }
     else {

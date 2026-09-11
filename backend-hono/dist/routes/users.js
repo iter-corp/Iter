@@ -119,7 +119,8 @@ userRoutes.patch('/me', requireAuth, zValidator('json', updateProfileSchema), as
         patch.eventNotifPrefs = body.eventNotifPrefs;
     if (body.metadata !== undefined)
         patch.metadata = body.metadata;
-    const [updated] = await db.update(users).set(patch).where(eq(users.id, uid)).returning();
+    await db.update(users).set(patch).where(eq(users.id, uid));
+    const [updated] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
     return c.json({ success: true, data: updated });
 });
 // ── 5. Get User by UID ──────────────────────────────────────────────────────
@@ -179,8 +180,7 @@ userRoutes.post('/:uid/visit', requireAuth, async (c) => {
         visitCount: 1,
         lastVisitedAt: new Date(),
     })
-        .onConflictDoUpdate({
-        target: [profileVisitors.ownerUid, profileVisitors.visitorUid],
+        .onDuplicateKeyUpdate({
         set: {
             visitCount: sql `${profileVisitors.visitCount} + 1`,
             lastVisitedAt: new Date(),
@@ -221,12 +221,12 @@ userRoutes.post('/:uid/follow', requireAuth, async (c) => {
         throw new AppError('User not found', 404, 'NOT_FOUND');
     const status = targetUser.isPrivate ? 'pending' : 'active';
     const followId = `${followerUid}_${targetUid}`;
-    await db.insert(follows).values({
+    await db.insert(follows).ignore().values({
         id: followId,
         followerUid,
         targetUid,
         status,
-    }).onConflictDoNothing();
+    });
     if (status === 'active') {
         // Increment counts
         await db.update(users).set({ followersCount: sql `${users.followersCount} + 1` }).where(eq(users.id, targetUid));
@@ -241,20 +241,20 @@ userRoutes.post('/:uid/follow', requireAuth, async (c) => {
             const sorted = [followerUid, targetUid].sort();
             const chatId = `${sorted[0]}_${sorted[1]}`;
             await db.update(chats).set({
-                acceptedBy: sql `jsonb_set(COALESCE(accepted_by, '[]'::jsonb), '{0}', to_jsonb(${followerUid}::text)) || to_jsonb(${targetUid}::text)`
+                acceptedBy: [followerUid, targetUid]
             }).where(eq(chats.id, chatId));
         }
     }
     // Create notification
     const [followerUser] = await db.select().from(users).where(eq(users.id, followerUid)).limit(1);
     const notifType = status === 'pending' ? 'follow_request' : 'follow';
-    await db.insert(notifications).values({
+    await db.insert(notifications).ignore().values({
         id: `notif_follow_${followerUid}_${targetUid}`,
         targetUid,
         actorUid: followerUid,
         type: notifType,
         targetId: followerUid,
-    }).onConflictDoNothing();
+    });
     // Send push notification
     await sendPushNotification({
         targetUid,
@@ -291,7 +291,7 @@ userRoutes.post('/:uid/block', requireAuth, async (c) => {
         throw new AppError('You cannot block yourself', 400, 'INVALID_ACTION');
     }
     const blockId = `${blockerUid}_${targetUid}`;
-    await db.insert(blocks).values({ id: blockId, blockerUid, blockedUid: targetUid }).onConflictDoNothing();
+    await db.insert(blocks).ignore().values({ id: blockId, blockerUid, blockedUid: targetUid });
     // Remove follow relations in both directions
     await db.delete(follows).where(sql `(${follows.followerUid} = ${blockerUid} AND ${follows.targetUid} = ${targetUid}) OR (${follows.followerUid} = ${targetUid} AND ${follows.targetUid} = ${blockerUid})`);
     return c.json({ success: true, blocked: true });
@@ -319,7 +319,7 @@ userRoutes.post('/:uid/report', requireAuth, zValidator('json', reportUserSchema
     if (!target)
         throw new AppError('Target user not found', 404, 'NOT_FOUND');
     const reportId = `${targetUid}_${reporterUid}`;
-    await db.insert(userReports).values({
+    await db.insert(userReports).ignore().values({
         id: reportId,
         targetUid,
         targetUsername: target.username || 'user',
@@ -328,7 +328,7 @@ userRoutes.post('/:uid/report', requireAuth, zValidator('json', reportUserSchema
         reporterUsername: reporter?.username || 'user',
         reason,
         details: details?.trim() || null,
-    }).onConflictDoNothing();
+    });
     return c.json({ success: true, message: 'User report submitted for moderation review' });
 });
 // ── 10. Submit Contact / Org Promotion Request ──────────────────────────────
@@ -342,7 +342,7 @@ userRoutes.post('/contact-request', requireAuth, zValidator('json', contactSchem
     const user = c.get('user');
     const body = c.req.valid('json');
     const reqId = `cr_${randomBytes(12).toString('hex')}`;
-    const [created] = await db
+    await db
         .insert(contactRequests)
         .values({
         id: reqId,
@@ -352,8 +352,8 @@ userRoutes.post('/contact-request', requireAuth, zValidator('json', contactSchem
         type: body.type,
         subject: body.subject,
         message: body.message,
-    })
-        .returning();
+    });
+    const [created] = await db.select().from(contactRequests).where(eq(contactRequests.id, reqId)).limit(1);
     return c.json({ success: true, data: created }, 201);
 });
 // ── 11. Submit Error / Crash Report ─────────────────────────────────────────

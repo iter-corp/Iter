@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { posts, postLikes, postReposts, postSaves, postReports, users, notifications } from '../db/schema/index.js';
+import { posts, postLikes, postReposts, postSaves, postReports, users, comments, notifications, follows } from '../db/schema/index.js';
 import { eq, and, sql, desc, inArray } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -21,14 +21,88 @@ postRoutes.get('/', optionalAuth, async (c) => {
     const viewerUid = c.get('uid');
     const limit = Math.min(Number(c.req.query('limit')) || 30, 100);
     const cursor = c.req.query('cursor');
-    const conditions = [eq(posts.postType, 'regular'), eq(posts.isPrivate, false)];
+    const authorUid = c.req.query('authorUid');
+    const type = c.req.query('type'); // 'regular' | 'qa' | 'all'
+    const saved = c.req.query('saved'); // 'true'
+    const repostedBy = c.req.query('repostedBy');
+    const answeredBy = c.req.query('answeredBy');
+    const conditions = [];
+    // 1. Author Filter (e.g. User Profile Page)
+    if (authorUid) {
+        conditions.push(eq(posts.authorUid, authorUid));
+        // Privacy check: Viewer sees private posts if viewer is author, or follows author actively
+        if (viewerUid && viewerUid !== authorUid) {
+            const [follow] = await db
+                .select()
+                .from(follows)
+                .where(and(eq(follows.followerUid, viewerUid), eq(follows.targetUid, authorUid), eq(follows.status, 'active')))
+                .limit(1);
+            if (!follow) {
+                conditions.push(eq(posts.isPrivate, false));
+            }
+        }
+        else if (!viewerUid) {
+            conditions.push(eq(posts.isPrivate, false));
+        }
+    }
+    // 2. Saved Posts Tab
+    if (saved === 'true') {
+        if (!viewerUid)
+            return c.json({ success: true, data: [] });
+        const savedPostIds = await db
+            .select({ postId: postSaves.postId })
+            .from(postSaves)
+            .where(eq(postSaves.uid, viewerUid));
+        const ids = savedPostIds.map((r) => r.postId);
+        if (ids.length === 0)
+            return c.json({ success: true, data: [] });
+        conditions.push(inArray(posts.id, ids));
+    }
+    // 3. Reposted Posts Tab
+    if (repostedBy) {
+        const repostedPostIds = await db
+            .select({ postId: postReposts.postId })
+            .from(postReposts)
+            .where(eq(postReposts.uid, repostedBy));
+        const ids = repostedPostIds.map((r) => r.postId);
+        if (ids.length === 0)
+            return c.json({ success: true, data: [] });
+        conditions.push(inArray(posts.id, ids));
+    }
+    // 4. QA Answered By Tab
+    if (answeredBy) {
+        const answeredPostIds = await db
+            .select({ postId: comments.postId })
+            .from(comments)
+            .where(eq(comments.authorUid, answeredBy));
+        const ids = Array.from(new Set(answeredPostIds.map((r) => r.postId)));
+        if (ids.length === 0)
+            return c.json({ success: true, data: [] });
+        conditions.push(inArray(posts.id, ids));
+        conditions.push(eq(posts.postType, 'qa'));
+    }
+    // 5. Post Type Filter
+    if (type === 'qa') {
+        conditions.push(eq(posts.postType, 'qa'));
+    }
+    else if (type === 'regular') {
+        conditions.push(eq(posts.postType, 'regular'));
+    }
+    else if (!type && !saved && !repostedBy && !answeredBy) {
+        conditions.push(eq(posts.postType, 'regular'));
+    }
+    // 6. Global Feed Privacy
+    if (!authorUid && saved !== 'true') {
+        conditions.push(eq(posts.isPrivate, false));
+    }
+    // 7. Cursor Pagination
     if (cursor) {
         conditions.push(sql `${posts.createdAt} < ${new Date(cursor)}`);
     }
     const feedPosts = await db
         .select()
         .from(posts)
-        .where(and(...conditions))
+        .where(conditions.length > 0 ? and(...conditions) : sql `1=1`)
         .orderBy(desc(posts.createdAt))
         .limit(limit);
     // If viewer signed in, enrich with liked/saved/reposted flags
@@ -119,7 +193,7 @@ postRoutes.post('/', requireAuth, zValidator('json', createPostSchema), async (c
     const [author] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
     const postId = `pst_${randomBytes(12).toString('hex')}`;
     const placeSearch = [body.postPlaceName, body.postPlaceCity].filter(Boolean).join(' ').toLowerCase();
-    const [newPost] = await db
+    await db
         .insert(posts)
         .values({
         id: postId,
@@ -138,8 +212,8 @@ postRoutes.post('/', requireAuth, zValidator('json', createPostSchema), async (c
         postLocationExact: body.postLocationExact,
         placeSearchKey: placeSearch || null,
         metadata: body.metadata || {},
-    })
-        .returning();
+    });
+    const [newPost] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
     // Increment user's posts count
     await db.update(users).set({ postsCount: sql `${users.postsCount} + 1` }).where(eq(users.id, uid));
     // Process @mentions
@@ -149,13 +223,13 @@ postRoutes.post('/', requireAuth, zValidator('json', createPostSchema), async (c
         for (const target of targets) {
             if (target.id === uid)
                 continue;
-            await db.insert(notifications).values({
+            await db.insert(notifications).ignore().values({
                 id: `mention_${postId}_${target.id}`,
                 targetUid: target.id,
                 actorUid: uid,
                 type: 'mention',
                 targetId: postId,
-            }).onConflictDoNothing();
+            });
             await sendPushNotification({
                 targetUid: target.id,
                 title: 'New mention',
@@ -185,7 +259,7 @@ postRoutes.post('/qa', requireAuth, zValidator('json', createQaSchema), async (c
     }
     const [author] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
     const postId = `qa_${randomBytes(12).toString('hex')}`;
-    const [qaPost] = await db
+    await db
         .insert(posts)
         .values({
         id: postId,
@@ -198,8 +272,8 @@ postRoutes.post('/qa', requireAuth, zValidator('json', createQaSchema), async (c
         postType: 'qa',
         discussKind,
         sourcePostId: sourcePostId || null,
-    })
-        .returning();
+    });
+    const [qaPost] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
     return c.json({ success: true, data: qaPost }, 201);
 });
 // ── 6. Delete Post ──────────────────────────────────────────────────────────
@@ -309,7 +383,7 @@ postRoutes.post('/:id/report', requireAuth, zValidator('json', reportPostSchema)
     }
     const [reporter] = await db.select().from(users).where(eq(users.id, reporterUid)).limit(1);
     const reportId = `${postId}_${reporterUid}`;
-    await db.insert(postReports).values({
+    await db.insert(postReports).ignore().values({
         id: reportId,
         postId,
         postAuthorUid: post.authorUid,
@@ -321,6 +395,6 @@ postRoutes.post('/:id/report', requireAuth, zValidator('json', reportPostSchema)
         reason,
         details: details?.trim() || null,
         isQa: post.postType === 'qa',
-    }).onConflictDoNothing();
+    });
     return c.json({ success: true, message: 'Report submitted successfully' });
 });

@@ -7,7 +7,7 @@ const envSchema = z.object({
     HOST: z.string().default('0.0.0.0'),
     APP_URL: z.string().default('http://localhost:3000'),
     CORS_ORIGIN: z.string().default('*'),
-    DATABASE_URL: z.string().default('postgres://postgres:postgres@localhost:5432/iter_db'),
+    DATABASE_URL: z.string().default('mysql://root:1842@localhost:3306/iter_db'),
     JWT_SECRET: z.string().min(16).default('iter_default_jwt_secret_change_in_production_32char'),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
     JWT_REFRESH_EXPIRATION: z.string().default('30d'),

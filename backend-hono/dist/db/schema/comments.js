@@ -1,51 +1,51 @@
-import { pgTable, text, timestamp, boolean, integer, uniqueIndex } from 'drizzle-orm/pg-core';
+import { mysqlTable, text, timestamp, boolean, int, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
 import { users } from './users.js';
 import { posts } from './posts.js';
-export const comments = pgTable('comments', {
-    id: text('id').primaryKey(),
-    postId: text('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
-    authorUid: text('author_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    authorUsername: text('author_username').notNull(),
+export const comments = mysqlTable('comments', {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    postId: varchar('post_id', { length: 128 }).notNull().references(() => posts.id, { onDelete: 'cascade' }),
+    authorUid: varchar('author_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+    authorUsername: varchar('author_username', { length: 64 }).notNull(),
     authorAvatar: text('author_avatar'),
     text: text('text').notNull(),
-    parentCommentId: text('parent_comment_id'),
-    replyToUsername: text('reply_to_username'),
-    helpfulCount: integer('helpful_count').default(0).notNull(),
-    unhelpfulCount: integer('unhelpful_count').default(0).notNull(),
-    likesCount: integer('likes_count').default(0).notNull(),
+    parentCommentId: varchar('parent_comment_id', { length: 128 }),
+    replyToUsername: varchar('reply_to_username', { length: 64 }),
+    helpfulCount: int('helpful_count').default(0).notNull(),
+    unhelpfulCount: int('unhelpful_count').default(0).notNull(),
+    likesCount: int('likes_count').default(0).notNull(),
     profanityFiltered: boolean('profanity_filtered').default(false).notNull(),
     senderOnly: boolean('sender_only').default(false).notNull(),
     markedHelpful: boolean('marked_helpful').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
-export const commentLikes = pgTable('comment_likes', {
-    id: text('id').primaryKey(), // `${commentId}_${uid}`
-    commentId: text('comment_id').notNull().references(() => comments.id, { onDelete: 'cascade' }),
-    uid: text('uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
+export const commentLikes = mysqlTable('comment_likes', {
+    id: varchar('id', { length: 255 }).primaryKey(), // `${commentId}_${uid}`
+    commentId: varchar('comment_id', { length: 128 }).notNull().references(() => comments.id, { onDelete: 'cascade' }),
+    uid: varchar('uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
     uniqueIndex('comment_likes_pair_idx').on(table.commentId, table.uid),
 ]);
-export const commentHelpfulVotes = pgTable('comment_helpful_votes', {
-    id: text('id').primaryKey(), // `${commentId}_${uid}`
-    commentId: text('comment_id').notNull().references(() => comments.id, { onDelete: 'cascade' }),
-    uid: text('uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
+export const commentHelpfulVotes = mysqlTable('comment_helpful_votes', {
+    id: varchar('id', { length: 255 }).primaryKey(), // `${commentId}_${uid}`
+    commentId: varchar('comment_id', { length: 128 }).notNull().references(() => comments.id, { onDelete: 'cascade' }),
+    uid: varchar('uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
     isHelpful: boolean('is_helpful').notNull(), // true = helpful, false = unhelpful
     createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
     uniqueIndex('comment_helpful_votes_pair_idx').on(table.commentId, table.uid),
 ]);
-export const commentReports = pgTable('comment_reports', {
-    id: text('id').primaryKey(),
-    commentId: text('comment_id').notNull().references(() => comments.id, { onDelete: 'cascade' }),
-    postId: text('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
-    commentAuthorUid: text('comment_author_uid').notNull(),
-    commentAuthorUsername: text('comment_author_username').notNull(),
+export const commentReports = mysqlTable('comment_reports', {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    commentId: varchar('comment_id', { length: 128 }).notNull().references(() => comments.id, { onDelete: 'cascade' }),
+    postId: varchar('post_id', { length: 128 }).notNull().references(() => posts.id, { onDelete: 'cascade' }),
+    commentAuthorUid: varchar('comment_author_uid', { length: 128 }).notNull(),
+    commentAuthorUsername: varchar('comment_author_username', { length: 64 }).notNull(),
     commentText: text('comment_text').notNull(),
-    reporterUid: text('reporter_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    reporterUsername: text('reporter_username').notNull(),
-    reason: text('reason').notNull(),
+    reporterUid: varchar('reporter_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+    reporterUsername: varchar('reporter_username', { length: 64 }).notNull(),
+    reason: varchar('reason', { length: 255 }).notNull(),
     resolved: boolean('resolved').default(false).notNull(),
     resolvedAt: timestamp('resolved_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),

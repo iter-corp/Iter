@@ -62,8 +62,7 @@ notificationRoutes.post('/fcm-token', requireAuth, zValidator('json', fcmTokenSc
         deviceType,
         updatedAt: new Date(),
     })
-        .onConflictDoUpdate({
-        target: [fcmTokens.token],
+        .onDuplicateKeyUpdate({
         set: {
             uid,
             deviceType,
