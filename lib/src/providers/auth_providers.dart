@@ -92,6 +92,10 @@ final currentUserDocProvider = StreamProvider<Map<String, dynamic>?>((ref) {
 /// so updated profile info is reflected retroactively.
 final userByUidProvider = StreamProvider.autoDispose
     .family<Map<String, dynamic>?, String>((ref, uid) {
-  if (uid.isEmpty) return Stream.value(null);
+  if (uid.isEmpty ||
+      uid == 'wikimedia_foundation' ||
+      uid == 'nasa_apod') {
+    return Stream.value(null);
+  }
   return ref.watch(userServiceProvider).streamUser(uid);
 });

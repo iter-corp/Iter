@@ -88,10 +88,12 @@ class AuthService {
       });
       if (syncRes is Map<String, dynamic> && syncRes['tokens'] != null) {
         final tokens = syncRes['tokens'] as Map<String, dynamic>;
+        final userObj = syncRes['user'] as Map<String, dynamic>?;
+        final dbUserId = userObj?['uid'] as String? ?? userObj?['id'] as String? ?? user.uid;
         await ApiClient.instance.setTokens(
           accessToken: tokens['accessToken'] as String,
           refreshToken: tokens['refreshToken'] as String,
-          userId: user.uid,
+          userId: dbUserId,
           userEmail: user.email,
         );
         RealtimeClient.instance.connect();
@@ -218,6 +220,7 @@ class AuthService {
       'suspended': false,
       'isPrivate': false,
       'appIntroSeen': false,
+      'welcomeMessageSeen': false,
       'followersCount': 0,
       'followingCount': 0,
       'postsCount': 0,
@@ -312,6 +315,7 @@ class AuthService {
       'suspended': false,
       'isPrivate': false,
       'appIntroSeen': false,
+      'welcomeMessageSeen': false,
       'followersCount': 0,
       'followingCount': 0,
       'postsCount': 0,

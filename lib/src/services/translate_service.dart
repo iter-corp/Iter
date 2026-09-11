@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -28,14 +29,36 @@ class _ApiKeyStore {
   // Each map: { 'id', 'key', 'provider', 'priority', 'statusMessage' }
   final List<Map<String, dynamic>> _allKeys = [];
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<User?>? _authSub;
   bool _initialized = false;
 
   final _db = FirebaseFirestore.instance;
 
-  /// Start listening to Firestore. Safe to call multiple times.
+  /// Start observing auth state so we only attach a Firestore stream
+  /// when an authenticated admin user is present, preventing PERMISSION_DENIED.
   void init() {
     if (_initialized) return;
     _initialized = true;
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (user == null) {
+        _stopFirestore();
+        return;
+      }
+      try {
+        final doc = await _db.collection('users').doc(user.uid).get();
+        if (doc.data()?['role'] == 'admin') {
+          _startFirestore();
+        } else {
+          _stopFirestore();
+        }
+      } catch (_) {
+        _stopFirestore();
+      }
+    });
+  }
+
+  void _startFirestore() {
+    if (_sub != null) return;
     _sub = _db
         .collection('apiKeys')
         .where('active', isEqualTo: true)
@@ -62,11 +85,17 @@ class _ApiKeyStore {
     );
   }
 
-  void dispose() {
+  void _stopFirestore() {
     _sub?.cancel();
     _sub = null;
-    _initialized = false;
     _allKeys.clear();
+  }
+
+  void dispose() {
+    _authSub?.cancel();
+    _authSub = null;
+    _stopFirestore();
+    _initialized = false;
   }
 
   /// Returns all active key entries for [provider] in priority order,

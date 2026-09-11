@@ -42,6 +42,8 @@ class AdminConfig {
   final List<String> profileGoalOptions;
 
   /// English profanity words used by chat moderation.
+  final bool welcomeMessageEnabled;
+  final String welcomeMessage;
   final List<String> profanityWordsEn;
 
   const AdminConfig({
@@ -49,6 +51,8 @@ class AdminConfig {
     this.repostsEnabled = true,
     this.translateEnabled = true,
     this.announcement = '',
+    this.welcomeMessageEnabled = true,
+    this.welcomeMessage = '',
     this.maintenanceMode = false,
     this.minAppVersion = '1.0.0',
     this.contactEmail = '',
@@ -74,11 +78,26 @@ class AdminConfig {
       return out.isEmpty ? fallback : out;
     }
 
+    final meta = (m['metadata'] as Map<String, dynamic>?) ?? const {};
+    final rawWelcome = (meta['welcomeMessage'] as String?) ??
+        (m['welcomeMessage'] as String?);
+    final rawWelcomeEnabled = (meta['welcomeMessageEnabled'] as bool?) ??
+        (m['welcomeMessageEnabled'] as bool?);
+    final rawAnnouncement = (m['announcement'] as String?) ?? '';
+
+    final effectiveWelcome = (rawWelcome != null && rawWelcome.trim().isNotEmpty)
+        ? rawWelcome
+        : (rawAnnouncement.toLowerCase().contains('welcome')
+            ? rawAnnouncement
+            : 'Welcome to Iter! Connect, explore, and share with your community.');
+
     return AdminConfig(
       storiesEnabled: (m['storiesEnabled'] as bool?) ?? true,
       repostsEnabled: (m['repostsEnabled'] as bool?) ?? true,
       translateEnabled: (m['translateEnabled'] as bool?) ?? true,
-      announcement: (m['announcement'] as String?) ?? '',
+      announcement: rawAnnouncement,
+      welcomeMessageEnabled: rawWelcomeEnabled ?? true,
+      welcomeMessage: effectiveWelcome,
       maintenanceMode: (m['maintenanceMode'] as bool?) ?? false,
       minAppVersion: (m['minAppVersion'] as String?) ?? '1.0.0',
       contactEmail: (m['contactEmail'] as String?) ?? '',
@@ -103,6 +122,12 @@ class AdminConfig {
         'repostsEnabled': repostsEnabled,
         'translateEnabled': translateEnabled,
         'announcement': announcement,
+        'welcomeMessageEnabled': welcomeMessageEnabled,
+        'welcomeMessage': welcomeMessage,
+        'metadata': {
+          'welcomeMessageEnabled': welcomeMessageEnabled,
+          'welcomeMessage': welcomeMessage,
+        },
         'maintenanceMode': maintenanceMode,
         'minAppVersion': minAppVersion,
         'contactEmail': contactEmail,
@@ -121,6 +146,8 @@ class AdminConfig {
     bool? repostsEnabled,
     bool? translateEnabled,
     String? announcement,
+    bool? welcomeMessageEnabled,
+    String? welcomeMessage,
     bool? maintenanceMode,
     String? minAppVersion,
     String? contactEmail,
@@ -139,6 +166,9 @@ class AdminConfig {
       repostsEnabled: repostsEnabled ?? this.repostsEnabled,
       translateEnabled: translateEnabled ?? this.translateEnabled,
       announcement: announcement ?? this.announcement,
+      welcomeMessageEnabled:
+          welcomeMessageEnabled ?? this.welcomeMessageEnabled,
+      welcomeMessage: welcomeMessage ?? this.welcomeMessage,
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
       minAppVersion: minAppVersion ?? this.minAppVersion,
       contactEmail: contactEmail ?? this.contactEmail,

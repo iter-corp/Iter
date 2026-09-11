@@ -245,12 +245,35 @@ class WikimediaFeedService {
     return posts;
   }
 
+  static bool _isDecodableRasterUrl(String url) {
+    final clean = url.split('?').first.toLowerCase();
+    if (clean.endsWith('.svg') ||
+        clean.endsWith('.tif') ||
+        clean.endsWith('.tiff') ||
+        clean.endsWith('.pdf')) {
+      return false;
+    }
+    return true;
+  }
+
   String? _extractImageUrl(Map<String, dynamic> data) {
     final original = data['originalimage']?['source'] as String?;
-    if (original != null && original.startsWith('http')) return original;
-
     final thumbnail = data['thumbnail']?['source'] as String?;
-    if (thumbnail != null && thumbnail.startsWith('http')) return thumbnail;
+
+    // 1. If original is a decodable raster image (JPG, PNG, WebP), prefer it.
+    if (original != null &&
+        original.startsWith('http') &&
+        _isDecodableRasterUrl(original)) {
+      return original;
+    }
+
+    // 2. If original is an SVG/TIFF or missing, fallback to thumbnail.
+    // Wikimedia Commons generates rendered PNG thumbnails for all SVGs.
+    if (thumbnail != null &&
+        thumbnail.startsWith('http') &&
+        _isDecodableRasterUrl(thumbnail)) {
+      return thumbnail;
+    }
 
     return null;
   }
