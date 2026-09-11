@@ -1,4 +1,4 @@
-import { mysqlTable, text, timestamp, boolean, serial, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
+import { mysqlTable, text, timestamp, boolean, bigint, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
 import { users } from './users.js';
 
 export const notifications = mysqlTable('notifications', {
@@ -16,7 +16,7 @@ export const notifications = mysqlTable('notifications', {
 });
 
 export const fcmTokens = mysqlTable('fcm_tokens', {
-  id: serial('id').primaryKey(),
+  id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
   uid: varchar('uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   token: varchar('token', { length: 512 }).notNull().unique(),
   deviceType: varchar('device_type', { length: 32 }).default('unknown').notNull(), // 'ios' | 'android' | 'web'

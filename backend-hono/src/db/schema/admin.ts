@@ -1,4 +1,4 @@
-import { mysqlTable, text, timestamp, boolean, int, json, serial, varchar } from 'drizzle-orm/mysql-core';
+import { mysqlTable, text, timestamp, boolean, int, json, bigint, varchar } from 'drizzle-orm/mysql-core';
 import { users } from './users.js';
 
 export const apiKeys = mysqlTable('api_keys', {
@@ -14,7 +14,7 @@ export const apiKeys = mysqlTable('api_keys', {
 });
 
 export const apiLogs = mysqlTable('api_logs', {
-  id: serial('id').primaryKey(),
+  id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
   provider: varchar('provider', { length: 64 }).notNull(),
   keyId: varchar('key_id', { length: 128 }),
   success: boolean('success').notNull(),

@@ -1,5 +1,5 @@
 CREATE TABLE `blacklist` (
-	`id` serial AUTO_INCREMENT NOT NULL,
+	`id` bigint unsigned NOT NULL AUTO_INCREMENT,
 	`email_or_domain` varchar(191) NOT NULL,
 	`reason` text,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
@@ -8,7 +8,7 @@ CREATE TABLE `blacklist` (
 );
 --> statement-breakpoint
 CREATE TABLE `profile_visitors` (
-	`id` serial AUTO_INCREMENT NOT NULL,
+	`id` bigint unsigned NOT NULL AUTO_INCREMENT,
 	`owner_uid` varchar(128) NOT NULL,
 	`visitor_uid` varchar(128) NOT NULL,
 	`visit_count` int NOT NULL DEFAULT 1,
@@ -414,7 +414,7 @@ CREATE TABLE `polls` (
 );
 --> statement-breakpoint
 CREATE TABLE `fcm_tokens` (
-	`id` serial AUTO_INCREMENT NOT NULL,
+	`id` bigint unsigned NOT NULL AUTO_INCREMENT,
 	`uid` varchar(128) NOT NULL,
 	`token` varchar(512) NOT NULL,
 	`device_type` varchar(32) NOT NULL DEFAULT 'unknown',
@@ -497,7 +497,7 @@ CREATE TABLE `api_keys` (
 );
 --> statement-breakpoint
 CREATE TABLE `api_logs` (
-	`id` serial AUTO_INCREMENT NOT NULL,
+	`id` bigint unsigned NOT NULL AUTO_INCREMENT,
 	`provider` varchar(64) NOT NULL,
 	`key_id` varchar(128),
 	`success` boolean NOT NULL,

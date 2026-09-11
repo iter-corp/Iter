@@ -1,4 +1,4 @@
-import { mysqlTable, text, timestamp, boolean, int, json, serial, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
+import { mysqlTable, text, timestamp, boolean, int, json, bigint, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
 import crypto from 'crypto';
 export const users = mysqlTable('users', {
     id: varchar('id', { length: 128 }).primaryKey(), // UID string or UUID
@@ -46,13 +46,13 @@ export const sessions = mysqlTable('sessions', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 export const blacklist = mysqlTable('blacklist', {
-    id: serial('id').primaryKey(),
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
     emailOrDomain: varchar('email_or_domain', { length: 191 }).notNull().unique(),
     reason: text('reason'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 export const profileVisitors = mysqlTable('profile_visitors', {
-    id: serial('id').primaryKey(),
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
     ownerUid: varchar('owner_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
     visitorUid: varchar('visitor_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
     visitCount: int('visit_count').default(1).notNull(),
