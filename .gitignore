@@ -72,6 +72,7 @@ node_modules
 # ─────────────────────────────────────────────
 service-account.json
 **/service-account*.json
+**/serviceAccountKey*.json
 *-firebase-adminsdk-*.json
 
 # ─────────────────────────────────────────────
@@ -80,4 +81,4 @@ service-account.json
 .env
 .env.*
 "android/local.properties" 
-"android/local.properties" 
+**/uploads/

@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Iter / Coil Master Central Configuration for Local Dev & Hostinger Production",
+  "activeProfile": "local",
+  "profiles": {
+    "local": {
+      "name": "Local Development (PC + Android Phone via Wi-Fi)",
+      "appUrl": "http://192.168.1.194:3000",
+      "storagePublicUrl": "http://192.168.1.194:3000/uploads",
+      "databaseUrl": "mysql://root:1842@localhost:3306/iter_db",
+      "flutterApiBaseUrl": "http://192.168.1.194:3000/api/v1"
+    },
+    "hostinger": {
+      "name": "Hostinger Production Server",
+      "appUrl": "https://api.yourdomain.com",
+      "storagePublicUrl": "https://api.yourdomain.com/uploads",
+      "databaseUrl": "mysql://u123456789_iter:YOUR_DB_PASSWORD@localhost:3306/u123456789_iter_db",
+      "flutterApiBaseUrl": "https://api.yourdomain.com/api/v1"
+    },
+    "custom": {
+      "name": "Custom Domain (https://api.testdomain.com)",
+      "appUrl": "https://api.testdomain.com",
+      "storagePublicUrl": "https://api.testdomain.com/uploads",
+      "databaseUrl": "mysql://root:1842@localhost:3306/iter_db",
+      "flutterApiBaseUrl": "https://api.testdomain.com/api/v1"
+    }
+  },
+  "legacyStoragePrefixes": [
+    "https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public",
+    "http://localhost:3000/uploads"
+  ],
+  "apps": [
+    {
+      "name": "iter-backend",
+      "script": "npx tsx src/index.ts",
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": 3000
+      }
+    }
+  ]
+}
