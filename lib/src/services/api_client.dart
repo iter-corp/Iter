@@ -50,16 +50,19 @@ class ApiClient {
     }
 
     if (kIsWeb) {
-      if (kReleaseMode) {
-        return 'https://iterglobal.icu/api/v1';
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        final port = Uri.base.hasPort ? ':${Uri.base.port}' : '';
+        return '${Uri.base.scheme}://$host$port/api/v1';
       }
-      return 'http://localhost:3000/api/v1';
+      return 'https://iterglobal.icu/api/v1';
     }
 
-    if (defaultTargetPlatform == TargetPlatform.android) {
+    if (!kReleaseMode && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:3000/api/v1';
     }
-    return 'http://localhost:3000/api/v1';
+
+    return 'https://iterglobal.icu/api/v1';
   }
 
   /// WebSocket URL for realtime presence and chat
