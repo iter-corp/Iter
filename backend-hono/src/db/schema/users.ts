@@ -1,39 +1,40 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, serial, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
+import { mysqlTable, text, timestamp, boolean, int, json, serial, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
+import crypto from 'crypto';
 
-export const users = pgTable('users', {
-  id: text('id').primaryKey(), // UID string or UUID
-  email: text('email').notNull().unique(),
+export const users = mysqlTable('users', {
+  id: varchar('id', { length: 128 }).primaryKey(), // UID string or UUID
+  email: varchar('email', { length: 191 }).notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   passwordHash: text('password_hash'), // Nullable for OAuth-only users
-  googleId: text('google_id'),
-  appleId: text('apple_id'),
-  username: text('username'),
-  usernameLower: text('username_lower'),
-  handle: text('handle'),
-  bio: text('bio').default('').notNull(),
+  googleId: varchar('google_id', { length: 191 }),
+  appleId: varchar('apple_id', { length: 191 }),
+  username: varchar('username', { length: 64 }),
+  usernameLower: varchar('username_lower', { length: 64 }),
+  handle: varchar('handle', { length: 64 }),
+  bio: text('bio'),
   avatarUrl: text('avatar_url'),
   coverUrl: text('cover_url'),
-  gender: text('gender'),
-  role: text('role').default('user').notNull(), // 'user' | 'org_admin' | 'admin'
+  gender: varchar('gender', { length: 32 }),
+  role: varchar('role', { length: 32 }).default('user').notNull(), // 'user' | 'org_admin' | 'admin'
   suspended: boolean('suspended').default(false).notNull(),
   suspendedAt: timestamp('suspended_at'),
-  suspendedBy: text('suspended_by'),
+  suspendedBy: varchar('suspended_by', { length: 128 }),
   isPrivate: boolean('is_private').default(false).notNull(),
   appIntroSeen: boolean('app_intro_seen').default(false).notNull(),
-  followersCount: integer('followers_count').default(0).notNull(),
-  followingCount: integer('following_count').default(0).notNull(),
-  postsCount: integer('posts_count').default(0).notNull(),
-  profession: text('profession'),
-  field: text('field'),
-  academicLevel: text('academic_level'),
-  goals: jsonb('goals').$type<string[]>().default([]).notNull(),
-  eventNotifPrefs: jsonb('event_notif_prefs').$type<{
+  followersCount: int('followers_count').default(0).notNull(),
+  followingCount: int('following_count').default(0).notNull(),
+  postsCount: int('posts_count').default(0).notNull(),
+  profession: varchar('profession', { length: 128 }),
+  field: varchar('field', { length: 128 }),
+  academicLevel: varchar('academic_level', { length: 128 }),
+  goals: json('goals').$type<string[]>().default([]).notNull(),
+  eventNotifPrefs: json('event_notif_prefs').$type<{
     mode: 'all' | 'off';
     types: string[];
     countries: string[];
   }>().default({ mode: 'all', types: [], countries: [] }).notNull(),
-  blockedUsers: jsonb('blocked_users').$type<string[]>().default([]).notNull(),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+  blockedUsers: json('blocked_users').$type<string[]>().default([]).notNull(),
+  metadata: json('metadata').$type<Record<string, unknown>>().default({}).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
@@ -41,41 +42,41 @@ export const users = pgTable('users', {
   uniqueIndex('users_username_lower_idx').on(table.usernameLower),
 ]);
 
-export const sessions = pgTable('sessions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  refreshToken: text('refresh_token').notNull().unique(),
+export const sessions = mysqlTable('sessions', {
+  id: varchar('id', { length: 128 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: varchar('user_id', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  refreshToken: varchar('refresh_token', { length: 512 }).notNull().unique(),
   userAgent: text('user_agent'),
-  ipAddress: text('ip_address'),
+  ipAddress: varchar('ip_address', { length: 64 }),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const blacklist = pgTable('blacklist', {
+export const blacklist = mysqlTable('blacklist', {
   id: serial('id').primaryKey(),
-  emailOrDomain: text('email_or_domain').notNull().unique(),
+  emailOrDomain: varchar('email_or_domain', { length: 191 }).notNull().unique(),
   reason: text('reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const profileVisitors = pgTable('profile_visitors', {
+export const profileVisitors = mysqlTable('profile_visitors', {
   id: serial('id').primaryKey(),
-  ownerUid: text('owner_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  visitorUid: text('visitor_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  visitCount: integer('visit_count').default(1).notNull(),
+  ownerUid: varchar('owner_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  visitorUid: varchar('visitor_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  visitCount: int('visit_count').default(1).notNull(),
   lastVisitedAt: timestamp('last_visited_at').defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('profile_visitors_pair_idx').on(table.ownerUid, table.visitorUid),
 ]);
 
-export const userReports = pgTable('user_reports', {
-  id: text('id').primaryKey(), // `${targetUid}_${reporterUid}`
-  targetUid: text('target_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  targetUsername: text('target_username').notNull(),
+export const userReports = mysqlTable('user_reports', {
+  id: varchar('id', { length: 128 }).primaryKey(), // `${targetUid}_${reporterUid}`
+  targetUid: varchar('target_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  targetUsername: varchar('target_username', { length: 64 }).notNull(),
   targetAvatar: text('target_avatar'),
-  reporterUid: text('reporter_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  reporterUsername: text('reporter_username').notNull(),
-  reason: text('reason').notNull(),
+  reporterUid: varchar('reporter_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  reporterUsername: varchar('reporter_username', { length: 64 }).notNull(),
+  reason: varchar('reason', { length: 255 }).notNull(),
   details: text('details'),
   resolved: boolean('resolved').default(false).notNull(),
   resolvedAt: timestamp('resolved_at'),

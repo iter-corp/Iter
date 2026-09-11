@@ -1,65 +1,65 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, doublePrecision, uniqueIndex } from 'drizzle-orm/pg-core';
+import { mysqlTable, text, timestamp, boolean, int, json, double, varchar, uniqueIndex } from 'drizzle-orm/mysql-core';
 import { users } from './users.js';
 
-export const chats = pgTable('chats', {
-  id: text('id').primaryKey(), // direct: 'uidA_uidB', group: uuid
-  kind: text('kind').default('direct').notNull(), // 'direct' | 'group'
-  groupName: text('group_name').default('').notNull(),
-  groupAvatarUrl: text('group_avatar_url').default('').notNull(),
-  adminUid: text('admin_uid').default('').notNull(),
+export const chats = mysqlTable('chats', {
+  id: varchar('id', { length: 128 }).primaryKey(), // direct: 'uidA_uidB', group: uuid
+  kind: varchar('kind', { length: 32 }).default('direct').notNull(), // 'direct' | 'group'
+  groupName: varchar('group_name', { length: 128 }).default('').notNull(),
+  groupAvatarUrl: text('group_avatar_url'),
+  adminUid: varchar('admin_uid', { length: 128 }).default('').notNull(),
   lastMessage: text('last_message').default('').notNull(),
-  lastMessageSenderUid: text('last_message_sender_uid').default('').notNull(),
+  lastMessageSenderUid: varchar('last_message_sender_uid', { length: 128 }).default('').notNull(),
   lastTime: timestamp('last_time').defaultNow().notNull(),
-  participants: jsonb('participants').$type<string[]>().default([]).notNull(),
-  acceptedBy: jsonb('accepted_by').$type<string[]>().default([]).notNull(),
-  mutedFor: jsonb('muted_for').$type<string[]>().default([]).notNull(),
-  unreadCounts: jsonb('unread_counts').$type<Record<string, number>>().default({}).notNull(),
-  userData: jsonb('user_data').$type<Record<string, { username: string; avatarUrl?: string }>>().default({}).notNull(),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+  participants: json('participants').$type<string[]>().default([]).notNull(),
+  acceptedBy: json('accepted_by').$type<string[]>().default([]).notNull(),
+  mutedFor: json('muted_for').$type<string[]>().default([]).notNull(),
+  unreadCounts: json('unread_counts').$type<Record<string, number>>().default({}).notNull(),
+  userData: json('user_data').$type<Record<string, { username: string; avatarUrl?: string }>>().default({}).notNull(),
+  metadata: json('metadata').$type<Record<string, unknown>>().default({}).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const messages = pgTable('messages', {
-  id: text('id').primaryKey(),
-  chatId: text('chat_id').notNull().references(() => chats.id, { onDelete: 'cascade' }),
-  senderUid: text('sender_uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
+export const messages = mysqlTable('messages', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  chatId: varchar('chat_id', { length: 128 }).notNull().references(() => chats.id, { onDelete: 'cascade' }),
+  senderUid: varchar('sender_uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   text: text('text').default('').notNull(),
   senderOnlyText: text('sender_only_text'),
   imageUrl: text('image_url'),
   videoUrl: text('video_url'),
   fileUrl: text('file_url'),
-  fileName: text('file_name'),
-  fileMimeType: text('file_mime_type'),
-  fileSizeBytes: integer('file_size_bytes'),
+  fileName: varchar('file_name', { length: 255 }),
+  fileMimeType: varchar('file_mime_type', { length: 128 }),
+  fileSizeBytes: int('file_size_bytes'),
   voiceUrl: text('voice_url'),
-  voiceDurationMs: integer('voice_duration_ms'),
+  voiceDurationMs: int('voice_duration_ms'),
   voiceTranscript: text('voice_transcript'),
   stickerUrl: text('sticker_url'),
-  stickerPackId: text('sticker_pack_id'),
-  sharedPostId: text('shared_post_id'),
-  sharedEventId: text('shared_event_id'),
-  storyId: text('story_id'),
+  stickerPackId: varchar('sticker_pack_id', { length: 128 }),
+  sharedPostId: varchar('shared_post_id', { length: 128 }),
+  sharedEventId: varchar('shared_event_id', { length: 128 }),
+  storyId: varchar('story_id', { length: 128 }),
   storyImageUrl: text('story_image_url'),
-  replyToId: text('reply_to_id'),
+  replyToId: varchar('reply_to_id', { length: 128 }),
   replyToText: text('reply_to_text'),
-  replyToSenderUid: text('reply_to_sender_uid'),
-  locationLat: doublePrecision('location_lat'),
-  locationLng: doublePrecision('location_lng'),
-  locationLabel: text('location_label'),
-  seenBy: jsonb('seen_by').$type<string[]>().default([]).notNull(),
-  visibleToUids: jsonb('visible_to_uids').$type<string[]>().default([]).notNull(),
-  deletedForUids: jsonb('deleted_for_uids').$type<string[]>().default([]).notNull(),
+  replyToSenderUid: varchar('reply_to_sender_uid', { length: 128 }),
+  locationLat: double('location_lat'),
+  locationLng: double('location_lng'),
+  locationLabel: varchar('location_label', { length: 255 }),
+  seenBy: json('seen_by').$type<string[]>().default([]).notNull(),
+  visibleToUids: json('visible_to_uids').$type<string[]>().default([]).notNull(),
+  deletedForUids: json('deleted_for_uids').$type<string[]>().default([]).notNull(),
   deletedForEveryone: boolean('deleted_for_everyone').default(false).notNull(),
   profanityFiltered: boolean('profanity_filtered').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const messageReactions = pgTable('message_reactions', {
-  id: text('id').primaryKey(), // `${messageId}_${uid}`
-  messageId: text('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
-  uid: text('uid').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  reaction: text('reaction').notNull(),
+export const messageReactions = mysqlTable('message_reactions', {
+  id: varchar('id', { length: 255 }).primaryKey(), // `${messageId}_${uid}`
+  messageId: varchar('message_id', { length: 128 }).notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  uid: varchar('uid', { length: 128 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  reaction: varchar('reaction', { length: 64 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('message_reactions_pair_idx').on(table.messageId, table.uid),

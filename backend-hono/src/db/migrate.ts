@@ -1,8 +1,8 @@
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import { db, client } from './index.js';
+import { migrate } from 'drizzle-orm/mysql2/migrator';
+import { db, poolConnection } from './index.js';
 
 export async function runMigrations() {
-  console.log('⏳ Running database migrations...');
+  console.log('⏳ Running database migrations on MySQL...');
   try {
     await migrate(db, { migrationsFolder: './src/db/migrations' });
     console.log('✅ Migrations completed successfully.');
@@ -10,7 +10,7 @@ export async function runMigrations() {
     console.error('❌ Migration failed:', error);
     throw error;
   } finally {
-    await client.end();
+    await poolConnection.end();
   }
 }
 
