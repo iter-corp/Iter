@@ -342,52 +342,18 @@ jobs:
               echo "DEVELOPMENT_TEAM = $TEAM_ID" >> ios/Flutter/Release.xcconfig
             fi
 
-            cat <<EOF > ios/ExportOptions.plist
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-                <key>method</key>
-                <string>app-store</string>
-                <key>teamID</key>
-                <string>${TEAM_ID:-WAC85HB79P}</string>
-                <key>uploadSymbols</key>
-                <true/>
-                <key>compileBitcode</key>
-                <false/>
-                <key>manageAppVersionAndBuildNumber</key>
-                <false/>
-                <key>signingStyle</key>
-                <string>manual</string>
-                <key>provisioningProfiles</key>
-                <dict>
-                    <key>com.iter.ai</key>
-                    <string>${PROFILE_NAME:-$PROFILE_UUID}</string>
-                </dict>
-            </dict>
-            </plist>
-            EOF
+            PROFILE_KEY="${PROFILE_NAME:-$PROFILE_UUID}"
+            if [ -n "$PROFILE_KEY" ]; then
+              /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :signingStyle manual" ios/ExportOptions.plist || true
+              /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ios/ExportOptions.plist 2>/dev/null || true
+              /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.iter.ai string $PROFILE_KEY" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.iter.ai $PROFILE_KEY" ios/ExportOptions.plist || true
+            fi
+            if [ -n "$TEAM_ID" ]; then
+              /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" ios/ExportOptions.plist 2>/dev/null || true
+            fi
             echo "Apple signing certificate and provisioning profile installed successfully."
           else
-            echo "::notice::Direct Apple Certificate/Profile secrets not found. Generating default App Store ExportOptions with Team ID WAC85HB79P."
-            cat <<EOF > ios/ExportOptions.plist
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-                <key>method</key>
-                <string>app-store</string>
-                <key>teamID</key>
-                <string>WAC85HB79P</string>
-                <key>uploadSymbols</key>
-                <true/>
-                <key>compileBitcode</key>
-                <false/>
-                <key>manageAppVersionAndBuildNumber</key>
-                <false/>
-            </dict>
-            </plist>
-            EOF
+            echo "::notice::Direct Apple Certificate/Profile secrets not found. Using preconfigured ios/ExportOptions.plist with Team ID WAC85HB79P."
           fi
 
       - name: Disable Swift Package Manager (Use CocoaPods)
