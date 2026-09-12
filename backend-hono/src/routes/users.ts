@@ -8,8 +8,17 @@ import { eq, and, sql, desc, inArray } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { sendPushNotification } from '../services/fcm.service.js';
+import { normalizeMediaUrl } from '../utils/url.js';
 
 export const userRoutes = new Hono();
+
+export function formatUser<T extends Record<string, any>>(user: T): T {
+  return {
+    ...user,
+    avatarUrl: normalizeMediaUrl(user.avatarUrl),
+    coverUrl: normalizeMediaUrl(user.coverUrl),
+  };
+}
 
 // ── 1. Check Username Availability ──────────────────────────────────────────
 userRoutes.get('/check-username', async (c) => {
@@ -66,7 +75,7 @@ userRoutes.get('/me', requireAuth, async (c) => {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  return c.json({ success: true, data: user });
+  return c.json({ success: true, data: formatUser(user) });
 });
 
 // ── 4. Update Current User Profile ──────────────────────────────────────────
@@ -130,7 +139,7 @@ userRoutes.patch('/me', requireAuth, zValidator('json', updateProfileSchema), as
   await db.update(users).set(patch).where(eq(users.id, uid));
   const [updated] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
 
-  return c.json({ success: true, data: updated });
+  return c.json({ success: true, data: updated ? formatUser(updated) : null });
 });
 
 // ── 5. Get User by UID ──────────────────────────────────────────────────────
@@ -175,12 +184,12 @@ userRoutes.get('/:uid', optionalAuth, async (c) => {
 
   return c.json({
     success: true,
-    data: {
+    data: formatUser({
       ...user,
       isFollowing,
       isPending,
       isBlocked,
-    },
+    }),
   });
 });
 
@@ -233,7 +242,12 @@ userRoutes.get('/:uid/visitors', requireAuth, async (c) => {
     .orderBy(desc(profileVisitors.lastVisitedAt))
     .limit(100);
 
-  return c.json({ success: true, data: visitors });
+  const formattedVisitors = visitors.map((v) => ({
+    ...v,
+    avatarUrl: normalizeMediaUrl(v.avatarUrl),
+  }));
+
+  return c.json({ success: true, data: formattedVisitors });
 });
 
 // ── 7. Follow / Unfollow ────────────────────────────────────────────────────

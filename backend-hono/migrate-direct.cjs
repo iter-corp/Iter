@@ -79,6 +79,67 @@ async function migrate() {
         created_at bigint
       );
     `);
+
+    // Automatically migrate any legacy Supabase storage URLs to active domain
+    const targetStorageUrl = (process.env.STORAGE_PUBLIC_URL || 'https://iterglobal.icu/uploads').replace(/\/+$/, '');
+    const legacyPrefix = 'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public';
+    try {
+      console.log(`🔄 Checking database for legacy Supabase URLs -> ${targetStorageUrl}...`);
+      await connection.query(
+        `UPDATE users SET avatar_url = REPLACE(avatar_url, ?, ?), cover_url = REPLACE(cover_url, ?, ?) WHERE avatar_url LIKE ? OR cover_url LIKE ?`,
+        [legacyPrefix, targetStorageUrl, legacyPrefix, targetStorageUrl, `%${legacyPrefix}%`, `%${legacyPrefix}%`]
+      );
+      await connection.query(
+        `UPDATE posts SET author_avatar = REPLACE(author_avatar, ?, ?) WHERE author_avatar LIKE ?`,
+        [legacyPrefix, targetStorageUrl, `%${legacyPrefix}%`]
+      );
+      await connection.query(
+        `UPDATE comments SET author_avatar = REPLACE(author_avatar, ?, ?) WHERE author_avatar LIKE ?`,
+        [legacyPrefix, targetStorageUrl, `%${legacyPrefix}%`]
+      );
+      await connection.query(
+        `UPDATE events SET cover_image_url = REPLACE(cover_image_url, ?, ?) WHERE cover_image_url LIKE ?`,
+        [legacyPrefix, targetStorageUrl, `%${legacyPrefix}%`]
+      );
+      await connection.query(
+        `UPDATE stories SET image_url = REPLACE(image_url, ?, ?), video_url = REPLACE(video_url, ?, ?), author_avatar = REPLACE(author_avatar, ?, ?) WHERE image_url LIKE ? OR video_url LIKE ? OR author_avatar LIKE ?`,
+        [legacyPrefix, targetStorageUrl, legacyPrefix, targetStorageUrl, legacyPrefix, targetStorageUrl, `%${legacyPrefix}%`, `%${legacyPrefix}%`, `%${legacyPrefix}%`]
+      );
+
+      const [postsToFix] = await connection.query(
+        `SELECT id, image_urls, video_urls FROM posts WHERE CAST(image_urls AS CHAR) LIKE ? OR CAST(video_urls AS CHAR) LIKE ?`,
+        [`%${legacyPrefix}%`, `%${legacyPrefix}%`]
+      );
+      if (Array.isArray(postsToFix)) {
+        for (const row of postsToFix) {
+          let imgUrls = [];
+          let vidUrls = [];
+          if (typeof row.image_urls === 'string') {
+            try { imgUrls = JSON.parse(row.image_urls); } catch (_) {}
+          } else if (Array.isArray(row.image_urls)) {
+            imgUrls = row.image_urls;
+          }
+          if (typeof row.video_urls === 'string') {
+            try { vidUrls = JSON.parse(row.video_urls); } catch (_) {}
+          } else if (Array.isArray(row.video_urls)) {
+            vidUrls = row.video_urls;
+          }
+
+          const newImgs = imgUrls.map((u) => (typeof u === 'string' ? u.replace(legacyPrefix, targetStorageUrl) : u));
+          const newVids = vidUrls.map((u) => (typeof u === 'string' ? u.replace(legacyPrefix, targetStorageUrl) : u));
+
+          await connection.query(
+            `UPDATE posts SET image_urls = ?, video_urls = ? WHERE id = ?`,
+            [JSON.stringify(newImgs), JSON.stringify(newVids), row.id]
+          );
+        }
+        if (postsToFix.length > 0) {
+          console.log(`   ✅ Converted media URLs for ${postsToFix.length} posts.`);
+        }
+      }
+    } catch (urlErr) {
+      console.warn('⚠️ Legacy URL conversion note:', urlErr.message);
+    }
   } catch (error) {
     console.error('❌ Migration failed:', error.sqlMessage || error.message);
     if (error.sql) {

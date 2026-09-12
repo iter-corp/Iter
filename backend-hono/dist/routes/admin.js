@@ -9,6 +9,9 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { sendPushNotification } from '../services/fcm.service.js';
 import { randomBytes } from 'crypto';
+import { env } from '../config/env.js';
+import fs from 'fs/promises';
+import path from 'path';
 export const adminRoutes = new Hono();
 // ── Client Error Reporting (Public/Authenticated) ───────────────────────────
 const errorReportSchema = z.object({
@@ -235,4 +238,113 @@ adminRoutes.patch('/config', async (c) => {
         .where(eq(appConfigs.id, 'app'));
     const [updated] = await db.select().from(appConfigs).where(eq(appConfigs.id, 'app')).limit(1);
     return c.json({ success: true, data: updated });
+});
+// ── 8. Media Synchronization & URL Migration ────────────────────────────────
+adminRoutes.post('/media/fix-urls', async (c) => {
+    const targetPrefix = env.STORAGE_PUBLIC_URL.replace(/\/+$/, '');
+    const oldPrefixes = [
+        'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public',
+        'http://localhost:3000/uploads',
+        'http://127.0.0.1:3000/uploads',
+    ];
+    const results = {};
+    for (const oldPrefix of oldPrefixes) {
+        if (oldPrefix === targetPrefix)
+            continue;
+        // 1. Users (avatar_url, cover_url)
+        await db.execute(sql `
+      UPDATE users SET 
+        avatar_url = REPLACE(avatar_url, ${oldPrefix}, ${targetPrefix}),
+        cover_url = REPLACE(cover_url, ${oldPrefix}, ${targetPrefix})
+      WHERE avatar_url LIKE ${`%${oldPrefix}%`} OR cover_url LIKE ${`%${oldPrefix}%`}
+    `);
+        // 2. Posts (author_avatar)
+        await db.execute(sql `
+      UPDATE posts SET 
+        author_avatar = REPLACE(author_avatar, ${oldPrefix}, ${targetPrefix})
+      WHERE author_avatar LIKE ${`%${oldPrefix}%`}
+    `);
+        // 3. Posts (image_urls, video_urls JSON)
+        const [rawPosts] = await db.execute(sql `
+      SELECT id, image_urls, video_urls FROM posts 
+      WHERE CAST(image_urls AS CHAR) LIKE ${`%${oldPrefix}%`} 
+         OR CAST(video_urls AS CHAR) LIKE ${`%${oldPrefix}%`}
+    `);
+        if (Array.isArray(rawPosts)) {
+            for (const row of rawPosts) {
+                let imgs = [];
+                let vids = [];
+                if (typeof row.image_urls === 'string') {
+                    try {
+                        imgs = JSON.parse(row.image_urls);
+                    }
+                    catch { }
+                }
+                else if (Array.isArray(row.image_urls)) {
+                    imgs = row.image_urls;
+                }
+                if (typeof row.video_urls === 'string') {
+                    try {
+                        vids = JSON.parse(row.video_urls);
+                    }
+                    catch { }
+                }
+                else if (Array.isArray(row.video_urls)) {
+                    vids = row.video_urls;
+                }
+                const newImgs = imgs.map((u) => (typeof u === 'string' ? u.replace(oldPrefix, targetPrefix) : u));
+                const newVids = vids.map((u) => (typeof u === 'string' ? u.replace(oldPrefix, targetPrefix) : u));
+                await db.execute(sql `
+          UPDATE posts SET 
+            image_urls = ${JSON.stringify(newImgs)},
+            video_urls = ${JSON.stringify(newVids)}
+          WHERE id = ${row.id}
+        `);
+            }
+            results[`posts_json_${oldPrefix}`] = rawPosts.length;
+        }
+        // 4. Comments
+        await db.execute(sql `
+      UPDATE comments SET 
+        author_avatar = REPLACE(author_avatar, ${oldPrefix}, ${targetPrefix})
+      WHERE author_avatar LIKE ${`%${oldPrefix}%`}
+    `);
+        // 5. Events
+        await db.execute(sql `
+      UPDATE events SET 
+        cover_image_url = REPLACE(cover_image_url, ${oldPrefix}, ${targetPrefix})
+      WHERE cover_image_url LIKE ${`%${oldPrefix}%`}
+    `);
+        // 6. Stories
+        await db.execute(sql `
+      UPDATE stories SET 
+        image_url = REPLACE(image_url, ${oldPrefix}, ${targetPrefix}),
+        video_url = REPLACE(video_url, ${oldPrefix}, ${targetPrefix}),
+        author_avatar = REPLACE(author_avatar, ${oldPrefix}, ${targetPrefix})
+      WHERE image_url LIKE ${`%${oldPrefix}%`} 
+         OR video_url LIKE ${`%${oldPrefix}%`} 
+         OR author_avatar LIKE ${`%${oldPrefix}%`}
+    `);
+    }
+    return c.json({ success: true, targetPrefix, results });
+});
+adminRoutes.post('/media/sync-file', async (c) => {
+    const bucket = c.req.query('bucket');
+    const filePath = c.req.query('path');
+    if (!bucket || !filePath) {
+        throw new AppError('Missing bucket or path query parameters', 400, 'INVALID_REQUEST');
+    }
+    const allowedBuckets = new Set(['avatars', 'posts']);
+    if (!allowedBuckets.has(bucket)) {
+        throw new AppError(`Invalid bucket "${bucket}"`, 400, 'INVALID_BUCKET');
+    }
+    // Normalize path and prevent directory traversal
+    const normalizedPath = path.normalize(filePath).replace(/^(\.\.[\/\\])+/, '');
+    const localTarget = path.resolve(env.STORAGE_LOCAL_DIR, bucket, normalizedPath);
+    await fs.mkdir(path.dirname(localTarget), { recursive: true });
+    const arrayBuffer = await c.req.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    await fs.writeFile(localTarget, buffer);
+    const publicUrl = `${env.STORAGE_PUBLIC_URL.replace(/\/+$/, '')}/${bucket}/${normalizedPath.replace(/\\/g, '/')}`;
+    return c.json({ success: true, path: normalizedPath, publicUrl, size: buffer.length });
 });

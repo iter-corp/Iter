@@ -9,8 +9,18 @@ import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { findProfanityMatches } from '../services/profanity.service.js';
 import { sendPushNotification } from '../services/fcm.service.js';
 import { randomBytes } from 'crypto';
+import { normalizeMediaUrl, normalizeMediaUrls } from '../utils/url.js';
 
 export const postRoutes = new Hono();
+
+export function formatPost<T extends Record<string, any>>(post: T): T {
+  return {
+    ...post,
+    authorAvatar: normalizeMediaUrl(post.authorAvatar),
+    imageUrls: normalizeMediaUrls(post.imageUrls),
+    videoUrls: normalizeMediaUrls(post.videoUrls),
+  };
+}
 
 function extractMentions(text: string): string[] {
   const matches = text.match(/@([a-zA-Z0-9_]{3,30})/g);
@@ -129,7 +139,7 @@ postRoutes.get('/', optionalAuth, async (c) => {
     repostedSet = new Set(repostsResult.map((r) => r.postId));
   }
 
-  const enriched = feedPosts.map((post) => ({
+  const enriched = feedPosts.map((post) => formatPost({
     ...post,
     isLiked: likedSet.has(post.id),
     isSaved: savedSet.has(post.id),
@@ -151,7 +161,7 @@ postRoutes.get('/qa', optionalAuth, async (c) => {
     .orderBy(desc(posts.createdAt))
     .limit(limit);
 
-  return c.json({ success: true, data: qaPosts });
+  return c.json({ success: true, data: qaPosts.map(formatPost) });
 });
 
 // ── 3. Get Single Post by ID ────────────────────────────────────────────────
@@ -178,12 +188,12 @@ postRoutes.get('/:id', optionalAuth, async (c) => {
 
   return c.json({
     success: true,
-    data: {
+    data: formatPost({
       ...post,
       isLiked,
       isSaved,
       isReposted,
-    },
+    }),
   });
 });
 
@@ -267,7 +277,7 @@ postRoutes.post('/', requireAuth, zValidator('json', createPostSchema), async (c
     }
   }
 
-  return c.json({ success: true, data: newPost }, 201);
+  return c.json({ success: true, data: newPost ? formatPost(newPost) : null }, 201);
 });
 
 // ── 5. Create Q&A Post / Discussion ─────────────────────────────────────────
@@ -308,7 +318,7 @@ postRoutes.post('/qa', requireAuth, zValidator('json', createQaSchema), async (c
 
   const [qaPost] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
 
-  return c.json({ success: true, data: qaPost }, 201);
+  return c.json({ success: true, data: qaPost ? formatPost(qaPost) : null }, 201);
 });
 
 // ── 6. Delete Post ──────────────────────────────────────────────────────────

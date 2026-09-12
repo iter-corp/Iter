@@ -14,6 +14,7 @@
     "db:import-firebase": "tsx src/scripts/migrate-firebase-to-mysql.ts",
     "switch-env": "tsx src/scripts/switch-env.ts",
     "switch-domain": "tsx src/scripts/switch-env.ts",
+    "media:sync": "node sync-media-to-remote.cjs",
     "test": "tsx test/api.test.ts"
   },
   "dependencies": {
