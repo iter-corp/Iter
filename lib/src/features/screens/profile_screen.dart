@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -563,17 +564,23 @@ class _VideoThumbState extends State<_VideoThumb> {
   }
 
   Future<void> _loadThumb() async {
+    final cleanUrl = widget.url.startsWith('https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public')
+        ? widget.url.replaceFirst('https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public', 'https://iterglobal.icu/uploads')
+        : widget.url;
+
     VideoPlayerController? c;
     try {
-      // 1. First attempt to load via local disk cache (fast and avoids redundant downloads)
-      final file = await MediaCache.videoFile(widget.url)
-          .timeout(const Duration(seconds: 4));
-      if (!mounted) return;
-      c = VideoPlayerController.file(file);
+      if (!kIsWeb) {
+        final file = await MediaCache.videoFile(cleanUrl)
+            .timeout(const Duration(seconds: 4));
+        if (!mounted) return;
+        c = VideoPlayerController.file(file);
+      } else {
+        c = VideoPlayerController.networkUrl(Uri.parse(cleanUrl));
+      }
     } catch (_) {
-      // 2. Cache miss or timeout — fall back to network streaming
       if (!mounted) return;
-      c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      c = VideoPlayerController.networkUrl(Uri.parse(cleanUrl));
     }
 
     if (!mounted) {
@@ -585,7 +592,7 @@ class _VideoThumbState extends State<_VideoThumb> {
     c.setVolume(0);
 
     try {
-      await c.initialize().timeout(const Duration(seconds: 4));
+      await c.initialize().timeout(Duration(seconds: kIsWeb ? 8 : 4));
       if (!mounted) {
         c.dispose();
         return;

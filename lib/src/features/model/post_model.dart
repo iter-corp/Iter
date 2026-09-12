@@ -54,6 +54,24 @@ class Post {
     this.discussKind,
   });
 
+String? _sanitizeMediaUrl(String? url) {
+  if (url == null) return null;
+  const legacyPrefix = 'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public';
+  if (url.startsWith(legacyPrefix)) {
+    return url.replaceFirst(legacyPrefix, 'https://iterglobal.icu/uploads');
+  }
+  return url;
+}
+
+List<String> _sanitizeMediaUrls(List? list) {
+  if (list == null) return const [];
+  return list
+      .whereType<String>()
+      .map((u) => _sanitizeMediaUrl(u) ?? u)
+      .where((u) => u.isNotEmpty)
+      .toList();
+}
+
   factory Post.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
     final data = d.data() ?? {};
     final postLocation = data['postLocation'];
@@ -62,10 +80,10 @@ class Post {
       id: d.id,
       authorUid: data['authorUid'] as String? ?? '',
       authorUsername: data['authorUsername'] as String? ?? 'unknown',
-      authorAvatar: data['authorAvatar'] as String?,
+      authorAvatar: _sanitizeMediaUrl(data['authorAvatar'] as String?),
       caption: data['caption'] as String? ?? '',
-      imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? const [],
-      videoUrls: (data['videoUrls'] as List?)?.cast<String>() ?? const [],
+      imageUrls: _sanitizeMediaUrls(data['imageUrls'] as List?),
+      videoUrls: _sanitizeMediaUrls(data['videoUrls'] as List?),
       likesCount: (data['likesCount'] as int?) ?? 0,
       commentsCount: (data['commentsCount'] as int?) ?? 0,
       isPrivate: (data['isPrivate'] as bool?) ?? false,
@@ -99,10 +117,10 @@ class Post {
       id: (data['id'] ?? data['postId']) as String? ?? '',
       authorUid: data['authorUid'] as String? ?? '',
       authorUsername: data['authorUsername'] as String? ?? 'unknown',
-      authorAvatar: data['authorAvatar'] as String?,
+      authorAvatar: _sanitizeMediaUrl(data['authorAvatar'] as String?),
       caption: data['caption'] as String? ?? '',
-      imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? const [],
-      videoUrls: (data['videoUrls'] as List?)?.cast<String>() ?? const [],
+      imageUrls: _sanitizeMediaUrls(data['imageUrls'] as List?),
+      videoUrls: _sanitizeMediaUrls(data['videoUrls'] as List?),
       likesCount: (data['likesCount'] as num?)?.toInt() ?? 0,
       commentsCount: (data['commentsCount'] as num?)?.toInt() ?? 0,
       isPrivate: (data['isPrivate'] as bool?) ?? false,
