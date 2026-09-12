@@ -53,6 +53,10 @@ function apiRequest(endpoint, method = 'GET', data = null) {
       res.on('data', chunk => body += chunk);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          if (!body || body.trim() === '') {
+            resolve({});
+            return;
+          }
           try {
             resolve(JSON.parse(body));
           } catch (e) {
@@ -105,26 +109,50 @@ async function sync() {
     certList = certsRes.data || [];
     console.log(`Found ${certList.length} certificates on Apple Developer portal:`);
     for (const c of certList) {
-      console.log(`  - Type: ${c.attributes.certificateType}, Name: ${c.attributes.name}, Serial: ${c.attributes.serialNumber}`);
+      console.log(`  - Type: ${c.attributes.certificateType}, Name: ${c.attributes.name}, Serial: ${c.attributes.serialNumber}, ID: ${c.id}`);
     }
   } catch (e) {
     console.warn(`Warning fetching certificates: ${e.message}`);
   }
+
+  // Check if keychain has a distribution private key
+  let hasDistPrivateKey = false;
+  try {
+    const idCheck = execSync(`security find-identity -v -p codesigning "${keychainPath}" 2>/dev/null || true`).toString();
+    if (idCheck.includes('Apple Distribution')) {
+      hasDistPrivateKey = true;
+    }
+  } catch (_) {}
 
   let distCert = certList.find(c =>
     c.attributes.certificateType === 'DISTRIBUTION' ||
     c.attributes.certificateType === 'IOS_DISTRIBUTION'
   );
 
-  // If no distribution certificate exists, create one via CSR
+  // If there is an existing distribution certificate on Apple portal, but this runner does not possess its private key:
+  // Revoke it via App Store Connect API so a new one with a locally-held private key can be cleanly generated.
+  if (!hasDistPrivateKey && distCert) {
+    console.log(`\nExisting Distribution certificate ${distCert.id} found without local private key in keychain.`);
+    console.log(`Revoking orphan certificate ${distCert.id} to generate a fresh pair with matching private key...`);
+    try {
+      await apiRequest(`/v1/certificates/${distCert.id}`, 'DELETE');
+      console.log(`Successfully revoked certificate ${distCert.id}.`);
+      distCert = null;
+    } catch (err) {
+      console.warn(`Could not revoke certificate: ${err.message}`);
+    }
+  }
+
+  // If no distribution cert with private key exists, generate one
   if (!distCert) {
-    console.log('\nNo Distribution certificate found on Apple Developer portal. Generating RSA key and CSR...');
+    console.log('\nGenerating RSA 2048-bit key and CSR for Apple Distribution certificate...');
     try {
       const keyPath = path.join(runnerTemp, 'dist_key.pem');
       const csrPath = path.join(runnerTemp, 'dist_csr.pem');
       execSync(`openssl req -new -newkey rsa:2048 -nodes -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=Apple Distribution: Iter/C=US"`);
       const csrContent = fs.readFileSync(csrPath, 'utf8').trim();
 
+      console.log('Submitting CSR to App Store Connect API...');
       const newCertRes = await apiRequest('/v1/certificates', 'POST', {
         data: {
           type: 'certificates',
@@ -137,27 +165,30 @@ async function sync() {
       distCert = newCertRes.data;
       console.log(`Successfully created Apple Distribution certificate: ID ${distCert.id}, Serial: ${distCert.attributes.serialNumber}`);
 
-      // Export .cer + .key to PKCS#12 (.p12) and import to build keychain
-      const cerPath = path.join(runnerTemp, 'dist_cert.cer');
+      // Apple returns DER formatted certificate base64. Convert DER -> PEM -> PKCS#12 (.p12)
+      const cerDerPath = path.join(runnerTemp, 'dist_cert.cer');
+      const cerPemPath = path.join(runnerTemp, 'dist_cert.pem');
       const p12Path = path.join(runnerTemp, 'dist.p12');
-      fs.writeFileSync(cerPath, Buffer.from(distCert.attributes.certificateContent, 'base64'));
-      execSync(`openssl pkcs12 -export -inkey "${keyPath}" -in "${cerPath}" -out "${p12Path}" -passout "pass:${keychainPass}"`);
+
+      fs.writeFileSync(cerDerPath, Buffer.from(distCert.attributes.certificateContent, 'base64'));
+      execSync(`openssl x509 -inform DER -in "${cerDerPath}" -out "${cerPemPath}"`);
+      execSync(`openssl pkcs12 -export -inkey "${keyPath}" -in "${cerPemPath}" -out "${p12Path}" -passout "pass:${keychainPass}"`);
       execSync(`security import "${p12Path}" -k "${keychainPath}" -P "${keychainPass}" -A -T /usr/bin/codesign`);
       execSync(`security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychainPass}" "${keychainPath}" || true`);
-      console.log('Imported newly created Apple Distribution certificate and private key into build keychain.');
+      console.log('Successfully imported Apple Distribution certificate and private key into build keychain.');
     } catch (err) {
-      console.error(`Failed to create distribution certificate: ${err.message}`);
+      console.error(`Failed to generate distribution certificate: ${err.message}`);
     }
   } else {
-    console.log(`Existing Distribution certificate found: ID ${distCert.id}`);
+    console.log(`Active Distribution certificate in use: ID ${distCert.id}`);
   }
 
   // 3. Fetch Provisioning Profiles
   let profileList = [];
   try {
-    const profilesRes = await apiRequest('/v1/profiles?include=bundleId&limit=100');
+    const profilesRes = await apiRequest('/v1/profiles?include=bundleId,certificates&limit=100');
     profileList = profilesRes.data || [];
-    console.log(`Found ${profileList.length} provisioning profiles on Apple Developer portal:`);
+    console.log(`\nFound ${profileList.length} provisioning profiles on Apple Developer portal:`);
     for (const p of profileList) {
       console.log(`  - Profile: "${p.attributes.name}" [${p.attributes.profileType}] State: ${p.attributes.profileState}, UUID: ${p.attributes.uuid}`);
     }
@@ -165,15 +196,28 @@ async function sync() {
     console.error(`Error fetching provisioning profiles: ${e.message}`);
   }
 
-  let matchedProfile = profileList.find(p =>
-    p.attributes.profileState === 'ACTIVE' &&
-    p.attributes.profileType === 'IOS_APP_STORE' &&
-    (p.attributes.name.toLowerCase().includes('iter') || p.attributes.name.toLowerCase().includes('distribution'))
-  );
+  // Check if existing profile matches current distCert
+  let matchedProfile = null;
+  if (distCert) {
+    for (const p of profileList) {
+      if (p.attributes.profileState === 'ACTIVE' && p.attributes.profileType === 'IOS_APP_STORE' && (p.attributes.name.toLowerCase().includes('iter') || p.attributes.name.toLowerCase().includes('distribution'))) {
+        const hasOurCert = (p.relationships?.certificates?.data || []).some(c => c.id === distCert.id);
+        if (hasOurCert) {
+          matchedProfile = p;
+          break;
+        } else {
+          console.log(`Profile "${p.attributes.name}" is linked to an older certificate. Removing to update...`);
+          try {
+            await apiRequest(`/v1/profiles/${p.id}`, 'DELETE');
+          } catch (_) {}
+        }
+      }
+    }
+  }
 
   // If no matching profile exists, create an App Store Provisioning Profile for com.iter.ai
   if (!matchedProfile && iterBundle && distCert) {
-    console.log(`\nNo active App Store profile found for com.iter.ai. Creating new App Store provisioning profile...`);
+    console.log(`\nCreating new App Store provisioning profile for com.iter.ai with Certificate ${distCert.id}...`);
     try {
       const profileName = `Iter AppStore Distribution ${Date.now()}`;
       const newProfileRes = await apiRequest('/v1/profiles', 'POST', {
@@ -240,8 +284,15 @@ async function sync() {
         console.warn(`Notice updating ExportOptions.plist: ${err.message}`);
       }
     }
-  } else {
-    console.log('No profile available to install.');
+  }
+
+  // Print verified code signing identities
+  console.log('\nVerified code signing identities in build keychain:');
+  try {
+    const ids = execSync(`security find-identity -v -p codesigning "${keychainPath}" 2>/dev/null || true`).toString();
+    console.log(ids);
+  } catch (err) {
+    console.warn('Could not verify identities:', err.message);
   }
 
   console.log('=== Synchronization Complete ===\n');
