@@ -360,21 +360,29 @@ class AuthService {
   }
 
   Future<User?> signInWithGoogle({required GoogleAuthIntent intent}) async {
-    // Always sign out first to clear any cached account so the account picker
-    // is shown every time rather than silently reusing the last session.
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {}
-    final googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) return null;
+    final UserCredential cred;
+    if (kIsWeb) {
+      final googleProvider = GoogleAuthProvider();
+      googleProvider.setCustomParameters({'prompt': 'select_account'});
+      cred = await _auth.signInWithPopup(googleProvider);
+    } else {
+      // Always sign out first to clear any cached account so the account picker
+      // is shown every time rather than silently reusing the last session.
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
 
-    final googleAuth = await googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
 
-    final cred = await _auth.signInWithCredential(credential);
+      cred = await _auth.signInWithCredential(credential);
+    }
+
     final user = cred.user;
     if (user == null) return null;
 
@@ -390,9 +398,11 @@ class AuthService {
       try {
         await user.delete();
       } catch (_) {}
-      try {
-        await _googleSignIn.signOut();
-      } catch (_) {}
+      if (!kIsWeb) {
+        try {
+          await _googleSignIn.signOut();
+        } catch (_) {}
+      }
       await _auth.signOut();
       throw const GoogleAuthFlowException(
         'No account found for this Google email. Please sign up first.',

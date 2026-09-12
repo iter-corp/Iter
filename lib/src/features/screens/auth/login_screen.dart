@@ -51,6 +51,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return 'Too many attempts. Please try again in a few minutes.';
       case 'network-request-failed':
         return 'Network error. Check your connection and try again.';
+      case 'unauthorized-domain':
+        return 'Domain is not authorized for Google Sign-In in Firebase Console.';
       default:
         return fallback;
     }
@@ -89,10 +91,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user') {
+        return;
+      }
       setState(
           () => _error = _friendlyError(e, fallback: 'Google sign-in failed.'));
     } catch (e) {
       debugPrint('[google-signin] error: $e');
+      final errStr = e.toString();
+      if (errStr.contains('popup_closed') || errStr.contains('popup_blocked')) {
+        return;
+      }
       setState(() => _error = 'Google sign-in failed: $e');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
