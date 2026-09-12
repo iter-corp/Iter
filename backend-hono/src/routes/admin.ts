@@ -15,6 +15,7 @@ import { randomBytes } from 'crypto';
 import { env } from '../config/env.js';
 import fs from 'fs/promises';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 
 export const adminRoutes = new Hono();
 
@@ -128,6 +129,68 @@ adminRoutes.patch('/users/:uid/role', async (c) => {
   });
 
   return c.json({ success: true, role });
+});
+
+adminRoutes.post('/users/:uid/set-password', async (c) => {
+  const targetUid = c.req.param('uid')!;
+  const body = await c.req.json();
+  const password = body.password;
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    throw new AppError('Password must be at least 6 characters', 400, 'INVALID_PASSWORD');
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, targetUid));
+  return c.json({ success: true, message: 'Password updated successfully' });
+});
+
+adminRoutes.post('/auth/seed-admins', async (c) => {
+  const adminHash = await bcrypt.hash('Admin@123456', 10);
+  const reviewerHash = await bcrypt.hash('IterReview2026!', 10);
+
+  // Reviewer
+  await db.insert(users).values({
+    id: 'google_reviewer_admin_2026',
+    email: 'google.reviewer@iter.app',
+    emailVerified: true,
+    passwordHash: reviewerHash,
+    username: 'google.reviewer',
+    usernameLower: 'google.reviewer',
+    handle: '@google.reviewer',
+    bio: 'Official Google Play App Reviewer (Super Admin)',
+    role: 'admin',
+    appIntroSeen: true,
+  }).onDuplicateKeyUpdate({
+    set: {
+      role: 'admin',
+      emailVerified: true,
+      passwordHash: reviewerHash,
+      username: 'google.reviewer',
+      usernameLower: 'google.reviewer',
+      handle: '@google.reviewer',
+    }
+  });
+
+  // Root Admin
+  await db.insert(users).values({
+    id: 'admin_initial_root',
+    email: 'admin@iter.app',
+    emailVerified: true,
+    passwordHash: adminHash,
+    username: 'admin',
+    usernameLower: 'admin',
+    handle: '@admin',
+    bio: 'Official Iter System Administrator',
+    role: 'admin',
+    appIntroSeen: true,
+  }).onDuplicateKeyUpdate({
+    set: {
+      role: 'admin',
+      emailVerified: true,
+      passwordHash: adminHash,
+    }
+  });
+
+  return c.json({ success: true, message: 'Super admins seeded successfully' });
 });
 
 // ── 3. Cascade Delete User ──────────────────────────────────────────────────

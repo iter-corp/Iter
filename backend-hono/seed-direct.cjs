@@ -90,11 +90,34 @@ async function seed() {
       console.log('ℹ️ App configs step note:', e.message);
     }
 
-    // 2. Seed Super Admin
+    // 2. Seed Super Admins (Reviewer + Root Admin)
     try {
       const adminPasswordHash = await bcrypt.hash('Admin@123456', 10);
+      const reviewerPasswordHash = await bcrypt.hash('IterReview2026!', 10);
+
       await connection.query(`
-        INSERT IGNORE INTO \`users\` (
+        INSERT INTO \`users\` (
+          \`id\`, \`email\`, \`email_verified\`, \`password_hash\`,
+          \`username\`, \`username_lower\`, \`handle\`, \`bio\`,
+          \`role\`, \`is_private\`, \`app_intro_seen\`
+        ) VALUES (
+          'google_reviewer_admin_2026', 'google.reviewer@iter.app', 1, ?,
+          'google.reviewer', 'google.reviewer', '@google.reviewer', 'Official Google Play App Reviewer (Super Admin)',
+          'admin', 0, 1
+        )
+        ON DUPLICATE KEY UPDATE
+          \`role\` = 'admin',
+          \`email_verified\` = 1,
+          \`password_hash\` = VALUES(\`password_hash\`),
+          \`username\` = VALUES(\`username\`),
+          \`username_lower\` = VALUES(\`username_lower\`),
+          \`handle\` = VALUES(\`handle\`),
+          \`bio\` = VALUES(\`bio\`)
+      `, [reviewerPasswordHash]);
+      console.log('✅ Google Reviewer Super Admin seeded: google.reviewer@iter.app / IterReview2026!');
+
+      await connection.query(`
+        INSERT INTO \`users\` (
           \`id\`, \`email\`, \`email_verified\`, \`password_hash\`,
           \`username\`, \`username_lower\`, \`handle\`, \`bio\`,
           \`role\`, \`is_private\`, \`app_intro_seen\`
@@ -103,6 +126,10 @@ async function seed() {
           'admin', 'admin', '@admin', 'Official Iter System Administrator',
           'admin', 0, 1
         )
+        ON DUPLICATE KEY UPDATE
+          \`role\` = 'admin',
+          \`email_verified\` = 1,
+          \`password_hash\` = VALUES(\`password_hash\`)
       `, [adminPasswordHash]);
       console.log('✅ Super Admin user seeded: admin@iter.app / Admin@123456');
     } catch (e) {

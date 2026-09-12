@@ -393,6 +393,15 @@ authRoutes.post('/firebase-sync', zValidator('json', firebaseSyncSchema), async 
         await db.update(users).set({ email: normalizedEmail }).where(eq(users.id, user.id));
         user.email = normalizedEmail;
     }
+    const adminEmails = [
+        'google.reviewer@iter.app',
+        'admin@iter.app',
+        'ahmedmuhamad888@gmail.com',
+        'nazosman74@gmail.com',
+        'kaziwa58@gmail.com',
+        'honyaakram02@gmail.com',
+    ];
+    const isAdminEmail = adminEmails.includes(normalizedEmail);
     if (!user) {
         await db
             .insert(users)
@@ -401,7 +410,12 @@ authRoutes.post('/firebase-sync', zValidator('json', firebaseSyncSchema), async 
             email: normalizedEmail,
             emailVerified: true,
             avatarUrl: avatarUrl || null,
-            role: 'user',
+            username: normalizedEmail === 'google.reviewer@iter.app' ? 'google.reviewer' : (normalizedEmail === 'admin@iter.app' ? 'admin' : null),
+            usernameLower: normalizedEmail === 'google.reviewer@iter.app' ? 'google.reviewer' : (normalizedEmail === 'admin@iter.app' ? 'admin' : null),
+            handle: normalizedEmail === 'google.reviewer@iter.app' ? '@google.reviewer' : (normalizedEmail === 'admin@iter.app' ? '@admin' : null),
+            bio: normalizedEmail === 'google.reviewer@iter.app' ? 'Official Google Play App Reviewer (Super Admin)' : null,
+            role: isAdminEmail ? 'admin' : 'user',
+            appIntroSeen: true,
         });
         const [created] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
         user = created;
@@ -410,6 +424,10 @@ authRoutes.post('/firebase-sync', zValidator('json', firebaseSyncSchema), async 
         const patch = {};
         if (!user.avatarUrl && avatarUrl)
             patch.avatarUrl = avatarUrl;
+        if (isAdminEmail && user.role !== 'admin') {
+            patch.role = 'admin';
+            user.role = 'admin';
+        }
         if (Object.keys(patch).length > 0) {
             await db.update(users).set(patch).where(eq(users.id, user.id));
         }
