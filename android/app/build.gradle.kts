@@ -48,10 +48,11 @@ android {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
                 val storeFilePath = keystoreProperties["storeFile"] as String
-                storeFile = if (file(storeFilePath).isAbsolute) {
-                    file(storeFilePath)
-                } else {
-                    rootProject.file(storeFilePath)
+                storeFile = when {
+                    file(storeFilePath).isAbsolute -> file(storeFilePath)
+                    file(storeFilePath).exists() -> file(storeFilePath)
+                    rootProject.file(storeFilePath).exists() -> rootProject.file(storeFilePath)
+                    else -> rootProject.file("app/$storeFilePath")
                 }
                 storePassword = keystoreProperties["storePassword"] as String
             }

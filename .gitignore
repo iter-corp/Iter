@@ -13,6 +13,10 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+android_keystore_base64.txt
+*.jks
+*.keystore
+key.properties
 
 # ─────────────────────────────────────────────
 # IntelliJ / Android Studio
