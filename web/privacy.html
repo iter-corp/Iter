@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Iter</title>
+  <meta name="description" content="Privacy Policy for Iter mobile and web applications (App Store & Google Play).">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0C0F17;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #F1F3F9;
+      --text-muted: #9BA3B5;
+      --primary: #CE5DE5;
+      --primary-gradient: linear-gradient(135deg, #CE5DE5 0%, #7A3FB8 100%);
+      --accent: #7A3FB8;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #F8F9FC;
+        --card-bg: #FFFFFF;
+        --card-border: rgba(0, 0, 0, 0.08);
+        --text: #111420;
+        --text-muted: #5E6578;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 48px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(12px);
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 16px 12px; }
+      .container { padding: 24px 20px; border-radius: 16px; }
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: var(--primary-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 16px rgba(122, 63, 184, 0.35);
+    }
+
+    .logo svg {
+      width: 26px;
+      height: 26px;
+      fill: #fff;
+    }
+
+    .header-text h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .meta-box {
+      background: rgba(206, 93, 229, 0.08);
+      border: 1px solid rgba(206, 93, 229, 0.2);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      font-size: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    .meta-item strong {
+      color: var(--primary);
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      color: var(--primary);
+    }
+
+    p {
+      margin-bottom: 14px;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    ul, ol {
+      margin-left: 24px;
+      margin-bottom: 16px;
+      font-size: 15px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .highlight-card {
+      background: rgba(122, 63, 184, 0.12);
+      border-left: 4px solid var(--primary);
+      padding: 16px 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+
+    .highlight-card p {
+      margin-bottom: 6px;
+    }
+
+    .highlight-card p:last-child {
+      margin-bottom: 0;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--card-border);
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      </div>
+      <div class="header-text">
+        <h1>Privacy Policy</h1>
+        <p>Iter Mobile & Web Applications</p>
+      </div>
+    </header>
+
+    <div class="meta-box">
+      <div class="meta-item"><strong>Effective Date:</strong> September 12, 2026</div>
+      <div class="meta-item"><strong>Last Updated:</strong> September 12, 2026</div>
+      <div class="meta-item"><strong>Organization:</strong> Iter Corp</div>
+      <div class="meta-item"><strong>Platform:</strong> iOS, Android & Web</div>
+    </div>
+
+    <h2>1. Introduction</h2>
+    <p>Welcome to <strong>Iter</strong> ("we", "our", or "us"). Iter is a community, social networking, and event discovery platform operated by Iter Corp, accessible via our mobile applications on the Apple App Store and Google Play Store, and our official web app at <a href="https://iterglobal.icu" target="_blank" rel="noopener">https://iterglobal.icu</a>.</p>
+    <p>We are dedicated to safeguarding your personal data and ensuring full transparency regarding our data collection, handling, and security practices in compliance with Apple App Store Review Guidelines and Google Play Developer Policies.</p>
+
+    <h2>2. Information We Collect</h2>
+    <p>We collect information to provide and improve our services, facilitate user communication, and ensure platform safety:</p>
+    
+    <h3>A. Information You Provide</h3>
+    <ul>
+      <li><strong>Account Details:</strong> Email address, username, display name, user handle, profile bio, and profile picture.</li>
+      <li><strong>Federated Sign-In:</strong> If you sign in via Google Sign-In or Apple Sign-In, we receive your name, verified email address, and profile photo as permitted by your account settings.</li>
+      <li><strong>User-Generated Content:</strong> Posts, text messages, comments, discussion threads, poll responses, questions, and answers that you submit.</li>
+      <li><strong>Media Uploads:</strong> Photos, images, and videos you select to upload for your avatar, stories, posts, or event listings.</li>
+      <li><strong>Customer Support:</strong> Communications and support messages submitted through the in-app Contact Us form.</li>
+    </ul>
+
+    <h3>B. Information Collected Automatically</h3>
+    <ul>
+      <li><strong>Device Information:</strong> Device model, operating system version, app version, language preferences, and unique device identifiers.</li>
+      <li><strong>Diagnostic Logs:</strong> Crash logs, latency data, and technical diagnostic records (via Firebase Crashlytics) to identify and fix bugs.</li>
+    </ul>
+
+    <h3>C. Device Permissions</h3>
+    <ul>
+      <li><strong>Camera:</strong> Used to capture photos and videos directly within the app for posts, stories, and profile pictures.</li>
+      <li><strong>Photo Library:</strong> Used to allow you to choose existing media from your gallery to share.</li>
+      <li><strong>Notifications:</strong> Used to deliver alerts for direct messages, mentions, and event reminders.</li>
+      <li><strong>Location (Optional):</strong> Used to explore nearby community events on the interactive map when granted. We do not track your location in the background.</li>
+    </ul>
+
+    <h2>3. How We Use Your Information</h2>
+    <p>Your information is used strictly for legitimate operational purposes:</p>
+    <ul>
+      <li>Operating and delivering the Iter platform, authentication, and core features.</li>
+      <li>Delivering direct messages, comments, notifications, and event updates.</li>
+      <li>Enforcing our Terms of Service and protecting users from spam, abuse, harassment, and security incidents.</li>
+      <li>Diagnosing system crashes, improving layout responsiveness, and optimizing performance.</li>
+    </ul>
+    <div class="highlight-card">
+      <p><strong>Strict Privacy Guarantee:</strong> We do NOT sell, lease, or monetize your personal data to data brokers, ad networks, or third-party advertisers.</p>
+    </div>
+
+    <h2>4. Third-Party Service Providers</h2>
+    <p>We partner with industry-standard, secure infrastructure providers who process data strictly under contractual data protection standards:</p>
+    <ul>
+      <li><strong>Google Firebase & Google Cloud:</strong> Authentication, encrypted Cloud Firestore database, media storage, and Crashlytics diagnostics.</li>
+      <li><strong>Google Sign-In & Apple Sign-In:</strong> Secure single sign-on authentication.</li>
+      <li><strong>OpenStreetMap & Leaflet:</strong> Rendering interactive event maps.</li>
+    </ul>
+
+    <h2>5. Data Retention & Security</h2>
+    <p>We employ modern security safeguards, including TLS 1.3/HTTPS encryption in transit, encrypted storage at rest, and role-based access control. Personal data is retained only for as long as your account is active or as necessary to fulfill legal requirements.</p>
+
+    <h2>6. Account Deletion & User Rights (Apple & Google Compliant)</h2>
+    <div class="highlight-card">
+      <p><strong>Right to Delete Your Account:</strong> You have full control over your data and can permanently delete your account and all associated personal data directly within the app at any time:</p>
+      <p><strong>Path:</strong> Profile &rarr; Settings (Gear Icon) &rarr; Account Center &rarr; <strong>Delete Account</strong>.</p>
+      <p>Upon confirmation, your profile, authentication records, and associated user data are immediately and permanently erased from our active database.</p>
+    </div>
+    <p>You also have the right to request access to your data, request corrections, or withdraw granted permissions through your device settings.</p>
+
+    <h2>7. Children's Privacy</h2>
+    <p>Iter is not intended for or directed toward children under 13 years of age (or under 16 in the European Economic Area). We do not knowingly collect personal data from children.</p>
+
+    <h2>8. Changes to this Policy</h2>
+    <p>We may update this Privacy Policy periodically. Any modifications will be posted here with an updated revision date. Substantial updates will be communicated via in-app notification or email.</p>
+
+    <h2>9. Contact Information</h2>
+    <p>If you have any questions, inquiries, or data requests regarding this Privacy Policy, please contact our team:</p>
+    <ul>
+      <li><strong>Organization:</strong> Iter Corp</li>
+      <li><strong>Website:</strong> <a href="https://iterglobal.icu" target="_blank" rel="noopener">https://iterglobal.icu</a></li>
+      <li><strong>Privacy Email:</strong> <a href="mailto:privacy@iterglobal.icu">privacy@iterglobal.icu</a></li>
+      <li><strong>Support Email:</strong> <a href="mailto:support@iterglobal.icu">support@iterglobal.icu</a></li>
+    </ul>
+
+    <footer>
+      <p>&copy; 2026 Iter Corp. All rights reserved. &bull; <a href="https://iterglobal.icu">Visit Iter Global</a></p>
+    </footer>
+  </div>
+</body>
+</html>

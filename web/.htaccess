@@ -4,6 +4,7 @@ RewriteEngine On
 RewriteRule ^api/(.*)$ api-proxy.php [QSA,L]
 RewriteRule ^uploads/(.*)$ api-proxy.php [QSA,L]
 RewriteRule ^health$ api-proxy.php [QSA,L]
+RewriteRule ^privacy$ privacy.html [L]
 
 # Allow assets/.env if requested by Flutter web
 <Files ".env">
