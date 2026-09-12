@@ -172,9 +172,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       backgroundColor: Colors.transparent,
       body: AppPageBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-            child: Form(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+                child: Form(
               key: _formKey,
               // No form-level autovalidate: each field opts in via its own
               // `touched` flag so errors only appear after the user leaves the
@@ -356,8 +359,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildAuthTextField({
     required TextEditingController controller,

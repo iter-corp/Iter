@@ -194,12 +194,12 @@ extension ResponsiveContext on BuildContext {
 
   /// Standard max content width for centering readable layouts:
   /// - Mobile: unbounded (double.infinity)
-  /// - Tablet: 680dp
-  /// - Desktop: 540dp (mobile/social feed app)
+  /// - Tablet: 720dp
+  /// - Desktop: 680dp (feed column)
   double get maxContentWidth => responsive<double>(
         mobile: double.infinity,
-        tablet: 680.0,
-        desktop: 540.0,
+        tablet: 720.0,
+        desktop: 680.0,
       );
 
   /// Bottom padding accounting for the iOS home indicator / Android nav bar.
@@ -215,22 +215,22 @@ extension ResponsiveContext on BuildContext {
 /// Guarantees that EVERY screen, dialog, sheet, and overlay automatically:
 /// 1. Runs with safe text scaling limits.
 /// 2. Scales smoothly on mobile (100% full width).
-/// 3. Centers in an optimal, high-density frame on tablet and desktop/web.
+/// 3. Expands to a multi-column social web layout on desktop up to 1440dp.
 /// 4. Injects [ResponsiveScope] for unified screen size detection across all pages.
 class ResponsiveBootstrap extends StatelessWidget {
   final Widget child;
 
-  /// Custom max content width for tablets. Defaults to 680dp.
+  /// Custom max content width for tablets. Defaults to 900dp.
   final double tabletMaxWidth;
 
-  /// Custom max content width for desktop. Defaults to 540dp.
+  /// Custom max content width for desktop. Defaults to 1440dp.
   final double desktopMaxWidth;
 
   const ResponsiveBootstrap({
     super.key,
     required this.child,
-    this.tabletMaxWidth = 680.0,
-    this.desktopMaxWidth = 540.0,
+    this.tabletMaxWidth = 900.0,
+    this.desktopMaxWidth = 1440.0,
   });
 
   @override
@@ -250,12 +250,12 @@ class ResponsiveBootstrap extends StatelessWidget {
         isFramed = false;
         break;
       case AppScreenSize.medium:
-        effectiveWidth = math.min(windowSize.width, tabletMaxWidth);
-        isFramed = windowSize.width > tabletMaxWidth;
+        effectiveWidth = windowSize.width;
+        isFramed = false;
         break;
       case AppScreenSize.expanded:
         effectiveWidth = math.min(windowSize.width, desktopMaxWidth);
-        isFramed = true;
+        isFramed = windowSize.width > desktopMaxWidth;
         break;
     }
 

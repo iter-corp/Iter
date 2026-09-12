@@ -13,6 +13,8 @@ import '../screens/explore_screen.dart';
 import '../screens/message_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/desktop_nav_sidebar.dart';
+import '../widgets/desktop_right_sidebar.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -96,6 +98,73 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     // Hide the floating bottom nav while the keyboard is open so it doesn't
     // float above the keyboard / overlap the input the user is typing in.
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1100;
+    final isTablet = screenWidth >= 650 && screenWidth < 1100;
+    final useSideNav = isDesktop || isTablet;
+    final showRightSidebar = screenWidth >= 1260;
+
+    if (useSideNav) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            const AppPageBackground(child: SizedBox.expand()),
+            SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1440),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Left Navigation Sidebar (Compact rail on Tablets, Full on Desktop) ──
+                      DesktopNavSidebar(
+                        selectedIndex: _selectedIndex,
+                        onTabSelected: _onNavTap,
+                        unreadChats: unreadChats,
+                        isCompact: isTablet,
+                      ),
+
+                      // ── Center Content Column (Feed / Active Screen) ──
+                      Expanded(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 720),
+                            child: PageView(
+                              controller: _pageController,
+                              physics: const NeverScrollableScrollPhysics(),
+                              onPageChanged: (index) {
+                                if (_selectedIndex != index) {
+                                  setState(() => _selectedIndex = index);
+                                  _trackTab(index);
+                                }
+                              },
+                              children: [
+                                HomeBody(scrollController: _homeScrollController),
+                                const EventBody(),
+                                const ExploreBody(),
+                                const MessageBody(),
+                                const ProfileScreen(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // ── Right Sidebar (Widgets, Upcoming Events, Trending) ──
+                      if (showRightSidebar)
+                        DesktopRightSidebar(
+                          onTabSelected: _onNavTap,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,

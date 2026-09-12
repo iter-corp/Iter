@@ -146,10 +146,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: Colors.transparent,
       body: AppPageBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-            child: Form(
-              key: _formKey,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+                child: Form(
+                  key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -316,8 +319,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildTextField({
     required TextEditingController controller,
