@@ -19,10 +19,11 @@ RewriteRule . /index.html [L]
 
 # Prevent stale caching of app entrypoints and bundles
 <IfModule mod_headers.c>
-    <FilesMatch "\.(html|js|json)$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    <FilesMatch "\.(html|js|json|wasm)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
         Header set Pragma "no-cache"
-        Header set Expires 0
+        Header set Expires "0"
+        Header set X-LiteSpeed-Cache-Control "no-cache"
     </FilesMatch>
 </IfModule>
 

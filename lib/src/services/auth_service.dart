@@ -43,7 +43,11 @@ class SignupResult {
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb
+        ? '751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com'
+        : null,
+  );
 
   AuthService() {
     _auth.authStateChanges().listen((user) {

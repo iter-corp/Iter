@@ -120,6 +120,9 @@ jobs:
           cp web/.htaccess build/web/.htaccess || true
           cp web/api-proxy.php build/web/api-proxy.php || true
           echo "3001" > build/web/.backend_port
+          BUILD_TAG=$(date +%s)
+          sed -i "s/main.dart.js/main.dart.js?v=$BUILD_TAG/g" build/web/flutter_bootstrap.js || true
+          sed -i "s/flutter_bootstrap.js/flutter_bootstrap.js?v=$BUILD_TAG/g" build/web/index.html || true
 
       - name: Configure SSH
         run: |
@@ -135,6 +138,6 @@ jobs:
           TARGET_DIR="/home/${{ secrets.SERVER_USERNAME }}/domains/iterglobal.icu/public_html/dev"
           echo "Deploying Dev Flutter Web to: $TARGET_DIR"
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} "mkdir -p $TARGET_DIR"
-          rsync -avz --delete \
+          rsync -avzc --delete \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no" \
             build/web/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:$TARGET_DIR/
