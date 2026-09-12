@@ -42,20 +42,26 @@ class ApiClient {
   /// Default API base URL. Can be overridden in `.env` as `API_BASE_URL`.
   /// Uses loopback alias for Android emulator (10.0.2.2) if on Android.
   String get baseUrl {
-    if (dotenv.isInitialized) {
-      final envUrl = dotenv.env['API_BASE_URL']?.trim();
-      if (envUrl != null && envUrl.isNotEmpty) {
-        return envUrl.replaceAll(RegExp(r'/+$'), '');
-      }
-    }
-
     if (kIsWeb) {
       final host = Uri.base.host;
       if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
         final port = Uri.base.hasPort ? ':${Uri.base.port}' : '';
         return '${Uri.base.scheme}://$host$port/api/v1';
       }
+      if (dotenv.isInitialized) {
+        final envUrl = dotenv.env['API_BASE_URL']?.trim();
+        if (envUrl != null && envUrl.isNotEmpty) {
+          return envUrl.replaceAll(RegExp(r'/+$'), '');
+        }
+      }
       return 'https://iterglobal.icu/api/v1';
+    }
+
+    if (dotenv.isInitialized) {
+      final envUrl = dotenv.env['API_BASE_URL']?.trim();
+      if (envUrl != null && envUrl.isNotEmpty) {
+        return envUrl.replaceAll(RegExp(r'/+$'), '');
+      }
     }
 
     if (!kReleaseMode && defaultTargetPlatform == TargetPlatform.android) {

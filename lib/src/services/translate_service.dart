@@ -13,6 +13,15 @@ import 'api_client.dart';
 /// Search the device log with: `flutter logs | grep [translate]`
 const String _kTranslateLogTag = '[translate]';
 
+String? _safeEnv(String key, {String? fallback}) {
+  if (!dotenv.isInitialized) return fallback;
+  try {
+    return dotenv.maybeGet(key, fallback: fallback);
+  } catch (_) {
+    return fallback;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // API Key Store — reads active keys from Firestore `apiKeys` collection and
 // falls back to .env values when Firestore has nothing configured.
@@ -110,11 +119,11 @@ class _ApiKeyStore {
     final envKeys = <String>[];
     switch (p) {
       case 'gemini':
-        final k = dotenv.maybeGet('GEMINI_API_KEY') ?? '';
+        final k = _safeEnv('GEMINI_API_KEY') ?? '';
         if (k.isNotEmpty) envKeys.add(k);
       case 'azure':
-        final k1 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '';
-        final k2 = dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '';
+        final k1 = _safeEnv('AZURE_TRANSLATOR_KEY') ?? '';
+        final k2 = _safeEnv('AZURE_TRANSLATOR_KEY_2') ?? '';
         if (k1.isNotEmpty) envKeys.add(k1);
         if (k2.isNotEmpty) envKeys.add(k2);
     }
@@ -656,8 +665,8 @@ class TranslateService {
           apiKey: key,
           // Region / endpoint: still read from .env as optional overrides;
           // if not set, the defaults below apply.
-          region: dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ?? 'centralindia',
-          endpoint: (dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
+          region: _safeEnv('AZURE_TRANSLATOR_REGION') ?? 'centralindia',
+          endpoint: (_safeEnv('AZURE_TRANSLATOR_ENDPOINT') ??
                   'https://api.cognitive.microsofttranslator.com/')
               .replaceAll(RegExp(r'/$'), ''),
           providerLabel: 'Azure primary',
@@ -670,11 +679,11 @@ class TranslateService {
         final key = keys.length > 1 ? keys[1] : '';
         return _callAzure(
           apiKey: key,
-          region: dotenv.maybeGet('AZURE_TRANSLATOR_REGION_2') ??
-              dotenv.maybeGet('AZURE_TRANSLATOR_REGION') ??
+          region: _safeEnv('AZURE_TRANSLATOR_REGION_2') ??
+              _safeEnv('AZURE_TRANSLATOR_REGION') ??
               'centralindia',
-          endpoint: (dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT_2') ??
-                  dotenv.maybeGet('AZURE_TRANSLATOR_ENDPOINT') ??
+          endpoint: (_safeEnv('AZURE_TRANSLATOR_ENDPOINT_2') ??
+                  _safeEnv('AZURE_TRANSLATOR_ENDPOINT') ??
                   'https://api.cognitive.microsofttranslator.com/')
               .replaceAll(RegExp(r'/$'), ''),
           providerLabel: 'Azure secondary',

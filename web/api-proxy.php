@@ -41,6 +41,20 @@ if (function_exists('getallheaders')) {
     }
 }
 
+// Ensure Content-Type is forwarded if provided in $_SERVER['CONTENT_TYPE']
+if (isset($_SERVER['CONTENT_TYPE']) && !empty($_SERVER['CONTENT_TYPE'])) {
+    $hasContentType = false;
+    foreach ($incomingHeaders as $h) {
+        if (stripos($h, 'Content-Type:') === 0) {
+            $hasContentType = true;
+            break;
+        }
+    }
+    if (!$hasContentType) {
+        $incomingHeaders[] = 'Content-Type: ' . $_SERVER['CONTENT_TYPE'];
+    }
+}
+
 $incomingHeaders[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
 $incomingHeaders[] = 'X-Forwarded-Proto: ' . ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http');
 $incomingHeaders[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? 'localhost');

@@ -32,6 +32,15 @@ import 'src/services/presence_service.dart';
 import 'src/theme/app_theme.dart';
 import 'src/utils/responsive.dart';
 
+String? _safeEnv(String key, {String? fallback}) {
+  if (!dotenv.isInitialized) return fallback;
+  try {
+    return dotenv.maybeGet(key, fallback: fallback);
+  } catch (_) {
+    return fallback;
+  }
+}
+
 Future<void> main() async {
   // Run the *entire* startup inside a guarded zone so uncaught async errors are
   // captured by the error reporter — and, crucially, so the binding is
@@ -68,11 +77,18 @@ Future<void> main() async {
       await dotenv.load(fileName: '.env');
       debugPrint('[boot] dotenv loaded');
     } catch (e) {
-      debugPrint('[boot] dotenv load failed (ignored): $e');
+      debugPrint('[boot] dotenv load failed (fallback to empty env): $e');
+      try {
+        dotenv.testLoad(fileInput: '');
+      } catch (_) {}
     }
 
-    await ApiClient.instance.init();
-    debugPrint('[boot] ApiClient initialized');
+    try {
+      await ApiClient.instance.init();
+      debugPrint('[boot] ApiClient initialized');
+    } catch (e) {
+      debugPrint('[boot] ApiClient init non-fatal: $e');
+    }
 
     try {
       await Firebase.initializeApp(
@@ -84,54 +100,72 @@ Future<void> main() async {
     }
     debugPrint('[boot] Firebase.apps=${Firebase.apps.length}');
 
-    // Wire up app-wide error logging now that Firebase is up. This chains onto
-    // the FlutterError.onError handler installed above and adds a platform-error
-    // hook, forwarding errors to the `errorReports` collection (rate-limited).
-    ErrorReportService.instance.install();
+    // Wire up app-wide error logging now that Firebase is up.
+    try {
+      ErrorReportService.instance.install();
+    } catch (e) {
+      debugPrint('[boot] ErrorReportService install non-fatal: $e');
+    }
 
-    // Connect to emulators only when explicitly enabled. On a real device,
-    // 'localhost' resolves to the phone itself, so leaving this on caused
-    // every callable/Firestore call to hang. Set USE_FIREBASE_EMULATOR=true
-    // in .env to re-enable, and set FIREBASE_EMULATOR_HOST to your PC's LAN
-    // IP (e.g. 192.168.1.42) when testing on a physical device.
-    final useEmulator =
-        (dotenv.maybeGet('USE_FIREBASE_EMULATOR') ?? '').toLowerCase() ==
-            'true';
-    if (kDebugMode && useEmulator) {
-      final host = dotenv.maybeGet('FIREBASE_EMULATOR_HOST') ?? 'localhost';
-      try {
-        await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-        FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-        FirebaseStorage.instance.useStorageEmulator(host, 9199);
-        FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
-        debugPrint('[boot] Connected to Firebase emulators @ $host');
-      } catch (e) {
-        debugPrint('[boot] Emulator connection failed: $e');
+    try {
+      final useEmulator =
+          (_safeEnv('USE_FIREBASE_EMULATOR') ?? '').toLowerCase() == 'true';
+      if (kDebugMode && useEmulator) {
+        final host = _safeEnv('FIREBASE_EMULATOR_HOST') ?? 'localhost';
+        try {
+          await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+          FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+          FirebaseStorage.instance.useStorageEmulator(host, 9199);
+          FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+          debugPrint('[boot] Connected to Firebase emulators @ $host');
+        } catch (e) {
+          debugPrint('[boot] Emulator connection failed: $e');
+        }
       }
+    } catch (e) {
+      debugPrint('[boot] Emulator check non-fatal: $e');
     }
 
     // Start the API key store — listens to Firestore `apiKeys` collection so
     // TranslateService picks up keys added/disabled in the admin panel live.
-    initApiKeyStore();
+    try {
+      initApiKeyStore();
+    } catch (e) {
+      debugPrint('[boot] initApiKeyStore non-fatal: $e');
+    }
 
     // One-time migration: seed existing .env keys into Firestore `apiKeys`
-    // so the admin panel isn't empty on first launch. Safe to run every boot
-    // — the function checks for existing docs before writing.
-    unawaited(_seedApiKeysFromEnv());
+    try {
+      unawaited(_seedApiKeysFromEnv());
+    } catch (e) {
+      debugPrint('[boot] _seedApiKeysFromEnv trigger non-fatal: $e');
+    }
 
     // Sanity-check that auth stream produces a first event.
-    FirebaseAuth.instance.authStateChanges().first.timeout(
-      const Duration(seconds: 5),
-      onTimeout: () {
-        debugPrint('[boot] authStateChanges timed out (no user / stuck)');
-        return null;
-      },
-    ).then((u) => debugPrint('[boot] first auth event: ${u?.uid ?? 'null'}'));
+    try {
+      FirebaseAuth.instance.authStateChanges().first.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('[boot] authStateChanges timed out (no user / stuck)');
+          return null;
+        },
+      ).then((u) => debugPrint('[boot] first auth event: ${u?.uid ?? 'null'}'));
+    } catch (e) {
+      debugPrint('[boot] authStateChanges listen non-fatal: $e');
+    }
 
-    final prefs = await SharedPreferences.getInstance();
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('[boot] SharedPreferences init error: $e');
+    }
+
     debugPrint('[boot] runApp');
     runApp(ProviderScope(
-      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      overrides: [
+        if (prefs != null) sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
       child: const MyApp(),
     ));
   });
@@ -151,18 +185,16 @@ Future<void> _seedApiKeysFromEnv() async {
     final db = FirebaseFirestore.instance;
     final col = db.collection('apiKeys');
 
-    // priority: gemini=0 (first for non-Kurdish), azure=1 (first for Kurdish
-    // but second overall since the translation service handles Kurdish routing).
+    final geminiKey = _safeEnv('GEMINI_API_KEY') ?? '';
+    final azureKey1 = _safeEnv('AZURE_TRANSLATOR_KEY') ?? '';
+    final azureKey2 = _safeEnv('AZURE_TRANSLATOR_KEY_2') ?? '';
     final seeds = [
-      if ((dotenv.maybeGet('GEMINI_API_KEY') ?? '').isNotEmpty)
-        {'id': 'gemini_env', 'provider': 'gemini',
-         'key': dotenv.maybeGet('GEMINI_API_KEY')!, 'priority': 0},
-      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY') ?? '').isNotEmpty)
-        {'id': 'azure_env', 'provider': 'azure',
-         'key': dotenv.maybeGet('AZURE_TRANSLATOR_KEY')!, 'priority': 1},
-      if ((dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2') ?? '').isNotEmpty)
-        {'id': 'azure_env_2', 'provider': 'azure',
-         'key': dotenv.maybeGet('AZURE_TRANSLATOR_KEY_2')!, 'priority': 2},
+      if (geminiKey.isNotEmpty)
+        {'id': 'gemini_env', 'provider': 'gemini', 'key': geminiKey, 'priority': 0},
+      if (azureKey1.isNotEmpty)
+        {'id': 'azure_env', 'provider': 'azure', 'key': azureKey1, 'priority': 1},
+      if (azureKey2.isNotEmpty)
+        {'id': 'azure_env_2', 'provider': 'azure', 'key': azureKey2, 'priority': 2},
     ];
 
     for (final s in seeds) {

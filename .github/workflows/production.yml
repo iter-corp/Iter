@@ -119,7 +119,7 @@ jobs:
 
       - name: Build Flutter Web Release
         run: |
-          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
+          echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           flutter pub get
           flutter build web --release
           cp web/.htaccess build/web/.htaccess || true
