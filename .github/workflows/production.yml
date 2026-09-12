@@ -69,12 +69,12 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts || true
           chmod 644 ~/.ssh/known_hosts
 
       - name: Test SSH Authentication
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'echo "SSH authentication verified: $(whoami)@$(hostname)"'
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'echo "SSH authentication verified: $(whoami)@$(hostname)"'
 
       - name: Sync Backend Files to Production Server
         run: |
@@ -83,12 +83,12 @@ jobs:
             --exclude '.env' \
             --exclude 'uploads' \
             --exclude '.git' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }}" \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no" \
             backend-hono/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:~/backend-hono/
 
       - name: Install Dependencies, Migrate & Reload PM2
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
             export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/opt/alt/alt-nodejs22/root/usr/bin:~/.npm-global/bin:$PATH
             cd ~/backend-hono
             npm install
@@ -132,7 +132,7 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts || true
           chmod 644 ~/.ssh/known_hosts
 
       - name: Deploy Flutter Web to Web Root
@@ -142,7 +142,7 @@ jobs:
           rsync -avz --delete \
             --exclude 'dev' \
             --exclude 'uploads' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }}" \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no" \
             build/web/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:$TARGET_DIR/
 
   # ─────────────────────────────────────────────────────────────
