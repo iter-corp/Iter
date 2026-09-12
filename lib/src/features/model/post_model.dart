@@ -54,23 +54,23 @@ class Post {
     this.discussKind,
   });
 
-String? _sanitizeMediaUrl(String? url) {
-  if (url == null) return null;
-  const legacyPrefix = 'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public';
-  if (url.startsWith(legacyPrefix)) {
-    return url.replaceFirst(legacyPrefix, 'https://iterglobal.icu/uploads');
+  static String? _sanitizeMediaUrl(String? url) {
+    if (url == null) return null;
+    const legacyPrefix = 'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public';
+    if (url.startsWith(legacyPrefix)) {
+      return url.replaceFirst(legacyPrefix, 'https://iterglobal.icu/uploads');
+    }
+    return url;
   }
-  return url;
-}
 
-List<String> _sanitizeMediaUrls(List? list) {
-  if (list == null) return const [];
-  return list
-      .whereType<String>()
-      .map((u) => _sanitizeMediaUrl(u) ?? u)
-      .where((u) => u.isNotEmpty)
-      .toList();
-}
+  static List<String> _sanitizeMediaUrls(List? list) {
+    if (list == null) return const [];
+    return list
+        .whereType<String>()
+        .map((u) => _sanitizeMediaUrl(u) ?? u)
+        .where((u) => u.isNotEmpty)
+        .toList();
+  }
 
   factory Post.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
     final data = d.data() ?? {};
