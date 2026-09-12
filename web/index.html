@@ -191,6 +191,15 @@
 
     // 3. Safety fallback: never block the user for more than 3.5 seconds
     setTimeout(hideIterLoader, 3500);
+
+    // 4. Evict stale service workers and cache to guarantee fresh code
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        for (var reg of registrations) {
+          reg.unregister();
+        }
+      });
+    }
   </script>
 
   <script src="flutter_bootstrap.js" async></script>
