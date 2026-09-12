@@ -88,6 +88,11 @@ jobs:
             cd ~/backend-hono-dev
             npm install
             if [ -f .env ]; then
+              sed -i "s/u814384925_iter_dev/u814384925_iter_db_dev/g" .env
+              sed -i "s/u814384925_iter_db\b/u814384925_iter_db_dev/g" .env
+              sed -i "s/u814384925_iter_user\b/u814384925_iter_user_dev/g" .env
+              sed -i "s/DB_NAME=.*/DB_NAME=u814384925_iter_db_dev/g" .env
+              sed -i "s/DB_USER=.*/DB_USER=u814384925_iter_user_dev/g" .env
               npm run db:migrate || true
               npm run db:seed || true
             fi
