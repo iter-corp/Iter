@@ -214,7 +214,7 @@ jobs:
       - name: Check Play Store Credentials
         id: check_play_creds
         env:
-          PLAY_CREDS: ${{ secrets.PLAY_STORE_JSON_KEY || secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || secrets.PLAY_CONFIG_JSON || secrets.PLAY_CONSOLE_JSON }}
+          PLAY_CREDS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT || secrets.PLAY_STORE_JSON_KEY || secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || secrets.PLAY_CONFIG_JSON || secrets.PLAY_CONSOLE_JSON }}
         run: |
           if [ -n "$PLAY_CREDS" ]; then
             echo "has_creds=true" >> $GITHUB_OUTPUT
@@ -227,7 +227,7 @@ jobs:
         if: steps.check_play_creds.outputs.has_creds == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY || secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || secrets.PLAY_CONFIG_JSON || secrets.PLAY_CONSOLE_JSON }}
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT || secrets.PLAY_STORE_JSON_KEY || secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || secrets.PLAY_CONFIG_JSON || secrets.PLAY_CONSOLE_JSON }}
           packageName: com.iter.ai
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: ${{ env.PLAY_TRACK }}
@@ -390,9 +390,9 @@ jobs:
       - name: Upload to App Store Connect / TestFlight
         if: steps.apple_auth.outputs.has_certs == 'true'
         env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || secrets.ASC_KEY_ID || secrets.APPLE_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || secrets.ASC_ISSUER_ID || secrets.APPLE_ISSUER_ID }}
-          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || secrets.ASC_PRIVATE_KEY || secrets.APPLE_PRIVATE_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID || secrets.ASC_KEY_ID || secrets.APPLE_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID || secrets.ASC_ISSUER_ID || secrets.APPLE_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY || secrets.ASC_PRIVATE_KEY || secrets.APPLE_PRIVATE_KEY }}
         run: |
           IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -n 1)
           if [ -z "$IPA_PATH" ]; then
