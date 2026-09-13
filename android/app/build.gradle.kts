@@ -40,6 +40,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        val appEnv = project.findProperty("APP_ENV") as String? ?: ""
+        manifestPlaceholders["appName"] = if (appEnv == "dev") "Iter Dev" else "Iter"
     }
 
     signingConfigs {
