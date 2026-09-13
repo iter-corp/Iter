@@ -403,7 +403,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final minVersion =
         ref.watch(adminConfigProvider).valueOrNull?.minAppVersion ?? '';
     final isAdmin = ref.watch(isAdminProvider);
+    final isDev = ApiClient.instance.isDevEnvironment;
     return MaterialApp.router(
+      title: isDev ? 'Iter (Dev)' : 'Iter',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
@@ -438,7 +440,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           systemNavigationBarIconBrightness:
               isDark ? Brightness.light : Brightness.dark,
         ));
-        return ResponsiveBootstrap(
+        Widget content = ResponsiveBootstrap(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -449,6 +451,21 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             ),
           ),
         );
+        if (isDev) {
+          content = Banner(
+            message: 'DEV',
+            location: BannerLocation.topStart,
+            color: const Color(0xFFE65100),
+            textStyle: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: 1.2,
+            ),
+            child: content,
+          );
+        }
+        return content;
       },
     );
   }

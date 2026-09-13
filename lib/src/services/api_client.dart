@@ -39,14 +39,47 @@ class ApiClient {
   bool _initialized = false;
   final http.Client _client = http.Client();
 
-  /// Default API base URL. Can be overridden in `.env` as `API_BASE_URL`.
-  /// Uses loopback alias for Android emulator (10.0.2.2) if on Android.
+  static const String _kAppEnv = String.fromEnvironment('APP_ENV', defaultValue: '');
+  static const String _kApiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+
+  /// Returns true if the app is currently running in the development environment.
+  bool get isDevEnvironment {
+    if (_kAppEnv == 'dev' || _kAppEnv == 'development') return true;
+    if (dotenv.isInitialized) {
+      final envSetting = dotenv.env['APP_ENV']?.toLowerCase().trim();
+      if (envSetting == 'dev' || envSetting == 'development') return true;
+      final envUrl = dotenv.env['API_BASE_URL']?.toLowerCase() ?? '';
+      if (envUrl.contains('dev') || envUrl.contains(':3001')) return true;
+    }
+    if (kIsWeb) {
+      final host = Uri.base.host.toLowerCase();
+      if (host.startsWith('dev.')) return true;
+      if (Uri.base.pathSegments.isNotEmpty &&
+          Uri.base.pathSegments.first.toLowerCase() == 'dev') {
+        return true;
+      }
+    }
+    final current = baseUrl.toLowerCase();
+    return current.contains('dev.') || current.contains('/dev/') || current.contains(':3001');
+  }
+
+  /// Default API base URL. Can be overridden via --dart-define=API_BASE_URL or in `.env`.
+  /// Automatically detects web dev paths and subdomains.
   String get baseUrl {
+    // 1. Compile-time --dart-define=API_BASE_URL=...
+    if (_kApiBaseUrl.isNotEmpty) {
+      return _kApiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    }
+
+    // 2. Web runtime detection
     if (kIsWeb) {
       final host = Uri.base.host;
       if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
         final port = Uri.base.hasPort ? ':${Uri.base.port}' : '';
-        return '${Uri.base.scheme}://$host$port/api/v1';
+        final isDevPath = Uri.base.pathSegments.isNotEmpty &&
+            Uri.base.pathSegments.first.toLowerCase() == 'dev';
+        final pathPrefix = isDevPath ? '/dev' : '';
+        return '${Uri.base.scheme}://$host$port$pathPrefix/api/v1';
       }
       if (dotenv.isInitialized) {
         final envUrl = dotenv.env['API_BASE_URL']?.trim();
@@ -57,6 +90,7 @@ class ApiClient {
       return 'https://iterglobal.icu/api/v1';
     }
 
+    // 3. Dotenv override
     if (dotenv.isInitialized) {
       final envUrl = dotenv.env['API_BASE_URL']?.trim();
       if (envUrl != null && envUrl.isNotEmpty) {
@@ -64,8 +98,14 @@ class ApiClient {
       }
     }
 
+    // 4. Android emulator local debug
     if (!kReleaseMode && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:3000/api/v1';
+    }
+
+    // 5. Explicit dev environment flag
+    if (_kAppEnv == 'dev' || _kAppEnv == 'development') {
+      return 'https://dev.iterglobal.icu/api/v1';
     }
 
     return 'https://iterglobal.icu/api/v1';
