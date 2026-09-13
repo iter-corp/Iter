@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Iter Dev Hono Backend Configuration (Port 3001)",
+  "apps": [
+    {
+      "name": "iter-backend-dev",
+      "script": "npx tsx src/index.ts",
+      "env": {
+        "NODE_ENV": "development",
+        "PORT": 3001
+      }
+    }
+  ]
+}

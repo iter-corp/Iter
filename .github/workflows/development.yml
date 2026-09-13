@@ -100,6 +100,7 @@ jobs:
             cd ~/backend-hono-dev
             npm install
             if [ -f .env ]; then
+              sed -i "s/PORT=.*/PORT=3001/g" .env
               sed -i "s/u814384925_iter_dev/u814384925_iter_db_dev/g" .env
               sed -i "s/u814384925_iter_db\b/u814384925_iter_db_dev/g" .env
               sed -i "s/u814384925_iter_user\b/u814384925_iter_user_dev/g" .env
@@ -108,7 +109,7 @@ jobs:
               npm run db:migrate || true
               npm run db:seed || true
             fi
-            pm2 reload ecosystem.config.json || pm2 restart ecosystem.config.json || pm2 start ecosystem.config.json
+            pm2 reload ecosystem.config.dev.json || pm2 restart ecosystem.config.dev.json || pm2 start ecosystem.config.dev.json
             pm2 save
           '
 
@@ -384,8 +385,9 @@ jobs:
             cp ios/Runner/GoogleService-Info-dev.plist ios/Runner/GoogleService-Info.plist
           fi
           echo "Setting bundle identifier to com.iter.ai.dev..."
-          sed -i '' 's/com.iter.ai;/com.iter.ai.dev;/g' ios/Runner.xcodeproj/project.pbxproj || true
-          sed -i '' 's/CFBundleDisplayName = Iter;/CFBundleDisplayName = "Iter Dev";/g' ios/Runner.xcodeproj/project.pbxproj || true
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = com.iter.ai;/PRODUCT_BUNDLE_IDENTIFIER = com.iter.ai.dev;/g' ios/Runner.xcodeproj/project.pbxproj || true
+          sed -i '' 's/INFOPLIST_KEY_CFBundleDisplayName = Iter;/INFOPLIST_KEY_CFBundleDisplayName = "Iter Dev";/g' ios/Runner.xcodeproj/project.pbxproj || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Iter Dev" ios/Runner/Info.plist 2>/dev/null || true
 
       - name: Build Flutter iOS Release IPA for Dev
         env:
