@@ -100,7 +100,8 @@ async function sync() {
     console.warn(`Warning fetching bundle IDs: ${e.message}`);
   }
 
-  const iterBundle = bundleList.find(b => b.attributes.identifier === 'com.iter.ai');
+  const targetBundleId = process.env.APP_BUNDLE_ID || 'com.iter.ai';
+  const iterBundle = bundleList.find(b => b.attributes.identifier === targetBundleId);
 
   // 2. Fetch Certificates
   let certList = [];
@@ -200,7 +201,8 @@ async function sync() {
   let matchedProfile = null;
   if (distCert) {
     for (const p of profileList) {
-      if (p.attributes.profileState === 'ACTIVE' && p.attributes.profileType === 'IOS_APP_STORE' && (p.attributes.name.toLowerCase().includes('iter') || p.attributes.name.toLowerCase().includes('distribution'))) {
+      const isForOurBundle = iterBundle && p.relationships?.bundleId?.data?.id === iterBundle.id;
+      if (p.attributes.profileState === 'ACTIVE' && p.attributes.profileType === 'IOS_APP_STORE' && isForOurBundle) {
         const hasOurCert = (p.relationships?.certificates?.data || []).some(c => c.id === distCert.id);
         if (hasOurCert) {
           matchedProfile = p;
@@ -215,11 +217,11 @@ async function sync() {
     }
   }
 
-  // If no matching profile exists, create an App Store Provisioning Profile for com.iter.ai
+  // If no matching profile exists, create an App Store Provisioning Profile for targetBundleId
   if (!matchedProfile && iterBundle && distCert) {
-    console.log(`\nCreating new App Store provisioning profile for com.iter.ai with Certificate ${distCert.id}...`);
+    console.log(`\nCreating new App Store provisioning profile for ${targetBundleId} with Certificate ${distCert.id}...`);
     try {
-      const profileName = `Iter AppStore Distribution ${Date.now()}`;
+      const profileName = `${targetBundleId === 'com.iter.ai.dev' ? 'IterDev' : 'Iter'} AppStore Distribution ${Date.now()}`;
       const newProfileRes = await apiRequest('/v1/profiles', 'POST', {
         data: {
           type: 'profiles',
@@ -278,8 +280,8 @@ async function sync() {
       try {
         execSync(`/usr/libexec/PlistBuddy -c "Add :signingStyle string manual" "${exportPlistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :signingStyle manual" "${exportPlistPath}" 2>/dev/null || true`);
         execSync(`/usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" "${exportPlistPath}" 2>/dev/null || true`);
-        execSync(`/usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.iter.ai string ${pName}" "${exportPlistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.iter.ai ${pName}" "${exportPlistPath}" 2>/dev/null || true`);
-        console.log(`Updated ios/ExportOptions.plist with profile mapping com.iter.ai -> ${pName}`);
+        execSync(`/usr/libexec/PlistBuddy -c "Add :provisioningProfiles:${targetBundleId} string ${pName}" "${exportPlistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:${targetBundleId} ${pName}" "${exportPlistPath}" 2>/dev/null || true`);
+        console.log(`Updated ios/ExportOptions.plist with profile mapping ${targetBundleId} -> ${pName}`);
       } catch (err) {
         console.warn(`Notice updating ExportOptions.plist: ${err.message}`);
       }

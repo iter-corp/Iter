@@ -32,8 +32,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.iter.ai"
+        val appEnv = project.findProperty("APP_ENV") as String? ?: ""
+        applicationId = if (appEnv == "dev") "com.iter.ai.dev" else "com.iter.ai"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -41,7 +41,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        val appEnv = project.findProperty("APP_ENV") as String? ?: ""
         manifestPlaceholders["appName"] = if (appEnv == "dev") "Iter Dev" else "Iter"
     }
 
