@@ -69,7 +69,19 @@ jobs:
 
       - name: Test SSH Authentication
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'echo "SSH authentication verified: $(whoami)@$(hostname)"'
+          for i in 1 2 3; do
+            echo "Attempt $i: Testing SSH authentication..."
+            if ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'echo "SSH authentication verified: $(whoami)@$(hostname)"'; then
+              echo "SSH authentication verified successfully."
+              break
+            fi
+            if [ $i -eq 3 ]; then
+              echo "SSH authentication failed after 3 attempts."
+              exit 1
+            fi
+            echo "SSH connection attempt failed. Retrying in 5 seconds..."
+            sleep 5
+          done
 
       - name: Sync Backend Files to Dev Server
         run: |
