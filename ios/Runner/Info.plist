@@ -39,7 +39,11 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Iter saves images you capture to your photo library.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Iter uses your location to show people near you in the Connect tab. You can skip this and enter your city manually instead.</string>
+	<string>Iter uses your location to show people near you in the Connect tab and share your location in chats and posts.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Iter uses your location to show people near you in the Connect tab and share your location in chats and posts.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Iter uses your location to show people near you in the Connect tab and share your location in chats and posts.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
