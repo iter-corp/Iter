@@ -310,8 +310,8 @@ jobs:
             echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
             chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
 
-            # Synchronize certificates and profiles directly from App Store Connect API
-            node ios/sync_apple_credentials.cjs || true
+            # Synchronize certificates and profiles directly from App Store Connect API for com.iter.ai.dev
+            APP_BUNDLE_ID=com.iter.ai.dev node ios/sync_apple_credentials.cjs || true
           fi
 
           if [ -n "$BUILD_CERTIFICATE_BASE64" ] && [ -n "$BUILD_PROVISION_PROFILE_BASE64" ]; then
@@ -367,7 +367,7 @@ jobs:
             if [ -n "$PROFILE_KEY" ]; then
               /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :signingStyle manual" ios/ExportOptions.plist || true
               /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ios/ExportOptions.plist 2>/dev/null || true
-              /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.iter.ai string $PROFILE_KEY" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.iter.ai $PROFILE_KEY" ios/ExportOptions.plist || true
+              /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.iter.ai.dev string $PROFILE_KEY" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.iter.ai.dev $PROFILE_KEY" ios/ExportOptions.plist || true
             fi
             if [ -n "$TEAM_ID" ]; then
               /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" ios/ExportOptions.plist 2>/dev/null || true
@@ -376,6 +376,16 @@ jobs:
 
       - name: Disable Swift Package Manager (Use CocoaPods)
         run: flutter config --no-enable-swift-package-manager
+
+      - name: Configure iOS Project for Dev (Bundle ID & Firebase)
+        run: |
+          if [ -f "ios/Runner/GoogleService-Info-dev.plist" ]; then
+            echo "Applying Dev Firebase configuration to GoogleService-Info.plist..."
+            cp ios/Runner/GoogleService-Info-dev.plist ios/Runner/GoogleService-Info.plist
+          fi
+          echo "Setting bundle identifier to com.iter.ai.dev..."
+          sed -i '' 's/com.iter.ai;/com.iter.ai.dev;/g' ios/Runner.xcodeproj/project.pbxproj || true
+          sed -i '' 's/CFBundleDisplayName = Iter;/CFBundleDisplayName = "Iter Dev";/g' ios/Runner.xcodeproj/project.pbxproj || true
 
       - name: Build Flutter iOS Release IPA for Dev
         env:
