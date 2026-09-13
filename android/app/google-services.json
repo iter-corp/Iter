@@ -64,10 +64,46 @@
               "client_type": 3
             },
             {
-              "client_id": "751233585713-apph3tgnten6j4kj12kcps3g3jqfjfg7.apps.googleusercontent.com",
+              "client_id": "751233585713-875j8db2r8dvsdv4lvkqgj76vfggbagf.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.team.coil"
+                "bundle_id": "com.iter.ai.dev"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:751233585713:android:6f451abbe928acfaa97b10",
+        "android_client_info": {
+          "package_name": "com.iter.ai.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBqeOrAoIPgBzOVvfXc6NP93_KbHwXMl0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "751233585713-cl111fujhkk21jcm3lbddodlb4hlldkq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "751233585713-875j8db2r8dvsdv4lvkqgj76vfggbagf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.iter.ai.dev"
               }
             }
           ]
