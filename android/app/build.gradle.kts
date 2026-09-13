@@ -32,8 +32,12 @@ android {
     }
 
     defaultConfig {
-        val appEnv = project.findProperty("APP_ENV") as String? ?: ""
-        applicationId = if (appEnv == "dev") "com.iter.ai.dev" else "com.iter.ai"
+        val rawEnv = (project.findProperty("APP_ENV") as String?) ?: System.getenv("APP_ENV") ?: "dev"
+        val isDev = rawEnv.equals("dev", ignoreCase = true)
+        applicationId = if (isDev) "com.iter.ai.dev" else "com.iter.ai"
+        println("==================================================")
+        println(">> Gradle Build Config: applicationId = $applicationId (isDev=$isDev)")
+        println("==================================================")
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -41,7 +45,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        manifestPlaceholders["appName"] = if (appEnv == "dev") "Iter Dev" else "Iter"
+        manifestPlaceholders["appName"] = if (isDev) "Iter Dev" else "Iter"
     }
 
     signingConfigs {
