@@ -101,7 +101,27 @@ async function sync() {
   }
 
   const targetBundleId = process.env.APP_BUNDLE_ID || 'com.iter.ai';
-  const iterBundle = bundleList.find(b => b.attributes.identifier === targetBundleId);
+  let iterBundle = bundleList.find(b => b.attributes.identifier === targetBundleId);
+
+  if (!iterBundle) {
+    console.log(`Bundle ID "${targetBundleId}" not found in registered Bundle IDs. Registering via App Store Connect API...`);
+    try {
+      const createRes = await apiRequest('/v1/bundleIds', 'POST', {
+        data: {
+          type: 'bundleIds',
+          attributes: {
+            identifier: targetBundleId,
+            name: targetBundleId === 'com.iter.ai.dev' ? 'Iter Dev' : 'Iter',
+            platform: 'IOS',
+          },
+        },
+      });
+      iterBundle = createRes.data;
+      console.log(`Successfully registered Bundle ID: ${iterBundle.attributes.identifier} (${iterBundle.id})`);
+    } catch (createErr) {
+      console.warn(`Notice registering Bundle ID via API: ${createErr.message}`);
+    }
+  }
 
   // 2. Fetch Certificates
   let certList = [];
