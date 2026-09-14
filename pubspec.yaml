@@ -1,7 +1,7 @@
 name: coil
 description: Coil — Social community app
 publish_to: "none"
-version: 1.1.5+1002
+version: 1.1.6+2001
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
