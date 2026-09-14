@@ -156,6 +156,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       if (errStr.contains('popup_closed') || errStr.contains('popup_blocked')) {
         return;
       }
+      if (errStr.contains(': 10') || errStr.contains('common.api.j: 10')) {
+        setState(() => _error =
+            'Google Sign-In configuration error (Code 10). Missing SHA-1 fingerprint in Firebase Console.');
+        return;
+      }
       setState(() => _error = 'Google sign-in failed: $e');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
