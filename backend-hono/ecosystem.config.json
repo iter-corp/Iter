@@ -32,7 +32,7 @@
   "apps": [
     {
       "name": "iter-backend",
-      "script": "npx tsx src/index.ts",
+      "script": "dist/index.js",
       "env": {
         "NODE_ENV": "production",
         "PORT": 3000

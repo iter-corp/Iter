@@ -4,7 +4,7 @@
   "apps": [
     {
       "name": "iter-backend-dev",
-      "script": "npx tsx src/index.ts",
+      "script": "dist/index.js",
       "env": {
         "NODE_ENV": "development",
         "PORT": 3001

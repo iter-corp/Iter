@@ -5,6 +5,7 @@ import '../../l10n/app_strings.dart';
 import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/follow_providers.dart';
+import '../../services/api_client.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/primary_action_button.dart';
@@ -33,7 +34,8 @@ class FollowListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
+    final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid)) ??
+        ApiClient.instance.currentUserId;
     final isOwnProfile = sessionUid != null && sessionUid == uid;
 
     return DefaultTabController(
@@ -100,7 +102,7 @@ class FollowListScreen extends ConsumerWidget {
 /// streams the member uids. Each row streams the user's live doc for an
 /// up-to-date avatar / username and opens that profile on tap.
 class _UserList extends ConsumerStatefulWidget {
-  final ProviderListenable<AsyncValue<List<String>>> usersProvider;
+  final Refreshable<AsyncValue<List<String>>> usersProvider;
   final _FollowKind kind;
   final bool isOwnProfile;
 
@@ -135,64 +137,88 @@ class _UserListState extends ConsumerState<_UserList> {
           child: _buildSearchField(context),
         ),
         Expanded(
-          child: usersAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(
-              child: Text(
-                context.t.errorWithMessage(e.toString()),
-                style: TextStyle(color: context.textSecondary),
-              ),
-            ),
-            data: (uids) {
-              if (uids.isEmpty) {
-                return Center(
-                  child: Text(
-                    context.t.profileNoUsersYet,
-                    style: TextStyle(color: context.textSecondary),
-                  ),
-                );
-              }
-
-              // Resolve every user's doc up front via the shared, cached
-              // userByUidProvider so search can match ALL of them (not just
-              // the rows currently scrolled into view). A row that hasn't
-              // loaded yet is kept while the query is empty and only filtered
-              // out once its name is known and doesn't match.
-              final docs = <String, Map<String, dynamic>?>{
-                for (final uid in uids)
-                  uid: ref.watch(userByUidProvider(uid)).valueOrNull,
-              };
-
-              bool matches(String uid) {
-                if (_query.isEmpty) return true;
-                final data = docs[uid];
-                if (data == null) return false; // unknown name can't match
-                final username =
-                    (data['username'] as String?)?.toLowerCase() ?? '';
-                final handle = (data['handle'] as String?)?.toLowerCase() ?? '';
-                return username.contains(_query) || handle.contains(_query);
-              }
-
-              final visible = uids.where(matches).toList();
-
-              if (visible.isEmpty) {
-                return Center(
-                  child: Text(
-                    context.t.followListNoMatches,
-                    style: TextStyle(color: context.textSecondary),
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.only(bottom: 8),
-                itemCount: visible.length,
-                itemBuilder: (context, index) {
-                  final uid = visible[index];
-                  return _buildRow(context, uid, docs[uid]);
-                },
-              );
+          child: RefreshIndicator(
+            onRefresh: () async {
+              final _ = ref.refresh(widget.usersProvider);
             },
+            child: usersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                  Center(
+                    child: Text(
+                      context.t.errorWithMessage(e.toString()),
+                      style: TextStyle(color: context.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+              data: (uids) {
+                if (uids.isEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                      Center(
+                        child: Text(
+                          context.t.profileNoUsersYet,
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                // Resolve every user's doc up front via the shared, cached
+                // userByUidProvider so search can match ALL of them (not just
+                // the rows currently scrolled into view). A row that hasn't
+                // loaded yet is kept while the query is empty and only filtered
+                // out once its name is known and doesn't match.
+                final docs = <String, Map<String, dynamic>?>{
+                  for (final uid in uids)
+                    uid: ref.watch(userByUidProvider(uid)).valueOrNull,
+                };
+
+                bool matches(String uid) {
+                  if (_query.isEmpty) return true;
+                  final data = docs[uid];
+                  if (data == null) return false; // unknown name can't match
+                  final username =
+                      (data['username'] as String?)?.toLowerCase() ?? '';
+                  final handle = (data['handle'] as String?)?.toLowerCase() ?? '';
+                  return username.contains(_query) || handle.contains(_query);
+                }
+
+                final visible = uids.where(matches).toList();
+
+                if (visible.isEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                      Center(
+                        child: Text(
+                          context.t.followListNoMatches,
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final uid = visible[index];
+                    return _buildRow(context, uid, docs[uid]);
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -331,13 +357,16 @@ class _RowActionState extends ConsumerState<_RowAction> {
   bool _busy = false;
 
   Future<void> _run() async {
-    final sessionUid = ref.read(authStateProvider).value?.uid;
+    final sessionUid = ref.read(authStateProvider).value?.uid ??
+        ApiClient.instance.currentUserId;
     if (sessionUid == null || _busy) return;
 
     final isUnfollow = widget.kind == _FollowKind.following;
     final message = isUnfollow
         ? context.t.followListUnfollowConfirm(widget.targetName)
         : context.t.followListRemoveFollowerConfirm(widget.targetName);
+    final messenger = ScaffoldMessenger.of(context);
+    final failedMsg = context.t.userFollowActionFailed;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -358,8 +387,6 @@ class _RowActionState extends ConsumerState<_RowAction> {
     if (confirmed != true) return;
 
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final failedMsg = context.t.userFollowActionFailed;
     final service = ref.read(followServiceProvider);
     try {
       if (isUnfollow) {

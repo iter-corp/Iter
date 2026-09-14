@@ -586,6 +586,28 @@ class AdminEvent {
     final d = doc.data() ?? {};
     final loc = d['geo'];
     final geoMap = loc is Map ? loc : null;
+
+    final List<String> images = [];
+    void collectUrl(dynamic val) {
+      if (val is String && val.trim().isNotEmpty) {
+        final trimmed = val.trim();
+        if (!images.contains(trimmed)) images.add(trimmed);
+      } else if (val is List) {
+        for (final item in val) {
+          collectUrl(item);
+        }
+      }
+    }
+
+    collectUrl(d['imageUrls']);
+    collectUrl(d['images']);
+    collectUrl(d['coverImageUrl']);
+    collectUrl(d['imageUrl']);
+    collectUrl(d['coverUrl']);
+    collectUrl(d['image']);
+    collectUrl(d['photoUrl']);
+    collectUrl(d['photoUrls']);
+
     return AdminEvent(
       id: doc.id,
       title: (d['title'] as String?) ?? '',
@@ -595,7 +617,7 @@ class AdminEvent {
       link: (d['link'] as String?) ?? '',
       phone: (d['phone'] as String?) ?? '',
       email: (d['email'] as String?) ?? '',
-      imageUrls: (d['imageUrls'] as List?)?.cast<String>() ?? const [],
+      imageUrls: images,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       deadlineAt: (d['deadline'] as Timestamp?)?.toDate(),
       eventType: (d['eventType'] as String?) ?? '',
@@ -1459,6 +1481,7 @@ class AdminService {
       'phone': phone,
       'email': email,
       'imageUrls': imageUrls,
+      if (imageUrls.isNotEmpty) 'coverImageUrl': imageUrls.first,
       if (deadlineAt != null) 'deadline': Timestamp.fromDate(deadlineAt),
       'eventType': eventType,
       if (lat != null && lng != null) 'geo': {'lat': lat, 'lng': lng},
@@ -1582,6 +1605,9 @@ class AdminService {
     }
     if (payload['deadline'] is DateTime) {
       payload['deadline'] = Timestamp.fromDate(payload['deadline'] as DateTime);
+    }
+    if (payload['imageUrls'] is List && (payload['imageUrls'] as List).isNotEmpty) {
+      payload['coverImageUrl'] = (payload['imageUrls'] as List).first;
     }
     await _db.collection('events').doc(id).update(payload);
   }

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -134,8 +135,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     }
   }
 
-  void _next() {
-    if (_currentImage < widget.imageUrls.length - 1) {
+  void _next(int totalImages) {
+    if (_currentImage < totalImages - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -148,6 +149,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final preferredLang = ref.watch(preferredLanguageProvider);
     final phone = widget.phone.trim();
     final email = widget.email.trim();
+    final validImages = widget.imageUrls
+        .map((u) => u.trim())
+        .where((u) => u.isNotEmpty)
+        .toList();
     final hasContact = phone.isNotEmpty || email.isNotEmpty;
     return Scaffold(
       backgroundColor: context.cardBg,
@@ -199,130 +204,193 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               const SizedBox(height: 14),
 
               // 📌 SECTION: Big banner image with title + subtitle overlay.
-              // The previous design showed a small 210-tall carousel after
-              // the header. We now use a 320-tall banner so the image is
-              // the visual hero, with the title and subtitle floated on
-              // top of a dark-to-transparent bottom gradient so they stay
-              // legible across any image content.
-              if (widget.imageUrls.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 320,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
+              // Uses CachedNetworkImage to reuse image caches from the events
+              // list, with a graceful gradient fallback if no photo exists.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 320,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (validImages.isNotEmpty)
                           PageView.builder(
                             controller: _pageController,
-                            itemCount: widget.imageUrls.length,
+                            itemCount: validImages.length,
                             onPageChanged: (i) =>
                                 setState(() => _currentImage = i),
-                            itemBuilder: (_, i) => Image.network(
-                              widget.imageUrls[i],
+                            itemBuilder: (_, i) => CachedNetworkImage(
+                              imageUrl: validImages[i],
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Container(color: context.borderColor),
+                              placeholder: (_, __) => Container(
+                                color: context.isDark
+                                    ? const Color(0xFF22222B)
+                                    : const Color(0xFFE8E8EE),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.purple,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      AppColors.purple,
+                                      AppColors.purpleDeep,
+                                    ],
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.event_rounded,
+                                  color: Colors.white,
+                                  size: 56,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.purple,
+                                  AppColors.purpleDeep,
+                                ],
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.event_rounded,
+                              color: Colors.white,
+                              size: 56,
                             ),
                           ),
-                          // Dark gradient at the bottom so the white
-                          // title/subtitle stay readable over any image.
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      Colors.black.withValues(alpha: 0.55),
-                                    ],
-                                    stops: const [0.45, 1.0],
-                                  ),
+                        // Dark gradient at the bottom so the white
+                        // title/subtitle stay readable over any image.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.65),
+                                  ],
+                                  stops: const [0.45, 1.0],
                                 ),
                               ),
                             ),
                           ),
-                          // Title + subtitle overlay, anchored to the
-                          // start side so it works in RTL too.
-                          PositionedDirectional(
-                            start: 16,
-                            end: 16,
-                            bottom: 16,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
+                        ),
+                        // Title + subtitle overlay, anchored to the
+                        // start side so it works in RTL too.
+                        PositionedDirectional(
+                          start: 16,
+                          end: 16,
+                          bottom: 16,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  height: 1.2,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black54,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (widget.subtitle.trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
                                 Text(
-                                  widget.title,
+                                  widget.subtitle,
                                   style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    height: 1.2,
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                    height: 1.35,
                                     shadows: [
                                       Shadow(
                                         color: Colors.black54,
-                                        blurRadius: 6,
-                                        offset: Offset(0, 1),
+                                        blurRadius: 4,
                                       ),
                                     ],
                                   ),
                                 ),
-                                if (widget.subtitle.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.subtitle,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white70,
-                                      height: 1.35,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black54,
-                                          blurRadius: 4,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
                               ],
+                            ],
+                          ),
+                        ),
+                        if (validImages.length > 1) ...[
+                          PositionedDirectional(
+                            start: 12,
+                            top: 0,
+                            bottom: 0,
+                            child: Center(
+                              child: _ArrowButton(
+                                icon: Icons.chevron_left,
+                                flipForRtl: true,
+                                onTap: _prev,
+                              ),
                             ),
                           ),
-                          if (widget.imageUrls.length > 1)
-                            PositionedDirectional(
-                              start: 12,
-                              top: 0,
-                              bottom: 0,
-                              child: Center(
-                                child: _ArrowButton(
-                                  icon: Icons.chevron_left,
-                                  flipForRtl: true,
-                                  onTap: _prev,
+                          PositionedDirectional(
+                            end: 12,
+                            top: 0,
+                            bottom: 0,
+                            child: Center(
+                              child: _ArrowButton(
+                                icon: Icons.chevron_right,
+                                flipForRtl: true,
+                                onTap: () => _next(validImages.length),
+                              ),
+                            ),
+                          ),
+                          PositionedDirectional(
+                            top: 12,
+                            end: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${_currentImage + 1} / ${validImages.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                          if (widget.imageUrls.length > 1)
-                            PositionedDirectional(
-                              end: 12,
-                              top: 0,
-                              bottom: 0,
-                              child: Center(
-                                child: _ArrowButton(
-                                  icon: Icons.chevron_right,
-                                  flipForRtl: true,
-                                  onTap: _next,
-                                ),
-                              ),
-                            ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
+              ),
 
               const SizedBox(height: 18),
 
@@ -508,7 +576,7 @@ class _ArrowButton extends StatelessWidget {
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.4),
+          color: Colors.black.withValues(alpha: 0.4),
           shape: BoxShape.circle,
         ),
         child: iconWidget,

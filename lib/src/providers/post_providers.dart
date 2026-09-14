@@ -45,8 +45,8 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
 
   return Rx.combineLatest3(
     ref.watch(postServiceProvider).streamFeed().onErrorReturn(<Post>[]),
-    followService.getFollowing(currentUid).onErrorReturn(<String>[]),
-    blockedStream.onErrorReturn(<String>[]),
+    followService.getFollowing(currentUid).startWith(<String>[]).onErrorReturn(<String>[]),
+    blockedStream.startWith(<String>[]).onErrorReturn(<String>[]),
     (List<Post> posts, List<String> following, List<String> blocked) {
       final allowed = {...following, currentUid};
       final blockedSet = blocked.toSet();
@@ -70,8 +70,8 @@ final qaFeedProvider = StreamProvider<List<Post>>((ref) {
 
   return Rx.combineLatest3(
     ref.watch(postServiceProvider).streamQaFeed().onErrorReturn(<Post>[]),
-    followService.getFollowing(currentUid).onErrorReturn(<String>[]),
-    blockedStream.onErrorReturn(<String>[]),
+    followService.getFollowing(currentUid).startWith(<String>[]).onErrorReturn(<String>[]),
+    blockedStream.startWith(<String>[]).onErrorReturn(<String>[]),
     (List<Post> posts, List<String> following, List<String> blocked) {
       final allowed = {...following, currentUid};
       final blockedSet = blocked.toSet();

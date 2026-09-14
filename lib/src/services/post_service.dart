@@ -174,6 +174,9 @@ class PostService {
   }
 
   Stream<List<Post>> streamFeed({int limit = 50}) {
+    if (_cachedFeed.isNotEmpty) {
+      Timer.run(() => _feedController.add(_cachedFeed));
+    }
     refreshFeed(limit: limit);
     return _feedController.stream;
   }
@@ -200,6 +203,9 @@ class PostService {
   }
 
   Stream<List<Post>> streamQaFeed({int limit = 80}) {
+    if (_cachedQaFeed.isNotEmpty) {
+      Timer.run(() => _qaFeedController.add(_cachedQaFeed));
+    }
     refreshQaFeed(limit: limit);
     return _qaFeedController.stream;
   }

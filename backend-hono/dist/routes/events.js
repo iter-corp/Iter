@@ -10,6 +10,12 @@ import { requireRole } from '../middleware/rbac.js';
 import { sendPushNotification } from '../services/fcm.service.js';
 import { randomBytes } from 'crypto';
 export const eventRoutes = new Hono();
+function formatEvent(e) {
+    return {
+        ...e,
+        imageUrls: e.coverImageUrl ? [e.coverImageUrl] : [],
+    };
+}
 // ── 1. List Events ──────────────────────────────────────────────────────────
 eventRoutes.get('/', optionalAuth, async (c) => {
     const type = c.req.query('type');
@@ -26,7 +32,7 @@ eventRoutes.get('/', optionalAuth, async (c) => {
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(events.createdAt))
         .limit(limit);
-    return c.json({ success: true, data: eventList });
+    return c.json({ success: true, data: eventList.map(formatEvent) });
 });
 // ── 2. Get Single Event ─────────────────────────────────────────────────────
 eventRoutes.get('/:id', optionalAuth, async (c) => {
@@ -47,7 +53,7 @@ eventRoutes.get('/:id', optionalAuth, async (c) => {
     return c.json({
         success: true,
         data: {
-            ...event,
+            ...formatEvent(event),
             myRegistration,
         },
     });
@@ -60,6 +66,7 @@ const createEventSchema = z.object({
     locationCountry: z.string(),
     eventType: z.string(),
     coverImageUrl: z.string().optional(),
+    imageUrls: z.array(z.string()).optional(),
     linkUrl: z.string().optional(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
@@ -74,6 +81,7 @@ eventRoutes.post('/', requireAuth, requireRole(['admin', 'org_admin']), zValidat
     const [author] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
     const eventId = `evt_${randomBytes(12).toString('hex')}`;
     const countryClean = body.locationCountry.trim().toLowerCase();
+    const resolvedCoverImageUrl = body.coverImageUrl || body.imageUrls?.[0] || null;
     await db
         .insert(events)
         .values({
@@ -83,7 +91,7 @@ eventRoutes.post('/', requireAuth, requireRole(['admin', 'org_admin']), zValidat
         location: body.location,
         locationCountry: countryClean,
         eventType: body.eventType,
-        coverImageUrl: body.coverImageUrl || null,
+        coverImageUrl: resolvedCoverImageUrl,
         linkUrl: body.linkUrl || null,
         startDate: body.startDate ? new Date(body.startDate) : null,
         endDate: body.endDate ? new Date(body.endDate) : null,

@@ -20,17 +20,11 @@ final isFollowingProvider =
 
 final followersProvider =
     StreamProvider.family<List<String>, String>((ref, uid) {
-  final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
-  if (sessionUid == null) return Stream.value(const []);
-
   return ref.watch(followServiceProvider).getFollowers(uid);
 });
 
 final followingProvider =
     StreamProvider.family<List<String>, String>((ref, uid) {
-  final sessionUid = ref.watch(authStateProvider.select((a) => a.value?.uid));
-  if (sessionUid == null) return Stream.value(const []);
-
   return ref.watch(followServiceProvider).getFollowing(uid);
 });
 
