@@ -100,6 +100,8 @@ postRoutes.get('/', optionalAuth, async (c) => {
     conditions.push(eq(posts.postType, 'qa'));
   } else if (type === 'regular') {
     conditions.push(eq(posts.postType, 'regular'));
+  } else if (type === 'all') {
+    // No post_type filter: returns all posts (regular, qa, discussion)
   } else if (!type && !saved && !repostedBy && !answeredBy) {
     conditions.push(eq(posts.postType, 'regular'));
   }

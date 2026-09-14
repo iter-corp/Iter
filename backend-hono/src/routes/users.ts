@@ -343,6 +343,120 @@ userRoutes.delete('/:uid/follow', requireAuth, async (c) => {
   return c.json({ success: true, message: 'Unfollowed successfully' });
 });
 
+userRoutes.get('/:uid/followers', optionalAuth, async (c) => {
+  const targetUid = c.req.param('uid')!;
+  const viewerUid = c.get('uid');
+
+  const followerRows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      handle: users.handle,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
+      isPrivate: users.isPrivate,
+      followersCount: users.followersCount,
+      followingCount: users.followingCount,
+    })
+    .from(follows)
+    .innerJoin(users, eq(follows.followerUid, users.id))
+    .where(and(eq(follows.targetUid, targetUid), eq(follows.status, 'active')));
+
+  let viewerFollowingSet = new Set<string>();
+  if (viewerUid && followerRows.length > 0) {
+    const userIds = followerRows.map((r) => r.id);
+    const viewerFollows = await db
+      .select({ targetUid: follows.targetUid })
+      .from(follows)
+      .where(and(eq(follows.followerUid, viewerUid), eq(follows.status, 'active'), inArray(follows.targetUid, userIds)));
+    viewerFollowingSet = new Set(viewerFollows.map((f) => f.targetUid));
+  }
+
+  const result = followerRows.map((u) => ({
+    ...u,
+    avatarUrl: normalizeMediaUrl(u.avatarUrl),
+    isFollowing: viewerFollowingSet.has(u.id),
+  }));
+
+  const uids = result.map((u) => u.id);
+
+  return c.json({
+    success: true,
+    data: result,
+    uids,
+  });
+});
+
+userRoutes.get('/:uid/following', optionalAuth, async (c) => {
+  const targetUid = c.req.param('uid')!;
+  const viewerUid = c.get('uid');
+
+  const followingRows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      handle: users.handle,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
+      isPrivate: users.isPrivate,
+      followersCount: users.followersCount,
+      followingCount: users.followingCount,
+    })
+    .from(follows)
+    .innerJoin(users, eq(follows.targetUid, users.id))
+    .where(and(eq(follows.followerUid, targetUid), eq(follows.status, 'active')));
+
+  let viewerFollowingSet = new Set<string>();
+  if (viewerUid && followingRows.length > 0) {
+    const userIds = followingRows.map((r) => r.id);
+    const viewerFollows = await db
+      .select({ targetUid: follows.targetUid })
+      .from(follows)
+      .where(and(eq(follows.followerUid, viewerUid), eq(follows.status, 'active'), inArray(follows.targetUid, userIds)));
+    viewerFollowingSet = new Set(viewerFollows.map((f) => f.targetUid));
+  }
+
+  const result = followingRows.map((u) => ({
+    ...u,
+    avatarUrl: normalizeMediaUrl(u.avatarUrl),
+    isFollowing: viewerFollowingSet.has(u.id),
+  }));
+
+  const uids = result.map((u) => u.id);
+
+  return c.json({
+    success: true,
+    data: result,
+    uids,
+  });
+});
+
+userRoutes.get('/:uid/follow-status', requireAuth, async (c) => {
+  const targetUid = c.req.param('uid')!;
+  const viewerUid = c.get('uid');
+
+  const [followingRel] = await db
+    .select()
+    .from(follows)
+    .where(and(eq(follows.followerUid, viewerUid), eq(follows.targetUid, targetUid)))
+    .limit(1);
+
+  const [followerRel] = await db
+    .select()
+    .from(follows)
+    .where(and(eq(follows.followerUid, targetUid), eq(follows.targetUid, viewerUid)))
+    .limit(1);
+
+  return c.json({
+    success: true,
+    data: {
+      isFollowing: followingRel?.status === 'active',
+      isPending: followingRel?.status === 'pending',
+      isFollower: followerRel?.status === 'active',
+    },
+  });
+});
+
 // ── 8. Block / Unblock ──────────────────────────────────────────────────────
 userRoutes.post('/:uid/block', requireAuth, async (c) => {
   const targetUid = c.req.param('uid')!;
