@@ -210,9 +210,9 @@ jobs:
         run: |
           [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           BUILD_NUMBER=$(( 5 + RUN_NUMBER ))
-          echo "Building Android AAB: version 1.1.4, build number $BUILD_NUMBER"
+          echo "Building Android AAB: version 1.1.5, build number $BUILD_NUMBER"
           flutter build appbundle --release \
-            --build-name=1.1.4 \
+            --build-name=1.1.5 \
             --build-number=$BUILD_NUMBER \
             --android-skip-build-dependency-validation
 
@@ -380,17 +380,17 @@ jobs:
 
           [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
           BUILD_NUMBER=$(( 5 + RUN_NUMBER ))
-          echo "Building iOS IPA: version 1.1.4, build number $BUILD_NUMBER"
+          echo "Building iOS IPA: version 1.1.5, build number $BUILD_NUMBER"
           flutter pub get
 
           if [ -f "ios/ExportOptions.plist" ]; then
             flutter build ipa --release \
-              --build-name=1.1.4 \
+              --build-name=1.1.5 \
               --build-number=$BUILD_NUMBER \
               --export-options-plist=ios/ExportOptions.plist
           else
             flutter build ipa --release \
-              --build-name=1.1.4 \
+              --build-name=1.1.5 \
               --build-number=$BUILD_NUMBER
           fi
 
