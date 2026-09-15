@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/repositories/push_notification_repo.dart';
 import '../../data/services/hardware/ble_service.dart';
+import 'auth/native_google_sign_in_service.dart';
 
 class WebViewService {
   late final WebViewController controller;
@@ -47,14 +49,24 @@ class WebViewService {
         },
         onNavigationRequest: (request) {
           final url = request.url;
-          if (url.startsWith('https://iterglobal.icu') ||
-              url.startsWith('http://iterglobal.icu') ||
-              url.startsWith('about:') ||
-              url.startsWith('data:')) {
+
+          // Intercept Google Sign-In to show native Android account picker
+          if (url.contains('providerId=google.com') ||
+              (url.contains('coil-50528.firebaseapp.com/__/auth/handler') && url.contains('google.com')) ||
+              (url.contains('accounts.google.com/o/oauth2') && url.contains('coil-50528'))) {
+            debugPrint('[WebView] Intercepting Google sign in -> showing native device account picker');
+            _performNativeGoogleSignIn();
+            return NavigationDecision.prevent;
+          }
+
+          if (_isAllowedUrl(url)) {
             return NavigationDecision.navigate;
           }
-          // External links: open in system browser via url_launcher
-          debugPrint('[WebView] Blocking external navigation: $url');
+          debugPrint('[WebView] External navigation -> launching in external browser: $url');
+          final uri = Uri.tryParse(url);
+          if (uri != null) {
+            launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
           return NavigationDecision.prevent;
         },
       ))
@@ -71,9 +83,40 @@ class WebViewService {
     return controller;
   }
 
+  bool _isAllowedUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+
+    if (uri.scheme == 'about' || uri.scheme == 'data' || uri.scheme == 'javascript') {
+      return true;
+    }
+
+    final host = uri.host.toLowerCase();
+    // Primary app domain
+    if (host == 'iterglobal.icu' || host.endsWith('.iterglobal.icu')) {
+      return true;
+    }
+
+    // Auth & OAuth providers (Firebase Auth handler, Google, Apple)
+    if (host.endsWith('firebaseapp.com') ||
+        host.endsWith('web.app') ||
+        host.endsWith('google.com') ||
+        host.endsWith('googleapis.com') ||
+        host.endsWith('gstatic.com') ||
+        host.endsWith('googleusercontent.com') ||
+        host.endsWith('apple.com') ||
+        host.endsWith('appleid.apple.com')) {
+      return true;
+    }
+
+    return false;
+  }
+
   String _buildUserAgent() {
-    final platform = Platform.isIOS ? 'iOS' : 'Android';
-    return 'Mozilla/5.0 ($platform) ${AppConstants.userAgentSuffix}';
+    if (Platform.isIOS) {
+      return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+    }
+    return 'Mozilla/5.0 (Linux; Android 11; SM-A505F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
   }
 
   void _configureAndroidFileSelector() {
@@ -187,7 +230,7 @@ class WebViewService {
           final text = data['text'] as String? ?? '';
           final url = data['url'] as String? ?? '';
           debugPrint('[Bridge] SHARE text=$text url=$url');
-          SharePlus.instance.share(ShareParams(text: '$text\n$url'));
+          Share.share('$text\n$url');
           break;
 
         default:
@@ -205,6 +248,17 @@ class WebViewService {
     controller.runJavaScript('''
       if (window.onIterBleResults) { window.onIterBleResults($json); }
     ''');
+  }
+
+  Future<void> _performNativeGoogleSignIn() async {
+    try {
+      final userCred = await NativeGoogleSignInService.instance.signInWithDeviceAccount();
+      if (userCred?.user != null) {
+        await NativeGoogleSignInService.instance.bridgeSessionToWebView(controller, userCred!.user!);
+      }
+    } catch (e) {
+      debugPrint('[WebViewService] Native Google sign-in error: $e');
+    }
   }
 
   Future<void> reload() async {

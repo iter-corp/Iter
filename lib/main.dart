@@ -123,7 +123,7 @@ class _NativeSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Material(
       color: const Color(0xFF0B0E14),
       child: Center(
         child: Column(
@@ -145,7 +145,7 @@ class _NativeSplash extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: Image.asset(
-                  'assets/icons/app_icon.png',
+                  'assets/img/app_icon.png',
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     color: const Color(0xFF9D4EDD),
@@ -162,6 +162,7 @@ class _NativeSplash extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
                 color: Colors.white,
+                decoration: TextDecoration.none,
               ),
             ),
             const SizedBox(height: 30),
