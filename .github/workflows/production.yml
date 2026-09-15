@@ -1,9 +1,9 @@
-name: Production Release Pipeline
+name: WebView Shell — iOS & Android Release
 
 on:
   push:
     branches:
-      - main
+      - claude/webview-app-store-approval-aw5e06
   workflow_dispatch:
     inputs:
       android_track:
@@ -12,15 +12,15 @@ on:
         default: 'internal'
 
 concurrency:
-  group: production-release
+  group: webview-release
   cancel-in-progress: false
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  #  1. Quality & Code Validation
+  #  1. Flutter Validation (no backend, no web)
   # ─────────────────────────────────────────────────────────────
   validate:
-    name: Validate (Flutter & Hono Backend)
+    name: Validate Flutter Project
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -31,134 +31,14 @@ jobs:
         with:
           channel: 'stable'
           cache: true
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: 'backend-hono/package-lock.json'
 
       - name: Validate Flutter Project
         run: |
           flutter pub get
           flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
-      - name: Validate Hono Backend
-        run: |
-          cd backend-hono
-          npm ci
-          npm test
-
   # ─────────────────────────────────────────────────────────────
-  #  2. Hono Backend Deployment (Production Server via SSH)
-  # ─────────────────────────────────────────────────────────────
-  deploy-backend:
-    name: Deploy Hono Backend
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts || true
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Test SSH Authentication
-        run: |
-          for i in 1 2 3; do
-            echo "Attempt $i: Testing SSH authentication..."
-            if ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'echo "SSH authentication verified: $(whoami)@$(hostname)"'; then
-              echo "SSH authentication verified successfully."
-              break
-            fi
-            if [ $i -eq 3 ]; then
-              echo "SSH authentication failed after 3 attempts."
-              exit 1
-            fi
-            echo "SSH connection attempt failed. Retrying in 5 seconds..."
-            sleep 5
-          done
-
-      - name: Sync Backend Files to Production Server
-        run: |
-          rsync -avz --delete \
-            --exclude 'node_modules' \
-            --exclude '.env' \
-            --exclude 'uploads' \
-            --exclude '.git' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no" \
-            backend-hono/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:~/backend-hono/
-
-      - name: Install Dependencies, Migrate & Reload PM2
-        run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no -o BatchMode=yes ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
-            export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/opt/alt/alt-nodejs22/root/usr/bin:~/.npm-global/bin:$PATH
-            cd ~/backend-hono
-            npm install
-            if [ -f .env ]; then
-              npm run db:migrate || true
-              npm run db:seed || true
-            fi
-            pm2 reload ecosystem.config.json || pm2 restart ecosystem.config.json || pm2 start ecosystem.config.json
-            pm2 save
-          '
-
-  # ─────────────────────────────────────────────────────────────
-  #  3. Flutter Web Deployment (Production Domain via SSH)
-  # ─────────────────────────────────────────────────────────────
-  deploy-web:
-    name: Deploy Flutter Web
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Build Flutter Web Release
-        run: |
-          flutter pub get
-          flutter build web --release
-          cp web/.htaccess build/web/.htaccess || true
-          cp web/api-proxy.php build/web/api-proxy.php || true
-          echo "3000" > build/web/.backend_port
-          BUILD_TAG=$(date +%s)
-          sed -i "s/main.dart.js/main.dart.js?v=$BUILD_TAG/g" build/web/flutter_bootstrap.js || true
-          sed -i "s/flutter_bootstrap.js/flutter_bootstrap.js?v=$BUILD_TAG/g" build/web/index.html || true
-
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || '65002' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts || true
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Deploy Flutter Web to Web Root
-        run: |
-          TARGET_DIR="/home/${{ secrets.SERVER_USERNAME }}/domains/iterglobal.icu/public_html"
-          echo "Deploying Flutter Web to: $TARGET_DIR"
-          rsync -avzc --delete \
-            --exclude 'dev' \
-            --exclude 'uploads' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no" \
-            build/web/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:$TARGET_DIR/
-
-  # ─────────────────────────────────────────────────────────────
-  #  4. Flutter Android Release (Google Play Console)
+  #  2. Flutter Android Release (Google Play Console)
   # ─────────────────────────────────────────────────────────────
   release-android:
     name: Release Android (Google Play Console)
@@ -243,7 +123,7 @@ jobs:
           status: completed
 
   # ─────────────────────────────────────────────────────────────
-  #  5. Flutter iOS Release (App Store Connect / TestFlight)
+  #  3. Flutter iOS Release (App Store Connect / TestFlight)
   # ─────────────────────────────────────────────────────────────
   release-ios:
     name: Release iOS (App Store Connect / TestFlight)
