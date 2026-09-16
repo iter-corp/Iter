@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../data/repositories/push_notification_repo.dart';
+import '../../data/services/permission_service.dart';
 import '../../data/services/webview_service.dart';
 
 class WebViewScreen extends StatefulWidget {
@@ -26,7 +27,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void initState() {
     super.initState();
     _initWebView();
-    _initPushNotifications();
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    await PermissionService.requestStartupPermissions();
+    await _initPushNotifications();
   }
 
   void _initWebView() {
