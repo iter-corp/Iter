@@ -42,6 +42,7 @@ class WebViewService {
         },
         onPageFinished: (url) {
           debugPrint('[WebView] Page finished: $url');
+          onReady?.call();
           _injectBridgeReadyListener();
         },
         onWebResourceError: (error) {
@@ -194,7 +195,7 @@ class WebViewService {
               JSON.stringify({ type: '${AppConstants.msgReady}' })
             );
           }
-        }, 5000);
+        }, 2000);
       })();
     ''');
   }
