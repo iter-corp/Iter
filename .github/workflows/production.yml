@@ -3,6 +3,8 @@ name: WebView Shell — iOS & Android Release
 on:
   push:
     branches:
+      - main
+      - webview-app
       - claude/webview-app-store-approval-aw5e06
   workflow_dispatch:
     inputs:
@@ -244,6 +246,15 @@ jobs:
       - name: Disable Swift Package Manager (Use CocoaPods)
         run: flutter config --no-enable-swift-package-manager
 
+      - name: Update CocoaPods Dependencies
+        run: |
+          flutter pub get
+          cd ios
+          rm -f Podfile.lock
+          pod repo update
+          pod install --repo-update
+          cd ..
+
       - name: Build Flutter iOS Release IPA
         env:
           RUN_NUMBER: ${{ github.run_number }}
@@ -257,7 +268,6 @@ jobs:
 
           BUILD_NUMBER=$(( 3000 + RUN_NUMBER ))
           echo "Building iOS IPA: version 2.0.0, build number $BUILD_NUMBER"
-          flutter pub get
 
           if [ -f "ios/ExportOptions.plist" ]; then
             flutter build ipa --release \
