@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
@@ -33,19 +34,32 @@ class WebViewService {
 
     controller = WebViewController.fromPlatformCreationParams(params);
 
+    // Fallback: dismiss splash after 1.8s regardless of JS bridge response
+    Timer(const Duration(milliseconds: 1800), () {
+      onReady?.call();
+    });
+
     controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(_buildUserAgent())
       ..setNavigationDelegate(NavigationDelegate(
+        onProgress: (progress) {
+          debugPrint('[WebView] Progress: $progress%');
+          if (progress >= 60) {
+            onReady?.call();
+          }
+        },
         onPageStarted: (url) {
           debugPrint('[WebView] Page started: $url');
         },
         onPageFinished: (url) {
           debugPrint('[WebView] Page finished: $url');
           _injectBridgeReadyListener();
+          onReady?.call();
         },
         onWebResourceError: (error) {
           debugPrint('[WebView] Error: ${error.description}');
+          onReady?.call();
         },
         onNavigationRequest: (request) {
           final url = request.url;

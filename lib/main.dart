@@ -61,6 +61,7 @@ class _IterAppState extends State<IterApp> {
   bool _isConnected = true;
   bool _webViewReady = false;
   StreamSubscription? _connectivitySub;
+  Timer? _splashTimer;
 
   @override
   void initState() {
@@ -71,16 +72,22 @@ class _IterAppState extends State<IterApp> {
     _networkService.checkConnectivity().then((connected) {
       if (mounted) setState(() => _isConnected = connected);
     });
+
+    // Safety fallback: ensure splash screen dismisses within 2 seconds
+    _splashTimer = Timer(const Duration(milliseconds: 2000), _onWebViewReady);
   }
 
   @override
   void dispose() {
+    _splashTimer?.cancel();
     _connectivitySub?.cancel();
     super.dispose();
   }
 
   void _onWebViewReady() {
-    if (mounted) setState(() => _webViewReady = true);
+    if (mounted && !_webViewReady) {
+      setState(() => _webViewReady = true);
+    }
   }
 
   @override
@@ -104,7 +111,15 @@ class _IterAppState extends State<IterApp> {
               if (mounted) setState(() => _isConnected = connected);
             },
           ),
-          if (!_webViewReady) const _NativeSplash(),
+          IgnorePointer(
+            ignoring: _webViewReady,
+            child: AnimatedOpacity(
+              opacity: _webViewReady ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOut,
+              child: const _NativeSplash(),
+            ),
+          ),
           if (!_isConnected)
             NoInternetScreen(
               onRetry: () async {
