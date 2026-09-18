@@ -12,7 +12,6 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/repositories/push_notification_repo.dart';
 import '../../data/services/hardware/ble_service.dart';
-import 'auth/native_google_sign_in_service.dart';
 
 class WebViewService {
   late final WebViewController controller;
@@ -51,9 +50,11 @@ class WebViewService {
         },
         onPageStarted: (url) {
           debugPrint('[WebView] Page started: $url');
+          _healCorruptedIndexedDb();
         },
         onPageFinished: (url) {
           debugPrint('[WebView] Page finished: $url');
+          _healCorruptedIndexedDb();
           _injectBridgeReadyListener();
           onReady?.call();
         },
@@ -63,15 +64,6 @@ class WebViewService {
         },
         onNavigationRequest: (request) {
           final url = request.url;
-
-          // Intercept Google Sign-In to show native Android account picker
-          if (url.contains('providerId=google.com') ||
-              (url.contains('coil-50528.firebaseapp.com/__/auth/handler') && url.contains('google.com')) ||
-              (url.contains('accounts.google.com/o/oauth2') && url.contains('coil-50528'))) {
-            debugPrint('[WebView] Intercepting Google sign in -> showing native device account picker');
-            _performNativeGoogleSignIn();
-            return NavigationDecision.prevent;
-          }
 
           if (_isAllowedUrl(url)) {
             return NavigationDecision.navigate;
@@ -264,15 +256,35 @@ class WebViewService {
     ''');
   }
 
-  Future<void> _performNativeGoogleSignIn() async {
-    try {
-      final userCred = await NativeGoogleSignInService.instance.signInWithDeviceAccount();
-      if (userCred?.user != null) {
-        await NativeGoogleSignInService.instance.bridgeSessionToWebView(controller, userCred!.user!);
-      }
-    } catch (e) {
-      debugPrint('[WebViewService] Native Google sign-in error: $e');
-    }
+  void _healCorruptedIndexedDb() {
+    controller.runJavaScript('''
+      (function() {
+        try {
+          var req = indexedDB.open('firebaseLocalStorageDb');
+          req.onsuccess = function(e) {
+            var db = e.target.result;
+            if (db.objectStoreNames.length === 0 || !db.objectStoreNames.contains('firebaseLocalStorage')) {
+              console.warn('[WebViewHealer] Corrupted or empty IndexedDB detected. Resetting...');
+              db.close();
+              var del = indexedDB.deleteDatabase('firebaseLocalStorageDb');
+              del.onsuccess = function() {
+                console.log('[WebViewHealer] Deleted corrupted database. Reloading clean state...');
+                window.location.reload();
+              };
+            } else {
+              db.close();
+            }
+          };
+          req.onerror = function() {
+            try {
+              indexedDB.deleteDatabase('firebaseLocalStorageDb');
+            } catch(e) {}
+          };
+        } catch (err) {
+          console.error('[WebViewHealer] Error checking DB: ' + err);
+        }
+      })();
+    ''');
   }
 
   Future<void> reload() async {
