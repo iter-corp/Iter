@@ -83,6 +83,12 @@ jobs:
             sleep 5
           done
 
+      - name: Build TypeScript Dist
+        run: |
+          cd backend-hono
+          npm ci
+          npm run build
+
       - name: Sync Backend Files to Production Server
         run: |
           rsync -avz --delete \
