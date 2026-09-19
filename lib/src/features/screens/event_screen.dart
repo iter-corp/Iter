@@ -1,12 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../utils/media_cache.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
@@ -940,14 +943,28 @@ class _EventCardState extends State<_EventCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (coverUrl != null)
+                if (coverUrl != null && coverUrl.isNotEmpty)
                   CachedNetworkImage(
                     imageUrl: coverUrl,
+                    cacheManager: kIsWeb ? null : MediaCache.images,
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
                         Container(color: const Color(0xFFE0E0E8)),
-                    errorWidget: (_, __, ___) =>
-                        Container(color: const Color(0xFFBDBDBD)),
+                    errorWidget: (_, __, ___) => Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [_kBrandPurple, _kBrandDeep],
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.event_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
+                    ),
                   )
                 else
                   Container(
@@ -1895,12 +1912,24 @@ class _EventMapSheet extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: cover != null
+                child: (cover != null && cover.isNotEmpty)
                     ? CachedNetworkImage(
                         imageUrl: cover,
+                        cacheManager: kIsWeb ? null : MediaCache.images,
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          width: 64,
+                          height: 64,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [_kBrandPurple, _kBrandDeep],
+                            ),
+                          ),
+                          child: const Icon(Icons.event_rounded,
+                              color: Colors.white),
+                        ),
                       )
                     : Container(
                         width: 64,

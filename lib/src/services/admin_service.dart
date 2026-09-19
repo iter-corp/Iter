@@ -610,6 +610,44 @@ class AdminEvent {
       createdByUid: (d['createdByUid'] as String?) ?? '',
     );
   }
+
+  factory AdminEvent.fromJson(Map<String, dynamic> d) {
+    final geoMap = d['geo'] is Map ? d['geo'] as Map : null;
+    final rawImages = d['imageUrls'] ?? d['image_urls'] ?? d['images'];
+    final cover = d['coverImageUrl'] ?? d['cover_image_url'] ?? d['coverImage'] ?? d['cover_image'];
+    final imgList = rawImages is List
+        ? rawImages.map((e) => e.toString()).toList()
+        : (cover != null && cover.toString().isNotEmpty ? [cover.toString()] : const <String>[]);
+    DateTime? parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is DateTime) return v;
+      if (v is Timestamp) return v.toDate();
+      if (v is String) return DateTime.tryParse(v);
+      return null;
+    }
+
+    return AdminEvent(
+      id: d['id']?.toString() ?? '',
+      title: d['title']?.toString() ?? '',
+      subtitle: d['subtitle']?.toString() ?? d['location']?.toString() ?? '',
+      location: d['location']?.toString() ?? '',
+      description: d['description']?.toString() ?? '',
+      link: d['linkUrl']?.toString() ?? d['link_url']?.toString() ?? d['link']?.toString() ?? '',
+      phone: d['phone']?.toString() ?? '',
+      email: d['email']?.toString() ?? '',
+      imageUrls: imgList,
+      createdAt: parseDate(d['createdAt'] ?? d['created_at']),
+      deadlineAt: parseDate(d['deadline'] ?? d['startDate'] ?? d['start_date'] ?? d['endDate'] ?? d['end_date']),
+      eventType: d['eventType']?.toString() ?? d['event_type']?.toString() ?? '',
+      country: ((d['country']?.toString().trim().isNotEmpty ?? false))
+          ? d['country'].toString().trim()
+          : (d['locationCountry']?.toString() ?? d['location_country']?.toString() ?? '').trim(),
+      funds: d['funds']?.toString() ?? '',
+      lat: (d['lat'] as num?)?.toDouble() ?? (geoMap?['lat'] as num?)?.toDouble(),
+      lng: (d['lng'] as num?)?.toDouble() ?? (geoMap?['lng'] as num?)?.toDouble(),
+      createdByUid: d['authorUid']?.toString() ?? d['author_uid']?.toString() ?? d['createdByUid']?.toString() ?? d['created_by_uid']?.toString() ?? '',
+    );
+  }
 }
 
 class PostReport {
@@ -1397,36 +1435,97 @@ class AdminService {
       _db.collection('commentReports').doc(id).delete();
 
   // -------- Events --------
-  Stream<List<AdminEvent>> streamEvents() {
-    return _db
+  Stream<List<AdminEvent>> streamEvents() async* {
+    List<AdminEvent> apiEvents = [];
+    try {
+      final res = await ApiClient.instance.get('/events', queryParams: {'limit': '100'});
+      if (res is List) {
+        apiEvents = res
+            .whereType<Map<String, dynamic>>()
+            .map(AdminEvent.fromJson)
+            .toList();
+        if (apiEvents.isNotEmpty) {
+          yield apiEvents;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminService] streamEvents API fetch error: $e');
+    }
+
+    yield* _db
         .collection('events')
         .snapshots()
-        .map((s) => s.docs.map(AdminEvent.fromDoc).toList()
-          ..sort((a, b) {
-            final at = a.createdAt;
-            final bt = b.createdAt;
-            if (at == null) return 1;
-            if (bt == null) return -1;
-            return bt.compareTo(at);
-          }));
+        .map((s) {
+          final firestoreEvents = s.docs.map(AdminEvent.fromDoc).toList();
+          final mergedMap = <String, AdminEvent>{};
+          for (final ev in apiEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          for (final ev in firestoreEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          final list = mergedMap.values.toList()
+            ..sort((a, b) {
+              final at = a.createdAt;
+              final bt = b.createdAt;
+              if (at == null) return 1;
+              if (bt == null) return -1;
+              return bt.compareTo(at);
+            });
+          return list;
+        })
+        .handleError((e) {
+          debugPrint('[AdminService] Firestore events stream error: $e');
+        });
   }
 
   /// Events filtered to those created by [uid]. Used by the org_admin
   /// role so an organization only sees / manages the events they
   /// posted themselves, never anyone else's.
-  Stream<List<AdminEvent>> streamEventsCreatedBy(String uid) {
-    return _db
+  Stream<List<AdminEvent>> streamEventsCreatedBy(String uid) async* {
+    List<AdminEvent> apiEvents = [];
+    try {
+      final res = await ApiClient.instance.get('/events', queryParams: {'limit': '100'});
+      if (res is List) {
+        apiEvents = res
+            .whereType<Map<String, dynamic>>()
+            .map(AdminEvent.fromJson)
+            .where((e) => e.createdByUid == uid)
+            .toList();
+        if (apiEvents.isNotEmpty) {
+          yield apiEvents;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminService] streamEventsCreatedBy API fetch error: $e');
+    }
+
+    yield* _db
         .collection('events')
         .where('createdByUid', isEqualTo: uid)
         .snapshots()
-        .map((s) => s.docs.map(AdminEvent.fromDoc).toList()
-          ..sort((a, b) {
-            final at = a.createdAt;
-            final bt = b.createdAt;
-            if (at == null) return 1;
-            if (bt == null) return -1;
-            return bt.compareTo(at);
-          }));
+        .map((s) {
+          final firestoreEvents = s.docs.map(AdminEvent.fromDoc).toList();
+          final mergedMap = <String, AdminEvent>{};
+          for (final ev in apiEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          for (final ev in firestoreEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          final list = mergedMap.values.toList()
+            ..sort((a, b) {
+              final at = a.createdAt;
+              final bt = b.createdAt;
+              if (at == null) return 1;
+              if (bt == null) return -1;
+              return bt.compareTo(at);
+            });
+          return list;
+        })
+        .handleError((e) {
+          debugPrint('[AdminService] Firestore streamEventsCreatedBy error: $e');
+        });
   }
 
   Future<String> createEvent({

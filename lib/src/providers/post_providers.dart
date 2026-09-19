@@ -161,10 +161,7 @@ final postDiscussionsProvider =
 });
 
 final userPostsProvider = StreamProvider.family<List<Post>, String>((ref, uid) {
-  // Gate on auth being settled. posts require signedIn() in Firestore rules;
-  // opening the stream before the token propagates causes permission-denied.
-  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
-  if (authed == null) return const Stream.empty();
+  if (uid.isEmpty) return const Stream.empty();
   return ref.watch(postServiceProvider).streamUserPosts(uid);
 });
 

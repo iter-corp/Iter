@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import '../features/model/post_model.dart';
@@ -229,19 +230,49 @@ class PostService {
   }
 
   Stream<List<Post>> streamUserPosts(String uid) async* {
+    List<Post> apiPosts = [];
     try {
       final res = await ApiClient.instance.get('/posts', queryParams: {'authorUid': uid});
       if (res is List) {
-        yield res
+        apiPosts = res
             .whereType<Map<String, dynamic>>()
-            .map(Post.fromJson)
+            .map((m) {
+              _updatePostLocalState(m);
+              return Post.fromJson(m);
+            })
             .toList();
-      } else {
-        yield <Post>[];
+        if (apiPosts.isNotEmpty) {
+          yield apiPosts;
+        }
       }
-    } catch (_) {
-      yield <Post>[];
+    } catch (e) {
+      debugPrint('[PostService] streamUserPosts API error: $e');
     }
+
+    yield* FirebaseFirestore.instance
+        .collection('posts')
+        .where('authorUid', isEqualTo: uid)
+        .snapshots()
+        .map((s) {
+          final firestorePosts = s.docs.map(Post.fromDoc).toList();
+          final map = <String, Post>{};
+          for (final p in apiPosts) {
+            map[p.id] = p;
+          }
+          for (final p in firestorePosts) {
+            map[p.id] = p;
+          }
+          final list = map.values.toList()
+            ..sort((a, b) {
+              final at = a.createdAt ?? DateTime(0);
+              final bt = b.createdAt ?? DateTime(0);
+              return bt.compareTo(at);
+            });
+          return list;
+        })
+        .handleError((e) {
+          debugPrint('[PostService] Firestore streamUserPosts error: $e');
+        });
   }
 
   Stream<List<Post>> streamUserQaAsked(String uid, {int limit = 120}) async* {

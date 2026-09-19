@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -260,8 +261,28 @@ class _PostCardState extends ConsumerState<PostCard>
                                   ),
                                   child: CachedNetworkImage(
                                     imageUrl: post.imageUrls[i],
-                                    cacheManager: MediaCache.images,
+                                    cacheManager: kIsWeb ? null : MediaCache.images,
                                     fit: BoxFit.cover,
+                                    placeholder: (_, __) => Container(
+                                      color: context.borderColor,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: context.borderColor,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.broken_image_rounded,
+                                          color: context.textSecondary,
+                                          size: 32,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               )
@@ -277,8 +298,28 @@ class _PostCardState extends ConsumerState<PostCard>
                                 ),
                                 child: CachedNetworkImage(
                                   imageUrl: post.imageUrls.first,
-                                  cacheManager: MediaCache.images,
+                                  cacheManager: kIsWeb ? null : MediaCache.images,
                                   fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    color: context.borderColor,
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: context.borderColor,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.broken_image_rounded,
+                                        color: context.textSecondary,
+                                        size: 32,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ))
                         : GestureDetector(

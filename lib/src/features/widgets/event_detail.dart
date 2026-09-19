@@ -1,6 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../utils/media_cache.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
@@ -220,11 +224,29 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             itemCount: widget.imageUrls.length,
                             onPageChanged: (i) =>
                                 setState(() => _currentImage = i),
-                            itemBuilder: (_, i) => Image.network(
-                              widget.imageUrls[i],
+                            itemBuilder: (_, i) => CachedNetworkImage(
+                              imageUrl: widget.imageUrls[i],
+                              cacheManager: kIsWeb ? null : MediaCache.images,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Container(color: context.borderColor),
+                              placeholder: (_, __) => Container(
+                                color: context.borderColor,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                color: context.borderColor,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.grey,
+                                  size: 36,
+                                ),
+                              ),
                             ),
                           ),
                           // Dark gradient at the bottom so the white
@@ -897,12 +919,13 @@ class _EventAuthorHeader extends ConsumerWidget {
         children: [
           ClipOval(
             child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                ? Image.network(
-                    avatarUrl,
+                ? CachedNetworkImage(
+                    imageUrl: avatarUrl,
+                    cacheManager: kIsWeb ? null : MediaCache.images,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _avatarPlaceholder(context),
+                    errorWidget: (_, __, ___) => _avatarPlaceholder(context),
                   )
                 : _avatarPlaceholder(context),
           ),

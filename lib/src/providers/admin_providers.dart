@@ -118,8 +118,6 @@ final errorReportsProvider = StreamProvider<List<ErrorReport>>((ref) {
 /// created it. NOT role-scoped — see [manageableEventsProvider] for
 /// the admin-screen filter.
 final adminEventsProvider = StreamProvider<List<AdminEvent>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return const Stream.empty();
   return ref.watch(adminServiceProvider).streamEvents();
 });
 
