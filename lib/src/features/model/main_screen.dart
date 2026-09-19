@@ -111,54 +111,44 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           children: [
             const AppPageBackground(child: SizedBox.expand()),
             SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1440),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Left Navigation Sidebar (Compact rail on Tablets, Full on Desktop) ──
-                      DesktopNavSidebar(
-                        selectedIndex: _selectedIndex,
-                        onTabSelected: _onNavTap,
-                        unreadChats: unreadChats,
-                        isCompact: isTablet,
-                      ),
-
-                      // ── Center Content Column (Feed / Active Screen) ──
-                      Expanded(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: PageView(
-                              controller: _pageController,
-                              physics: const NeverScrollableScrollPhysics(),
-                              onPageChanged: (index) {
-                                if (_selectedIndex != index) {
-                                  setState(() => _selectedIndex = index);
-                                  _trackTab(index);
-                                }
-                              },
-                              children: [
-                                HomeBody(scrollController: _homeScrollController),
-                                const EventBody(),
-                                const ExploreBody(),
-                                const MessageBody(),
-                                const ProfileScreen(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // ── Right Sidebar (Widgets, Upcoming Events, Trending) ──
-                      if (showRightSidebar)
-                        DesktopRightSidebar(
-                          onTabSelected: _onNavTap,
-                        ),
-                    ],
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Left Navigation Sidebar (Compact rail on Tablets, Full on Desktop) ──
+                  DesktopNavSidebar(
+                    selectedIndex: _selectedIndex,
+                    onTabSelected: _onNavTap,
+                    unreadChats: unreadChats,
+                    isCompact: isTablet,
                   ),
-                ),
+
+                  // ── Center Content Column (Feed / Active Screen) ──
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (index) {
+                        if (_selectedIndex != index) {
+                          setState(() => _selectedIndex = index);
+                          _trackTab(index);
+                        }
+                      },
+                      children: [
+                        HomeBody(scrollController: _homeScrollController),
+                        const EventBody(),
+                        const ExploreBody(),
+                        const MessageBody(),
+                        const ProfileScreen(),
+                      ],
+                    ),
+                  ),
+
+                  // ── Right Sidebar (Widgets, Upcoming Events, Trending) ──
+                  if (showRightSidebar)
+                    DesktopRightSidebar(
+                      onTabSelected: _onNavTap,
+                    ),
+                ],
               ),
             ),
           ],
