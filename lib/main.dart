@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -428,6 +429,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      scrollBehavior: const AppScrollBehavior(),
       routerConfig: router,
       builder: (context, child) {
         // Update system UI to match current theme.
@@ -582,4 +584,18 @@ class _UpdateRequiredScreen extends StatelessWidget {
         ),
     );
   }
+}
+
+/// Allows mouse, touch, trackpad, and stylus drag gestures across all
+/// scrollables (e.g. PageView, horizontal carousels) on Web and Desktop.
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }

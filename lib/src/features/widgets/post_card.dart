@@ -420,6 +420,46 @@ class _PostCardState extends ConsumerState<PostCard>
                   ),
                 ),
               ),
+              if (isMulti) ...[
+                if (_currentPage > 0)
+                  PositionedDirectional(
+                    start: 10,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: _ImageNavButton(
+                        icon: Directionality.of(context) == TextDirection.rtl
+                            ? Icons.chevron_right_rounded
+                            : Icons.chevron_left_rounded,
+                        onTap: () {
+                          _pageController.previousPage(
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                if (_currentPage < imageCount - 1)
+                  PositionedDirectional(
+                    end: 10,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: _ImageNavButton(
+                        icon: Directionality.of(context) == TextDirection.rtl
+                            ? Icons.chevron_left_rounded
+                            : Icons.chevron_right_rounded,
+                        onTap: () {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+              ],
               PositionedDirectional(
                 top: 12,
                 start: 14,
@@ -472,10 +512,34 @@ class _PostCardState extends ConsumerState<PostCard>
                           child: _frostedPanel(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              child: _PageDots(
-                                count: imageCount,
-                                activeIndex: _currentPage,
+                                  horizontal: 12, vertical: 6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _PageDots(
+                                    count: imageCount,
+                                    activeIndex: _currentPage,
+                                    onDotTapped: (index) {
+                                      _pageController.animateToPage(
+                                        index,
+                                        duration:
+                                            const Duration(milliseconds: 280),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${_currentPage + 1}/$imageCount',
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.92),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -2663,8 +2727,13 @@ class _ViewerMenu extends StatelessWidget {
 class _PageDots extends StatelessWidget {
   final int count;
   final int activeIndex;
+  final ValueChanged<int>? onDotTapped;
 
-  const _PageDots({required this.count, required this.activeIndex});
+  const _PageDots({
+    required this.count,
+    required this.activeIndex,
+    this.onDotTapped,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2672,21 +2741,71 @@ class _PageDots extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(count, (i) {
         final isActive = i == activeIndex;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: EdgeInsets.symmetric(horizontal: i == 0 ? 0 : 3),
-          width: isActive ? 7 : 5,
-          height: isActive ? 7 : 5,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color:
-                isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDotTapped != null ? () => onDotTapped!(i) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: isActive ? 8 : 5,
+              height: isActive ? 8 : 5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isActive
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
           ),
         );
       }),
     );
   }
 }
+
+class _ImageNavButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ImageNavButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.48),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.28),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 /// Inline-expandable caption. Shows up to [collapsedMaxLines] then truncates
 /// with a "Read more" / "Show less" toggle. Used for text-only post hero
