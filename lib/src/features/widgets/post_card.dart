@@ -80,9 +80,8 @@ class _PostCardState extends ConsumerState<PostCard>
 
   // Outer carousel: page 0 is Discuss threads (swipe right to reach it),
   // page 1 (the default) is the post itself.
-  // keepPage: false ensures PageStorage never accidentally restores page 0 (Discuss)
-  // when recycling or scrolling back up in a feed list.
   late final PageController _discussPageController;
+  int _discussPage = 1;
 
   // Double-tap-to-like heart burst animation. Driven once per double tap;
   // a value of 0 means the overlay is hidden.
@@ -94,6 +93,7 @@ class _PostCardState extends ConsumerState<PostCard>
   @override
   void initState() {
     super.initState();
+    _discussPage = 1;
     _pageController = PageController(keepPage: false);
     _discussPageController = PageController(initialPage: 1, keepPage: false);
   }
@@ -200,7 +200,15 @@ class _PostCardState extends ConsumerState<PostCard>
     // can position its scrubber above it on the next paint. The
     // measure is cheap (single RenderBox read) and short-circuits
     // when the height hasn't changed.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureCaptionPanel());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureCaptionPanel();
+      if (_discussPage == 1 &&
+          _discussPageController.hasClients &&
+          _discussPageController.page != null &&
+          _discussPageController.page! < 0.5) {
+        _discussPageController.jumpToPage(1);
+      }
+    });
 
     final isDark = context.isDark;
     return Container(
@@ -234,9 +242,9 @@ class _PostCardState extends ConsumerState<PostCard>
           // right from the post to reach it); page 1 is the post itself,
           // unchanged below.
           child: PageView(
-            key: PageStorageKey('post_discuss_view_${post.id}'),
             controller: _discussPageController,
             physics: const ClampingScrollPhysics(),
+            onPageChanged: (p) => _discussPage = p,
             children: [
               _PostDiscussPage(post: post),
               Stack(
@@ -258,7 +266,6 @@ class _PostCardState extends ConsumerState<PostCard>
                     : hasImage
                         ? (isMulti
                             ? PageView.builder(
-                                key: PageStorageKey('post_images_view_${post.id}'),
                                 controller: _pageController,
                                 physics: const ClampingScrollPhysics(),
                                 itemCount: imageCount,
