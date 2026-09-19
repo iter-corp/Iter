@@ -119,7 +119,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithApple();
+      final user = await ref.read(authServiceProvider).signInWithApple();
+      if (user != null && mounted) {
+        context.go('/home');
+      }
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
@@ -137,7 +140,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithGoogle(intent: GoogleAuthIntent.signup);
+      final user = await ref.read(authServiceProvider).signInWithGoogle(intent: GoogleAuthIntent.signup);
+      if (user != null && mounted) {
+        context.go('/home');
+      }
     } on GoogleAuthFlowException catch (e) {
       setState(() => _error = e.toString());
     } on AccountDeletedException catch (e) {

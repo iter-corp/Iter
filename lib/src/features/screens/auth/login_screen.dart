@@ -59,7 +59,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithApple();
+      final user = await ref.read(authServiceProvider).signInWithApple();
+      if (user != null && mounted) {
+        context.go('/home');
+      }
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
@@ -77,7 +80,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithGoogle(intent: GoogleAuthIntent.login);
+      final user = await ref.read(authServiceProvider).signInWithGoogle(intent: GoogleAuthIntent.login);
+      if (user != null && mounted) {
+        context.go('/home');
+      }
     } on GoogleAuthFlowException catch (e) {
       setState(() => _error = e.toString());
     } on AccountDeletedException catch (e) {
@@ -114,10 +120,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signIn(
+      final user = await ref.read(authServiceProvider).signIn(
             email: _usernameCtrl.text,
             password: _passCtrl.text,
           );
+      if (user != null && mounted) {
+        context.go('/home');
+      }
     } on AccountDeletedException catch (e) {
       setState(() => _error = e.toString());
     } on FirebaseAuthException catch (e) {
