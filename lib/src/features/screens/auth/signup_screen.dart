@@ -365,6 +365,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     width: logoSize,
                     height: logoSize,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/icons/app_icon.png',
+                      width: logoSize,
+                      height: logoSize,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),

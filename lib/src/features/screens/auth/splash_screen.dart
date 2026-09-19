@@ -21,6 +21,12 @@ class SplashScreen extends StatelessWidget {
                 width: 96,
                 height: 96,
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Image.asset(
+                  'assets/icons/app_icon.png',
+                  width: 96,
+                  height: 96,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             const SizedBox(height: 18),

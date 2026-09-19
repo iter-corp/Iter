@@ -190,12 +190,7 @@ class DesktopNavSidebar extends ConsumerWidget {
       width: 38,
       height: 38,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFCE5DE5), Color(0xFF7A3FB8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(11),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF7A3FB8).withValues(alpha: 0.35),
@@ -204,10 +199,35 @@ class DesktopNavSidebar extends ConsumerWidget {
           ),
         ],
       ),
-      child: const Icon(
-        Icons.public_rounded,
-        color: Colors.white,
-        size: 22,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Image.asset(
+          'assets/img/app_icon.png',
+          width: 38,
+          height: 38,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Image.asset(
+            'assets/icons/app_icon.png',
+            width: 38,
+            height: 38,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFCE5DE5), Color(0xFF7A3FB8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: const Icon(
+                Icons.public_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

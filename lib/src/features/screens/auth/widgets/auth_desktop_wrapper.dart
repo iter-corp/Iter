@@ -144,7 +144,7 @@ class _BrandPitchSection extends StatelessWidget {
               width: 58,
               height: 58,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF9D4EDD).withValues(alpha: 0.35),
@@ -154,13 +154,28 @@ class _BrandPitchSection extends StatelessWidget {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 child: Image.asset(
                   'assets/img/app_icon.png',
+                  width: 58,
+                  height: 58,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFF9D4EDD),
-                    child: const Icon(Icons.public, color: Colors.white, size: 32),
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/icons/app_icon.png',
+                    width: 58,
+                    height: 58,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF8A3FB8), Color(0xFFCE5DE5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.public_rounded, color: Colors.white, size: 32),
+                    ),
                   ),
                 ),
               ),
