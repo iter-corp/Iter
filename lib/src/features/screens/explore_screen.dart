@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/post_card.dart';
+import '../widgets/skeleton_loader.dart';
 import 'chat_screen.dart';
 import 'home_screen.dart' show QaThreadCard;
 
@@ -217,7 +218,7 @@ class _ExploreBodyState extends ConsumerState<ExploreBody> {
                         subtitle: context.t.exploreBlankSubtitle,
                       )
                     : loading
-                        ? const Center(child: CircularProgressIndicator())
+                        ? const SkeletonExploreList()
                         : hits.isEmpty
                             ? _ExploreMessage(
                                 icon: Icons.search_off_rounded,

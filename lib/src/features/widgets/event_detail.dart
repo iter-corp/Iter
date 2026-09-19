@@ -1,7 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../utils/media_cache.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_providers.dart';
@@ -224,6 +227,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                 setState(() => _currentImage = i),
                             itemBuilder: (_, i) => CachedNetworkImage(
                               imageUrl: validImages[i],
+                              cacheManager: kIsWeb ? null : MediaCache.images,
                               fit: BoxFit.cover,
                               placeholder: (_, __) => Container(
                                 color: context.isDark
@@ -965,12 +969,13 @@ class _EventAuthorHeader extends ConsumerWidget {
         children: [
           ClipOval(
             child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                ? Image.network(
-                    avatarUrl,
+                ? CachedNetworkImage(
+                    imageUrl: avatarUrl,
+                    cacheManager: kIsWeb ? null : MediaCache.images,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _avatarPlaceholder(context),
+                    errorWidget: (_, __, ___) => _avatarPlaceholder(context),
                   )
                 : _avatarPlaceholder(context),
           ),

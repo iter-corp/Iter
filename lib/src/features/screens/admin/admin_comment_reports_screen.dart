@@ -10,6 +10,7 @@ import '../../../services/admin_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
 import '../../widgets/app_page_background.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../post_detail_screen.dart';
 
 class AdminCommentReportsScreen extends ConsumerWidget {
@@ -67,7 +68,7 @@ class AdminCommentReportsScreen extends ConsumerWidget {
         Tab(text: context.t.adminTabResolved(resolved.length)),
       ],
       body: reportsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonList(count: 6),
         error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (_) => TabBarView(
           children: [

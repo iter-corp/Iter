@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'notification_service.dart';
@@ -12,6 +14,7 @@ class AdminConfig {
   final bool storiesEnabled;
   final bool repostsEnabled;
   final bool translateEnabled;
+  final bool wikipediaEnabled;
   final String announcement;
   final bool maintenanceMode;
   final String minAppVersion;
@@ -50,6 +53,7 @@ class AdminConfig {
     this.storiesEnabled = true,
     this.repostsEnabled = true,
     this.translateEnabled = true,
+    this.wikipediaEnabled = true,
     this.announcement = '',
     this.welcomeMessageEnabled = true,
     this.welcomeMessage = '',
@@ -83,6 +87,8 @@ class AdminConfig {
         (m['welcomeMessage'] as String?);
     final rawWelcomeEnabled = (meta['welcomeMessageEnabled'] as bool?) ??
         (m['welcomeMessageEnabled'] as bool?);
+    final rawWikipediaEnabled = (meta['wikipediaEnabled'] as bool?) ??
+        (m['wikipediaEnabled'] as bool?);
     final rawAnnouncement = (m['announcement'] as String?) ?? '';
 
     final effectiveWelcome = (rawWelcome != null && rawWelcome.trim().isNotEmpty)
@@ -95,6 +101,7 @@ class AdminConfig {
       storiesEnabled: (m['storiesEnabled'] as bool?) ?? true,
       repostsEnabled: (m['repostsEnabled'] as bool?) ?? true,
       translateEnabled: (m['translateEnabled'] as bool?) ?? true,
+      wikipediaEnabled: rawWikipediaEnabled ?? true,
       announcement: rawAnnouncement,
       welcomeMessageEnabled: rawWelcomeEnabled ?? true,
       welcomeMessage: effectiveWelcome,
@@ -121,12 +128,14 @@ class AdminConfig {
         'storiesEnabled': storiesEnabled,
         'repostsEnabled': repostsEnabled,
         'translateEnabled': translateEnabled,
+        'wikipediaEnabled': wikipediaEnabled,
         'announcement': announcement,
         'welcomeMessageEnabled': welcomeMessageEnabled,
         'welcomeMessage': welcomeMessage,
         'metadata': {
           'welcomeMessageEnabled': welcomeMessageEnabled,
           'welcomeMessage': welcomeMessage,
+          'wikipediaEnabled': wikipediaEnabled,
         },
         'maintenanceMode': maintenanceMode,
         'minAppVersion': minAppVersion,
@@ -145,6 +154,7 @@ class AdminConfig {
     bool? storiesEnabled,
     bool? repostsEnabled,
     bool? translateEnabled,
+    bool? wikipediaEnabled,
     String? announcement,
     bool? welcomeMessageEnabled,
     String? welcomeMessage,
@@ -165,6 +175,7 @@ class AdminConfig {
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
       repostsEnabled: repostsEnabled ?? this.repostsEnabled,
       translateEnabled: translateEnabled ?? this.translateEnabled,
+      wikipediaEnabled: wikipediaEnabled ?? this.wikipediaEnabled,
       announcement: announcement ?? this.announcement,
       welcomeMessageEnabled:
           welcomeMessageEnabled ?? this.welcomeMessageEnabled,
@@ -632,6 +643,44 @@ class AdminEvent {
       createdByUid: (d['createdByUid'] as String?) ?? '',
     );
   }
+
+  factory AdminEvent.fromJson(Map<String, dynamic> d) {
+    final geoMap = d['geo'] is Map ? d['geo'] as Map : null;
+    final rawImages = d['imageUrls'] ?? d['image_urls'] ?? d['images'];
+    final cover = d['coverImageUrl'] ?? d['cover_image_url'] ?? d['coverImage'] ?? d['cover_image'];
+    final imgList = rawImages is List
+        ? rawImages.map((e) => e.toString()).toList()
+        : (cover != null && cover.toString().isNotEmpty ? [cover.toString()] : const <String>[]);
+    DateTime? parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is DateTime) return v;
+      if (v is Timestamp) return v.toDate();
+      if (v is String) return DateTime.tryParse(v);
+      return null;
+    }
+
+    return AdminEvent(
+      id: d['id']?.toString() ?? '',
+      title: d['title']?.toString() ?? '',
+      subtitle: d['subtitle']?.toString() ?? d['location']?.toString() ?? '',
+      location: d['location']?.toString() ?? '',
+      description: d['description']?.toString() ?? '',
+      link: d['linkUrl']?.toString() ?? d['link_url']?.toString() ?? d['link']?.toString() ?? '',
+      phone: d['phone']?.toString() ?? '',
+      email: d['email']?.toString() ?? '',
+      imageUrls: imgList,
+      createdAt: parseDate(d['createdAt'] ?? d['created_at']),
+      deadlineAt: parseDate(d['deadline'] ?? d['startDate'] ?? d['start_date'] ?? d['endDate'] ?? d['end_date']),
+      eventType: d['eventType']?.toString() ?? d['event_type']?.toString() ?? '',
+      country: ((d['country']?.toString().trim().isNotEmpty ?? false))
+          ? d['country'].toString().trim()
+          : (d['locationCountry']?.toString() ?? d['location_country']?.toString() ?? '').trim(),
+      funds: d['funds']?.toString() ?? '',
+      lat: (d['lat'] as num?)?.toDouble() ?? (geoMap?['lat'] as num?)?.toDouble(),
+      lng: (d['lng'] as num?)?.toDouble() ?? (geoMap?['lng'] as num?)?.toDouble(),
+      createdByUid: d['authorUid']?.toString() ?? d['author_uid']?.toString() ?? d['createdByUid']?.toString() ?? d['created_by_uid']?.toString() ?? '',
+    );
+  }
 }
 
 class PostReport {
@@ -792,27 +841,76 @@ class CommentReport {
 }
 
 class AdminService {
+  static const String _localConfigKey = 'cached_admin_config_v1';
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
 
+  DocumentReference<Map<String, dynamic>> get _configDoc =>
+      _db.collection('adminConfig').doc('app');
+
   Stream<AdminConfig> streamConfig() async* {
+    AdminConfig current = const AdminConfig();
+
+    // 1. Instantly yield cached config if available from local storage
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localJson = prefs.getString(_localConfigKey);
+      if (localJson != null && localJson.isNotEmpty) {
+        final decoded = jsonDecode(localJson);
+        if (decoded is Map<String, dynamic>) {
+          current = AdminConfig.fromMap(decoded);
+          yield current;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fetch from Hono /dynamic/config if online
     try {
       final res = await ApiClient.instance.get('/dynamic/config');
       if (res is Map<String, dynamic>) {
-        yield AdminConfig.fromMap(res);
-      } else {
-        yield const AdminConfig();
+        current = AdminConfig.fromMap(res);
+        yield current;
+        _saveLocalCache(res);
       }
-    } catch (_) {
-      yield const AdminConfig();
-    }
+    } catch (_) {}
+
+    // 3. Listen to live Firestore snapshots for instant sync across admin panels
+    yield* _configDoc.snapshots().map((snap) {
+      if (snap.exists && snap.data() != null) {
+        final data = snap.data()!;
+        current = AdminConfig.fromMap(data);
+        _saveLocalCache(data);
+        return current;
+      }
+      return current;
+    }).handleError((_) => current);
+  }
+
+  Future<void> _saveLocalCache(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localConfigKey, jsonEncode(data));
+    } catch (_) {}
   }
 
   Future<void> saveConfig(AdminConfig cfg) async {
+    final map = cfg.toMap();
+
+    // 1. Immediately update local storage
+    await _saveLocalCache(map);
+
+    // 2. Persist to Firestore
     try {
-      await ApiClient.instance.patch('/admin/config', body: cfg.toMap());
+      await _configDoc.set(map, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('[AdminService] saveConfig error: $e');
+      debugPrint('[AdminService] Firestore saveConfig error: $e');
+    }
+
+    // 3. Persist to Hono /admin/config
+    try {
+      await ApiClient.instance.patch('/admin/config', body: map);
+    } catch (e) {
+      debugPrint('[AdminService] Hono saveConfig error: $e');
     }
   }
 
@@ -1419,36 +1517,97 @@ class AdminService {
       _db.collection('commentReports').doc(id).delete();
 
   // -------- Events --------
-  Stream<List<AdminEvent>> streamEvents() {
-    return _db
+  Stream<List<AdminEvent>> streamEvents() async* {
+    List<AdminEvent> apiEvents = [];
+    try {
+      final res = await ApiClient.instance.get('/events', queryParams: {'limit': '100'});
+      if (res is List) {
+        apiEvents = res
+            .whereType<Map<String, dynamic>>()
+            .map(AdminEvent.fromJson)
+            .toList();
+        if (apiEvents.isNotEmpty) {
+          yield apiEvents;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminService] streamEvents API fetch error: $e');
+    }
+
+    yield* _db
         .collection('events')
         .snapshots()
-        .map((s) => s.docs.map(AdminEvent.fromDoc).toList()
-          ..sort((a, b) {
-            final at = a.createdAt;
-            final bt = b.createdAt;
-            if (at == null) return 1;
-            if (bt == null) return -1;
-            return bt.compareTo(at);
-          }));
+        .map((s) {
+          final firestoreEvents = s.docs.map(AdminEvent.fromDoc).toList();
+          final mergedMap = <String, AdminEvent>{};
+          for (final ev in apiEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          for (final ev in firestoreEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          final list = mergedMap.values.toList()
+            ..sort((a, b) {
+              final at = a.createdAt;
+              final bt = b.createdAt;
+              if (at == null) return 1;
+              if (bt == null) return -1;
+              return bt.compareTo(at);
+            });
+          return list;
+        })
+        .handleError((e) {
+          debugPrint('[AdminService] Firestore events stream error: $e');
+        });
   }
 
   /// Events filtered to those created by [uid]. Used by the org_admin
   /// role so an organization only sees / manages the events they
   /// posted themselves, never anyone else's.
-  Stream<List<AdminEvent>> streamEventsCreatedBy(String uid) {
-    return _db
+  Stream<List<AdminEvent>> streamEventsCreatedBy(String uid) async* {
+    List<AdminEvent> apiEvents = [];
+    try {
+      final res = await ApiClient.instance.get('/events', queryParams: {'limit': '100'});
+      if (res is List) {
+        apiEvents = res
+            .whereType<Map<String, dynamic>>()
+            .map(AdminEvent.fromJson)
+            .where((e) => e.createdByUid == uid)
+            .toList();
+        if (apiEvents.isNotEmpty) {
+          yield apiEvents;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminService] streamEventsCreatedBy API fetch error: $e');
+    }
+
+    yield* _db
         .collection('events')
         .where('createdByUid', isEqualTo: uid)
         .snapshots()
-        .map((s) => s.docs.map(AdminEvent.fromDoc).toList()
-          ..sort((a, b) {
-            final at = a.createdAt;
-            final bt = b.createdAt;
-            if (at == null) return 1;
-            if (bt == null) return -1;
-            return bt.compareTo(at);
-          }));
+        .map((s) {
+          final firestoreEvents = s.docs.map(AdminEvent.fromDoc).toList();
+          final mergedMap = <String, AdminEvent>{};
+          for (final ev in apiEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          for (final ev in firestoreEvents) {
+            mergedMap[ev.id] = ev;
+          }
+          final list = mergedMap.values.toList()
+            ..sort((a, b) {
+              final at = a.createdAt;
+              final bt = b.createdAt;
+              if (at == null) return 1;
+              if (bt == null) return -1;
+              return bt.compareTo(at);
+            });
+          return list;
+        })
+        .handleError((e) {
+          debugPrint('[AdminService] Firestore streamEventsCreatedBy error: $e');
+        });
   }
 
   Future<String> createEvent({

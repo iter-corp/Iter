@@ -1,12 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../utils/media_cache.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../providers/admin_providers.dart';
@@ -912,6 +915,103 @@ class _EventCardState extends State<_EventCard> {
     );
   }
 
+  Widget _buildCategoryBackdrop(AdminEvent e) {
+    final type = e.eventType.trim().toLowerCase();
+    List<Color> gradientColors;
+    IconData iconData;
+
+    if (type.contains('scholarship')) {
+      gradientColors = const [Color(0xFF2E0854), Color(0xFF7B2CBF), Color(0xFF9D4EDD)];
+      iconData = Icons.school_rounded;
+    } else if (type.contains('internship')) {
+      gradientColors = const [Color(0xFF0D1B2A), Color(0xFF1B4965), Color(0xFF3A86FF)];
+      iconData = Icons.badge_rounded;
+    } else if (type.contains('competition') || type.contains('challenge')) {
+      gradientColors = const [Color(0xFF240046), Color(0xFF5A189A), Color(0xFFE056FD)];
+      iconData = Icons.emoji_events_rounded;
+    } else if (type.contains('conference') || type.contains('forum') || type.contains('summit')) {
+      gradientColors = const [Color(0xFF0B2545), Color(0xFF134074), Color(0xFF247BA0)];
+      iconData = Icons.groups_rounded;
+    } else if (type.contains('research')) {
+      gradientColors = const [Color(0xFF1D2D44), Color(0xFF3E5C76), Color(0xFF748CAB)];
+      iconData = Icons.biotech_rounded;
+    } else if (type.contains('summer') || type.contains('program')) {
+      gradientColors = const [Color(0xFF3D0814), Color(0xFF8B1E3F), Color(0xFFD64045)];
+      iconData = Icons.explore_rounded;
+    } else if (type.contains('leadership')) {
+      gradientColors = const [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)];
+      iconData = Icons.military_tech_rounded;
+    } else {
+      gradientColors = const [Color(0xFF1F1135), Color(0xFF4A154B), Color(0xFF7B2CBF)];
+      iconData = Icons.event_note_rounded;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -30,
+            bottom: -30,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Icon(
+                iconData,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final e = widget.event;
@@ -940,31 +1040,17 @@ class _EventCardState extends State<_EventCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (coverUrl != null)
+                if (coverUrl != null && coverUrl.isNotEmpty)
                   CachedNetworkImage(
                     imageUrl: coverUrl,
+                    cacheManager: kIsWeb ? null : MediaCache.images,
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
                         Container(color: const Color(0xFFE0E0E8)),
-                    errorWidget: (_, __, ___) =>
-                        Container(color: const Color(0xFFBDBDBD)),
+                    errorWidget: (_, __, ___) => _buildCategoryBackdrop(e),
                   )
                 else
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_kBrandPurple, _kBrandDeep],
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.event_rounded,
-                      color: Colors.white,
-                      size: 42,
-                    ),
-                  ),
+                  _buildCategoryBackdrop(e),
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -1895,12 +1981,24 @@ class _EventMapSheet extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: cover != null
+                child: (cover != null && cover.isNotEmpty)
                     ? CachedNetworkImage(
                         imageUrl: cover,
+                        cacheManager: kIsWeb ? null : MediaCache.images,
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          width: 64,
+                          height: 64,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [_kBrandPurple, _kBrandDeep],
+                            ),
+                          ),
+                          child: const Icon(Icons.event_rounded,
+                              color: Colors.white),
+                        ),
                       )
                     : Container(
                         width: 64,

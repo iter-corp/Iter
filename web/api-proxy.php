@@ -15,8 +15,32 @@ if (file_exists(__DIR__ . '/.backend_port')) {
 }
 
 $backendHost = "http://127.0.0.1:{$targetPort}";
+
+// Resolve incoming request URI
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+// Remove any leading script path if present (e.g. /api-proxy.php/api/...)
+$requestUri = preg_replace('#^/api-proxy\.php#', '', $requestUri);
+if (empty($requestUri)) {
+    $requestUri = '/';
+}
+
 $targetUrl = $backendHost . $requestUri;
+
+// Handle CORS preflight immediately
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, x-firebase-token, apikey, Range, X-Requested-With, Origin, Accept');
+    header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, Retry-After');
+    header('Access-Control-Max-Age: 86400');
+    http_response_code(204);
+    exit;
+}
+
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, x-firebase-token, apikey, Range, X-Requested-With, Origin, Accept');
+header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, Retry-After');
 
 $ch = curl_init($targetUrl);
 
@@ -55,7 +79,15 @@ if (isset($_SERVER['CONTENT_TYPE']) && !empty($_SERVER['CONTENT_TYPE'])) {
     }
 }
 
-$incomingHeaders[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+// Get the real client IP (supporting Cloudflare, reverse proxies, and direct connections)
+$clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] 
+    ?? (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]) : null)
+    ?? $_SERVER['HTTP_X_REAL_IP'] 
+    ?? $_SERVER['REMOTE_ADDR'] 
+    ?? '127.0.0.1';
+
+$incomingHeaders[] = 'X-Forwarded-For: ' . $clientIp;
+$incomingHeaders[] = 'X-Real-IP: ' . $clientIp;
 $incomingHeaders[] = 'X-Forwarded-Proto: ' . ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http');
 $incomingHeaders[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 

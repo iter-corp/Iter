@@ -5,11 +5,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      android_track:
-        description: 'Google Play track (internal, alpha, beta, production)'
-        required: false
-        default: 'internal'
 
 concurrency:
   group: production-release
@@ -88,6 +83,12 @@ jobs:
             sleep 5
           done
 
+      - name: Build TypeScript Dist
+        run: |
+          cd backend-hono
+          npm ci
+          npm run build
+
       - name: Sync Backend Files to Production Server
         run: |
           rsync -avz --delete \
@@ -104,11 +105,13 @@ jobs:
             export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/opt/alt/alt-nodejs22/root/usr/bin:~/.npm-global/bin:$PATH
             cd ~/backend-hono
             npm install
+            npm run build || true
             if [ -f .env ]; then
               npm run db:migrate || true
               npm run db:seed || true
             fi
-            pm2 reload ecosystem.config.json || pm2 restart ecosystem.config.json || pm2 start ecosystem.config.json
+            pm2 delete iter-backend || true
+            pm2 start ecosystem.config.json
             pm2 save
           '
 
@@ -159,275 +162,3 @@ jobs:
             --exclude 'uploads' \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT || '65002' }} -o StrictHostKeyChecking=no" \
             build/web/ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:$TARGET_DIR/
-
-  # ─────────────────────────────────────────────────────────────
-  #  4. Flutter Android Release (Google Play Console)
-  # ─────────────────────────────────────────────────────────────
-  release-android:
-    name: Release Android (Google Play Console)
-    needs: validate
-    runs-on: ubuntu-latest
-    env:
-      PLAY_TRACK: ${{ inputs.android_track || vars.PLAY_STORE_TRACK || 'internal' }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Configure Android Signing Keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 || secrets.PLAY_STORE_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Configuring release signing keystore..."
-            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-            echo "storePassword=$KEYSTORE_PASSWORD" > android/key.properties
-            echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
-            echo "keyAlias=$KEY_ALIAS" >> android/key.properties
-            echo "storeFile=upload-keystore.jks" >> android/key.properties
-          else
-            echo "No keystore secret provided; relying on existing Gradle signing configuration"
-          fi
-
-      - name: Build Android Release AAB
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-        run: |
-          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
-          BUILD_NUMBER=$(( 2000 + RUN_NUMBER ))
-          echo "Building Android AAB: version 1.1.6, build number $BUILD_NUMBER"
-          flutter build appbundle --release \
-            --build-name=1.1.6 \
-            --build-number=$BUILD_NUMBER \
-            --android-skip-build-dependency-validation
-
-      - name: Upload Android AAB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
-          retention-days: 30
-
-      - name: Check Play Store Credentials
-        id: check_play_creds
-        env:
-          PLAY_CREDS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT || secrets.PLAY_STORE_JSON_KEY || secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || secrets.PLAY_CONFIG_JSON || secrets.PLAY_CONSOLE_JSON }}
-        run: |
-          if [ -n "$PLAY_CREDS" ]; then
-            echo "has_creds=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_creds=false" >> $GITHUB_OUTPUT
-            echo "::notice::Google Play credentials not configured in GitHub Secrets. Skipping Play Store upload. The signed AAB has been saved to workflow artifacts."
-          fi
-
-      - name: Upload to Google Play Console
-        if: steps.check_play_creds.outputs.has_creds == 'true'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT || secrets.PLAY_STORE_JSON_KEY || secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || secrets.PLAY_CONFIG_JSON || secrets.PLAY_CONSOLE_JSON }}
-          packageName: com.iter.ai
-          releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: ${{ env.PLAY_TRACK }}
-          status: completed
-
-  # ─────────────────────────────────────────────────────────────
-  #  5. Flutter iOS Release (App Store Connect / TestFlight)
-  # ─────────────────────────────────────────────────────────────
-  release-ios:
-    name: Release iOS (App Store Connect / TestFlight)
-    needs: validate
-    runs-on: macos-15
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Select Latest Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest-stable'
-
-      - name: Install Apple Certificate and Provisioning Profile
-        id: apple_auth
-        env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 || secrets.APPLE_CERTIFICATE_BASE64 || secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD || secrets.APPLE_CERTIFICATE_PASSWORD || secrets.P12_PASSWORD }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 || secrets.APPLE_PROVISIONING_PROFILE_BASE64 || secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary_runner_keychain_pass' }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID || secrets.ASC_KEY_ID || secrets.APPLE_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID || secrets.ASC_ISSUER_ID || secrets.APPLE_ISSUER_ID }}
-          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY || secrets.ASC_PRIVATE_KEY || secrets.APPLE_PRIVATE_KEY }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH || true
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH || true
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH || true
-          security default-keychain -s $KEYCHAIN_PATH || true
-
-          if [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ] && [ -n "$APP_STORE_CONNECT_KEY_ID" ]; then
-            echo "Configuring App Store Connect API private key..."
-            mkdir -p ~/.appstoreconnect/private_keys ~/.private_keys
-            echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-            echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-            chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-
-            # Synchronize certificates and profiles directly from App Store Connect API
-            node ios/sync_apple_credentials.cjs || true
-          fi
-
-          if [ -n "$BUILD_CERTIFICATE_BASE64" ] && [ -n "$BUILD_PROVISION_PROFILE_BASE64" ]; then
-            echo "Installing Apple distribution certificate from repository secrets..."
-            CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-            PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-
-            echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > $CERTIFICATE_PATH
-            echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > $PP_PATH
-
-            security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-            security list-keychain -d user -s $KEYCHAIN_PATH $(security list-keychains -d user | tr -d '"')
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH || true
-            echo "Installed Code Signing Identities:"
-            security find-identity -v -p codesigning $KEYCHAIN_PATH || true
-
-            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-
-            security cms -D -i $PP_PATH > $RUNNER_TEMP/profile.plist 2>/dev/null || true
-            if [ -f "$RUNNER_TEMP/profile.plist" ]; then
-              PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" $RUNNER_TEMP/profile.plist 2>/dev/null || true)
-              PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" $RUNNER_TEMP/profile.plist 2>/dev/null || true)
-              TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" $RUNNER_TEMP/profile.plist 2>/dev/null || true)
-            fi
-
-            if [ -z "$PROFILE_UUID" ]; then
-              PROFILE_UUID=$(strings $PP_PATH | grep -A1 -m1 "<key>UUID</key>" | grep -v "<key>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n\r ')
-            fi
-            if [ -z "$PROFILE_NAME" ]; then
-              PROFILE_NAME=$(strings $PP_PATH | grep -A1 -m1 "<key>Name</key>" | grep -v "<key>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n\r ')
-            fi
-            if [ -z "$TEAM_ID" ]; then
-              TEAM_ID=$(strings $PP_PATH | grep -A2 -m1 "<key>TeamIdentifier</key>" | grep "<string>" | sed -e 's/<[^>]*>//g' | tr -d '\t\n\r ')
-            fi
-
-            if [ -n "$PROFILE_UUID" ]; then
-              cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
-            fi
-            cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
-            echo "Detected Profile Name: $PROFILE_NAME"
-            echo "Detected Profile UUID: $PROFILE_UUID"
-            echo "Detected Team ID: $TEAM_ID"
-
-            echo "CODE_SIGN_STYLE = Manual" >> ios/Flutter/Release.xcconfig
-            echo "CODE_SIGN_IDENTITY = Apple Distribution" >> ios/Flutter/Release.xcconfig
-            echo "CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution" >> ios/Flutter/Release.xcconfig
-            if [ -n "$PROFILE_NAME" ]; then
-              echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_NAME" >> ios/Flutter/Release.xcconfig
-            fi
-            if [ -n "$PROFILE_UUID" ]; then
-              echo "PROVISIONING_PROFILE = $PROFILE_UUID" >> ios/Flutter/Release.xcconfig
-            fi
-            if [ -n "$TEAM_ID" ]; then
-              echo "DEVELOPMENT_TEAM = $TEAM_ID" >> ios/Flutter/Release.xcconfig
-            fi
-
-            PROFILE_KEY="${PROFILE_NAME:-$PROFILE_UUID}"
-            if [ -n "$PROFILE_KEY" ]; then
-              /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :signingStyle manual" ios/ExportOptions.plist || true
-              /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ios/ExportOptions.plist 2>/dev/null || true
-              /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.iter.ai string $PROFILE_KEY" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.iter.ai $PROFILE_KEY" ios/ExportOptions.plist || true
-            fi
-            if [ -n "$TEAM_ID" ]; then
-              /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" ios/ExportOptions.plist 2>/dev/null || true
-            fi
-            echo "Apple signing certificate and provisioning profile installed successfully."
-          else
-            echo "::notice::Direct Apple Certificate/Profile secrets not found. Using preconfigured ios/ExportOptions.plist with Team ID WAC85HB79P."
-          fi
-
-      - name: Disable Swift Package Manager (Use CocoaPods)
-        run: flutter config --no-enable-swift-package-manager
-
-      - name: Build Flutter iOS Release IPA
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary_runner_keychain_pass' }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          if [ -f "$KEYCHAIN_PATH" ]; then
-            security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH || true
-            security default-keychain -s $KEYCHAIN_PATH || true
-          fi
-
-          [ -f .env ] || echo "API_BASE_URL=https://iterglobal.icu/api/v1" > .env
-          BUILD_NUMBER=$(( 2000 + RUN_NUMBER ))
-          echo "Building iOS IPA: version 1.1.6, build number $BUILD_NUMBER"
-          flutter pub get
-
-          if [ -f "ios/ExportOptions.plist" ]; then
-            flutter build ipa --release \
-              --build-name=1.1.6 \
-              --build-number=$BUILD_NUMBER \
-              --export-options-plist=ios/ExportOptions.plist
-          else
-            flutter build ipa --release \
-              --build-name=1.1.6 \
-              --build-number=$BUILD_NUMBER
-          fi
-
-      - name: Upload iOS IPA Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-ipa
-          path: build/ios/ipa/*.ipa
-          retention-days: 30
-
-      - name: Upload to App Store Connect / TestFlight
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID || secrets.ASC_KEY_ID || secrets.APPLE_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID || secrets.ASC_ISSUER_ID || secrets.APPLE_ISSUER_ID }}
-          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY || secrets.ASC_PRIVATE_KEY || secrets.APPLE_PRIVATE_KEY }}
-        run: |
-          IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -n 1)
-          if [ -z "$IPA_PATH" ]; then
-            echo "::error::No generated IPA file found in build/ios/ipa"
-            exit 1
-          fi
-          echo "Found IPA: $IPA_PATH"
-
-          if [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ] && [ -n "$APP_STORE_CONNECT_KEY_ID" ]; then
-            mkdir -p ~/.appstoreconnect/private_keys ~/.private_keys
-            echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-            echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-
-            echo "Uploading IPA to App Store Connect / TestFlight..."
-            xcrun altool --upload-app \
-              --type ios \
-              --file "$IPA_PATH" \
-              --apiKey "$APP_STORE_CONNECT_KEY_ID" \
-              --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
-            echo "Upload to TestFlight complete."
-          else
-            echo "::error::App Store Connect API key secrets are not configured."
-            exit 1
-          fi

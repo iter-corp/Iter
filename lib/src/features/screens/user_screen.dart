@@ -12,6 +12,7 @@ import '../../providers/profile_visitor_providers.dart';
 import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/skeleton_loader.dart';
 import '../widgets/user_profile_widget.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart' show PostDetailScreen, PostThumbTile;
@@ -417,7 +418,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       backgroundColor: Colors.transparent,
       body: AppPageBackground(
         child: userAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SkeletonProfile(isOtherUser: true),
           error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (user) {
             if (user == null) {
@@ -681,10 +682,7 @@ class _UserPostsGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(userPostsProvider(uid));
     return postsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const SkeletonGrid(),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
         child: Center(child: Text(context.t.errorWithMessage(e))),
@@ -711,10 +709,7 @@ class _UserRepostsGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repostsAsync = ref.watch(userRepostsProvider(uid));
     return repostsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const SkeletonGrid(),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
         child: Center(child: Text(context.t.errorWithMessage(e))),
@@ -754,10 +749,7 @@ class _UserQaActivitySectionState
     Widget activityList(AsyncValue<List<Post>> asyncPosts,
         {required bool asked}) {
       return asyncPosts.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.all(40),
-          child: Center(child: CircularProgressIndicator()),
-        ),
+        loading: () => const SkeletonCommentList(count: 3),
         error: (e, _) => Padding(
           padding: const EdgeInsets.all(24),
           child: Center(child: Text(context.t.errorWithMessage(e))),

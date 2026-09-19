@@ -343,6 +343,7 @@ userRoutes.delete('/:uid/follow', requireAuth, async (c) => {
   return c.json({ success: true, message: 'Unfollowed successfully' });
 });
 
+// ── 7b. Get Followers ───────────────────────────────────────────────────────
 userRoutes.get('/:uid/followers', optionalAuth, async (c) => {
   const targetUid = c.req.param('uid')!;
   const viewerUid = c.get('uid');
@@ -387,6 +388,7 @@ userRoutes.get('/:uid/followers', optionalAuth, async (c) => {
   });
 });
 
+// ── 7c. Get Following ───────────────────────────────────────────────────────
 userRoutes.get('/:uid/following', optionalAuth, async (c) => {
   const targetUid = c.req.param('uid')!;
   const viewerUid = c.get('uid');
@@ -431,6 +433,7 @@ userRoutes.get('/:uid/following', optionalAuth, async (c) => {
   });
 });
 
+// ── 7d. Get Follow Status ───────────────────────────────────────────────────
 userRoutes.get('/:uid/follow-status', requireAuth, async (c) => {
   const targetUid = c.req.param('uid')!;
   const viewerUid = c.get('uid');
@@ -457,6 +460,83 @@ userRoutes.get('/:uid/follow-status', requireAuth, async (c) => {
   });
 });
 
+// ── 7e. Get Follow Requests ─────────────────────────────────────────────────
+userRoutes.get('/:uid/follow-requests', requireAuth, async (c) => {
+  const uid = c.get('uid');
+  const targetUid = c.req.param('uid')!;
+  if (uid !== targetUid) {
+    throw new AppError('Forbidden', 403, 'FORBIDDEN');
+  }
+  const rows = await db
+    .select({ followerUid: follows.followerUid })
+    .from(follows)
+    .where(and(eq(follows.targetUid, uid), eq(follows.status, 'pending')))
+    .orderBy(desc(follows.createdAt));
+
+  const uids = rows.map((r) => r.followerUid);
+  return c.json({ success: true, data: uids });
+});
+
+// ── 7f. Accept Follow Request ───────────────────────────────────────────────
+userRoutes.post('/:uid/follow-requests/:requesterUid/accept', requireAuth, async (c) => {
+  const uid = c.get('uid');
+  const targetUid = c.req.param('uid')!;
+  const requesterUid = c.req.param('requesterUid')!;
+  if (uid !== targetUid) {
+    throw new AppError('Forbidden', 403, 'FORBIDDEN');
+  }
+
+  const [request] = await db
+    .select()
+    .from(follows)
+    .where(and(eq(follows.followerUid, requesterUid), eq(follows.targetUid, uid), eq(follows.status, 'pending')))
+    .limit(1);
+
+  if (!request) {
+    throw new AppError('Follow request not found', 404, 'NOT_FOUND');
+  }
+
+  await db
+    .update(follows)
+    .set({ status: 'active' })
+    .where(and(eq(follows.followerUid, requesterUid), eq(follows.targetUid, uid)));
+
+  await db.update(users).set({ followersCount: sql`${users.followersCount} + 1` }).where(eq(users.id, uid));
+  await db.update(users).set({ followingCount: sql`${users.followingCount} + 1` }).where(eq(users.id, requesterUid));
+
+  // Promote mutual direct chat if exists
+  const [reciprocal] = await db
+    .select()
+    .from(follows)
+    .where(and(eq(follows.followerUid, uid), eq(follows.targetUid, requesterUid), eq(follows.status, 'active')))
+    .limit(1);
+
+  if (reciprocal) {
+    const sorted = [requesterUid, uid].sort();
+    const chatId = `${sorted[0]}_${sorted[1]}`;
+    await db.update(chats).set({
+      acceptedBy: [requesterUid, uid],
+    }).where(eq(chats.id, chatId));
+  }
+
+  return c.json({ success: true, accepted: true });
+});
+
+// ── 7g. Reject Follow Request ───────────────────────────────────────────────
+userRoutes.post('/:uid/follow-requests/:requesterUid/reject', requireAuth, async (c) => {
+  const uid = c.get('uid');
+  const targetUid = c.req.param('uid')!;
+  const requesterUid = c.req.param('requesterUid')!;
+  if (uid !== targetUid) {
+    throw new AppError('Forbidden', 403, 'FORBIDDEN');
+  }
+
+  await db
+    .delete(follows)
+    .where(and(eq(follows.followerUid, requesterUid), eq(follows.targetUid, uid), eq(follows.status, 'pending')));
+
+  return c.json({ success: true, rejected: true });
+});
 // ── 8. Block / Unblock ──────────────────────────────────────────────────────
 userRoutes.post('/:uid/block', requireAuth, async (c) => {
   const targetUid = c.req.param('uid')!;

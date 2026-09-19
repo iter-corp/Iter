@@ -338,6 +338,11 @@ const Map<String, String> ckbStrings = {
   'action_cannot_be_undone': 'ئەم هەنگاوە ناتوانرێت پاشگەزکرێتەوە.',
   'something_went_wrong': 'هەڵەیەک ڕوویدا',
   'try_again': 'هەوڵبدەرەوە',
+  'server_issues_title': 'ڕووبەڕووی کێشەی تەکنیکی بووینەتەوە',
+  'server_issues_subtitle':
+      'سێرڤەر لەم کاتەدا بەردەست نییە یان لەژێر چاککردنەوەدایە. تیمەکەمان سەرقاڵی چارەسەرکردنین. ناوەڕۆکی پاشەکەوتکراو بە ئۆفلاین نیشاندەدرێت.',
+  'offline_content_banner':
+      'دۆخی ئۆفلاین: نیشاندانی ناوەڕۆکی پاشەکەوتکراو. پەیوەستبوون بە سێرڤەر...',
   'permission_denied': 'مۆڵەت ڕەتکرایەوە',
   'camera_permission_needed': 'مۆڵەتی کامێرا پێویستە',
   'gallery_permission_needed': 'مۆڵەتی گەلەری وێنەکان پێویستە',
@@ -1217,6 +1222,7 @@ const Map<String, String> ckbStrings = {
   'admin_flag_stories': 'ستۆرییەکان چالاککراون',
   'admin_flag_reposts': 'ڕیپۆست چالاککراوە',
   'admin_flag_translate': 'وەرگێڕان چالاککراوە',
+  'admin_flag_wikipedia': 'پێگەی ویکیپیدیا چالاککراوە',
   'admin_section_welcome_message': 'پەیامی بەخێرهاتن (بەکارهێنەرانی نوێ)',
   'admin_flag_welcome_message':
       'نیشاندانی تابلۆی بەخێرهاتن بۆ بەکارهێنەرانی نوێ لە یەکەم چوونەژوورەوەدا',

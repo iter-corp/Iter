@@ -402,6 +402,9 @@ class AppStrings {
   String get actionCannotBeUndone => _get('action_cannot_be_undone');
   String get somethingWentWrong => _get('something_went_wrong');
   String get tryAgain => _get('try_again');
+  String get serverIssuesTitle => _get('server_issues_title');
+  String get serverIssuesSubtitle => _get('server_issues_subtitle');
+  String get offlineContentBanner => _get('offline_content_banner');
   String get permissionDenied => _get('permission_denied');
   String get cameraPermissionNeeded => _get('camera_permission_needed');
   String get galleryPermissionNeeded => _get('gallery_permission_needed');
@@ -1442,6 +1445,7 @@ class AppStrings {
   String get adminFlagStories => _get('admin_flag_stories');
   String get adminFlagReposts => _get('admin_flag_reposts');
   String get adminFlagTranslate => _get('admin_flag_translate');
+  String get adminFlagWikipedia => _get('admin_flag_wikipedia');
   String get adminSectionWelcomeMessage => _get('admin_section_welcome_message');
   String get adminFlagWelcomeMessage => _get('admin_flag_welcome_message');
   String get adminWelcomeMessageHint => _get('admin_welcome_message_hint');

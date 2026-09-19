@@ -17,6 +17,7 @@ import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/comment_report_sheet.dart';
+import '../widgets/skeleton_loader.dart';
 import 'post_detail_screen.dart';
 
 class QaThreadScreen extends ConsumerStatefulWidget {
@@ -185,8 +186,10 @@ class _QaThreadScreenState extends ConsumerState<QaThreadScreen> {
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
                         children: [
                           _QuestionCard(post: post),
-                          const SizedBox(height: 18),
-                          const Center(child: CircularProgressIndicator()),
+                          const SizedBox(height: 12),
+                          const SkeletonCommentTile(),
+                          const SkeletonCommentTile(),
+                          const SkeletonCommentTile(),
                         ],
                       ),
                       error: (e, _) => ListView(

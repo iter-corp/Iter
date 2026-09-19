@@ -5,6 +5,7 @@ import '../features/model/post_model.dart';
 import '../services/nasa_apod_service.dart';
 import '../services/post_service.dart';
 import '../services/wikimedia_feed_service.dart';
+import 'admin_providers.dart';
 import 'auth_providers.dart';
 import 'block_providers.dart';
 import 'follow_providers.dart';
@@ -21,6 +22,11 @@ final wikimediaFeedServiceProvider =
     Provider<WikimediaFeedService>((_) => WikimediaFeedService());
 
 final wikimediaFeedProvider = FutureProvider<List<Post>>((ref) async {
+  final cfg = ref.watch(adminConfigProvider).valueOrNull;
+  final enabled = cfg?.wikipediaEnabled ?? true;
+  if (!enabled) {
+    return const <Post>[];
+  }
   return ref.watch(wikimediaFeedServiceProvider).fetchFeed();
 });
 
@@ -92,17 +98,23 @@ class HomeFeedItem {
   const HomeFeedItem({required this.post, required this.isQa});
 }
 
+final isHomeFeedOfflineProvider = Provider<bool>((ref) {
+  final feed = ref.watch(feedProvider);
+  return feed.hasError;
+});
+
 /// The home feed: regular posts, NASA APOD posts, Wikimedia featured cards, and standalone Discuss questions
 /// merged into a single list, newest first. Replaces the old separate
 /// Feed/Discuss tabs.
 final homeFeedProvider = Provider<AsyncValue<List<HomeFeedItem>>>((ref) {
+  final postService = ref.watch(postServiceProvider);
   final feed = ref.watch(feedProvider);
   final qa = ref.watch(qaFeedProvider);
   final nasa = ref.watch(nasaFeedProvider);
   final wiki = ref.watch(wikimediaFeedProvider);
 
-  final feedPosts = feed.value ?? const <Post>[];
-  final qaPosts = qa.value ?? const <Post>[];
+  final feedPosts = feed.value ?? postService.cachedFeed;
+  final qaPosts = qa.value ?? postService.cachedQaFeed;
   final nasaPosts = nasa.value ?? const <Post>[];
   final wikiPosts = wiki.value ?? const <Post>[];
 
@@ -161,10 +173,7 @@ final postDiscussionsProvider =
 });
 
 final userPostsProvider = StreamProvider.family<List<Post>, String>((ref, uid) {
-  // Gate on auth being settled. posts require signedIn() in Firestore rules;
-  // opening the stream before the token propagates causes permission-denied.
-  final authed = ref.watch(authStateProvider.select((a) => a.value?.uid));
-  if (authed == null) return const Stream.empty();
+  if (uid.isEmpty) return const Stream.empty();
   return ref.watch(postServiceProvider).streamUserPosts(uid);
 });
 

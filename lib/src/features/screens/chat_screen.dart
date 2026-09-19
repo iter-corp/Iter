@@ -43,6 +43,7 @@ import '../widgets/location_map.dart';
 import '../widgets/mention_text.dart';
 import '../widgets/message_reactions_bar.dart';
 import '../widgets/poll_widgets.dart';
+import '../widgets/skeleton_loader.dart';
 import 'chat_media_screen.dart';
 import 'group_settings_screen.dart';
 import 'post_detail_screen.dart';
@@ -1672,7 +1673,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             // MESSAGES
             Expanded(
               child: messagesAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const SkeletonChatMessages(),
                 error: (e, _) =>
                     Center(child: Text(context.t.errorWithMessage(e))),
                 data: (msgs) {

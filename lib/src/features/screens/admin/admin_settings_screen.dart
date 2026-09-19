@@ -232,7 +232,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         // _cfg already carries the edited list fields.
       );
       await ref.read(adminServiceProvider).saveConfig(next);
+      ref.invalidate(adminConfigProvider);
       if (mounted) {
+        setState(() => _cfg = next);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.t.adminSaved)),
         );
@@ -315,6 +317,12 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                         value: _cfg.translateEnabled,
                         onChanged: (v) => setState(
                             () => _cfg = _cfg.copyWith(translateEnabled: v)),
+                      ),
+                      _flag(
+                        title: context.t.adminFlagWikipedia,
+                        value: _cfg.wikipediaEnabled,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(wikipediaEnabled: v)),
                       ),
                       const SizedBox(height: 16),
                       _section(context.t.adminSectionWelcomeMessage),

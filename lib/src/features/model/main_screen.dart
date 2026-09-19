@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../providers/chat_providers.dart';
 import '../../providers/post_providers.dart';
 import '../../services/chat_service.dart';
@@ -17,16 +19,25 @@ import '../widgets/desktop_nav_sidebar.dart';
 import '../widgets/desktop_right_sidebar.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
-  const MainScreen({super.key});
+  final int initialTab;
+  const MainScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
   final ScrollController _homeScrollController = ScrollController();
   late final PageController _pageController;
+
+  static const List<String> _tabRoutes = [
+    '/home',
+    '/events',
+    '/explore',
+    '/messages',
+    '/profile',
+  ];
 
   final List<String> _navIcons = [
     "assets/icons/Home.svg",
@@ -55,8 +66,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialTab.clamp(0, 4);
     _pageController = PageController(initialPage: _selectedIndex);
     _trackTab(_selectedIndex);
+  }
+
+  @override
+  void didUpdateWidget(covariant MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab && widget.initialTab != _selectedIndex) {
+      final targetIndex = widget.initialTab.clamp(0, 4);
+      setState(() => _selectedIndex = targetIndex);
+      _trackTab(targetIndex);
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(targetIndex);
+      }
+    }
   }
 
   @override
@@ -86,6 +111,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
     }
+    if (index >= 0 && index < _tabRoutes.length) {
+      context.go(_tabRoutes[index]);
+    }
   }
 
   // 📌 SECTION: Resolve background color per tab
@@ -111,54 +139,44 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           children: [
             const AppPageBackground(child: SizedBox.expand()),
             SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1440),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Left Navigation Sidebar (Compact rail on Tablets, Full on Desktop) ──
-                      DesktopNavSidebar(
-                        selectedIndex: _selectedIndex,
-                        onTabSelected: _onNavTap,
-                        unreadChats: unreadChats,
-                        isCompact: isTablet,
-                      ),
-
-                      // ── Center Content Column (Feed / Active Screen) ──
-                      Expanded(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: PageView(
-                              controller: _pageController,
-                              physics: const NeverScrollableScrollPhysics(),
-                              onPageChanged: (index) {
-                                if (_selectedIndex != index) {
-                                  setState(() => _selectedIndex = index);
-                                  _trackTab(index);
-                                }
-                              },
-                              children: [
-                                HomeBody(scrollController: _homeScrollController),
-                                const EventBody(),
-                                const ExploreBody(),
-                                const MessageBody(),
-                                const ProfileScreen(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // ── Right Sidebar (Widgets, Upcoming Events, Trending) ──
-                      if (showRightSidebar)
-                        DesktopRightSidebar(
-                          onTabSelected: _onNavTap,
-                        ),
-                    ],
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Left Navigation Sidebar (Compact rail on Tablets, Full on Desktop) ──
+                  DesktopNavSidebar(
+                    selectedIndex: _selectedIndex,
+                    onTabSelected: _onNavTap,
+                    unreadChats: unreadChats,
+                    isCompact: isTablet,
                   ),
-                ),
+
+                  // ── Center Content Column (Feed / Active Screen) ──
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (index) {
+                        if (_selectedIndex != index) {
+                          setState(() => _selectedIndex = index);
+                          _trackTab(index);
+                        }
+                      },
+                      children: [
+                        HomeBody(scrollController: _homeScrollController),
+                        const EventBody(),
+                        const ExploreBody(),
+                        const MessageBody(),
+                        const ProfileScreen(),
+                      ],
+                    ),
+                  ),
+
+                  // ── Right Sidebar (Widgets, Upcoming Events, Trending) ──
+                  if (showRightSidebar)
+                    DesktopRightSidebar(
+                      onTabSelected: _onNavTap,
+                    ),
+                ],
               ),
             ),
           ],

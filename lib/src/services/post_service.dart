@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/model/post_model.dart';
 import 'api_client.dart';
@@ -24,9 +27,65 @@ class PostBlockedException implements Exception {
 }
 
 class PostService {
+  static const String _cachedFeedKey = 'offline_cached_feed_v1';
+  static const String _cachedQaFeedKey = 'offline_cached_qa_feed_v1';
+
   static final PostService _instance = PostService._internal();
   factory PostService() => _instance;
-  PostService._internal();
+  PostService._internal() {
+    _loadOfflineCache();
+  }
+
+  Future<void> _loadOfflineCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final feedJson = prefs.getString(_cachedFeedKey);
+      if (feedJson != null && feedJson.isNotEmpty) {
+        final decoded = jsonDecode(feedJson);
+        if (decoded is List && _cachedFeed.isEmpty) {
+          _cachedFeed = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((m) {
+                _updatePostLocalState(m);
+                return Post.fromJson(m);
+              })
+              .toList();
+          if (_cachedFeed.isNotEmpty) {
+            _feedController.add(_cachedFeed);
+          }
+        }
+      }
+
+      final qaJson = prefs.getString(_cachedQaFeedKey);
+      if (qaJson != null && qaJson.isNotEmpty) {
+        final decoded = jsonDecode(qaJson);
+        if (decoded is List && _cachedQaFeed.isEmpty) {
+          _cachedQaFeed = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((m) {
+                _updatePostLocalState(m);
+                return Post.fromJson(m);
+              })
+              .toList();
+          if (_cachedQaFeed.isNotEmpty) {
+            _qaFeedController.add(_cachedQaFeed);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[PostService] _loadOfflineCache error: $e');
+    }
+  }
+
+  Future<void> _saveOfflineCache(String key, List rawList) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, jsonEncode(rawList));
+    } catch (_) {}
+  }
+
+  List<Post> get cachedFeed => List.unmodifiable(_cachedFeed);
+  List<Post> get cachedQaFeed => List.unmodifiable(_cachedQaFeed);
 
   final ProfanityFilterService _profanityFilter = ProfanityFilterService();
 
@@ -182,6 +241,9 @@ class PostService {
   }
 
   Future<void> refreshFeed({int limit = 50}) async {
+    if (_cachedFeed.isNotEmpty) {
+      _feedController.add(_cachedFeed);
+    }
     try {
       final res = await ApiClient.instance.get('/posts', queryParams: {'limit': '$limit'});
       if (res is List) {
@@ -193,6 +255,7 @@ class PostService {
             })
             .toList();
         _feedController.add(_cachedFeed);
+        _saveOfflineCache(_cachedFeedKey, res);
       }
     } catch (e) {
       debugPrint('[PostService] refreshFeed error: $e');
@@ -211,6 +274,9 @@ class PostService {
   }
 
   Future<void> refreshQaFeed({int limit = 80}) async {
+    if (_cachedQaFeed.isNotEmpty) {
+      _qaFeedController.add(_cachedQaFeed);
+    }
     try {
       final res = await ApiClient.instance.get('/posts', queryParams: {
         'limit': '$limit',
@@ -225,6 +291,7 @@ class PostService {
             })
             .toList();
         _qaFeedController.add(_cachedQaFeed);
+        _saveOfflineCache(_cachedQaFeedKey, res);
       }
     } catch (e) {
       debugPrint('[PostService] refreshQaFeed error: $e');
@@ -235,19 +302,49 @@ class PostService {
   }
 
   Stream<List<Post>> streamUserPosts(String uid) async* {
+    List<Post> apiPosts = [];
     try {
       final res = await ApiClient.instance.get('/posts', queryParams: {'authorUid': uid});
       if (res is List) {
-        yield res
+        apiPosts = res
             .whereType<Map<String, dynamic>>()
-            .map(Post.fromJson)
+            .map((m) {
+              _updatePostLocalState(m);
+              return Post.fromJson(m);
+            })
             .toList();
-      } else {
-        yield <Post>[];
+        if (apiPosts.isNotEmpty) {
+          yield apiPosts;
+        }
       }
-    } catch (_) {
-      yield <Post>[];
+    } catch (e) {
+      debugPrint('[PostService] streamUserPosts API error: $e');
     }
+
+    yield* FirebaseFirestore.instance
+        .collection('posts')
+        .where('authorUid', isEqualTo: uid)
+        .snapshots()
+        .map((s) {
+          final firestorePosts = s.docs.map(Post.fromDoc).toList();
+          final map = <String, Post>{};
+          for (final p in apiPosts) {
+            map[p.id] = p;
+          }
+          for (final p in firestorePosts) {
+            map[p.id] = p;
+          }
+          final list = map.values.toList()
+            ..sort((a, b) {
+              final at = a.createdAt ?? DateTime(0);
+              final bt = b.createdAt ?? DateTime(0);
+              return bt.compareTo(at);
+            });
+          return list;
+        })
+        .handleError((e) {
+          debugPrint('[PostService] Firestore streamUserPosts error: $e');
+        });
   }
 
   Stream<List<Post>> streamUserQaAsked(String uid, {int limit = 120}) async* {

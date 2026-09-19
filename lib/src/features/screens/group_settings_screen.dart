@@ -8,6 +8,7 @@ import '../../navigation/user_profile_nav.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/chat_providers.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// Group chat settings screen — shows the member list (with the admin
 /// badge for the user who created the group), gives non-admins a "Leave
@@ -153,7 +154,7 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
         centerTitle: false,
       ),
       body: chatDocAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonUserList(count: 6),
         error: (e, _) => Center(child: Text(context.t.groupSettingsError(e))),
         data: (data) {
           if (data == null) {

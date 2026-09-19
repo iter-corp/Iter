@@ -8,6 +8,7 @@ import '../../../services/contact_request_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
 import '../../widgets/app_page_background.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../contact_us_screen.dart';
 
 /// Admin-side list of every contact-us thread. Tapping a row opens [ContactThreadScreen], which the
@@ -59,10 +60,7 @@ class _AdminContactRequestsScreenState
               ),
             ),
             async.when<Widget>(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              ),
+              loading: () => SkeletonListTile.sliver(count: 6),
               error: (e, _) => SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: Text(context.t.adminCouldNotLoad(e))),

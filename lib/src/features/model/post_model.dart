@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../utils/media_cache.dart';
 
 class Post {
   final String id;
@@ -55,12 +56,8 @@ class Post {
   });
 
   static String? _sanitizeMediaUrl(String? url) {
-    if (url == null) return null;
-    const legacyPrefix = 'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public';
-    if (url.startsWith(legacyPrefix)) {
-      return url.replaceFirst(legacyPrefix, 'https://iterglobal.icu/uploads');
-    }
-    return url;
+    if (url == null || url.trim().isEmpty) return null;
+    return normalizeMediaUrl(url);
   }
 
   static List<String> _sanitizeMediaUrls(List? list) {

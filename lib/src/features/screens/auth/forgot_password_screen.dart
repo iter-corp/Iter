@@ -1,18 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_strings.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../theme/app_theme.dart';
+import '../../widgets/app_page_background.dart';
 import '../../widgets/primary_action_button.dart';
+import 'widgets/auth_desktop_wrapper.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
@@ -63,9 +65,202 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
+    return AuthDesktopWrapper(
+      mobileContent: _buildMobileLayout(context),
+      cardContent: _buildDesktopCardForm(context),
+      underCardWidget: _buildDesktopUnderCard(context),
+    );
+  }
+
+  Widget _buildDesktopCardForm(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, size: 20),
+                onPressed: () => context.canPop() ? context.pop() : context.go('/login'),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                context.t.forgotPassword,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            context.t.forgotPasswordSubtitle,
+            style: TextStyle(
+              fontSize: 13,
+              color: context.textMuted,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (_sent) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: context.isDark ? const Color(0xFF1A2E1A) : const Color(0xFFEEFAEE),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF3BD671), size: 44),
+                  const SizedBox(height: 12),
+                  Text(
+                    context.t.forgotPasswordEmailSent,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.t.forgotPasswordCheckInbox,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () => context.go('/login'),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: context.borderColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  context.t.forgotPasswordBackToLogin,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            AppGlassCard(
+              radius: 16,
+              child: TextFormField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return context.t.forgotPasswordEnterEmail;
+                  if (!v.contains('@')) return context.t.forgotPasswordEnterValidEmail;
+                  return null;
+                },
+                style: TextStyle(fontSize: 14, color: context.textPrimary),
+                decoration: InputDecoration(
+                  hintText: context.t.forgotPasswordEmailAddress,
+                  hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+                  prefixIcon: Icon(Icons.email_outlined, size: 20, color: context.textMuted),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.isDark ? const Color(0xFF3D1F1F) : const Color(0xFFFFEEEE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            PrimaryActionButton(
+              label: context.t.forgotPasswordSendResetLink,
+              onPressed: _loading ? null : _submit,
+              loading: _loading,
+              size: PrimaryActionSize.large,
+              fullWidth: true,
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: GestureDetector(
+                onTap: () => context.go('/login'),
+                child: Text(
+                  context.t.forgotPasswordBackToLogin,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.textMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopUnderCard(BuildContext context) {
+    return Center(
+      child: GestureDetector(
+        onTap: () => context.go('/login'),
+        child: Text(
+          '← ${context.t.forgotPasswordBackToLogin}',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFFCE5DE5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Form(
@@ -74,24 +269,21 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 12),
-                // Back button
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.canPop() ? context.pop() : context.go('/login'),
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: context.inputFill,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.arrow_back,
-                          size: 20, color: context.textPrimary),
+                      child: Icon(Icons.arrow_back, size: 20, color: context.textPrimary),
                     ),
                   ),
                 ),
                 const SizedBox(height: 30),
-                // Lock icon
                 Container(
                   width: 80,
                   height: 80,
@@ -125,16 +317,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-
                 if (_sent) ...[
-                  // Success state
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: context.isDark
-                          ? const Color(0xFF1A2E1A)
-                          : const Color(0xFFEEFAEE),
+                      color: context.isDark ? const Color(0xFF1A2E1A) : const Color(0xFFEEFAEE),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -168,7 +356,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     width: double.infinity,
                     height: 52,
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.go('/login'),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: context.borderColor),
                         shape: RoundedRectangleBorder(
@@ -186,64 +374,60 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     ),
                   ),
                 ] else ...[
-                  // Email input
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return context.t.forgotPasswordEnterEmail;
-                      }
-                      if (!v.contains('@')) {
-                        return context.t.forgotPasswordEnterValidEmail;
-                      }
-                      return null;
-                    },
-                    style: TextStyle(fontSize: 14, color: context.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: context.t.forgotPasswordEmailAddress,
-                      hintStyle:
-                          TextStyle(fontSize: 14, color: context.textMuted),
-                      prefixIcon: Icon(Icons.email_outlined,
-                          size: 20, color: context.textMuted),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
+                  AppGlassCard(
+                    radius: 16,
+                    child: TextFormField(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return context.t.forgotPasswordEnterEmail;
+                        }
+                        if (!v.contains('@')) {
+                          return context.t.forgotPasswordEnterValidEmail;
+                        }
+                        return null;
+                      },
+                      style: TextStyle(fontSize: 14, color: context.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: context.t.forgotPasswordEmailAddress,
+                        hintStyle: TextStyle(fontSize: 14, color: context.textMuted),
+                        prefixIcon:
+                            Icon(Icons.email_outlined, size: 20, color: context.textMuted),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        filled: true,
+                        fillColor: Colors.transparent,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      filled: true,
-                      fillColor: context.cardBg,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: context.isDark
-                            ? const Color(0xFF3D1F1F)
-                            : const Color(0xFFFFEEEE),
+                        color: context.isDark ? const Color(0xFF3D1F1F) : const Color(0xFFFFEEEE),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline,
-                              color: Colors.red, size: 18),
+                          const Icon(Icons.error_outline, color: Colors.red, size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _error!,
-                              style: const TextStyle(
-                                  color: Colors.red, fontSize: 13),
+                              style: const TextStyle(color: Colors.red, fontSize: 13),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-
                   const SizedBox(height: 24),
                   PrimaryActionButton(
                     label: context.t.forgotPasswordSendResetLink,
@@ -254,12 +438,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 20),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.go('/login'),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.arrow_back,
-                            size: 16, color: context.textMuted),
+                        Icon(Icons.arrow_back, size: 16, color: context.textMuted),
                         const SizedBox(width: 4),
                         Text(
                           context.t.forgotPasswordBackToLogin,

@@ -8,6 +8,7 @@ import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../model/post_model.dart';
 import '../../widgets/app_page_background.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../qa_thread_screen.dart';
 
 class AdminDiscussPostsScreen extends ConsumerStatefulWidget {
@@ -76,10 +77,7 @@ class _AdminDiscussPostsScreenState
               ),
             ),
             postsAsync.when<Widget>(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              ),
+              loading: () => SkeletonListTile.sliver(count: 6),
               error: (e, _) => SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: Text(context.t.errorWithMessage(e))),

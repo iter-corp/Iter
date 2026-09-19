@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +12,8 @@ import '../features/screens/auth/otp_screen.dart';
 import '../features/screens/auth/signup_screen.dart';
 import '../features/screens/auth/splash_screen.dart';
 import '../features/screens/language_screen.dart';
+import '../features/screens/notification_screen.dart';
+import '../features/screens/profile_settings_screen.dart';
 import '../providers/auth_providers.dart';
 import '../services/error_report_service.dart';
 
@@ -120,18 +121,43 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
+      GoRoute(path: '/', redirect: (_, __) => '/home'),
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const SplashScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const LoginScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/signup',
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const SignupScreen(),
+        ),
+      ),
       GoRoute(
         path: '/forgot-password',
-        builder: (_, __) => const ForgotPasswordScreen(),
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const ForgotPasswordScreen(),
+        ),
       ),
       GoRoute(
         path: '/otp',
-        builder: (_, state) => OtpScreen(
-          email: state.uri.queryParameters['email'],
-          initialError: state.uri.queryParameters['sendError'],
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: OtpScreen(
+            email: state.uri.queryParameters['email'],
+            initialError: state.uri.queryParameters['sendError'],
+          ),
         ),
       ),
       GoRoute(
@@ -142,7 +168,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/app-intro',
         builder: (_, __) => const AppIntroScreen(),
       ),
-      GoRoute(path: '/home', builder: (_, __) => const MainScreen()),
+      GoRoute(path: '/home', builder: (_, __) => const MainScreen(initialTab: 0)),
+      GoRoute(path: '/events', builder: (_, __) => const MainScreen(initialTab: 1)),
+      GoRoute(path: '/explore', builder: (_, __) => const MainScreen(initialTab: 2)),
+      GoRoute(path: '/messages', builder: (_, __) => const MainScreen(initialTab: 3)),
+      GoRoute(path: '/profile', builder: (_, __) => const MainScreen(initialTab: 4)),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (_, __) => const ProfileSettingsScreen(),
+      ),
       GoRoute(
         path: '/language',
         builder: (_, __) => const LanguageScreen(),
@@ -203,4 +241,24 @@ class _AuthListenable extends ChangeNotifier {
     _removeListener?.call();
     super.dispose();
   }
+}
+
+Page<dynamic> _buildFadePage({
+  required GoRouterState state,
+  required Widget child,
+  Duration duration = const Duration(milliseconds: 450),
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: duration,
+    reverseTransitionDuration: duration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeInOutCubic,
+      );
+      return FadeTransition(opacity: curved, child: child);
+    },
+  );
 }

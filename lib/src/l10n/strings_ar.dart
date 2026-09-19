@@ -333,6 +333,11 @@ const Map<String, String> arStrings = {
   'action_cannot_be_undone': 'لا يمكن التراجع عن هذا الإجراء.',
   'something_went_wrong': 'حدث خطأ ما',
   'try_again': 'حاول مرة أخرى',
+  'server_issues_title': 'نواجه صعوبات فنية مؤقتة',
+  'server_issues_subtitle':
+      'الخادم غير متاح حالياً أو يخضع للصيانة. يعمل فريقنا بنشاط لحل المشكلة. يتم عرض المحتوى المحفوظ بلا اتصال.',
+  'offline_content_banner':
+      'وضع غير متصل: يتم عرض المحتوى المحفوظ. جاري الاتصال بالخادم...',
   'permission_denied': 'تم رفض الإذن',
   'camera_permission_needed': 'إذن الكاميرا مطلوب',
   'gallery_permission_needed': 'إذن مكتبة الصور مطلوب',
@@ -1203,6 +1208,7 @@ const Map<String, String> arStrings = {
   'admin_flag_stories': 'القصص مفعلة',
   'admin_flag_reposts': 'إعادة النشر مفعلة',
   'admin_flag_translate': 'الترجمة مفعلة',
+  'admin_flag_wikipedia': 'تغذية ويكيبيديا مفعلة',
   'admin_section_welcome_message': 'رسالة الترحيب (المستخدمون الجدد)',
   'admin_flag_welcome_message':
       'عرض شريط الترحيب للمستخدمين الجدد عند أول تسجيل دخول أو تسجيل جديد',

@@ -1,5 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../../utils/media_cache.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
@@ -164,8 +167,10 @@ class ProfileCoverAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasCover = coverUrl != null && coverUrl!.trim().isNotEmpty;
-    final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+    final cleanCover = normalizeMediaUrl(coverUrl);
+    final cleanAvatar = normalizeMediaUrl(avatarUrl);
+    final hasCover = cleanCover.isNotEmpty;
+    final hasAvatar = cleanAvatar.isNotEmpty;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -175,7 +180,8 @@ class ProfileCoverAvatar extends StatelessWidget {
           width: double.infinity,
           child: hasCover
               ? CachedNetworkImage(
-                  imageUrl: coverUrl!,
+                  imageUrl: cleanCover,
+                  cacheManager: kIsWeb ? null : MediaCache.images,
                   fit: BoxFit.cover,
                   placeholder: (_, __) =>
                       const ProfileDefaultCover(height: 180),
@@ -204,7 +210,8 @@ class ProfileCoverAvatar extends StatelessWidget {
               ),
               child: hasAvatar
                   ? CachedNetworkImage(
-                      imageUrl: avatarUrl!,
+                      imageUrl: cleanAvatar,
+                      cacheManager: kIsWeb ? null : MediaCache.images,
                       imageBuilder: (_, imageProvider) => CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.transparent,

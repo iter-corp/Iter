@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 import 'api_client.dart';
 import 'user_service.dart';
 
@@ -10,11 +11,14 @@ class FollowService {
 
   final Map<String, Set<String>> _followingMap = {};
   final Map<String, Set<String>> _followersMap = {};
-  final Map<String, StreamController<List<String>>> _followingControllers = {};
-  final Map<String, StreamController<List<String>>> _followersControllers = {};
+  final Map<String, BehaviorSubject<List<String>>> _followingSubjects = {};
+  final Map<String, BehaviorSubject<List<String>>> _followersSubjects = {};
+  final Map<String, BehaviorSubject<List<String>>> _followRequestsSubjects = {};
 
-  final Map<String, StreamController<bool>> _isFollowingControllers = {};
+  final Map<String, BehaviorSubject<bool>> _isFollowingSubjects = {};
   final Map<String, bool> _isFollowingState = {};
+  final Map<String, BehaviorSubject<bool>> _hasRequestedFollowSubjects = {};
+  final Map<String, bool> _hasRequestedFollowState = {};
 
   Future<void> follow({
     required String currentUid,
@@ -24,19 +28,34 @@ class FollowService {
     if (currentUid == targetUid) return;
 
     try {
-      await ApiClient.instance.post('/users/$targetUid/follow');
+      final res = await ApiClient.instance.post('/users/$targetUid/follow');
+      final status = (res is Map<String, dynamic>)
+          ? res['status']
+          : (isPrivate ? 'pending' : 'active');
+      final isPending = status == 'pending';
+      final isActive = status == 'active';
 
-      _followingMap.putIfAbsent(currentUid, () => {}).add(targetUid);
-      _followingControllers[currentUid]?.add(_followingMap[currentUid]!.toList());
+      if (isActive) {
+        _followingMap.putIfAbsent(currentUid, () => {}).add(targetUid);
+        _followingSubjects[currentUid]?.add(_followingMap[currentUid]!.toList());
 
-      _followersMap.putIfAbsent(targetUid, () => {}).add(currentUid);
-      _followersControllers[targetUid]?.add(_followersMap[targetUid]!.toList());
+        _followersMap.putIfAbsent(targetUid, () => {}).add(currentUid);
+        _followersSubjects[targetUid]?.add(_followersMap[targetUid]!.toList());
+      }
 
       final key = '${currentUid}_$targetUid';
-      _isFollowingState[key] = !isPrivate;
-      _isFollowingControllers[key]?.add(!isPrivate);
+      _isFollowingState[key] = isActive;
+      _isFollowingSubjects[key]?.add(isActive);
+
+      _hasRequestedFollowState[key] = isPending;
+      _hasRequestedFollowSubjects[key]?.add(isPending);
+
+      // Refresh user profiles so followersCount & followingCount counters stay in sync
+      UserService().getUser(currentUid);
+      UserService().getUser(targetUid);
     } catch (e) {
       debugPrint('[FollowService] follow error: $e');
+      rethrow;
     }
   }
 
@@ -50,16 +69,25 @@ class FollowService {
       await ApiClient.instance.delete('/users/$targetUid/follow');
 
       _followingMap[currentUid]?.remove(targetUid);
-      _followingControllers[currentUid]?.add(_followingMap[currentUid]?.toList() ?? []);
+      _followingSubjects[currentUid]
+          ?.add(_followingMap[currentUid]?.toList() ?? []);
 
       _followersMap[targetUid]?.remove(currentUid);
-      _followersControllers[targetUid]?.add(_followersMap[targetUid]?.toList() ?? []);
+      _followersSubjects[targetUid]
+          ?.add(_followersMap[targetUid]?.toList() ?? []);
 
       final key = '${currentUid}_$targetUid';
       _isFollowingState[key] = false;
-      _isFollowingControllers[key]?.add(false);
+      _isFollowingSubjects[key]?.add(false);
+
+      _hasRequestedFollowState[key] = false;
+      _hasRequestedFollowSubjects[key]?.add(false);
+
+      UserService().getUser(currentUid);
+      UserService().getUser(targetUid);
     } catch (e) {
       debugPrint('[FollowService] unfollow error: $e');
+      rethrow;
     }
   }
 
@@ -67,49 +95,73 @@ class FollowService {
     required String currentUid,
     required String requesterUid,
   }) async {
-    await follow(currentUid: currentUid, targetUid: requesterUid, isPrivate: false);
+    try {
+      await ApiClient.instance
+          .post('/users/$currentUid/follow-requests/$requesterUid/accept');
+
+      _followersMap.putIfAbsent(currentUid, () => {}).add(requesterUid);
+      _followersSubjects[currentUid]?.add(_followersMap[currentUid]!.toList());
+
+      _followingMap.putIfAbsent(requesterUid, () => {}).add(currentUid);
+      _followingSubjects[requesterUid]?.add(_followingMap[requesterUid]!.toList());
+
+      refreshFollowRequests(currentUid);
+      UserService().getUser(currentUid);
+      UserService().getUser(requesterUid);
+    } catch (e) {
+      debugPrint('[FollowService] acceptFollowRequest error: $e');
+      rethrow;
+    }
   }
 
   Future<void> rejectFollowRequest({
     required String currentUid,
     required String requesterUid,
   }) async {
-    await unfollow(currentUid: requesterUid, targetUid: currentUid);
+    try {
+      await ApiClient.instance
+          .post('/users/$currentUid/follow-requests/$requesterUid/reject');
+      refreshFollowRequests(currentUid);
+    } catch (e) {
+      debugPrint('[FollowService] rejectFollowRequest error: $e');
+      rethrow;
+    }
   }
 
   Stream<bool> isFollowing({
     required String currentUid,
     required String targetUid,
-  }) async* {
-    if (currentUid == targetUid) {
-      yield false;
-      return;
-    }
+  }) {
+    if (currentUid == targetUid) return Stream.value(false);
     final key = '${currentUid}_$targetUid';
-    if (!_isFollowingControllers.containsKey(key) || _isFollowingControllers[key]!.isClosed) {
-      _isFollowingControllers[key] = StreamController<bool>.broadcast();
+
+    if (!_isFollowingSubjects.containsKey(key) ||
+        _isFollowingSubjects[key]!.isClosed) {
+      final initial = _isFollowingState[key] ?? false;
+      _isFollowingSubjects[key] = BehaviorSubject<bool>.seeded(initial);
     }
 
-    if (_isFollowingState.containsKey(key)) {
-      yield _isFollowingState[key]!;
-    }
-
-    try {
-      final res = await ApiClient.instance.get('/users/$targetUid/follow-status');
-      if (res is Map<String, dynamic> && res.containsKey('isFollowing')) {
-        final isF = res['isFollowing'] == true;
-        _isFollowingState[key] = isF;
-        yield isF;
-      } else if (!_isFollowingState.containsKey(key)) {
-        yield false;
+    // Refresh state asynchronously from user profile or follow-status endpoint
+    ApiClient.instance.get('/users/$targetUid').then((res) {
+      if (res is Map<String, dynamic>) {
+        if (res.containsKey('isFollowing')) {
+          final isF = res['isFollowing'] == true;
+          _isFollowingState[key] = isF;
+          if (!(_isFollowingSubjects[key]?.isClosed ?? true)) {
+            _isFollowingSubjects[key]?.add(isF);
+          }
+        }
+        if (res.containsKey('isPending')) {
+          final isP = res['isPending'] == true;
+          _hasRequestedFollowState[key] = isP;
+          if (!(_hasRequestedFollowSubjects[key]?.isClosed ?? true)) {
+            _hasRequestedFollowSubjects[key]?.add(isP);
+          }
+        }
       }
-    } catch (_) {
-      if (!_isFollowingState.containsKey(key)) {
-        yield false;
-      }
-    }
+    }).catchError((_) {});
 
-    yield* _isFollowingControllers[key]!.stream;
+    return _isFollowingSubjects[key]!.stream;
   }
 
   Stream<bool> hasRequestedFollow({
@@ -117,94 +169,129 @@ class FollowService {
     required String targetUid,
   }) {
     if (currentUid == targetUid) return Stream.value(false);
-    return Stream.value(false);
+    final key = '${currentUid}_$targetUid';
+
+    if (!_hasRequestedFollowSubjects.containsKey(key) ||
+        _hasRequestedFollowSubjects[key]!.isClosed) {
+      final initial = _hasRequestedFollowState[key] ?? false;
+      _hasRequestedFollowSubjects[key] = BehaviorSubject<bool>.seeded(initial);
+    }
+
+    return _hasRequestedFollowSubjects[key]!.stream;
   }
 
-  Stream<List<String>> getFollowing(String uid) async* {
-    if (!_followingControllers.containsKey(uid) || _followingControllers[uid]!.isClosed) {
-      _followingControllers[uid] = StreamController<List<String>>.broadcast();
+  Stream<List<String>> getFollowing(String uid) {
+    if (!_followingSubjects.containsKey(uid) ||
+        _followingSubjects[uid]!.isClosed) {
+      final cached = _followingMap[uid]?.toList();
+      _followingSubjects[uid] = cached != null
+          ? BehaviorSubject<List<String>>.seeded(cached)
+          : BehaviorSubject<List<String>>();
     }
 
-    // Always emit current cached state immediately so stream consumers don't hang
-    if (_followingMap.containsKey(uid)) {
-      yield _followingMap[uid]!.toList();
-    }
+    refreshFollowing(uid);
+    return _followingSubjects[uid]!.stream;
+  }
 
-    // Refresh from backend API
+  Future<void> refreshFollowing(String uid) async {
     try {
       final res = await ApiClient.instance.get('/users/$uid/following');
-      final uids = <String>[];
-      final List items = res is List
-          ? res
-          : (res is Map<String, dynamic> && res['data'] is List)
-              ? res['data'] as List
-              : const [];
+      final list = <String>[];
+      final dynamic raw = res is Map<String, dynamic> && res.containsKey('data')
+          ? res['data']
+          : res;
 
-      for (final item in items) {
-        if (item is Map<String, dynamic>) {
-          final id = item['id']?.toString() ?? item['uid']?.toString() ?? '';
-          if (id.isNotEmpty) {
-            uids.add(id);
-            UserService().cacheUser(id, item);
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Map) {
+            final id = (item['id'] ?? item['uid'])?.toString();
+            if (id != null && id.isNotEmpty) {
+              list.add(id);
+              if (item is Map<String, dynamic>) {
+                UserService().cacheUser(id, item);
+              }
+            }
+          } else if (item != null) {
+            list.add(item.toString());
           }
         }
+        _followingMap[uid] = list.toSet();
+        if (!(_followingSubjects[uid]?.isClosed ?? true)) {
+          _followingSubjects[uid]?.add(list);
+        }
       }
-
-      _followingMap[uid] = uids.toSet();
-      yield uids;
     } catch (e) {
-      debugPrint('[FollowService] getFollowing error: $e');
-      if (!_followingMap.containsKey(uid)) {
-        yield const <String>[];
-      }
+      debugPrint('[FollowService] refreshFollowing error for $uid: $e');
     }
-
-    yield* _followingControllers[uid]!.stream;
   }
 
-  Stream<List<String>> getFollowers(String uid) async* {
-    if (!_followersControllers.containsKey(uid) || _followersControllers[uid]!.isClosed) {
-      _followersControllers[uid] = StreamController<List<String>>.broadcast();
+  Stream<List<String>> getFollowers(String uid) {
+    if (!_followersSubjects.containsKey(uid) ||
+        _followersSubjects[uid]!.isClosed) {
+      final cached = _followersMap[uid]?.toList();
+      _followersSubjects[uid] = cached != null
+          ? BehaviorSubject<List<String>>.seeded(cached)
+          : BehaviorSubject<List<String>>();
     }
 
-    // Always emit current cached state immediately so stream consumers don't hang
-    if (_followersMap.containsKey(uid)) {
-      yield _followersMap[uid]!.toList();
-    }
+    refreshFollowers(uid);
+    return _followersSubjects[uid]!.stream;
+  }
 
-    // Refresh from backend API
+  Future<void> refreshFollowers(String uid) async {
     try {
       final res = await ApiClient.instance.get('/users/$uid/followers');
-      final uids = <String>[];
-      final List items = res is List
-          ? res
-          : (res is Map<String, dynamic> && res['data'] is List)
-              ? res['data'] as List
-              : const [];
+      final list = <String>[];
+      final dynamic raw = res is Map<String, dynamic> && res.containsKey('data')
+          ? res['data']
+          : res;
 
-      for (final item in items) {
-        if (item is Map<String, dynamic>) {
-          final id = item['id']?.toString() ?? item['uid']?.toString() ?? '';
-          if (id.isNotEmpty) {
-            uids.add(id);
-            UserService().cacheUser(id, item);
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Map) {
+            final id = (item['id'] ?? item['uid'])?.toString();
+            if (id != null && id.isNotEmpty) {
+              list.add(id);
+              if (item is Map<String, dynamic>) {
+                UserService().cacheUser(id, item);
+              }
+            }
+          } else if (item != null) {
+            list.add(item.toString());
           }
         }
+        _followersMap[uid] = list.toSet();
+        if (!(_followersSubjects[uid]?.isClosed ?? true)) {
+          _followersSubjects[uid]?.add(list);
+        }
       }
-
-      _followersMap[uid] = uids.toSet();
-      yield uids;
     } catch (e) {
-      debugPrint('[FollowService] getFollowers error: $e');
-      if (!_followersMap.containsKey(uid)) {
-        yield const <String>[];
-      }
+      debugPrint('[FollowService] refreshFollowers error for $uid: $e');
     }
-
-    yield* _followersControllers[uid]!.stream;
   }
 
   Stream<List<String>> getFollowRequests(String uid) {
-    return Stream.value(const []);
+    if (!_followRequestsSubjects.containsKey(uid) ||
+        _followRequestsSubjects[uid]!.isClosed) {
+      _followRequestsSubjects[uid] =
+          BehaviorSubject<List<String>>.seeded(const []);
+    }
+
+    refreshFollowRequests(uid);
+    return _followRequestsSubjects[uid]!.stream;
+  }
+
+  Future<void> refreshFollowRequests(String uid) async {
+    try {
+      final res = await ApiClient.instance.get('/users/$uid/follow-requests');
+      if (res is List) {
+        final list = res.map((e) => e.toString()).toList();
+        if (!(_followRequestsSubjects[uid]?.isClosed ?? true)) {
+          _followRequestsSubjects[uid]?.add(list);
+        }
+      }
+    } catch (e) {
+      debugPrint('[FollowService] refreshFollowRequests error for $uid: $e');
+    }
   }
 }

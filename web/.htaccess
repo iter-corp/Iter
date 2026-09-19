@@ -1,32 +1,81 @@
 RewriteEngine On
 
-# API & Backend proxy to Hono Node.js backend
-RewriteRule ^api/(.*)$ api-proxy.php [QSA,L]
-RewriteRule ^uploads/(.*)$ api-proxy.php [QSA,L]
-RewriteRule ^health$ api-proxy.php [QSA,L]
-RewriteRule ^privacy$ privacy.html [L]
+# ── 1. Disable LiteSpeed Per-Client Throttling (Prevents 429 Too Many Requests on Rapid Reloads) ──
+SetEnv NOTHROTTLE 1
+SetEnv noabort 1
+<IfModule LiteSpeed>
+    RewriteRule .* - [E=nothrottle:1,E=noabort:1]
+</IfModule>
+<IfModule mod_litespeed.c>
+    RewriteRule .* - [E=nothrottle:1,E=noabort:1]
+</IfModule>
+<IfModule Litespeed>
+    RewriteRule .* - [E=nothrottle:1,E=noabort:1]
+</IfModule>
+RewriteRule .* - [E=nothrottle:1,E=noabort:1]
 
-# Allow assets/.env if requested by Flutter web
+# ── 2. Global CORS & Security Headers (Ensures CanvasKit and Video Elements in WebViews Render Correctly) ──
+<IfModule mod_headers.c>
+    Header set Connection keep-alive
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, x-firebase-token, apikey, Range, X-Requested-With, Origin, Accept"
+    Header set Access-Control-Expose-Headers "Content-Length, Content-Range, Accept-Ranges, Retry-After"
+</IfModule>
+
+# ── 3. Enable GZIP & Deflate Compression (Reduces JS/WASM bundle sizes by 75%) ──
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json application/wasm image/svg+xml
+</IfModule>
+
+# ── 4. MIME Types Configuration ──
+<IfModule mod_mime.c>
+    AddType application/wasm .wasm
+    AddType application/javascript .js
+    AddType application/javascript .mjs
+    AddType application/json .json
+    AddType image/x-icon .ico
+    AddType image/png .png
+    AddType image/webp .webp
+    AddType video/mp4 .mp4
+    AddType video/webm .webm
+    AddType font/ttf .ttf
+    AddType font/otf .otf
+    AddType font/woff2 .woff2
+</IfModule>
+
+# ── 5. API & Backend Proxy to Node.js / Hono Backend ──
+RewriteRule ^api/(.*)$ api-proxy.php [E=nothrottle:1,QSA,L]
+RewriteRule ^uploads/(.*)$ api-proxy.php [E=nothrottle:1,QSA,L]
+RewriteRule ^health$ api-proxy.php [E=nothrottle:1,QSA,L]
+RewriteRule ^privacy$ privacy.html [E=nothrottle:1,L]
+
+# ── 6. Allow assets/.env if requested by Flutter Web ──
 <Files ".env">
     Order allow,deny
     Allow from all
     Require all granted
 </Files>
 
-# SPA fallback for Flutter Web
+# ── 7. SPA Routing Fallback for Flutter Web ──
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.html [L]
+RewriteRule . /index.html [E=nothrottle:1,L]
 
-# Prevent stale caching of app entrypoints and bundles
+# ── 8. Smart Caching Strategy ──
 <IfModule mod_headers.c>
-    <FilesMatch "\.(html|js|json|wasm)$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
-        Header set Pragma "no-cache"
-        Header set Expires "0"
-        Header set X-LiteSpeed-Cache-Control "no-cache"
+    # HTML & bootstrap loader: check for updates, allow 304 Not Modified
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
+    <FilesMatch "^flutter_bootstrap\.js$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
+    # Cacheable static assets (WASM, JS bundles with version hash, Fonts, Images, Videos)
+    <FilesMatch "\.(wasm|js|mjs|css|json|otf|ttf|woff|woff2|png|jpg|jpeg|gif|webp|svg|ico|mp4|webm)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+        Header set X-LiteSpeed-Cache-Control "public, max-age=31536000"
     </FilesMatch>
 </IfModule>
-
-AddType image/x-icon .ico
-AddType image/png .png

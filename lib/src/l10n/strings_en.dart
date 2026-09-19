@@ -338,6 +338,11 @@ const Map<String, String> enStrings = {
   'action_cannot_be_undone': 'This action cannot be undone.',
   'something_went_wrong': 'Something went wrong',
   'try_again': 'Try again',
+  'server_issues_title': 'We’re experiencing technical difficulties',
+  'server_issues_subtitle':
+      'Our server is temporarily unreachable or undergoing maintenance. Our team is actively working on it. Your cached content will load offline.',
+  'offline_content_banner':
+      'Offline mode: Showing cached content. Connecting to server...',
   'permission_denied': 'Permission denied',
   'camera_permission_needed': 'Camera permission is required',
   'gallery_permission_needed': 'Photo library permission is required',
@@ -1232,6 +1237,7 @@ const Map<String, String> enStrings = {
   'admin_flag_stories': 'Stories enabled',
   'admin_flag_reposts': 'Reposts enabled',
   'admin_flag_translate': 'Translate enabled',
+  'admin_flag_wikipedia': 'Wikipedia / Wikimedia Feed enabled',
   'admin_section_welcome_message': 'Welcome Message (New Users)',
   'admin_flag_welcome_message':
       'Show welcome banner to newly registered/logged in users',

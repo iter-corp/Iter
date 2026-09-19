@@ -16,6 +16,7 @@ import '../../theme/app_theme.dart';
 import '../widgets/event_detail.dart';
 import '../widgets/event_unavailable_screen.dart';
 import '../widgets/notification_tile.dart';
+import '../widgets/skeleton_loader.dart';
 import 'chat_screen.dart';
 import 'event_screen.dart';
 import 'post_detail_screen.dart';
@@ -375,7 +376,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             /// LIST
             Expanded(
               child: notificationsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const SkeletonNotificationList(count: 8),
                 error: (e, _) =>
                     Center(child: Text(context.t.errorWithMessage(e))),
                 data: (notifications) {

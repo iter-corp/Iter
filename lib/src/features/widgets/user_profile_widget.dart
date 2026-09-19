@@ -1,7 +1,10 @@
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../../utils/media_cache.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
@@ -89,12 +92,15 @@ class UserCoverAvatar extends StatelessWidget {
           )
         : const SizedBox.shrink();
 
-    final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
-    final hasCover = coverUrl != null && coverUrl!.trim().isNotEmpty;
+    final cleanAvatar = normalizeMediaUrl(avatarUrl);
+    final cleanCover = normalizeMediaUrl(coverUrl);
+    final hasAvatar = cleanAvatar.isNotEmpty;
+    final hasCover = cleanCover.isNotEmpty;
 
     final avatar = hasAvatar
         ? CachedNetworkImage(
-            imageUrl: avatarUrl!,
+            imageUrl: cleanAvatar,
+            cacheManager: kIsWeb ? null : MediaCache.images,
             imageBuilder: (_, imageProvider) => CircleAvatar(
               radius: 40,
               backgroundColor: Colors.transparent,
@@ -117,7 +123,8 @@ class UserCoverAvatar extends StatelessWidget {
                 imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                 child: hasCover
                     ? CachedNetworkImage(
-                        imageUrl: coverUrl!,
+                        imageUrl: cleanCover,
+                        cacheManager: kIsWeb ? null : MediaCache.images,
                         height: 140,
                         width: double.infinity,
                         fit: BoxFit.cover,
@@ -172,7 +179,8 @@ class UserCoverAvatar extends StatelessWidget {
             width: double.infinity,
             child: hasCover
                 ? CachedNetworkImage(
-                    imageUrl: coverUrl!,
+                    imageUrl: cleanCover,
+                    cacheManager: kIsWeb ? null : MediaCache.images,
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
                         const ProfileDefaultCover(height: 180),

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 
+import '../utils/media_cache.dart';
 import 'api_client.dart';
 import 'realtime_client.dart';
 
@@ -77,24 +79,24 @@ class ChatMessage {
       id: (d['id'] as String?) ?? '',
       senderUid: (d['senderUid'] as String?) ?? '',
       text: (d['text'] as String?) ?? '',
-      imageUrl: d['imageUrl'] as String?,
-      videoUrl: d['videoUrl'] as String?,
-      fileUrl: d['fileUrl'] as String?,
+      imageUrl: d['imageUrl'] != null ? normalizeMediaUrl(d['imageUrl'] as String?) : null,
+      videoUrl: d['videoUrl'] != null ? normalizeMediaUrl(d['videoUrl'] as String?) : null,
+      fileUrl: d['fileUrl'] != null ? normalizeMediaUrl(d['fileUrl'] as String?) : null,
       fileName: d['fileName'] as String?,
       fileMimeType: d['fileMimeType'] as String?,
       fileSizeBytes: (d['fileSizeBytes'] as num?)?.toInt(),
       sharedPostId: d['sharedPostId'] as String?,
       sharedEventId: d['sharedEventId'] as String?,
-      voiceUrl: d['voiceUrl'] as String?,
+      voiceUrl: d['voiceUrl'] != null ? normalizeMediaUrl(d['voiceUrl'] as String?) : null,
       voiceDurationMs: (d['voiceDurationMs'] as num?)?.toInt(),
-      stickerUrl: d['stickerUrl'] as String?,
+      stickerUrl: d['stickerUrl'] != null ? normalizeMediaUrl(d['stickerUrl'] as String?) : null,
       stickerPackId: d['stickerPackId'] as String?,
       voiceTranscript: d['voiceTranscript'] as String?,
       replyToId: d['replyToId'] as String?,
       replyToText: d['replyToText'] as String?,
       replyToSenderUid: d['replyToSenderUid'] as String?,
       storyId: d['storyId'] as String?,
-      storyImageUrl: d['storyImageUrl'] as String?,
+      storyImageUrl: d['storyImageUrl'] != null ? normalizeMediaUrl(d['storyImageUrl'] as String?) : null,
       locationLat: (d['locationLat'] as num?)?.toDouble(),
       locationLng: (d['locationLng'] as num?)?.toDouble(),
       locationLabel: d['locationLabel'] as String?,
@@ -150,7 +152,7 @@ class ChatConversation {
       chatId: (d['chatId'] as String?) ?? '',
       otherUid: (d['otherUid'] as String?) ?? '',
       otherUsername: (d['otherUsername'] as String?) ?? 'User',
-      otherAvatarUrl: (d['otherAvatarUrl'] as String?) ?? '',
+      otherAvatarUrl: normalizeMediaUrl((d['otherAvatarUrl'] as String?) ?? ''),
       lastMessage: (d['lastMessage'] as String?) ?? '',
       lastTime: lastTime,
       unreadCount: (d['unreadCount'] as num?)?.toInt() ?? 0,
@@ -158,7 +160,7 @@ class ChatConversation {
       mutedFor: List<String>.from(d['mutedFor'] as List? ?? const []),
       isGroup: d['isGroup'] == true,
       groupName: (d['groupName'] as String?) ?? '',
-      groupAvatarUrl: (d['groupAvatarUrl'] as String?) ?? '',
+      groupAvatarUrl: normalizeMediaUrl((d['groupAvatarUrl'] as String?) ?? ''),
       adminUid: (d['adminUid'] as String?) ?? '',
       participants: List<String>.from(d['participants'] as List? ?? const []),
     );
@@ -168,19 +170,25 @@ class ChatConversation {
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
-  ChatService._internal();
+  ChatService._internal() {
+    // Whenever a new message arrives over WebSocket, refresh conversations
+    // so the inbox updates unread counts and latest messages in real time!
+    RealtimeClient.instance.messageStream.listen((_) {
+      refreshConversations();
+    });
+  }
 
   final Map<String, StreamController<List<ChatMessage>>> _messagesControllers = {};
   final Map<String, List<ChatMessage>> _messagesCache = {};
 
-  final StreamController<List<ChatConversation>> _convosController =
-      StreamController<List<ChatConversation>>.broadcast();
-  final StreamController<List<ChatConversation>> _requestsController =
-      StreamController<List<ChatConversation>>.broadcast();
+  final BehaviorSubject<List<ChatConversation>> _convosSubject =
+      BehaviorSubject<List<ChatConversation>>();
+  final BehaviorSubject<List<ChatConversation>> _requestsSubject =
+      BehaviorSubject<List<ChatConversation>>();
 
   Stream<List<ChatConversation>> streamConversations(String uid) {
     refreshConversations();
-    return _convosController.stream;
+    return _convosSubject.stream;
   }
 
   Stream<List<ChatConversation>> streamInbox(String uid) =>
@@ -191,7 +199,7 @@ class ChatService {
 
   Stream<List<ChatConversation>> streamConversationRequests(String uid) {
     refreshRequests();
-    return _requestsController.stream;
+    return _requestsSubject.stream;
   }
 
   Stream<List<ChatConversation>> streamRequests(String uid) =>
@@ -205,10 +213,17 @@ class ChatService {
             .whereType<Map<String, dynamic>>()
             .map(ChatConversation.fromJson)
             .toList();
-        _convosController.add(list);
+        _convosSubject.add(list);
+      } else {
+        if (!_convosSubject.hasValue) {
+          _convosSubject.add(const []);
+        }
       }
     } catch (e) {
       debugPrint('[ChatService] refreshConversations error: $e');
+      if (!_convosSubject.hasValue) {
+        _convosSubject.add(const []);
+      }
     }
   }
 
@@ -220,10 +235,17 @@ class ChatService {
             .whereType<Map<String, dynamic>>()
             .map(ChatConversation.fromJson)
             .toList();
-        _requestsController.add(list);
+        _requestsSubject.add(list);
+      } else {
+        if (!_requestsSubject.hasValue) {
+          _requestsSubject.add(const []);
+        }
       }
     } catch (e) {
       debugPrint('[ChatService] refreshRequests error: $e');
+      if (!_requestsSubject.hasValue) {
+        _requestsSubject.add(const []);
+      }
     }
   }
 

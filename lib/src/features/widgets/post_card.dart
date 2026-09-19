@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,7 @@ import '../screens/image_viewer_screen.dart';
 import '../screens/qa_thread_screen.dart';
 import '../../navigation/user_profile_nav.dart';
 import 'mention_text.dart';
+import 'skeleton_loader.dart';
 
 class PostCard extends ConsumerStatefulWidget {
   final Post post;
@@ -260,8 +262,28 @@ class _PostCardState extends ConsumerState<PostCard>
                                   ),
                                   child: CachedNetworkImage(
                                     imageUrl: post.imageUrls[i],
-                                    cacheManager: MediaCache.images,
+                                    cacheManager: kIsWeb ? null : MediaCache.images,
                                     fit: BoxFit.cover,
+                                    placeholder: (_, __) => Container(
+                                      color: context.borderColor,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: context.borderColor,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.broken_image_rounded,
+                                          color: context.textSecondary,
+                                          size: 32,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               )
@@ -277,8 +299,28 @@ class _PostCardState extends ConsumerState<PostCard>
                                 ),
                                 child: CachedNetworkImage(
                                   imageUrl: post.imageUrls.first,
-                                  cacheManager: MediaCache.images,
+                                  cacheManager: kIsWeb ? null : MediaCache.images,
                                   fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    color: context.borderColor,
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: context.borderColor,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.broken_image_rounded,
+                                        color: context.textSecondary,
+                                        size: 32,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ))
                         : GestureDetector(
@@ -1057,7 +1099,7 @@ class _PostDiscussPage extends ConsumerWidget {
             itemBuilder: (_, i) => _DiscussPreviewRow(thread: threads[i]),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonList(count: 4),
         error: (_, __) => Center(
           child: Text(
             context.t.errorGeneric,
@@ -1451,21 +1493,27 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   /// Builds the controller for [url]. The video is first downloaded to
   /// the disk cache (so it never re-streams from the server), then
   /// played from that local file.
-  Future<void> _setupController(String url) async {
+  Future<void> _setupController(String rawUrl) async {
+    final url = normalizeMediaUrl(rawUrl);
+    if (url.isEmpty) return;
     VideoPlayerController controller;
-    try {
-      final file = await MediaCache.videoFile(url);
-      if (!mounted) return;
-      controller = VideoPlayerController.file(file);
-    } catch (_) {
-      // Cache miss/failure — fall back to streaming the network URL.
-      if (!mounted) return;
+    if (kIsWeb) {
       controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    } else {
+      try {
+        final file = await MediaCache.videoFile(url);
+        if (!mounted) return;
+        controller = VideoPlayerController.file(file);
+      } catch (_) {
+        // Cache miss/failure — fall back to streaming the network URL.
+        if (!mounted) return;
+        controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      }
     }
 
     // The widget may have been swapped to another post while the
     // cache download was in flight — bail if so.
-    if (!mounted || url != widget.url) {
+    if (!mounted || rawUrl != widget.url) {
       controller.dispose();
       return;
     }
@@ -1883,7 +1931,8 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
     super.initState();
     _muted = widget.muted;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+    final cleanUrl = normalizeMediaUrl(widget.url);
+    _controller = VideoPlayerController.networkUrl(Uri.parse(cleanUrl))
       ..setLooping(true)
       ..setVolume(_muted ? 0 : 1)
       ..addListener(_onTick)
