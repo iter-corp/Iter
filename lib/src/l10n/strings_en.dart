@@ -1232,6 +1232,7 @@ const Map<String, String> enStrings = {
   'admin_flag_stories': 'Stories enabled',
   'admin_flag_reposts': 'Reposts enabled',
   'admin_flag_translate': 'Translate enabled',
+  'admin_flag_wikipedia': 'Wikipedia / Wikimedia Feed enabled',
   'admin_section_welcome_message': 'Welcome Message (New Users)',
   'admin_flag_welcome_message':
       'Show welcome banner to newly registered/logged in users',

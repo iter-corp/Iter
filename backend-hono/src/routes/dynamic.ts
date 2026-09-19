@@ -21,6 +21,7 @@ dynamicRoutes.get('/config', async (c) => {
         storiesEnabled: true,
         repostsEnabled: true,
         translateEnabled: true,
+        wikipediaEnabled: true,
         maintenanceMode: false,
         maintenanceMessage: '',
         minAppVersion: '1.0.0',

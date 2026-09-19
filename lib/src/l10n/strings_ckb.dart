@@ -1217,6 +1217,7 @@ const Map<String, String> ckbStrings = {
   'admin_flag_stories': 'ستۆرییەکان چالاککراون',
   'admin_flag_reposts': 'ڕیپۆست چالاککراوە',
   'admin_flag_translate': 'وەرگێڕان چالاککراوە',
+  'admin_flag_wikipedia': 'پێگەی ویکیپیدیا چالاککراوە',
   'admin_section_welcome_message': 'پەیامی بەخێرهاتن (بەکارهێنەرانی نوێ)',
   'admin_flag_welcome_message':
       'نیشاندانی تابلۆی بەخێرهاتن بۆ بەکارهێنەرانی نوێ لە یەکەم چوونەژوورەوەدا',

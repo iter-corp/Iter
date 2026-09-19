@@ -1203,6 +1203,7 @@ const Map<String, String> arStrings = {
   'admin_flag_stories': 'القصص مفعلة',
   'admin_flag_reposts': 'إعادة النشر مفعلة',
   'admin_flag_translate': 'الترجمة مفعلة',
+  'admin_flag_wikipedia': 'تغذية ويكيبيديا مفعلة',
   'admin_section_welcome_message': 'رسالة الترحيب (المستخدمون الجدد)',
   'admin_flag_welcome_message':
       'عرض شريط الترحيب للمستخدمين الجدد عند أول تسجيل دخول أو تسجيل جديد',

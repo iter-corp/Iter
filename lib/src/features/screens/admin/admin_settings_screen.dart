@@ -316,6 +316,12 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                         onChanged: (v) => setState(
                             () => _cfg = _cfg.copyWith(translateEnabled: v)),
                       ),
+                      _flag(
+                        title: context.t.adminFlagWikipedia,
+                        value: _cfg.wikipediaEnabled,
+                        onChanged: (v) => setState(
+                            () => _cfg = _cfg.copyWith(wikipediaEnabled: v)),
+                      ),
                       const SizedBox(height: 16),
                       _section(context.t.adminSectionWelcomeMessage),
                       _flag(

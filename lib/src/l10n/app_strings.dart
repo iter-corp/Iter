@@ -1442,6 +1442,7 @@ class AppStrings {
   String get adminFlagStories => _get('admin_flag_stories');
   String get adminFlagReposts => _get('admin_flag_reposts');
   String get adminFlagTranslate => _get('admin_flag_translate');
+  String get adminFlagWikipedia => _get('admin_flag_wikipedia');
   String get adminSectionWelcomeMessage => _get('admin_section_welcome_message');
   String get adminFlagWelcomeMessage => _get('admin_flag_welcome_message');
   String get adminWelcomeMessageHint => _get('admin_welcome_message_hint');

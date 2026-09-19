@@ -277,7 +277,7 @@ adminRoutes.get('/api-logs', async (c) => {
 // ── 7. Update App Config ────────────────────────────────────────────────────
 adminRoutes.patch('/config', async (c) => {
     const body = await c.req.json();
-    const { welcomeMessage, welcomeMessageEnabled, metadata: bodyMetadata, ...directFields } = body;
+    const { welcomeMessage, welcomeMessageEnabled, wikipediaEnabled, metadata: bodyMetadata, ...directFields } = body;
     const [existing] = await db.select().from(appConfigs).where(eq(appConfigs.id, 'app')).limit(1);
     const existingMetadata = existing?.metadata || {};
     const mergedMetadata = {
@@ -285,6 +285,7 @@ adminRoutes.patch('/config', async (c) => {
         ...(bodyMetadata || {}),
         ...(welcomeMessage !== undefined ? { welcomeMessage } : {}),
         ...(welcomeMessageEnabled !== undefined ? { welcomeMessageEnabled } : {}),
+        ...(wikipediaEnabled !== undefined ? { wikipediaEnabled } : {}),
     };
     await db
         .update(appConfigs)

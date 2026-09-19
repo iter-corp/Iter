@@ -5,6 +5,7 @@ import '../features/model/post_model.dart';
 import '../services/nasa_apod_service.dart';
 import '../services/post_service.dart';
 import '../services/wikimedia_feed_service.dart';
+import 'admin_providers.dart';
 import 'auth_providers.dart';
 import 'block_providers.dart';
 import 'follow_providers.dart';
@@ -21,6 +22,11 @@ final wikimediaFeedServiceProvider =
     Provider<WikimediaFeedService>((_) => WikimediaFeedService());
 
 final wikimediaFeedProvider = FutureProvider<List<Post>>((ref) async {
+  final cfg = ref.watch(adminConfigProvider).valueOrNull;
+  final enabled = cfg?.wikipediaEnabled ?? true;
+  if (!enabled) {
+    return const <Post>[];
+  }
   return ref.watch(wikimediaFeedServiceProvider).fetchFeed();
 });
 

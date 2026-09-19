@@ -12,6 +12,7 @@ class AdminConfig {
   final bool storiesEnabled;
   final bool repostsEnabled;
   final bool translateEnabled;
+  final bool wikipediaEnabled;
   final String announcement;
   final bool maintenanceMode;
   final String minAppVersion;
@@ -50,6 +51,7 @@ class AdminConfig {
     this.storiesEnabled = true,
     this.repostsEnabled = true,
     this.translateEnabled = true,
+    this.wikipediaEnabled = true,
     this.announcement = '',
     this.welcomeMessageEnabled = true,
     this.welcomeMessage = '',
@@ -83,6 +85,8 @@ class AdminConfig {
         (m['welcomeMessage'] as String?);
     final rawWelcomeEnabled = (meta['welcomeMessageEnabled'] as bool?) ??
         (m['welcomeMessageEnabled'] as bool?);
+    final rawWikipediaEnabled = (meta['wikipediaEnabled'] as bool?) ??
+        (m['wikipediaEnabled'] as bool?);
     final rawAnnouncement = (m['announcement'] as String?) ?? '';
 
     final effectiveWelcome = (rawWelcome != null && rawWelcome.trim().isNotEmpty)
@@ -95,6 +99,7 @@ class AdminConfig {
       storiesEnabled: (m['storiesEnabled'] as bool?) ?? true,
       repostsEnabled: (m['repostsEnabled'] as bool?) ?? true,
       translateEnabled: (m['translateEnabled'] as bool?) ?? true,
+      wikipediaEnabled: rawWikipediaEnabled ?? true,
       announcement: rawAnnouncement,
       welcomeMessageEnabled: rawWelcomeEnabled ?? true,
       welcomeMessage: effectiveWelcome,
@@ -121,12 +126,14 @@ class AdminConfig {
         'storiesEnabled': storiesEnabled,
         'repostsEnabled': repostsEnabled,
         'translateEnabled': translateEnabled,
+        'wikipediaEnabled': wikipediaEnabled,
         'announcement': announcement,
         'welcomeMessageEnabled': welcomeMessageEnabled,
         'welcomeMessage': welcomeMessage,
         'metadata': {
           'welcomeMessageEnabled': welcomeMessageEnabled,
           'welcomeMessage': welcomeMessage,
+          'wikipediaEnabled': wikipediaEnabled,
         },
         'maintenanceMode': maintenanceMode,
         'minAppVersion': minAppVersion,
@@ -145,6 +152,7 @@ class AdminConfig {
     bool? storiesEnabled,
     bool? repostsEnabled,
     bool? translateEnabled,
+    bool? wikipediaEnabled,
     String? announcement,
     bool? welcomeMessageEnabled,
     String? welcomeMessage,
@@ -165,6 +173,7 @@ class AdminConfig {
       storiesEnabled: storiesEnabled ?? this.storiesEnabled,
       repostsEnabled: repostsEnabled ?? this.repostsEnabled,
       translateEnabled: translateEnabled ?? this.translateEnabled,
+      wikipediaEnabled: wikipediaEnabled ?? this.wikipediaEnabled,
       announcement: announcement ?? this.announcement,
       welcomeMessageEnabled:
           welcomeMessageEnabled ?? this.welcomeMessageEnabled,

@@ -329,6 +329,7 @@ adminRoutes.patch('/config', async (c) => {
   const {
     welcomeMessage,
     welcomeMessageEnabled,
+    wikipediaEnabled,
     metadata: bodyMetadata,
     ...directFields
   } = body;
@@ -341,6 +342,7 @@ adminRoutes.patch('/config', async (c) => {
     ...(bodyMetadata || {}),
     ...(welcomeMessage !== undefined ? { welcomeMessage } : {}),
     ...(welcomeMessageEnabled !== undefined ? { welcomeMessageEnabled } : {}),
+    ...(wikipediaEnabled !== undefined ? { wikipediaEnabled } : {}),
   };
 
   await db
