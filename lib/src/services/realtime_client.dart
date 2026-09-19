@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import 'api_client.dart';
 
 class RealtimeClient {
   RealtimeClient._();
   static final RealtimeClient instance = RealtimeClient._();
 
-  WebSocket? _ws;
+  WebSocketChannel? _channel;
+  bool _connected = false;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
   bool _connecting = false;
@@ -27,8 +28,9 @@ class RealtimeClient {
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
 
   Future<void> connect() async {
-    if (_ws != null && _ws!.readyState == WebSocket.open) return;
-    if (_connecting || _disposed) return;
+    _disposed = false;
+    if (_connected && _channel != null) return;
+    if (_connecting) return;
     _connecting = true;
 
     try {
@@ -41,12 +43,17 @@ class RealtimeClient {
       final wsUrl = '${ApiClient.instance.wsUrl}?token=$token';
       debugPrint('[RealtimeClient] Connecting to $wsUrl');
 
-      _ws = await WebSocket.connect(wsUrl).timeout(const Duration(seconds: 10));
+      final uri = Uri.parse(wsUrl);
+      final channel = WebSocketChannel.connect(uri);
+      await channel.ready.timeout(const Duration(seconds: 10));
+
+      _channel = channel;
+      _connected = true;
       debugPrint('[RealtimeClient] WebSocket connected successfully');
 
       _startHeartbeat();
 
-      _ws!.listen(
+      _channel!.stream.listen(
         (data) {
           try {
             final map = jsonDecode(data.toString()) as Map<String, dynamic>;
@@ -56,12 +63,15 @@ class RealtimeClient {
           }
         },
         onDone: () => _handleDisconnect(),
-        onError: (err) => _handleDisconnect(),
+        onError: (err) {
+          debugPrint('[RealtimeClient] Error: $err');
+          _handleDisconnect();
+        },
         cancelOnError: true,
       );
     } catch (e) {
       debugPrint('[RealtimeClient] Connection failed: $e');
-      _scheduleReconnect();
+      _handleDisconnect();
     } finally {
       _connecting = false;
     }
@@ -85,15 +95,18 @@ class RealtimeClient {
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-      if (_ws != null && _ws!.readyState == WebSocket.open) {
-        _ws!.add(jsonEncode({'type': 'heartbeat'}));
+      if (_connected && _channel != null) {
+        try {
+          _channel!.sink.add(jsonEncode({'type': 'heartbeat'}));
+        } catch (_) {}
       }
     });
   }
 
   void _handleDisconnect() {
+    _connected = false;
     _heartbeatTimer?.cancel();
-    _ws = null;
+    _channel = null;
     _scheduleReconnect();
   }
 
@@ -111,23 +124,28 @@ class RealtimeClient {
     required bool isTyping,
     required List<String> recipientUids,
   }) {
-    if (_ws != null && _ws!.readyState == WebSocket.open) {
-      _ws!.add(jsonEncode({
-        'type': 'typing',
-        'payload': {
-          'chatId': chatId,
-          'isTyping': isTyping,
-          'recipientUids': recipientUids,
-        },
-      }));
+    if (_connected && _channel != null) {
+      try {
+        _channel!.sink.add(jsonEncode({
+          'type': 'typing',
+          'payload': {
+            'chatId': chatId,
+            'isTyping': isTyping,
+            'recipientUids': recipientUids,
+          },
+        }));
+      } catch (_) {}
     }
   }
 
   void disconnect() {
     _disposed = true;
+    _connected = false;
     _heartbeatTimer?.cancel();
     _reconnectTimer?.cancel();
-    _ws?.close();
-    _ws = null;
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
   }
 }

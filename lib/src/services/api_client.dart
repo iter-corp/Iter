@@ -80,6 +80,16 @@ class ApiClient {
     return wsBase.replaceAll('/api/v1', '/ws');
   }
 
+  /// Active origin without path (e.g. "http://192.168.1.194:3000" or "https://iterglobal.icu")
+  String get baseOrigin {
+    final uri = Uri.tryParse(baseUrl);
+    if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+      final port = uri.hasPort ? ':${uri.port}' : '';
+      return '${uri.scheme}://${uri.host}$port';
+    }
+    return 'https://iterglobal.icu';
+  }
+
   Future<void> init() async {
     if (_initialized) return;
     final prefs = await SharedPreferences.getInstance();

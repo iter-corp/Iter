@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import '../services/api_client.dart';
 
 /// App-wide media disk cache for feed/travel/discuss content.
 ///
@@ -60,31 +61,35 @@ class MediaCache {
   }
 }
 
-/// Normalizes any legacy or relative media URL to a clean, absolute HTTPS URL.
+/// Normalizes any legacy or relative media URL to a clean, absolute URL
+/// aligned with the active backend host (local PC or production).
 String normalizeMediaUrl(String? raw) {
   if (raw == null) return '';
   var url = raw.trim();
   if (url.isEmpty) return '';
 
+  final activeOrigin = ApiClient.instance.baseOrigin;
+
   // 1. Rewrite legacy Supabase storage URLs
   if (url.startsWith('https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public')) {
     url = url.replaceFirst(
       'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public',
-      'https://iterglobal.icu/uploads',
+      '$activeOrigin/uploads',
     );
   }
 
-  // 2. Rewrite legacy local IP URLs
+  // 2. Normalize local vs remote storage endpoints
   if (url.contains(':3000/uploads/')) {
-    url = url.replaceFirst(RegExp(r'https?:\/\/[^\/]+:3000\/uploads\/'), 'https://iterglobal.icu/uploads/');
+    // Point all variants (localhost, 127.0.0.1, 10.0.2.2, remote, etc.) to activeOrigin
+    url = url.replaceFirst(RegExp(r'https?:\/\/[^\/]+:3000\/uploads\/'), '$activeOrigin/uploads/');
   }
 
   // 3. Resolve relative /uploads/... paths
   if (url.startsWith('/uploads/')) {
-    url = 'https://iterglobal.icu$url';
+    url = '$activeOrigin$url';
   }
 
-  // 4. Upgrade HTTP to HTTPS for domain
+  // 4. Upgrade HTTP to HTTPS for remote domain
   if (url.startsWith('http://iterglobal.icu')) {
     url = url.replaceFirst('http://', 'https://');
   }
