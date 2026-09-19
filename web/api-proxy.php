@@ -15,6 +15,17 @@ if (file_exists(__DIR__ . '/.backend_port')) {
 }
 
 $backendHost = "http://127.0.0.1:{$targetPort}";
+
+// Resolve incoming request URI
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+// Remove any leading script path if present (e.g. /api-proxy.php/api/...)
+$requestUri = preg_replace('#^/api-proxy\.php#', '', $requestUri);
+if (empty($requestUri)) {
+    $requestUri = '/';
+}
+
+$targetUrl = $backendHost . $requestUri;
+
 // Handle CORS preflight immediately
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     header('Access-Control-Allow-Origin: *');

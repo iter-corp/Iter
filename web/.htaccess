@@ -1,9 +1,16 @@
 RewriteEngine On
 
 # ── 1. Disable LiteSpeed Per-Client Throttling (Prevents 429 Too Many Requests on Rapid Reloads) ──
+<IfModule LiteSpeed>
+    RewriteRule .* - [E=nothrottle:1]
+</IfModule>
+<IfModule mod_litespeed.c>
+    RewriteRule .* - [E=nothrottle:1]
+</IfModule>
 <IfModule Litespeed>
     RewriteRule .* - [E=nothrottle:1]
 </IfModule>
+RewriteRule .* - [E=nothrottle:1]
 
 # ── 2. Global CORS & Security Headers (Ensures CanvasKit and Video Elements in WebViews Render Correctly) ──
 <IfModule mod_headers.c>
