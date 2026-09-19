@@ -1,16 +1,18 @@
 RewriteEngine On
 
 # ── 1. Disable LiteSpeed Per-Client Throttling (Prevents 429 Too Many Requests on Rapid Reloads) ──
+SetEnv NOTHROTTLE 1
+SetEnv noabort 1
 <IfModule LiteSpeed>
-    RewriteRule .* - [E=nothrottle:1]
+    RewriteRule .* - [E=nothrottle:1,E=noabort:1]
 </IfModule>
 <IfModule mod_litespeed.c>
-    RewriteRule .* - [E=nothrottle:1]
+    RewriteRule .* - [E=nothrottle:1,E=noabort:1]
 </IfModule>
 <IfModule Litespeed>
-    RewriteRule .* - [E=nothrottle:1]
+    RewriteRule .* - [E=nothrottle:1,E=noabort:1]
 </IfModule>
-RewriteRule .* - [E=nothrottle:1]
+RewriteRule .* - [E=nothrottle:1,E=noabort:1]
 
 # ── 2. Global CORS & Security Headers (Ensures CanvasKit and Video Elements in WebViews Render Correctly) ──
 <IfModule mod_headers.c>
@@ -30,6 +32,7 @@ RewriteRule .* - [E=nothrottle:1]
 <IfModule mod_mime.c>
     AddType application/wasm .wasm
     AddType application/javascript .js
+    AddType application/javascript .mjs
     AddType application/json .json
     AddType image/x-icon .ico
     AddType image/png .png
@@ -42,10 +45,10 @@ RewriteRule .* - [E=nothrottle:1]
 </IfModule>
 
 # ── 5. API & Backend Proxy to Node.js / Hono Backend ──
-RewriteRule ^api/(.*)$ api-proxy.php [QSA,L]
-RewriteRule ^uploads/(.*)$ api-proxy.php [QSA,L]
-RewriteRule ^health$ api-proxy.php [QSA,L]
-RewriteRule ^privacy$ privacy.html [L]
+RewriteRule ^api/(.*)$ api-proxy.php [E=nothrottle:1,QSA,L]
+RewriteRule ^uploads/(.*)$ api-proxy.php [E=nothrottle:1,QSA,L]
+RewriteRule ^health$ api-proxy.php [E=nothrottle:1,QSA,L]
+RewriteRule ^privacy$ privacy.html [E=nothrottle:1,L]
 
 # ── 6. Allow assets/.env if requested by Flutter Web ──
 <Files ".env">
@@ -57,7 +60,7 @@ RewriteRule ^privacy$ privacy.html [L]
 # ── 7. SPA Routing Fallback for Flutter Web ──
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.html [L]
+RewriteRule . /index.html [E=nothrottle:1,L]
 
 # ── 8. Smart Caching Strategy ──
 <IfModule mod_headers.c>
@@ -71,7 +74,8 @@ RewriteRule . /index.html [L]
     </FilesMatch>
 
     # Cacheable static assets (WASM, JS bundles with version hash, Fonts, Images, Videos)
-    <FilesMatch "\.(wasm|otf|ttf|woff|woff2|png|jpg|jpeg|gif|webp|svg|ico|mp4|webm)$">
-        Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
+    <FilesMatch "\.(wasm|js|mjs|css|json|otf|ttf|woff|woff2|png|jpg|jpeg|gif|webp|svg|ico|mp4|webm)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+        Header set X-LiteSpeed-Cache-Control "public, max-age=31536000"
     </FilesMatch>
 </IfModule>
