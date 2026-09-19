@@ -9,6 +9,7 @@ import '../../../services/error_report_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/app_feedback.dart';
 import '../../widgets/app_page_background.dart';
+import '../../widgets/skeleton_loader.dart';
 import 'admin_reports_toolbar.dart';
 
 /// Admin view of app-wide errors captured by [ErrorReportService] — uncaught
@@ -58,7 +59,7 @@ class _AdminErrorReportsScreenState
         Tab(text: context.t.adminTabSolved(solved.length)),
       ],
       body: reportsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonList(count: 6),
         error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
         data: (_) => TabBarView(
           children: [

@@ -23,6 +23,7 @@ import '../model/post_model.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/post_card.dart';
 import '../widgets/profile_widget.dart';
+import '../widgets/skeleton_loader.dart';
 import 'blocked_users_screen.dart';
 import 'follow_list_screen.dart';
 import 'profile_settings_screen.dart';
@@ -67,7 +68,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: Colors.transparent,
       body: AppPageBackground(
         child: userAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SkeletonProfile(),
           error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
           data: (user) {
             if (user == null) {
@@ -688,10 +689,7 @@ class UserPostsGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(userPostsProvider(uid));
     return postsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const SkeletonGrid(),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
         child: Center(child: Text(context.t.errorWithMessage(e))),
@@ -750,10 +748,7 @@ class UserRepostsGrid extends ConsumerWidget {
         (ref.watch(blockedUsersProvider).valueOrNull ?? const <String>[])
             .toSet();
     return repostsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const SkeletonGrid(),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
         child: Center(child: Text(context.t.errorWithMessage(e))),
@@ -817,10 +812,7 @@ class UserSavedGrid extends ConsumerWidget {
         (ref.watch(blockedUsersProvider).valueOrNull ?? const <String>[])
             .toSet();
     return savedAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const SkeletonGrid(),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(24),
         child: Center(child: Text(context.t.errorWithMessage(e))),
@@ -892,10 +884,7 @@ class _UserQaActivitySectionState extends ConsumerState<UserQaActivitySection> {
 
     Widget listFor(AsyncValue<List<Post>> asyncPosts, {required bool asked}) {
       return asyncPosts.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.all(40),
-          child: Center(child: CircularProgressIndicator()),
-        ),
+        loading: () => const SkeletonCommentList(count: 3),
         error: (e, _) => Padding(
           padding: const EdgeInsets.all(24),
           child: Center(child: Text(context.t.errorWithMessage(e))),

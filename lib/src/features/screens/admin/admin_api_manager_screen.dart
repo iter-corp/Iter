@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../l10n/app_strings.dart';
 import '../../../theme/app_theme.dart';
 import '../../widgets/app_page_background.dart';
+import '../../widgets/skeleton_loader.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
@@ -265,7 +266,7 @@ class _KeysTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef r) {
     final keysAsync = r.watch(_apiKeysProvider);
     return keysAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonList(count: 6),
       error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
       data: (keys) {
         if (keys.isEmpty) {
@@ -675,7 +676,7 @@ class _LogTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef r) {
     final logsAsync = r.watch(_apiLogsProvider);
     return logsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonList(count: 6),
       error: (e, _) => Center(child: Text(context.t.errorWithMessage(e))),
       data: (logs) {
         return Column(

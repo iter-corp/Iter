@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../model/post_model.dart';
 import '../screens/comment_screen.dart';
 import '../widgets/post_card.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// A standalone screen that displays a single post fetched by [postId].
 /// When [highlightCommentId] is provided the comment sheet opens
@@ -88,7 +89,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             .snapshots(),
         builder: (_, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: SkeletonPostCard(isDetailed: true),
+            );
           }
           if (!snap.hasData || !snap.data!.exists) {
             return Center(

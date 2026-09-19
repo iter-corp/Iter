@@ -10,6 +10,7 @@ import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_feedback.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// Lets a user tune push notifications for newly published events:
 ///   1. Master on/off switch.
@@ -149,10 +150,7 @@ class _EventNotificationsSettingsScreenState
               ],
             ),
             prefsAsync.when<Widget>(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              ),
+              loading: () => SkeletonListTile.sliver(count: 5),
               error: (e, _) => SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: Text(context.t.errorWithMessage(e))),

@@ -25,6 +25,7 @@ import '../widgets/app_page_background.dart';
 import '../widgets/primary_action_button.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_section.dart';
+import '../widgets/skeleton_loader.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -210,8 +211,10 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 showStories: showStories,
                 isOffline: isOffline,
               ),
-              const SizedBox(height: 24),
-              const Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 8),
+              const SkeletonPostCard(),
+              const SkeletonPostCard(),
+              const SkeletonPostCard(),
             ],
           ),
           error: (e, _) => ListView(

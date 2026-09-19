@@ -9,6 +9,7 @@ import '../../providers/profile_visitor_providers.dart';
 import '../../services/profile_visitor_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// "Who visited my profile" — a list of users sorted by their most
 /// recent visit, with a tap-through to each visitor's profile. Driven
@@ -68,11 +69,8 @@ class ProfileVisitorsScreen extends ConsumerWidget {
               ),
             ),
             ...visitorsAsync.when(
-              loading: () => const <Widget>[
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+              loading: () => <Widget>[
+                SkeletonUserList.sliver(count: 6),
               ],
               error: (e, _) => <Widget>[
                 SliverFillRemaining(

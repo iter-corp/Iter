@@ -6,6 +6,7 @@ import '../../../l10n/app_strings.dart';
 import '../../../providers/admin_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../widgets/app_page_background.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../user_screen.dart';
 
 class AdminUsersScreen extends ConsumerStatefulWidget {
@@ -118,8 +119,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
               ),
               Expanded(
                 child: usersAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
+                  loading: () => const SkeletonUserList(count: 7),
                   error: (e, _) =>
                       Center(child: Text(context.t.errorWithMessage(e))),
                   data: (users) {

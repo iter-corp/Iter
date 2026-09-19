@@ -28,6 +28,7 @@ import '../screens/image_viewer_screen.dart';
 import '../screens/qa_thread_screen.dart';
 import '../../navigation/user_profile_nav.dart';
 import 'mention_text.dart';
+import 'skeleton_loader.dart';
 
 class PostCard extends ConsumerStatefulWidget {
   final Post post;
@@ -1098,7 +1099,7 @@ class _PostDiscussPage extends ConsumerWidget {
             itemBuilder: (_, i) => _DiscussPreviewRow(thread: threads[i]),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonList(count: 4),
         error: (_, __) => Center(
           child: Text(
             context.t.errorGeneric,

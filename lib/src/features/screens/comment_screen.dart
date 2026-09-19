@@ -18,6 +18,7 @@ import '../../utils/text_direction.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/comment_report_sheet.dart';
 import '../widgets/mention_text.dart';
+import '../widgets/skeleton_loader.dart';
 
 class _ReplyTarget {
   final String parentCommentId;
@@ -217,7 +218,7 @@ class _CommentScreenState extends ConsumerState<CommentScreen> {
             // Comment list
             Expanded(
               child: commentsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const SkeletonCommentList(count: 6),
                 error: (e, _) =>
                     Center(child: Text(context.t.homeErrorPrefix(e))),
                 data: (comments) {

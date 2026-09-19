@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/app_page_background.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// Data returned when the user taps a saved entry — used to restore it into
 /// the Translate screen's inputs.
@@ -79,10 +80,7 @@ class SavedTranslationsScreen extends StatelessWidget {
                 stream: query!.snapshots(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
-                    return const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(child: CircularProgressIndicator()),
-                    );
+                    return SkeletonListTile.sliver(count: 6);
                   }
                   if (snap.hasError) {
                     return SliverFillRemaining(

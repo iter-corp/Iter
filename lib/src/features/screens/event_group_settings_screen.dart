@@ -11,6 +11,7 @@ import '../../providers/event_registration_providers.dart';
 import '../../providers/follow_providers.dart';
 import '../../services/event_registration_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// Settings page for an event group chat. For the event's admin, this shows
 /// pending registrations (to approve/reject), current members (with remove
@@ -265,10 +266,7 @@ class _PendingList extends ConsumerWidget {
       stream: svc.streamPendingForEvent(eventId),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return const SkeletonUserList(count: 3);
         }
         final items = snap.data ?? const <EventRegistration>[];
         if (items.isEmpty) {
@@ -393,10 +391,7 @@ class _MemberList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final membersAsync = ref.watch(eventChatMembersProvider(eventId));
     return membersAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const SkeletonUserList(count: 4),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(16),
         child: Text(context.t.eventGroupFailedLoadMembers(e),
@@ -602,7 +597,7 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
             ),
             Expanded(
               child: followingAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const SkeletonUserList(count: 6),
                 error: (e, _) =>
                     Center(child: Text(context.t.eventGroupFailed(e))),
                 data: (uids) {

@@ -15,6 +15,7 @@ import '../../services/event_chat_service.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/create_group_sheet.dart';
 import '../widgets/message_widget.dart';
+import '../widgets/skeleton_loader.dart';
 import 'chat_screen.dart';
 import 'event_chat_screen.dart';
 import 'request_screen.dart';
@@ -254,8 +255,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
             Expanded(
               child: selectedTab == 0
                   ? inboxAsync.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
+                      loading: () => const SkeletonConversationList(),
                       error: (e, _) =>
                           Center(child: Text(context.t.errorWithMessage(e))),
                       data: (_) {
@@ -280,8 +280,7 @@ class _MessageBodyState extends ConsumerState<MessageBody> {
                       },
                     )
                   : requestsAsync.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
+                      loading: () => const SkeletonConversationList(),
                       error: (e, _) =>
                           Center(child: Text(context.t.errorWithMessage(e))),
                       data: (_) {

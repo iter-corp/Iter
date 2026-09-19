@@ -8,6 +8,7 @@ import '../../providers/follow_providers.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/app_page_background.dart';
 import '../widgets/primary_action_button.dart';
+import '../widgets/skeleton_loader.dart';
 
 /// Which list a [_UserList] tab renders, and therefore which row action
 /// (if any) it offers when the viewer owns the profile.
@@ -136,7 +137,7 @@ class _UserListState extends ConsumerState<_UserList> {
         ),
         Expanded(
           child: usersAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonUserList(),
             error: (e, _) => Center(
               child: Text(
                 context.t.errorWithMessage(e.toString()),
