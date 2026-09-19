@@ -99,11 +99,13 @@ jobs:
             export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/opt/alt/alt-nodejs22/root/usr/bin:~/.npm-global/bin:$PATH
             cd ~/backend-hono
             npm install
+            npm run build || true
             if [ -f .env ]; then
               npm run db:migrate || true
               npm run db:seed || true
             fi
-            pm2 reload ecosystem.config.json || pm2 restart ecosystem.config.json || pm2 start ecosystem.config.json
+            pm2 delete iter-backend || true
+            pm2 start ecosystem.config.json
             pm2 save
           '
 
