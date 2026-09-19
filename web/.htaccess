@@ -1,4 +1,5 @@
 RewriteEngine On
+DirectoryIndex index.html index.php
 
 # ── 1. Disable LiteSpeed Per-Client Throttling (Prevents 429 Too Many Requests on Rapid Reloads) ──
 SetEnv NOTHROTTLE 1
