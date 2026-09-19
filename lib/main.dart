@@ -522,6 +522,10 @@ class _VersionGateState extends State<_VersionGate> {
 
   @override
   Widget build(BuildContext context) {
+    // Web platforms (including dev web) receive continuous automatic updates on reload
+    // and must never be blocked by mobile app store force-update screens.
+    if (kIsWeb) return widget.child;
+
     final minVersion = widget.minVersion;
     final current = _currentVersion;
     final requiresUpdate = !widget.isAdmin &&

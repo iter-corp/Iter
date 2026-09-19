@@ -35,6 +35,7 @@ postRoutes.get('/', optionalAuth, async (c) => {
     const saved = c.req.query('saved'); // 'true'
     const repostedBy = c.req.query('repostedBy');
     const answeredBy = c.req.query('answeredBy');
+    const sourcePostId = c.req.query('sourcePostId');
     const conditions = [];
     // 1. Author Filter (e.g. User Profile Page)
     if (authorUid) {
@@ -90,6 +91,10 @@ postRoutes.get('/', optionalAuth, async (c) => {
         conditions.push(inArray(posts.id, ids));
         conditions.push(eq(posts.postType, 'qa'));
     }
+    // 4b. Source Post Discuss Filter
+    if (sourcePostId) {
+        conditions.push(eq(posts.sourcePostId, sourcePostId));
+    }
     // 5. Post Type Filter
     if (type === 'qa') {
         conditions.push(eq(posts.postType, 'qa'));
@@ -97,14 +102,11 @@ postRoutes.get('/', optionalAuth, async (c) => {
     else if (type === 'regular') {
         conditions.push(eq(posts.postType, 'regular'));
     }
-    else if (type === 'all') {
-        // No post_type filter: returns all posts (regular, qa, discussion)
-    }
-    else if (!type && !saved && !repostedBy && !answeredBy) {
+    else if (!type && !saved && !repostedBy && !answeredBy && !sourcePostId) {
         conditions.push(eq(posts.postType, 'regular'));
     }
     // 6. Global Feed Privacy
-    if (!authorUid && saved !== 'true') {
+    if (!authorUid && saved !== 'true' && !sourcePostId) {
         conditions.push(eq(posts.isPrivate, false));
     }
     // 7. Cursor Pagination
