@@ -98,17 +98,23 @@ class HomeFeedItem {
   const HomeFeedItem({required this.post, required this.isQa});
 }
 
+final isHomeFeedOfflineProvider = Provider<bool>((ref) {
+  final feed = ref.watch(feedProvider);
+  return feed.hasError;
+});
+
 /// The home feed: regular posts, NASA APOD posts, Wikimedia featured cards, and standalone Discuss questions
 /// merged into a single list, newest first. Replaces the old separate
 /// Feed/Discuss tabs.
 final homeFeedProvider = Provider<AsyncValue<List<HomeFeedItem>>>((ref) {
+  final postService = ref.watch(postServiceProvider);
   final feed = ref.watch(feedProvider);
   final qa = ref.watch(qaFeedProvider);
   final nasa = ref.watch(nasaFeedProvider);
   final wiki = ref.watch(wikimediaFeedProvider);
 
-  final feedPosts = feed.value ?? const <Post>[];
-  final qaPosts = qa.value ?? const <Post>[];
+  final feedPosts = feed.value ?? postService.cachedFeed;
+  final qaPosts = qa.value ?? postService.cachedQaFeed;
   final nasaPosts = nasa.value ?? const <Post>[];
   final wikiPosts = wiki.value ?? const <Post>[];
 

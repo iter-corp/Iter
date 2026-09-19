@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'notification_service.dart';
@@ -817,27 +819,76 @@ class CommentReport {
 }
 
 class AdminService {
+  static const String _localConfigKey = 'cached_admin_config_v1';
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final NotificationService _notifications = NotificationService();
 
+  DocumentReference<Map<String, dynamic>> get _configDoc =>
+      _db.collection('adminConfig').doc('app');
+
   Stream<AdminConfig> streamConfig() async* {
+    AdminConfig current = const AdminConfig();
+
+    // 1. Instantly yield cached config if available from local storage
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localJson = prefs.getString(_localConfigKey);
+      if (localJson != null && localJson.isNotEmpty) {
+        final decoded = jsonDecode(localJson);
+        if (decoded is Map<String, dynamic>) {
+          current = AdminConfig.fromMap(decoded);
+          yield current;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fetch from Hono /dynamic/config if online
     try {
       final res = await ApiClient.instance.get('/dynamic/config');
       if (res is Map<String, dynamic>) {
-        yield AdminConfig.fromMap(res);
-      } else {
-        yield const AdminConfig();
+        current = AdminConfig.fromMap(res);
+        yield current;
+        _saveLocalCache(res);
       }
-    } catch (_) {
-      yield const AdminConfig();
-    }
+    } catch (_) {}
+
+    // 3. Listen to live Firestore snapshots for instant sync across admin panels
+    yield* _configDoc.snapshots().map((snap) {
+      if (snap.exists && snap.data() != null) {
+        final data = snap.data()!;
+        current = AdminConfig.fromMap(data);
+        _saveLocalCache(data);
+        return current;
+      }
+      return current;
+    }).handleError((_) => current);
+  }
+
+  Future<void> _saveLocalCache(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localConfigKey, jsonEncode(data));
+    } catch (_) {}
   }
 
   Future<void> saveConfig(AdminConfig cfg) async {
+    final map = cfg.toMap();
+
+    // 1. Immediately update local storage
+    await _saveLocalCache(map);
+
+    // 2. Persist to Firestore
     try {
-      await ApiClient.instance.patch('/admin/config', body: cfg.toMap());
+      await _configDoc.set(map, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('[AdminService] saveConfig error: $e');
+      debugPrint('[AdminService] Firestore saveConfig error: $e');
+    }
+
+    // 3. Persist to Hono /admin/config
+    try {
+      await ApiClient.instance.patch('/admin/config', body: map);
+    } catch (e) {
+      debugPrint('[AdminService] Hono saveConfig error: $e');
     }
   }
 

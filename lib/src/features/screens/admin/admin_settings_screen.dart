@@ -232,7 +232,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
         // _cfg already carries the edited list fields.
       );
       await ref.read(adminServiceProvider).saveConfig(next);
+      ref.invalidate(adminConfigProvider);
       if (mounted) {
+        setState(() => _cfg = next);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.t.adminSaved)),
         );

@@ -287,16 +287,35 @@ adminRoutes.patch('/config', async (c) => {
         ...(welcomeMessageEnabled !== undefined ? { welcomeMessageEnabled } : {}),
         ...(wikipediaEnabled !== undefined ? { wikipediaEnabled } : {}),
     };
+    const allowedKeys = [
+        'storiesEnabled', 'repostsEnabled', 'translateEnabled',
+        'maintenanceMode', 'maintenanceMessage', 'minAppVersion',
+        'announcement', 'contactEmail', 'iosAppStoreUrl', 'androidPlayStoreUrl',
+        'eventTypes', 'profileProfessionOptions', 'profileFieldOptions',
+        'profileAcademicLevelOptions', 'profileGoalOptions', 'profanityWordsEn',
+    ];
+    const safeDirect = {};
+    for (const k of allowedKeys) {
+        if (directFields[k] !== undefined) {
+            safeDirect[k] = directFields[k];
+        }
+    }
     await db
         .update(appConfigs)
         .set({
-        ...directFields,
+        ...safeDirect,
         metadata: mergedMetadata,
         updatedAt: new Date(),
     })
         .where(eq(appConfigs.id, 'app'));
     const [updated] = await db.select().from(appConfigs).where(eq(appConfigs.id, 'app')).limit(1);
-    return c.json({ success: true, data: updated });
+    return c.json({
+        success: true,
+        data: {
+            ...updated,
+            wikipediaEnabled: mergedMetadata.wikipediaEnabled ?? true,
+        },
+    });
 });
 // ── 8. Media Synchronization & URL Migration ────────────────────────────────
 adminRoutes.post('/media/fix-urls', async (c) => {

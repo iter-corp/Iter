@@ -109,8 +109,35 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
     required String announcement,
     required bool maintenance,
     required bool showStories,
+    bool isOffline = false,
   }) {
     return [
+      if (isOffline)
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 16, color: Colors.amber),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  context.t.offlineContentBanner,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       if (showWelcome && onDismissWelcome != null)
         _WelcomeBanner(
           message: welcomeMessage,
@@ -132,6 +159,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
   @override
   Widget build(BuildContext context) {
     final postsAsync = ref.watch(homeFeedProvider);
+    final isOffline = ref.watch(isHomeFeedOfflineProvider);
 
     final cfg = ref.watch(adminConfigProvider).valueOrNull;
     final announcement = cfg?.announcement ?? '';
@@ -180,6 +208,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 announcement: announcement,
                 maintenance: maintenance,
                 showStories: showStories,
+                isOffline: isOffline,
               ),
               const SizedBox(height: 24),
               const Center(child: CircularProgressIndicator()),
@@ -198,9 +227,86 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                 announcement: announcement,
                 maintenance: maintenance,
                 showStories: showStories,
+                isOffline: isOffline,
               ),
-              const SizedBox(height: 24),
-              Center(child: Text(context.t.homeErrorPrefix(e))),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? const Color(0xFF151922)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: context.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.06),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9D4EDD).withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.cloud_off_rounded,
+                        size: 32,
+                        color: Color(0xFF9D4EDD),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      context.t.serverIssuesTitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      context.t.serverIssuesSubtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () => _refresh(ref),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF7B2CBF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                      ),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: Text(
+                        context.t.tryAgain,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           data: (items) {
@@ -218,6 +324,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                     announcement: announcement,
                     maintenance: maintenance,
                     showStories: showStories,
+                    isOffline: isOffline,
                   ),
                   const SizedBox(height: 24),
                   Center(
@@ -241,6 +348,7 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
                       announcement: announcement,
                       maintenance: maintenance,
                       showStories: showStories,
+                      isOffline: isOffline,
                     ),
                   ),
                 ),

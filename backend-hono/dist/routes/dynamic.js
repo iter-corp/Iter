@@ -34,7 +34,15 @@ dynamicRoutes.get('/config', async (c) => {
             },
         });
     }
-    return c.json({ success: true, data: config });
+    const meta = config.metadata || {};
+    const wikipediaEnabled = meta.wikipediaEnabled !== undefined ? Boolean(meta.wikipediaEnabled) : true;
+    return c.json({
+        success: true,
+        data: {
+            ...config,
+            wikipediaEnabled,
+        },
+    });
 });
 // ── 2. Server-Driven UI (SDUI) Screen Layout ────────────────────────────────
 dynamicRoutes.get('/screens/:screenId', async (c) => {

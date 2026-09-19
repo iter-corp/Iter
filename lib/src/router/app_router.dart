@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -123,18 +122,42 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/', redirect: (_, __) => '/home'),
-      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const SplashScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const LoginScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/signup',
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const SignupScreen(),
+        ),
+      ),
       GoRoute(
         path: '/forgot-password',
-        builder: (_, __) => const ForgotPasswordScreen(),
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: const ForgotPasswordScreen(),
+        ),
       ),
       GoRoute(
         path: '/otp',
-        builder: (_, state) => OtpScreen(
-          email: state.uri.queryParameters['email'],
-          initialError: state.uri.queryParameters['sendError'],
+        pageBuilder: (_, state) => _buildFadePage(
+          state: state,
+          child: OtpScreen(
+            email: state.uri.queryParameters['email'],
+            initialError: state.uri.queryParameters['sendError'],
+          ),
         ),
       ),
       GoRoute(
@@ -218,4 +241,24 @@ class _AuthListenable extends ChangeNotifier {
     _removeListener?.call();
     super.dispose();
   }
+}
+
+Page<dynamic> _buildFadePage({
+  required GoRouterState state,
+  required Widget child,
+  Duration duration = const Duration(milliseconds: 450),
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: duration,
+    reverseTransitionDuration: duration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeInOutCubic,
+      );
+      return FadeTransition(opacity: curved, child: child);
+    },
+  );
 }

@@ -345,10 +345,24 @@ adminRoutes.patch('/config', async (c) => {
     ...(wikipediaEnabled !== undefined ? { wikipediaEnabled } : {}),
   };
 
+  const allowedKeys = [
+    'storiesEnabled', 'repostsEnabled', 'translateEnabled',
+    'maintenanceMode', 'maintenanceMessage', 'minAppVersion',
+    'announcement', 'contactEmail', 'iosAppStoreUrl', 'androidPlayStoreUrl',
+    'eventTypes', 'profileProfessionOptions', 'profileFieldOptions',
+    'profileAcademicLevelOptions', 'profileGoalOptions', 'profanityWordsEn',
+  ];
+  const safeDirect: Record<string, unknown> = {};
+  for (const k of allowedKeys) {
+    if ((directFields as Record<string, unknown>)[k] !== undefined) {
+      safeDirect[k] = (directFields as Record<string, unknown>)[k];
+    }
+  }
+
   await db
     .update(appConfigs)
     .set({
-      ...directFields,
+      ...safeDirect,
       metadata: mergedMetadata,
       updatedAt: new Date(),
     })
@@ -356,7 +370,13 @@ adminRoutes.patch('/config', async (c) => {
 
   const [updated] = await db.select().from(appConfigs).where(eq(appConfigs.id, 'app')).limit(1);
 
-  return c.json({ success: true, data: updated });
+  return c.json({
+    success: true,
+    data: {
+      ...updated,
+      wikipediaEnabled: (mergedMetadata as any).wikipediaEnabled ?? true,
+    },
+  });
 });
 
 // ── 8. Media Synchronization & URL Migration ────────────────────────────────

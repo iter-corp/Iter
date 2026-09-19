@@ -402,6 +402,9 @@ class AppStrings {
   String get actionCannotBeUndone => _get('action_cannot_be_undone');
   String get somethingWentWrong => _get('something_went_wrong');
   String get tryAgain => _get('try_again');
+  String get serverIssuesTitle => _get('server_issues_title');
+  String get serverIssuesSubtitle => _get('server_issues_subtitle');
+  String get offlineContentBanner => _get('offline_content_banner');
   String get permissionDenied => _get('permission_denied');
   String get cameraPermissionNeeded => _get('camera_permission_needed');
   String get galleryPermissionNeeded => _get('gallery_permission_needed');
