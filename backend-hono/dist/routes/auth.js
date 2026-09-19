@@ -24,7 +24,7 @@ const signupSchema = z.object({
     username: z.string().min(3).max(30).optional(),
     uid: z.string().optional(),
 });
-authRoutes.post('/signup', rateLimit({ maxRequests: 5, windowSeconds: 60 }), zValidator('json', signupSchema), async (c) => {
+authRoutes.post('/signup', rateLimit({ maxRequests: 30, windowSeconds: 60 }), zValidator('json', signupSchema), async (c) => {
     const { email, password, username, uid } = c.req.valid('json');
     const normalizedEmail = email.trim().toLowerCase();
     // Check blacklist
@@ -105,7 +105,7 @@ const loginSchema = z.object({
     email: z.string().email(),
     password: z.string(),
 });
-authRoutes.post('/login', rateLimit({ maxRequests: 10, windowSeconds: 60 }), zValidator('json', loginSchema), async (c) => {
+authRoutes.post('/login', rateLimit({ maxRequests: 60, windowSeconds: 60 }), zValidator('json', loginSchema), async (c) => {
     const { email, password } = c.req.valid('json');
     const normalizedEmail = email.trim().toLowerCase();
     const [user] = await db

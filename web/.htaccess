@@ -1,32 +1,61 @@
 RewriteEngine On
 
-# API & Backend proxy to Hono Node.js backend
+# ── 1. Disable LiteSpeed Per-Client Throttling (Prevents 429 Too Many Requests on Rapid Reloads) ──
+<IfModule Litespeed>
+    RewriteRule .* - [E=nothrottle:1]
+</IfModule>
+
+# ── 2. Enable GZIP & Deflate Compression (Reduces JS/WASM bundle sizes by 75%) ──
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json application/wasm image/svg+xml
+</IfModule>
+
+# ── 3. MIME Types Configuration ──
+<IfModule mod_mime.c>
+    AddType application/wasm .wasm
+    AddType application/javascript .js
+    AddType application/json .json
+    AddType image/x-icon .ico
+    AddType image/png .png
+    AddType image/webp .webp
+    AddType font/ttf .ttf
+    AddType font/otf .otf
+    AddType font/woff2 .woff2
+</IfModule>
+
+# ── 4. API & Backend Proxy to Node.js / Hono Backend ──
 RewriteRule ^api/(.*)$ api-proxy.php [QSA,L]
 RewriteRule ^uploads/(.*)$ api-proxy.php [QSA,L]
 RewriteRule ^health$ api-proxy.php [QSA,L]
 RewriteRule ^privacy$ privacy.html [L]
 
-# Allow assets/.env if requested by Flutter web
+# ── 5. Allow assets/.env if requested by Flutter Web ──
 <Files ".env">
     Order allow,deny
     Allow from all
     Require all granted
 </Files>
 
-# SPA fallback for Flutter Web
+# ── 6. SPA Routing Fallback for Flutter Web ──
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule . /index.html [L]
 
-# Prevent stale caching of app entrypoints and bundles
+# ── 7. Smart Caching Strategy (Prevents Server Overload on Hard Reloads) ──
 <IfModule mod_headers.c>
-    <FilesMatch "\.(html|js|json|wasm)$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
-        Header set Pragma "no-cache"
-        Header set Expires "0"
-        Header set X-LiteSpeed-Cache-Control "no-cache"
+    Header set Connection keep-alive
+
+    # HTML & bootstrap loader: check for updates, allow 304 Not Modified
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
+    <FilesMatch "^flutter_bootstrap\.js$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
+    # Cacheable static assets (WASM, JS bundles with version hash, Fonts, Images)
+    <FilesMatch "\.(wasm|otf|ttf|woff|woff2|png|jpg|jpeg|gif|webp|svg|ico)$">
+        Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
     </FilesMatch>
 </IfModule>
-
-AddType image/x-icon .ico
-AddType image/png .png

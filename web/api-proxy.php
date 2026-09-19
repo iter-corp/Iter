@@ -55,7 +55,15 @@ if (isset($_SERVER['CONTENT_TYPE']) && !empty($_SERVER['CONTENT_TYPE'])) {
     }
 }
 
-$incomingHeaders[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+// Get the real client IP (supporting Cloudflare, reverse proxies, and direct connections)
+$clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] 
+    ?? (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]) : null)
+    ?? $_SERVER['HTTP_X_REAL_IP'] 
+    ?? $_SERVER['REMOTE_ADDR'] 
+    ?? '127.0.0.1';
+
+$incomingHeaders[] = 'X-Forwarded-For: ' . $clientIp;
+$incomingHeaders[] = 'X-Real-IP: ' . $clientIp;
 $incomingHeaders[] = 'X-Forwarded-Proto: ' . ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http');
 $incomingHeaders[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 

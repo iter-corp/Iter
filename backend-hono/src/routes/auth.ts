@@ -33,7 +33,7 @@ const signupSchema = z.object({
   uid: z.string().optional(),
 });
 
-authRoutes.post('/signup', rateLimit({ maxRequests: 5, windowSeconds: 60 }), zValidator('json', signupSchema), async (c) => {
+authRoutes.post('/signup', rateLimit({ maxRequests: 30, windowSeconds: 60 }), zValidator('json', signupSchema), async (c) => {
   const { email, password, username, uid } = c.req.valid('json');
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -128,7 +128,7 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-authRoutes.post('/login', rateLimit({ maxRequests: 10, windowSeconds: 60 }), zValidator('json', loginSchema), async (c) => {
+authRoutes.post('/login', rateLimit({ maxRequests: 60, windowSeconds: 60 }), zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json');
   const normalizedEmail = email.trim().toLowerCase();
 
