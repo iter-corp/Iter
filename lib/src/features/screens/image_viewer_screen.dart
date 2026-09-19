@@ -119,7 +119,45 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                 onTap: _saveCurrent,
               ),
             ),
-            if (widget.urls.length > 1)
+            if (widget.urls.length > 1) ...[
+              if (_index > 0)
+                PositionedDirectional(
+                  start: 14,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: _CircleAction(
+                      icon: Directionality.of(context) == TextDirection.rtl
+                          ? Icons.chevron_right_rounded
+                          : Icons.chevron_left_rounded,
+                      onTap: () {
+                        _controller.previousPage(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              if (_index < widget.urls.length - 1)
+                PositionedDirectional(
+                  end: 14,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: _CircleAction(
+                      icon: Directionality.of(context) == TextDirection.rtl
+                          ? Icons.chevron_left_rounded
+                          : Icons.chevron_right_rounded,
+                      onTap: () {
+                        _controller.nextPage(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                ),
               Positioned(
                 bottom: 20,
                 left: 0,
@@ -139,6 +177,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
       ),

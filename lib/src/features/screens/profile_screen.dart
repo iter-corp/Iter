@@ -503,13 +503,36 @@ class PostThumbTile extends StatelessWidget {
   Widget build(BuildContext context) {
     if (post.imageUrls.isNotEmpty) {
       final cleanUrl = normalizeMediaUrl(post.imageUrls.first);
-      return CachedNetworkImage(
-        imageUrl: cleanUrl,
-        cacheManager: kIsWeb ? null : MediaCache.images,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => Container(color: context.borderColor),
-        errorWidget: (_, __, ___) =>
-            Icon(Icons.broken_image, color: context.textSecondary),
+      final isMulti = post.imageUrls.length > 1;
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          CachedNetworkImage(
+            imageUrl: cleanUrl,
+            cacheManager: kIsWeb ? null : MediaCache.images,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => Container(color: context.borderColor),
+            errorWidget: (_, __, ___) =>
+                Icon(Icons.broken_image, color: context.textSecondary),
+          ),
+          if (isMulti)
+            PositionedDirectional(
+              top: 6,
+              end: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.collections_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+              ),
+            ),
+        ],
       );
     }
     if (post.videoUrls.isNotEmpty) {
