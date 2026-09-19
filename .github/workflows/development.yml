@@ -1,4 +1,9 @@
-name: Development Pipeline
+name: Development Pipeline (Dev Web & Backend Only)
+# ─────────────────────────────────────────────────────────────
+# TARGET: Dev Web (https://dev.iterglobal.icu) only.
+# No mobile releases (iOS TestFlight/App Store or Android Play Store)
+# are ever built or dispatched by this pipeline.
+# ─────────────────────────────────────────────────────────────
 
 on:
   push:
