@@ -18,6 +18,7 @@ import '../../providers/story_providers.dart';
 import '../../services/own_story_seen_service.dart';
 import '../../services/story_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/media_cache.dart';
 import '../model/post_model.dart';
 import '../widgets/event_share.dart';
 import '../widgets/story_text_overlay.dart';
@@ -2580,7 +2581,8 @@ class _VideoStoryPlayerState extends State<_VideoStoryPlayer>
     if (_setupInFlight) return;
     _setupInFlight = true;
     try {
-      final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      final cleanUrl = normalizeMediaUrl(widget.url);
+      final c = VideoPlayerController.networkUrl(Uri.parse(cleanUrl));
       await c.initialize();
       if (!mounted) {
         await c.dispose();

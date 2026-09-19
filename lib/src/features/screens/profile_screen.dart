@@ -501,8 +501,10 @@ class PostThumbTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (post.imageUrls.isNotEmpty) {
+      final cleanUrl = normalizeMediaUrl(post.imageUrls.first);
       return CachedNetworkImage(
-        imageUrl: post.imageUrls.first,
+        imageUrl: cleanUrl,
+        cacheManager: kIsWeb ? null : MediaCache.images,
         fit: BoxFit.cover,
         placeholder: (_, __) => Container(color: context.borderColor),
         errorWidget: (_, __, ___) =>
@@ -564,9 +566,11 @@ class _VideoThumbState extends State<_VideoThumb> {
   }
 
   Future<void> _loadThumb() async {
-    final cleanUrl = widget.url.startsWith('https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public')
-        ? widget.url.replaceFirst('https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public', 'https://iterglobal.icu/uploads')
-        : widget.url;
+    final cleanUrl = normalizeMediaUrl(widget.url);
+    if (cleanUrl.isEmpty) {
+      if (mounted) setState(() => _failed = true);
+      return;
+    }
 
     VideoPlayerController? c;
     try {

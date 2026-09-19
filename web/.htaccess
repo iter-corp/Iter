@@ -5,12 +5,21 @@ RewriteEngine On
     RewriteRule .* - [E=nothrottle:1]
 </IfModule>
 
-# ── 2. Enable GZIP & Deflate Compression (Reduces JS/WASM bundle sizes by 75%) ──
+# ── 2. Global CORS & Security Headers (Ensures CanvasKit and Video Elements in WebViews Render Correctly) ──
+<IfModule mod_headers.c>
+    Header set Connection keep-alive
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, x-firebase-token, apikey, Range, X-Requested-With, Origin, Accept"
+    Header set Access-Control-Expose-Headers "Content-Length, Content-Range, Accept-Ranges, Retry-After"
+</IfModule>
+
+# ── 3. Enable GZIP & Deflate Compression (Reduces JS/WASM bundle sizes by 75%) ──
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json application/wasm image/svg+xml
 </IfModule>
 
-# ── 3. MIME Types Configuration ──
+# ── 4. MIME Types Configuration ──
 <IfModule mod_mime.c>
     AddType application/wasm .wasm
     AddType application/javascript .js
@@ -18,33 +27,33 @@ RewriteEngine On
     AddType image/x-icon .ico
     AddType image/png .png
     AddType image/webp .webp
+    AddType video/mp4 .mp4
+    AddType video/webm .webm
     AddType font/ttf .ttf
     AddType font/otf .otf
     AddType font/woff2 .woff2
 </IfModule>
 
-# ── 4. API & Backend Proxy to Node.js / Hono Backend ──
+# ── 5. API & Backend Proxy to Node.js / Hono Backend ──
 RewriteRule ^api/(.*)$ api-proxy.php [QSA,L]
 RewriteRule ^uploads/(.*)$ api-proxy.php [QSA,L]
 RewriteRule ^health$ api-proxy.php [QSA,L]
 RewriteRule ^privacy$ privacy.html [L]
 
-# ── 5. Allow assets/.env if requested by Flutter Web ──
+# ── 6. Allow assets/.env if requested by Flutter Web ──
 <Files ".env">
     Order allow,deny
     Allow from all
     Require all granted
 </Files>
 
-# ── 6. SPA Routing Fallback for Flutter Web ──
+# ── 7. SPA Routing Fallback for Flutter Web ──
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule . /index.html [L]
 
-# ── 7. Smart Caching Strategy (Prevents Server Overload on Hard Reloads) ──
+# ── 8. Smart Caching Strategy ──
 <IfModule mod_headers.c>
-    Header set Connection keep-alive
-
     # HTML & bootstrap loader: check for updates, allow 304 Not Modified
     <FilesMatch "\.(html|htm)$">
         Header set Cache-Control "no-cache, must-revalidate"
@@ -54,8 +63,8 @@ RewriteRule . /index.html [L]
         Header set Cache-Control "no-cache, must-revalidate"
     </FilesMatch>
 
-    # Cacheable static assets (WASM, JS bundles with version hash, Fonts, Images)
-    <FilesMatch "\.(wasm|otf|ttf|woff|woff2|png|jpg|jpeg|gif|webp|svg|ico)$">
+    # Cacheable static assets (WASM, JS bundles with version hash, Fonts, Images, Videos)
+    <FilesMatch "\.(wasm|otf|ttf|woff|woff2|png|jpg|jpeg|gif|webp|svg|ico|mp4|webm)$">
         Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
     </FilesMatch>
 </IfModule>

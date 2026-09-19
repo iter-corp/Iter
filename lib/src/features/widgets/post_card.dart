@@ -1492,21 +1492,27 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
   /// Builds the controller for [url]. The video is first downloaded to
   /// the disk cache (so it never re-streams from the server), then
   /// played from that local file.
-  Future<void> _setupController(String url) async {
+  Future<void> _setupController(String rawUrl) async {
+    final url = normalizeMediaUrl(rawUrl);
+    if (url.isEmpty) return;
     VideoPlayerController controller;
-    try {
-      final file = await MediaCache.videoFile(url);
-      if (!mounted) return;
-      controller = VideoPlayerController.file(file);
-    } catch (_) {
-      // Cache miss/failure — fall back to streaming the network URL.
-      if (!mounted) return;
+    if (kIsWeb) {
       controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    } else {
+      try {
+        final file = await MediaCache.videoFile(url);
+        if (!mounted) return;
+        controller = VideoPlayerController.file(file);
+      } catch (_) {
+        // Cache miss/failure — fall back to streaming the network URL.
+        if (!mounted) return;
+        controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      }
     }
 
     // The widget may have been swapped to another post while the
     // cache download was in flight — bail if so.
-    if (!mounted || url != widget.url) {
+    if (!mounted || rawUrl != widget.url) {
       controller.dispose();
       return;
     }
@@ -1924,7 +1930,8 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
     super.initState();
     _muted = widget.muted;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+    final cleanUrl = normalizeMediaUrl(widget.url);
+    _controller = VideoPlayerController.networkUrl(Uri.parse(cleanUrl))
       ..setLooping(true)
       ..setVolume(_muted ? 0 : 1)
       ..addListener(_onTick)

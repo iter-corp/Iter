@@ -59,3 +59,35 @@ class MediaCache {
     await videos.emptyCache();
   }
 }
+
+/// Normalizes any legacy or relative media URL to a clean, absolute HTTPS URL.
+String normalizeMediaUrl(String? raw) {
+  if (raw == null) return '';
+  var url = raw.trim();
+  if (url.isEmpty) return '';
+
+  // 1. Rewrite legacy Supabase storage URLs
+  if (url.startsWith('https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public')) {
+    url = url.replaceFirst(
+      'https://htiwlasyspclmsyslaco.supabase.co/storage/v1/object/public',
+      'https://iterglobal.icu/uploads',
+    );
+  }
+
+  // 2. Rewrite legacy local IP URLs
+  if (url.contains(':3000/uploads/')) {
+    url = url.replaceFirst(RegExp(r'https?:\/\/[^\/]+:3000\/uploads\/'), 'https://iterglobal.icu/uploads/');
+  }
+
+  // 3. Resolve relative /uploads/... paths
+  if (url.startsWith('/uploads/')) {
+    url = 'https://iterglobal.icu$url';
+  }
+
+  // 4. Upgrade HTTP to HTTPS for domain
+  if (url.startsWith('http://iterglobal.icu')) {
+    url = url.replaceFirst('http://', 'https://');
+  }
+
+  return url;
+}

@@ -15,8 +15,21 @@ if (file_exists(__DIR__ . '/.backend_port')) {
 }
 
 $backendHost = "http://127.0.0.1:{$targetPort}";
-$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-$targetUrl = $backendHost . $requestUri;
+// Handle CORS preflight immediately
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, x-firebase-token, apikey, Range, X-Requested-With, Origin, Accept');
+    header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, Retry-After');
+    header('Access-Control-Max-Age: 86400');
+    http_response_code(204);
+    exit;
+}
+
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, x-firebase-token, apikey, Range, X-Requested-With, Origin, Accept');
+header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, Retry-After');
 
 $ch = curl_init($targetUrl);
 
