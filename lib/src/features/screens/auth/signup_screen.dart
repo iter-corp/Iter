@@ -164,7 +164,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return AuthDesktopWrapper(
       mobileContent: _buildMobileLayout(context),
       cardContent: _buildDesktopCardForm(context),
-      underCardWidget: _buildDesktopUnderCard(context),
     );
   }
 
@@ -337,33 +336,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopUnderCard(BuildContext context) {
-    return Center(
-      child: Text.rich(
-        TextSpan(
-          text: '${context.t.alreadyHaveAccount} ',
-          style: TextStyle(fontSize: 13, color: context.textMuted),
-          children: [
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: GestureDetector(
-                onTap: () => context.go('/login'),
-                child: Text(
-                  context.t.signIn,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFCE5DE5),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
