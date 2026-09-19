@@ -13,6 +13,10 @@ export function initFirebase() {
             firebaseInitialized = true;
             return true;
         }
+        if (env.NODE_ENV === 'development') {
+            console.log('ℹ️ [FCM] NODE_ENV is development — mobile push notifications are disabled in dev.');
+            return false;
+        }
         const keyConfig = env.FIREBASE_SERVICE_ACCOUNT_KEY;
         if (!keyConfig) {
             console.log('ℹ️ [FCM] FIREBASE_SERVICE_ACCOUNT_KEY not provided — running FCM in mock/log mode.');
