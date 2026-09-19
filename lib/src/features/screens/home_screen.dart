@@ -340,6 +340,8 @@ class _HomeBodyState extends ConsumerState<HomeBody> {
             return CustomScrollView(
               controller: widget.scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
+              // ignore: deprecated_member_use
+              cacheExtent: 2000.0,
               slivers: [
                 SliverToBoxAdapter(
                   child: Column(

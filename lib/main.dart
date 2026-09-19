@@ -49,6 +49,8 @@ Future<void> main() async {
   // these match). See https://docs.flutter.dev/testing/errors.
   ErrorReportService.instance.runGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    PaintingBinding.instance.imageCache.maximumSize = 2000;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 300 << 20; // 300 MB
 
     if (kIsWeb) {
       debugPrint = (String? message, {int? wrapWidth}) {
