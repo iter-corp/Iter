@@ -80,6 +80,7 @@ dependencies:
   country_state_city: ^0.1.6
   diacritic: ^0.1.6
   image_cropper: ^8.0.2
+  web_socket_channel: ^3.0.3
 
 dependency_overrides:
   # record 5.1.2 transitively pulls record_linux 0.7.2, which is incompatible
