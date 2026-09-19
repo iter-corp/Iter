@@ -45,14 +45,15 @@ final feedProvider = StreamProvider<List<Post>>((ref) {
   );
   if (currentUid == null) return const Stream.empty();
 
+  final postService = ref.watch(postServiceProvider);
   final followService = ref.watch(followServiceProvider);
   final blockedStream =
       ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
 
   return Rx.combineLatest3(
-    ref.watch(postServiceProvider).streamFeed().onErrorReturn(<Post>[]),
-    followService.getFollowing(currentUid).onErrorReturn(<String>[]),
-    blockedStream.onErrorReturn(<String>[]),
+    postService.streamFeed().startWith(postService.cachedFeed).onErrorReturn(<Post>[]),
+    followService.getFollowing(currentUid).startWith(const <String>[]).onErrorReturn(<String>[]),
+    blockedStream.startWith(const <String>[]).onErrorReturn(<String>[]),
     (List<Post> posts, List<String> following, List<String> blocked) {
       final allowed = {...following, currentUid};
       final blockedSet = blocked.toSet();
@@ -70,14 +71,15 @@ final qaFeedProvider = StreamProvider<List<Post>>((ref) {
   );
   if (currentUid == null) return const Stream.empty();
 
+  final postService = ref.watch(postServiceProvider);
   final followService = ref.watch(followServiceProvider);
   final blockedStream =
       ref.watch(blockServiceProvider).getBlockedUsers(currentUid);
 
   return Rx.combineLatest3(
-    ref.watch(postServiceProvider).streamQaFeed().onErrorReturn(<Post>[]),
-    followService.getFollowing(currentUid).onErrorReturn(<String>[]),
-    blockedStream.onErrorReturn(<String>[]),
+    postService.streamQaFeed().startWith(postService.cachedQaFeed).onErrorReturn(<Post>[]),
+    followService.getFollowing(currentUid).startWith(const <String>[]).onErrorReturn(<String>[]),
+    blockedStream.startWith(const <String>[]).onErrorReturn(<String>[]),
     (List<Post> posts, List<String> following, List<String> blocked) {
       final allowed = {...following, currentUid};
       final blockedSet = blocked.toSet();
@@ -161,15 +163,30 @@ final homeFeedProvider = Provider<AsyncValue<List<HomeFeedItem>>>((ref) {
 });
 
 /// Discuss threads made about one specific post (its `sourcePostId`) —
-/// shown on that post's own "swipe to see Discuss" panel. Reuses
-/// [qaFeedProvider]'s already-open stream rather than opening a new one
-/// per post card.
+/// shown on that post's own "swipe to see Discuss" panel.
 final postDiscussionsProvider =
-    Provider.family<AsyncValue<List<Post>>, String>((ref, postId) {
-  final qa = ref.watch(qaFeedProvider);
-  return qa.whenData(
-    (posts) => posts.where((p) => p.sourcePostId == postId).toList(),
-  );
+    StreamProvider.family<List<Post>, String>((ref, postId) async* {
+  final postService = ref.watch(postServiceProvider);
+
+  // 1. Instantly yield cached discussions for this post
+  final cached = postService.cachedQaFeed
+      .where((p) => p.sourcePostId == postId)
+      .toList();
+  yield cached;
+
+  // 2. Fetch specific discussions from backend API
+  try {
+    final directThreads = await postService.getPostDiscussions(postId);
+    if (directThreads.isNotEmpty || cached.isEmpty) {
+      yield directThreads;
+    }
+  } catch (_) {}
+
+  // 3. Keep listening to qaFeed updates for real-time reactivity
+  await for (final allQa in postService.streamQaFeed()) {
+    final matching = allQa.where((p) => p.sourcePostId == postId).toList();
+    yield matching;
+  }
 });
 
 final userPostsProvider = StreamProvider.family<List<Post>, String>((ref, uid) {

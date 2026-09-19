@@ -103,6 +103,13 @@ class UserService {
     }
   }
 
+  void cacheUser(String uid, Map<String, dynamic> data) {
+    _userCache[uid] = data;
+    if (!(_userStreams[uid]?.isClosed ?? true)) {
+      _userStreams[uid]?.add(data);
+    }
+  }
+
   Stream<Map<String, dynamic>?> streamUser(String uid) {
     if (!_userStreams.containsKey(uid) || _userStreams[uid]!.isClosed) {
       _userStreams[uid] = StreamController<Map<String, dynamic>?>.broadcast();

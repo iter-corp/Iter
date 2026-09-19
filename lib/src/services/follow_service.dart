@@ -183,10 +183,8 @@ class FollowService {
   Stream<List<String>> getFollowing(String uid) {
     if (!_followingSubjects.containsKey(uid) ||
         _followingSubjects[uid]!.isClosed) {
-      final cached = _followingMap[uid]?.toList();
-      _followingSubjects[uid] = cached != null
-          ? BehaviorSubject<List<String>>.seeded(cached)
-          : BehaviorSubject<List<String>>();
+      final cached = _followingMap[uid]?.toList() ?? const <String>[];
+      _followingSubjects[uid] = BehaviorSubject<List<String>>.seeded(cached);
     }
 
     refreshFollowing(uid);
@@ -196,8 +194,25 @@ class FollowService {
   Future<void> refreshFollowing(String uid) async {
     try {
       final res = await ApiClient.instance.get('/users/$uid/following');
-      if (res is List) {
-        final list = res.map((e) => e.toString()).toList();
+      final list = <String>[];
+      final dynamic raw = res is Map<String, dynamic> && res.containsKey('data')
+          ? res['data']
+          : res;
+
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Map) {
+            final id = (item['id'] ?? item['uid'])?.toString();
+            if (id != null && id.isNotEmpty) {
+              list.add(id);
+              if (item is Map<String, dynamic>) {
+                UserService().cacheUser(id, item);
+              }
+            }
+          } else if (item != null) {
+            list.add(item.toString());
+          }
+        }
         _followingMap[uid] = list.toSet();
         if (!(_followingSubjects[uid]?.isClosed ?? true)) {
           _followingSubjects[uid]?.add(list);
@@ -211,10 +226,8 @@ class FollowService {
   Stream<List<String>> getFollowers(String uid) {
     if (!_followersSubjects.containsKey(uid) ||
         _followersSubjects[uid]!.isClosed) {
-      final cached = _followersMap[uid]?.toList();
-      _followersSubjects[uid] = cached != null
-          ? BehaviorSubject<List<String>>.seeded(cached)
-          : BehaviorSubject<List<String>>();
+      final cached = _followersMap[uid]?.toList() ?? const <String>[];
+      _followersSubjects[uid] = BehaviorSubject<List<String>>.seeded(cached);
     }
 
     refreshFollowers(uid);
