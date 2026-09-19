@@ -13,6 +13,8 @@ import '../features/screens/auth/otp_screen.dart';
 import '../features/screens/auth/signup_screen.dart';
 import '../features/screens/auth/splash_screen.dart';
 import '../features/screens/language_screen.dart';
+import '../features/screens/notification_screen.dart';
+import '../features/screens/profile_settings_screen.dart';
 import '../providers/auth_providers.dart';
 import '../services/error_report_service.dart';
 
@@ -120,6 +122,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/', redirect: (_, __) => '/home'),
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
@@ -142,7 +145,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/app-intro',
         builder: (_, __) => const AppIntroScreen(),
       ),
-      GoRoute(path: '/home', builder: (_, __) => const MainScreen()),
+      GoRoute(path: '/home', builder: (_, __) => const MainScreen(initialTab: 0)),
+      GoRoute(path: '/events', builder: (_, __) => const MainScreen(initialTab: 1)),
+      GoRoute(path: '/explore', builder: (_, __) => const MainScreen(initialTab: 2)),
+      GoRoute(path: '/messages', builder: (_, __) => const MainScreen(initialTab: 3)),
+      GoRoute(path: '/profile', builder: (_, __) => const MainScreen(initialTab: 4)),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (_, __) => const ProfileSettingsScreen(),
+      ),
       GoRoute(
         path: '/language',
         builder: (_, __) => const LanguageScreen(),
