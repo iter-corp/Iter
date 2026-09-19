@@ -43,7 +43,10 @@ class PostCard extends ConsumerStatefulWidget {
 }
 
 class _PostCardState extends ConsumerState<PostCard>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   // Optimistic UI: non-null while a like toggle is in-flight.
   bool? _pendingLike;
   // null = follow the default (raised for all post types so the caption is
@@ -72,13 +75,14 @@ class _PostCardState extends ConsumerState<PostCard>
   }
 
   // Carousel state for multi-image posts.
-  final PageController _pageController = PageController();
+  late final PageController _pageController;
   int _currentPage = 0;
 
   // Outer carousel: page 0 is Discuss threads (swipe right to reach it),
   // page 1 (the default) is the post itself.
-  final PageController _discussPageController =
-      PageController(initialPage: 1);
+  // keepPage: false ensures PageStorage never accidentally restores page 0 (Discuss)
+  // when recycling or scrolling back up in a feed list.
+  late final PageController _discussPageController;
 
   // Double-tap-to-like heart burst animation. Driven once per double tap;
   // a value of 0 means the overlay is hidden.
@@ -86,6 +90,13 @@ class _PostCardState extends ConsumerState<PostCard>
     vsync: this,
     duration: const Duration(milliseconds: 700),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(keepPage: false);
+    _discussPageController = PageController(initialPage: 1, keepPage: false);
+  }
 
   @override
   void dispose() {
@@ -161,6 +172,7 @@ class _PostCardState extends ConsumerState<PostCard>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final post = widget.post;
     final userData = ref.watch(userByUidProvider(post.authorUid)).value;
     final avatarUrl = (userData?['avatarUrl'] as String?) ?? post.authorAvatar;
@@ -222,6 +234,7 @@ class _PostCardState extends ConsumerState<PostCard>
           // right from the post to reach it); page 1 is the post itself,
           // unchanged below.
           child: PageView(
+            key: PageStorageKey('post_discuss_view_${post.id}'),
             controller: _discussPageController,
             physics: const ClampingScrollPhysics(),
             children: [
@@ -245,7 +258,9 @@ class _PostCardState extends ConsumerState<PostCard>
                     : hasImage
                         ? (isMulti
                             ? PageView.builder(
+                                key: PageStorageKey('post_images_view_${post.id}'),
                                 controller: _pageController,
+                                physics: const ClampingScrollPhysics(),
                                 itemCount: imageCount,
                                 onPageChanged: (i) =>
                                     setState(() => _currentPage = i),
@@ -261,7 +276,7 @@ class _PostCardState extends ConsumerState<PostCard>
                                     ),
                                   ),
                                   child: CachedNetworkImage(
-                                    imageUrl: post.imageUrls[i],
+                                    imageUrl: normalizeMediaUrl(post.imageUrls[i]),
                                     cacheManager: kIsWeb ? null : MediaCache.images,
                                     fit: BoxFit.cover,
                                     placeholder: (_, __) => Container(
@@ -298,7 +313,7 @@ class _PostCardState extends ConsumerState<PostCard>
                                   ),
                                 ),
                                 child: CachedNetworkImage(
-                                  imageUrl: post.imageUrls.first,
+                                  imageUrl: normalizeMediaUrl(post.imageUrls.first),
                                   cacheManager: kIsWeb ? null : MediaCache.images,
                                   fit: BoxFit.cover,
                                   placeholder: (_, __) => Container(
