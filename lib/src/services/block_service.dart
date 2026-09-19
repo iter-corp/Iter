@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 import 'api_client.dart';
 
 class BlockService {
@@ -8,7 +9,7 @@ class BlockService {
   BlockService._internal();
 
   final Map<String, Set<String>> _blockedMap = {};
-  final Map<String, StreamController<List<String>>> _blockedControllers = {};
+  final Map<String, BehaviorSubject<List<String>>> _blockedSubjects = {};
 
   Future<void> blockUser({
     required String currentUid,
@@ -19,7 +20,7 @@ class BlockService {
     try {
       await ApiClient.instance.post('/users/$targetUid/block');
       _blockedMap.putIfAbsent(currentUid, () => {}).add(targetUid);
-      _blockedControllers[currentUid]?.add(_blockedMap[currentUid]!.toList());
+      _blockedSubjects[currentUid]?.add(_blockedMap[currentUid]!.toList());
     } catch (e) {
       debugPrint('[BlockService] blockUser error: $e');
     }
@@ -34,7 +35,8 @@ class BlockService {
     try {
       await ApiClient.instance.delete('/users/$targetUid/block');
       _blockedMap[currentUid]?.remove(targetUid);
-      _blockedControllers[currentUid]?.add(_blockedMap[currentUid]?.toList() ?? []);
+      _blockedSubjects[currentUid]
+          ?.add(_blockedMap[currentUid]?.toList() ?? []);
     } catch (e) {
       debugPrint('[BlockService] unblockUser error: $e');
     }
@@ -58,14 +60,10 @@ class BlockService {
   }
 
   Stream<List<String>> getBlockedUsers(String uid) {
-    if (!_blockedControllers.containsKey(uid) || _blockedControllers[uid]!.isClosed) {
-      _blockedControllers[uid] = StreamController<List<String>>.broadcast();
+    if (!_blockedSubjects.containsKey(uid) || _blockedSubjects[uid]!.isClosed) {
+      final initial = _blockedMap[uid]?.toList() ?? const <String>[];
+      _blockedSubjects[uid] = BehaviorSubject<List<String>>.seeded(initial);
     }
-
-    if (_blockedMap.containsKey(uid)) {
-      Timer.run(() => _blockedControllers[uid]?.add(_blockedMap[uid]!.toList()));
-    }
-
-    return _blockedControllers[uid]!.stream;
+    return _blockedSubjects[uid]!.stream;
   }
 }

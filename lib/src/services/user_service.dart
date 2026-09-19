@@ -88,13 +88,6 @@ class UserService {
   final Map<String, StreamController<Map<String, dynamic>?>> _userStreams = {};
   final Map<String, Map<String, dynamic>> _userCache = {};
 
-  void cacheUser(String uid, Map<String, dynamic> data) {
-    _userCache[uid] = data;
-    if (_userStreams.containsKey(uid) && !(_userStreams[uid]!.isClosed)) {
-      _userStreams[uid]!.add(data);
-    }
-  }
-
   Future<Map<String, dynamic>?> getUser(String uid) async {
     try {
       final res = await ApiClient.instance.get('/users/$uid');
@@ -110,29 +103,28 @@ class UserService {
     }
   }
 
-  Stream<Map<String, dynamic>?> streamUser(String uid) async* {
+  void cacheUser(String uid, Map<String, dynamic> data) {
+    _userCache[uid] = data;
+    if (!(_userStreams[uid]?.isClosed ?? true)) {
+      _userStreams[uid]?.add(data);
+    }
+  }
+
+  Stream<Map<String, dynamic>?> streamUser(String uid) {
     if (!_userStreams.containsKey(uid) || _userStreams[uid]!.isClosed) {
       _userStreams[uid] = StreamController<Map<String, dynamic>?>.broadcast();
     }
 
     if (_userCache.containsKey(uid)) {
-      yield _userCache[uid];
+      Timer.run(() {
+        if (!(_userStreams[uid]?.isClosed ?? true)) {
+          _userStreams[uid]!.add(_userCache[uid]);
+        }
+      });
     }
 
-    try {
-      final user = await getUser(uid);
-      if (user != null) {
-        yield user;
-      } else if (!_userCache.containsKey(uid)) {
-        yield null;
-      }
-    } catch (_) {
-      if (!_userCache.containsKey(uid)) {
-        yield null;
-      }
-    }
-
-    yield* _userStreams[uid]!.stream;
+    getUser(uid);
+    return _userStreams[uid]!.stream;
   }
 
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {

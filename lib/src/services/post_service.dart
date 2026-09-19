@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/model/post_model.dart';
@@ -102,11 +103,11 @@ class PostService {
   final Map<String, StreamController<bool>> _saveControllers = {};
   final Map<String, bool> _saveState = {};
 
-  // Broadcast stream controller for global feeds
-  final StreamController<List<Post>> _feedController =
-      StreamController<List<Post>>.broadcast();
-  final StreamController<List<Post>> _qaFeedController =
-      StreamController<List<Post>>.broadcast();
+  // Reactive stream controller for global feeds
+  final BehaviorSubject<List<Post>> _feedController =
+      BehaviorSubject<List<Post>>.seeded(const <Post>[]);
+  final BehaviorSubject<List<Post>> _qaFeedController =
+      BehaviorSubject<List<Post>>.seeded(const <Post>[]);
 
   List<Post> _cachedFeed = [];
   List<Post> _cachedQaFeed = [];
@@ -299,6 +300,27 @@ class PostService {
         _qaFeedController.add(_cachedQaFeed);
       }
     }
+  }
+
+  Future<List<Post>> getPostDiscussions(String postId) async {
+    try {
+      final res = await ApiClient.instance.get('/posts', queryParams: {
+        'sourcePostId': postId,
+        'limit': '50',
+      });
+      if (res is List) {
+        return res
+            .whereType<Map<String, dynamic>>()
+            .map((m) {
+              _updatePostLocalState(m);
+              return Post.fromJson(m);
+            })
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[PostService] getPostDiscussions error for $postId: $e');
+    }
+    return const <Post>[];
   }
 
   Stream<List<Post>> streamUserPosts(String uid) async* {

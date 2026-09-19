@@ -183,10 +183,8 @@ class FollowService {
   Stream<List<String>> getFollowing(String uid) {
     if (!_followingSubjects.containsKey(uid) ||
         _followingSubjects[uid]!.isClosed) {
-      final cached = _followingMap[uid]?.toList();
-      _followingSubjects[uid] = cached != null
-          ? BehaviorSubject<List<String>>.seeded(cached)
-          : BehaviorSubject<List<String>>();
+      final cached = _followingMap[uid]?.toList() ?? const <String>[];
+      _followingSubjects[uid] = BehaviorSubject<List<String>>.seeded(cached);
     }
 
     refreshFollowing(uid);
@@ -228,10 +226,8 @@ class FollowService {
   Stream<List<String>> getFollowers(String uid) {
     if (!_followersSubjects.containsKey(uid) ||
         _followersSubjects[uid]!.isClosed) {
-      final cached = _followersMap[uid]?.toList();
-      _followersSubjects[uid] = cached != null
-          ? BehaviorSubject<List<String>>.seeded(cached)
-          : BehaviorSubject<List<String>>();
+      final cached = _followersMap[uid]?.toList() ?? const <String>[];
+      _followersSubjects[uid] = BehaviorSubject<List<String>>.seeded(cached);
     }
 
     refreshFollowers(uid);
